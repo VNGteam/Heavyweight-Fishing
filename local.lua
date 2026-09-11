@@ -5654,35 +5654,111 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         isTrainingBusy = true
                         task.spawn(function()
                             local chosenSkill = Config.TrainSkill or "Z"
+                            local cleanKey = chosenSkill:match("([ZXCVzxcv])") or chosenSkill
+                            cleanKey = cleanKey:upper()
 
-                            -- 1. Chờ nhịp minigame ổn định (0.08s) để game nhận lệnh skill
-                            task.wait(0.08)
-
-                            -- 2. Nhấn tung chiêu luyện
-                            if Events and Events:FindFirstChild("UseSkill") then
-                                Events.UseSkill:FireServer(chosenSkill)
-                            end
-                            if Events and Events:FindFirstChild("TriggerMinigameSkill") then
-                                Events.TriggerMinigameSkill:FireServer(chosenSkill)
-                            end
-                            pcall(function()
-                                local vim = game:GetService("VirtualInputManager")
-                                local kCode = Enum.KeyCode[chosenSkill]
-                                if vim and kCode then
-                                    vim:SendKeyEvent(true, kCode, false, game)
-                                    task.wait(0.03)
-                                    vim:SendKeyEvent(false, kCode, false, game)
+                            -- Nhịp 1: Chờ minigame thực sự sẵn sàng nhận đòn (0.35s)
+                            -- Trong lúc chờ, tự giữ cân bằng bar để cá không tuột
+                            local waitStart = tick()
+                            while (tick() - waitStart) < 0.35 do
+                                if fUI and fUI.Visible then
+                                    local barFrame = fUI:FindFirstChild("BarFrame")
+                                    if barFrame and barFrame:FindFirstChild("Bar") then
+                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                    end
                                 end
-                            end)
+                                task.wait(0.05)
+                            end
+
+                            -- Nếu chiêu đang bị Cooldown từ lần trước: giữ cá chờ hết Cooldown rồi mới tung!
+                            local cdWaitStart = tick()
+                            while isRunning and IsSkillOnCooldown(cleanKey, fUI) and (tick() - cdWaitStart) < 12.0 do
+                                if fUI and fUI.Visible then
+                                    local barFrame = fUI:FindFirstChild("BarFrame")
+                                    if barFrame and barFrame:FindFirstChild("Bar") then
+                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                    end
+                                end
+                                task.wait(0.1)
+                            end
+
+                            -- Nhịp 2: Tung chiêu luyện (Bắn nhịp liên tục kết hợp Remote + Phím + Click GUI cho đến khi skill thực sự xuất ra)
+                            local initialFishHp = GetFishHealth(fUI)
+                            local pulseStart = tick()
+
+                            while isRunning and (tick() - pulseStart) < 1.2 do
+                                -- Remote Events
+                                if Events and Events:FindFirstChild("UseSkill") then
+                                    Events.UseSkill:FireServer(cleanKey)
+                                end
+                                if Events and Events:FindFirstChild("TriggerMinigameSkill") then
+                                    Events.TriggerMinigameSkill:FireServer(cleanKey)
+                                end
+
+                                -- VirtualInputManager Phím bấm
+                                pcall(function()
+                                    local vim = game:GetService("VirtualInputManager")
+                                    local kCode = Enum.KeyCode[cleanKey]
+                                    if vim and kCode then
+                                        vim:SendKeyEvent(true, kCode, false, game)
+                                        task.wait(0.02)
+                                        vim:SendKeyEvent(false, kCode, false, game)
+                                    end
+                                end)
+
+                                -- Click trực tiếp nút GUI trên màn hình
+                                pcall(function()
+                                    if not fUI then return end
+                                    for _, d in ipairs(fUI:GetDescendants()) do
+                                        local dUpper = d.Name:upper()
+                                        if (dUpper == cleanKey or dUpper:find("SKILL" .. cleanKey) or dUpper:find("SLOT" .. cleanKey) or dUpper:find("BUTTON" .. cleanKey)) then
+                                            local btn = d:IsA("GuiButton") and d or d:FindFirstChildOfClass("TextButton") or d:FindFirstChildOfClass("ImageButton")
+                                            if btn and btn.Visible then
+                                                if firesignal then
+                                                    pcall(function() firesignal(btn.MouseButton1Click) end)
+                                                    pcall(function() firesignal(btn.Activated) end)
+                                                    pcall(function() firesignal(btn.MouseButton1Down) end)
+                                                end
+                                                local vim = game:GetService("VirtualInputManager")
+                                                if vim and btn.AbsoluteSize.X > 0 then
+                                                    local cx = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
+                                                    local cy = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
+                                                    vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+                                                    task.wait(0.01)
+                                                    vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
+                                                end
+                                            end
+                                        end
+                                    end
+                                end)
+
+                                if fUI and fUI.Visible then
+                                    local barFrame = fUI:FindFirstChild("BarFrame")
+                                    if barFrame and barFrame:FindFirstChild("Bar") then
+                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                    end
+                                end
+
+                                task.wait(0.06)
+
+                                -- Kiểm tra xem chiêu đã bắt đầu xuất ra chưa:
+                                local curHp = GetFishHealth(fUI)
+                                local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
+                                local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
+
+                                if nowOnCd or hpDropped or (tick() - pulseStart >= 0.45) then
+                                    break
+                                end
+                            end
 
                             Config.TrainCurrentCount = Config.TrainCurrentCount + 1
                             if infoTrainProgress and infoTrainProgress.Set then
-                                infoTrainProgress.Set(string.format("%d / %d lần (Vừa cast: %s)", Config.TrainCurrentCount, Config.TrainTargetCount, chosenSkill))
+                                infoTrainProgress.Set(string.format("%d / %d lần (Vừa cast: %s)", Config.TrainCurrentCount, Config.TrainTargetCount, cleanKey))
                             end
 
                             if Config.TrainCurrentCount >= Config.TrainTargetCount then
                                 Config.AutoTrainSkill = false
-                                ShowNotification("Luyện Chiêu Hoàn Tất", string.format("Đã luyện đủ %d/%d lần cho chiêu %s!", Config.TrainCurrentCount, Config.TrainTargetCount, chosenSkill), "SUCCESS", 7)
+                                ShowNotification("Luyện Chiêu Hoàn Tất", string.format("Đã luyện đủ %d/%d lần cho chiêu %s!", Config.TrainCurrentCount, Config.TrainTargetCount, cleanKey), "SUCCESS", 7)
                                 pcall(function()
                                     local c = LocalPlayer.Character
                                     local h = c and c:FindFirstChildOfClass("Humanoid")
@@ -5692,11 +5768,20 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 return
                             end
 
-                            -- 3. Nhịp chờ skill bắt đầu thi triển và server ghi nhận đòn đánh (0.x giây theo cấu hình, mặc định 0.45s)
+                            -- Nhịp 3: Đợi nhân vật thực hiện hoạt ảnh đòn đánh (0.x giây theo cấu hình, mặc định 0.45s)
                             local cancelDelay = tonumber(Config.TrainCancelDelay) or 0.45
-                            task.wait(cancelDelay)
+                            local animStart = tick()
+                            while (tick() - animStart) < cancelDelay do
+                                if fUI and fUI.Visible then
+                                    local barFrame = fUI:FindFirstChild("BarFrame")
+                                    if barFrame and barFrame:FindFirstChild("Bar") then
+                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                    end
+                                end
+                                task.wait(0.05)
+                            end
 
-                            -- 4. Cất cần vào túi (UnequipTools) để hủy cá & đóng minigame ngay lập tức
+                            -- Nhịp 4: Cất cần vào túi (UnequipTools) để hủy cá & đóng minigame ngay lập tức
                             local rodSlot = "1"
                             local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
                             if pData and pData:FindFirstChild("Hotbar") then
@@ -5715,7 +5800,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 if h then h:UnequipTools() end
                             end)
 
-                            -- 5. Đợi 0.25s để server dọn dẹp minigame, sau đó lấy cần ra lại
+                            -- Nhịp 5: Đợi 0.25s để server dọn dẹp minigame, sau đó lấy cần ra lại
                             task.wait(0.25)
                             pcall(function()
                                 if Events and Events:FindFirstChild("ToggleHotbar") then
@@ -5730,7 +5815,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
                             end)
 
-                            -- 6. Đợi cần cầm lên tay hoàn tất (0.25s) rồi quăng cần xuống nước câu lại ngay
+                            -- Nhịp 6: Đợi cần cầm lên tay hoàn tất (0.25s) rồi quăng cần xuống nước câu lại ngay
                             task.wait(0.25)
                             local c2 = LocalPlayer.Character
                             local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
@@ -5739,7 +5824,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 lastCastTime = tick()
                             end
 
-                            -- 7. Cho phép vòng lặp tiếp theo sau khi đã quăng cần xong
+                            -- Nhịp 7: Cho phép vòng lặp tiếp theo sau khi đã quăng cần xong
                             task.wait(0.35)
                             isTrainingBusy = false
                         end)
