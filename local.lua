@@ -1486,7 +1486,23 @@ createSliderRow(comboCard, "Số Lần Dùng Chiêu Mở Màn", "Số lần tung
     Config.OpenerMaxCount = v
 end)
 
-local loopOptions = {"X, C", "X, C, V", "Z, X, C", "Z, X, C, V", "C, V", "Z, X"}
+local loopOptions = {
+    "X, V",
+    "X, C",
+    "C, V",
+    "Z, X",
+    "Z, C",
+    "Z, V",
+    "X, C, V",
+    "Z, X, C",
+    "Z, X, V",
+    "Z, C, V",
+    "Z, X, C, V",
+    "Z",
+    "X",
+    "C",
+    "V"
+}
 createDropdownRow(comboCard, "Chuỗi Đảo Chiêu Luân Phiên", "Các chiêu đánh xoay vòng liên tục, tự bỏ qua chiêu đang hồi", loopOptions, Config.LoopSkills, function(v)
     Config.LoopSkills = v
 end)
