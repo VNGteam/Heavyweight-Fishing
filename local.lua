@@ -3206,9 +3206,16 @@ createButtonRow(dailyCard, "Nhận Hết Quà 7 Ngày", "Nhận nhanh toàn bộ
     end)
 end)
 
-createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập toàn bộ hơn 90 mã giftcode (PVP, SoTamOrb, 19KActives, mốc Likes & Visits...)", "Nhập Code", function()
+createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập toàn bộ hơn 100 mã giftcode (65KLikes, 41MVisits, PVP, SoTamOrb...)", "Nhập Code", function()
     local codes = {
-        -- Mã mới nhất & Đang hoạt động
+        -- Mã mới nhất từ thông báo game (Update mới nhất)
+        "65KLikes",
+        "41MVisits",
+        "40MVisits",
+        "39MVisits",
+        "38MVisits",
+        "37MVisits",
+        -- Mã đang hoạt động & hot
         "PVP",
         "19KActives",
         "WaitForPeak",
@@ -3222,7 +3229,6 @@ createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập to
         "AXO",
         "TaijiEvo",
         "NewSeason",
-        "40MVisits",
         "33MVisits",
         "32MVisits",
         "31MVisits",
