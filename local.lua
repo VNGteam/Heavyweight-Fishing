@@ -213,6 +213,14 @@ local Config = {
     AntiAFK = true,
     AutoRejoin = false,
     AutoExecuteOnJoin = false,
+    AutoProtectMutations = true,
+    AcidWaterShield = true,
+    ShowFishWeightRing = true,
+    WebhookEnabled = false,
+    WebhookUrl = "",
+    WebhookNotifyBoss = true,
+    WebhookHourlyStats = true,
+    WebhookStatsInterval = 30,
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End,
     ActiveProfile = "default",
@@ -854,6 +862,31 @@ local function createInfoRow(parent, labelText, valueText, indexSearch)
     return {frame = row, Set = function(nv) vl.Text = nv end}
 end
 
+local function createInputRow(parent, labelText, descText, initialVal, callback, indexSearch)
+    local row = createBaseRow(parent, labelText, descText, indexSearch)
+    local tb = Instance.new("TextBox")
+    tb.Size = UDim2.new(0, 160, 0, 24)
+    tb.Position = UDim2.new(1, -160, 0.5, -12)
+    tb.BackgroundColor3 = Colors.InputBg
+    tb.Font = Enum.Font.Gotham
+    tb.Text = initialVal or ""
+    tb.PlaceholderText = "Dán link vào đây..."
+    tb.PlaceholderColor3 = Colors.TextMuted
+    tb.TextColor3 = Colors.TextWhite
+    tb.TextSize = 11
+    tb.ClearTextOnFocus = false
+    tb.BorderSizePixel = 0
+    tb.Parent = row
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
+    local s = Instance.new("UIStroke", tb)
+    s.Color = Colors.BorderSubtle
+    s.Thickness = 1
+    tb.FocusLost:Connect(function(enterPressed)
+        if type(callback) == "function" then callback(tb.Text) end
+    end)
+    return {frame = row, Set = function(val) tb.Text = val end, Get = function() return tb.Text end}
+end
+
 -- ============================================================
 -- SECRET BOSS DATABASE & CHAT HUNTER LOGIC
 -- ============================================================
@@ -1004,6 +1037,50 @@ local secretBossState = {
 
 local statusLabelSecretBoss = nil
 local bossTogglesMap = {}
+
+local weatherTotems = {
+    {name = "Totem Bão Sấm (Bamboo Isle)", island = "Đảo Tre (Bamboo Isle)", weather = "Thunderstorm (Bão Sấm)", pos = Vector3.new(-1242.0, 8.5, -195.0)},
+    {name = "Totem Bão Tuyết (Frost Isle)", island = "Đảo Băng (Frost Isle)", weather = "Snowy (Bão Tuyết)", pos = Vector3.new(-1390.0, 10.2, -1515.0)},
+    {name = "Totem Sương Mù (Coconut Isle)", island = "Đảo Quả Dừa (Coconut Isle)", weather = "Foggy (Sương Mù)", pos = Vector3.new(1475.0, 9.8, -1415.0)},
+    {name = "Totem Nắng Gắt (Amber Isle)", island = "Đảo Hổ Phách (Amber Isle)", weather = "Blazing Sun (Nắng Gắt)", pos = Vector3.new(1275.0, 9.5, 1450.0)},
+}
+
+local sessionStartTime = tick()
+local initialCash = nil
+local initialFishCaught = nil
+local initialGems = nil
+local lastWebhookStatsTime = tick()
+
+local function SendDiscordWebhook(title, description, color, fields)
+    if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
+    pcall(function()
+        local embed = {
+            title = title or "Heavyweight Fishing Bot",
+            description = description or "",
+            color = color or 11029759,
+            fields = fields or {},
+            footer = {text = "Identical Hub • Heavyweight Fishing V1.4"},
+            timestamp = DateTime.now():ToIsoDate()
+        }
+        local payload = {
+            username = "Heavyweight Fishing Monitor",
+            avatar_url = "https://www.roblox.com/headshot-thumbnail/image?userId=" .. tostring(LocalPlayer.UserId) .. "&width=150&height=150&format=png",
+            embeds = {embed}
+        }
+        local body = HttpService:JSONEncode(payload)
+        local headers = {["Content-Type"] = "application/json"}
+
+        local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
+        if reqFunc then
+            reqFunc({
+                Url = Config.WebhookUrl,
+                Method = "POST",
+                Headers = headers,
+                Body = body
+            })
+        end
+    end)
+end
 
 local function GetPlayerRodPower()
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
@@ -1311,6 +1388,10 @@ local infoEquippedRod = createInfoRow(statsCard, "Cần Đang Dùng", "Chưa có
 local infoEquippedBait = createInfoRow(statsCard, "Mồi Đang Dùng", "Chưa có")
 local infoFishCaught = createInfoRow(statsCard, "Tổng Cá Đã Câu", "0 con")
 local infoCash = createInfoRow(statsCard, "Tiền Hiện Tại", "$0")
+local infoUptime = createInfoRow(statsCard, "Thời Gian Treo Máy", "00:00:00")
+local infoFishPerHour = createInfoRow(statsCard, "Tốc Độ Câu (Fish/h)", "0 con/h")
+local infoCashPerHour = createInfoRow(statsCard, "Tốc Độ Kiếm Tiền", "$0 /h")
+local infoGemsGained = createInfoRow(statsCard, "Gems Thu Được", "+0 Gems")
 
 createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
 local fishCard = createCardGroup(tabFishing)
@@ -1471,7 +1552,33 @@ end)
 local fishList = {"Colossal Tigerfish", "Heavenpiercer Turtle", "Golden Guardian Fish", "Crimson Electric Eel", "Frost Kingfish", "Ascended Perch", "Primordial Kunfish Overlord", "Warbringer Shark", "Mountain Fish", "Tiger Mirefish", "Mirage Lanternfish", "Octoparasitic Fish", "Elder Scarlet Fish", "Verdant Bonefang", "Draconic Koi", "Sanguine Fish", "Flying Fish Emperor", "Reborn Puffer Beast"}
 createToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá quý hiếm đã chọn, không bao giờ bị bán nhầm", Config.AutoFavouriteFish, function(v) Config.AutoFavouriteFish = v end)
 createDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName, function(v) Config.FavouriteFishName = v end)
+createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
 createToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
+
+createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)")
+local totemCard = createCardGroup(tabBoss)
+
+for _, t in ipairs(weatherTotems) do
+    createButtonRow(totemCard, t.name, "Bay đến và kích hoạt: " .. t.weather, "Kích Hoạt", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(t.pos + Vector3.new(0, 3, 0))
+            ShowNotification("Bàn Thờ Thời Tiết", "Đã đến " .. t.name .. "! Đang tương tác...", "SUCCESS", 4)
+            task.wait(0.4)
+            pcall(function()
+                for _, d in ipairs(Workspace:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
+                        local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
+                        if (pPos - t.pos).Magnitude <= 35 then
+                            TriggerPrompt(d)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end
 
 createCategoryHeader(tabBoss, "Boss Bạch Tuộc Bí Mật (Octoparasite)")
 local octoCard = createCardGroup(tabBoss)
@@ -1924,6 +2031,7 @@ createToggleRow(espCard, "ESP Đạo Sĩ (Taoist)", "Hiện vị trí NPC hoặc
 createToggleRow(espCard, "ESP Trùm Boss", "Hiện vị trí các Boss đang xuất hiện", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
 createToggleRow(espCard, "ESP Người Chơi", "Hiện khung & khoảng cách đến người chơi khác", Config.ESP_Players, function(v) Config.ESP_Players = v end)
 createToggleRow(espCard, "Vòng Tròn Định Vị Cá", "Hiện vòng tròn đỏ dưới nước chỉ đúng con cá cắn câu", Config.FishRedRing, function(v) Config.FishRedRing = v end)
+createToggleRow(espCard, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ", "Hiển thị tên cá, cân nặng (kg) và loại đột biến trực tiếp trên vòng định vị", Config.ShowFishWeightRing, function(v) Config.ShowFishWeightRing = v end)
 
 createCategoryHeader(tabVisuals, "Ánh Sáng & Tối Ưu Giảm Lag")
 local perfCard = createCardGroup(tabVisuals)
@@ -2034,6 +2142,7 @@ createToggleRow(moveCard, "Bay Lượn Tự Do (Fly)", "Bay tự do trên không
 createSliderRow(moveCard, "Tốc Độ Bay", "Tốc độ di chuyển khi bay", 20, 150, Config.FlySpeed, false, "", function(v) Config.FlySpeed = v end)
 createToggleRow(moveCard, "Nhảy Vô Hạn (Infinite Jump)", "Nhảy liên tục trên không trung không giới hạn", Config.InfiniteJump, function(v) Config.InfiniteJump = v end)
 createToggleRow(moveCard, "Đi Trên Mặt Nước", "Đi bộ trên mặt biển như trên đất liền", Config.WalkOnWater, function(v) Config.WalkOnWater = v end)
+createToggleRow(moveCard, "Khiên Nước Axit (Acid Shield)", "Tạo sàn nổi kháng sát thương độc/axit tại Đảo Fallout", Config.AcidWaterShield, function(v) Config.AcidWaterShield = v end)
 createToggleRow(moveCard, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua vách núi, tường rào và vật cản", Config.Noclip, function(v) Config.Noclip = v end)
 
 createCategoryHeader(tabPlayer, "Chống Văng Game & Ổn Định")
@@ -2061,6 +2170,51 @@ createButtonRow(profCard, "Nạp Cấu Hình (Load)", "Tải lại các cài đ�
 end)
 
 createToggleRow(profCard, "Tự Nạp Khi Chạy Script", "Tự động nạp cài đặt đã lưu khi mở script", Config.AutoLoadProfile, function(v) Config.AutoLoadProfile = v end)
+
+createCategoryHeader(tabProfiles, "📢 Discord Webhook Báo Cáo Từ Xa")
+local hookCard = createCardGroup(tabProfiles)
+
+createInputRow(hookCard, "Webhook URL", "Dán URL Webhook từ máy chủ Discord của bạn vào đây", Config.WebhookUrl or "", function(txt)
+    Config.WebhookUrl = txt
+end)
+
+createToggleRow(hookCard, "Bật Webhook", "Kích hoạt gửi thông báo về Discord", Config.WebhookEnabled, function(v)
+    Config.WebhookEnabled = v
+end)
+
+createToggleRow(hookCard, "Thông Báo Bắt Được Boss", "Gửi tin nhắn khi câu trúng hoặc bắt thành công Boss / Cá Thần Thoại", Config.WebhookNotifyBoss, function(v)
+    Config.WebhookNotifyBoss = v
+end)
+
+createToggleRow(hookCard, "Báo Cáo Định Kỳ (Mỗi 30 Phút)", "Gửi bảng tổng kết thời gian treo máy, số cá và tiền kiếm được", Config.WebhookHourlyStats, function(v)
+    Config.WebhookHourlyStats = v
+end)
+
+createButtonRow(hookCard, "Kiểm Tra Webhook (Test)", "Gửi thử 1 thông báo mẫu về Discord ngay lập tức", "Gửi Test", function()
+    if not Config.WebhookUrl or Config.WebhookUrl == "" then
+        ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN")
+        return
+    end
+    ShowNotification("Webhook", "Đang gửi tin nhắn test...", "INFO")
+    task.spawn(function()
+        local ok = pcall(function()
+            SendDiscordWebhook(
+                "🔔 Test Webhook - Heavyweight Fishing",
+                "Kết nối Webhook thành công từ tài khoản: **" .. (LocalPlayer and LocalPlayer.Name or "Unknown") .. "**!",
+                3066993,
+                {
+                    { name = "Trạng Thái", value = "✅ Hoạt Động Tốt", inline = true },
+                    { name = "Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
+                }
+            )
+        end)
+        if ok then
+            ShowNotification("Webhook", "Đã gửi lệnh test đến Discord!", "SUCCESS")
+        else
+            ShowNotification("Webhook", "Gửi thất bại! Kiểm tra lại URL Webhook.", "ERROR")
+        end
+    end)
+end)
 
 createCategoryHeader(tabProfiles, "Tùy Chọn Khác")
 local credCard = createCardGroup(tabProfiles)
@@ -2301,9 +2455,13 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             hum.WalkSpeed = Config.WalkSpeedValue
         end
 
-        if Config.WalkOnWater then
-            waterPlatform.CFrame = CFrame.new(root.Position.X, 0, root.Position.Z)
-            waterPlatform.CanCollide = (root.Position.Y >= -1)
+        if Config.WalkOnWater or Config.AcidWaterShield then
+            local yLevel = 0
+            if Config.AcidWaterShield then
+                yLevel = 3.5
+            end
+            waterPlatform.CFrame = CFrame.new(root.Position.X, yLevel, root.Position.Z)
+            waterPlatform.CanCollide = (root.Position.Y >= yLevel - 2)
         else
             waterPlatform.CanCollide = false
         end
@@ -2348,8 +2506,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         if isMinigame and not wasMinigame then
             minigameDurationTracker = now
             openerUsedCount = 0
+            secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             minigameDurationTracker = 0
+            secretBossState.webhookSentForCurrent = false
         end
         wasMinigame = isMinigame
 
@@ -2385,6 +2545,19 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             secretBossState.isCatchingTarget = true
                             if statusLabelSecretBoss and statusLabelSecretBoss.Set then
                                 statusLabelSecretBoss.Set("🎯 ĐANG CÂU BOSS: " .. hookedFish .. "!")
+                            end
+                            if Config.WebhookEnabled and Config.WebhookNotifyBoss and not secretBossState.webhookSentForCurrent then
+                                secretBossState.webhookSentForCurrent = true
+                                SendDiscordWebhook(
+                                    "🚨 PHÁT HIỆN SECRET BOSS!",
+                                    "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng Secret Boss: **" .. tostring(hookedFish) .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
+                                    15158332,
+                                    {
+                                        { name = "🐟 Boss Mục Tiêu", value = tostring(hookedFish), inline = true },
+                                        { name = "📍 Bản Đồ", value = tostring(secretBossState.currentMap or "Đảo Hiện Tại"), inline = true },
+                                        { name = "⏰ Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
+                                    }
+                                )
                             end
                         else
                             -- Không phải Secret Boss -> Giật cần thả lại ngay!
@@ -2587,13 +2760,37 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                     if invCount >= pData.InventoryLimit.Value then
                         canCast = false
+                        local function IsMutatedFish(item)
+                            local name = item.Name
+                            for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
+                                if name:find(kw) then return true end
+                            end
+                            local mutVal = item:FindFirstChild("Mutation")
+                            if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
+                                return true
+                            end
+                            for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
+                                local v = item:GetAttribute(attr)
+                                if v and tostring(v) ~= "" and tostring(v) ~= "None" then
+                                    return true
+                                end
+                            end
+                            return false
+                        end
+
                         if Config.AutoSell and (now - lastSellTime >= 5.0) and Events:FindFirstChild("SellFish") then
-                            if (Config.MaterialFarming or Config.AutoFavouriteFish) and pData:FindFirstChild("Inventory") then
+                            if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and pData:FindFirstChild("Inventory") then
                                 for _, item in ipairs(pData.Inventory:GetChildren()) do
                                     local itemName = item.Name
                                     local isFav = item:FindFirstChild("Favorite") and item.Favorite.Value == true
-                                    if not isFav and ((Config.MaterialFarming and craftMaterialFish[itemName]) or (Config.AutoFavouriteFish and itemName == Config.FavouriteFishName)) then
-                                        if Events:FindFirstChild("FavoriteItem") then Events.FavoriteItem:FireServer(item) end
+                                    if not isFav then
+                                        local shouldFav = false
+                                        if Config.AutoProtectMutations and IsMutatedFish(item) then shouldFav = true end
+                                        if Config.MaterialFarming and craftMaterialFish[itemName] then shouldFav = true end
+                                        if Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then shouldFav = true end
+                                        if shouldFav and Events:FindFirstChild("FavoriteItem") then
+                                            Events.FavoriteItem:FireServer(item)
+                                        end
                                     end
                                 end
                             end
@@ -2603,13 +2800,37 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                 end
 
+                local function IsMutatedFish(item)
+                    local name = item.Name
+                    for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
+                        if name:find(kw) then return true end
+                    end
+                    local mutVal = item:FindFirstChild("Mutation")
+                    if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
+                        return true
+                    end
+                    for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
+                        local v = item:GetAttribute(attr)
+                        if v and tostring(v) ~= "" and tostring(v) ~= "None" then
+                            return true
+                        end
+                    end
+                    return false
+                end
+
                 if Config.AutoSell and (now - lastSellTime >= Config.SellInterval) and Events:FindFirstChild("SellFish") then
-                    if (Config.MaterialFarming or Config.AutoFavouriteFish) and pData and pData:FindFirstChild("Inventory") then
+                    if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and pData and pData:FindFirstChild("Inventory") then
                         for _, item in ipairs(pData.Inventory:GetChildren()) do
                             local itemName = item.Name
                             local isFav = item:FindFirstChild("Favorite") and item.Favorite.Value == true
-                            if not isFav and ((Config.MaterialFarming and craftMaterialFish[itemName]) or (Config.AutoFavouriteFish and itemName == Config.FavouriteFishName)) then
-                                if Events:FindFirstChild("FavoriteItem") then Events.FavoriteItem:FireServer(item) end
+                            if not isFav then
+                                local shouldFav = false
+                                if Config.AutoProtectMutations and IsMutatedFish(item) then shouldFav = true end
+                                if Config.MaterialFarming and craftMaterialFish[itemName] then shouldFav = true end
+                                if Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then shouldFav = true end
+                                if shouldFav and Events:FindFirstChild("FavoriteItem") then
+                                    Events.FavoriteItem:FireServer(item)
+                                end
                             end
                         end
                     end
@@ -2617,13 +2838,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     lastSellTime = now
                 end
 
-                if (Config.MaterialFarming or Config.AutoFavouriteFish) and (now - lastProtectTime >= 1.5) and pData and pData:FindFirstChild("Inventory") then
+                if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and (now - lastProtectTime >= 1.5) and pData and pData:FindFirstChild("Inventory") then
                     lastProtectTime = now
                     for _, item in ipairs(pData.Inventory:GetChildren()) do
                         local itemName = item.Name
                         local isFav = item:FindFirstChild("Favorite") and item.Favorite.Value == true
                         if not isFav then
                             local shouldProtect = false
+                            if Config.AutoProtectMutations and IsMutatedFish(item) then shouldProtect = true end
                             if Config.MaterialFarming and craftMaterialFish[itemName] then shouldProtect = true end
                             if Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then shouldProtect = true end
                             if shouldProtect and Events:FindFirstChild("FavoriteItem") then
@@ -2700,6 +2922,58 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "" then infoEquippedBait.Set(pData.EquippedBait.Value) end
             if pData:FindFirstChild("FishCaught") then infoFishCaught.Set(tostring(pData.FishCaught.Value)) end
             if pData:FindFirstChild("Cash") then infoCash.Set("$" .. tostring(pData.Cash.Value)) end
+
+            local curFish = pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
+            local curCash = pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
+            local curGems = (pData:FindFirstChild("Gems") and tonumber(pData.Gems.Value)) or (pData:FindFirstChild("Gem") and tonumber(pData.Gem.Value)) or 0
+
+            if not initialFishCaught then initialFishCaught = curFish end
+            if not initialCash then initialCash = curCash end
+            if not initialGems then initialGems = curGems end
+
+            local elapsedSec = math.max(1, tick() - sessionStartTime)
+            local elapsedHours = elapsedSec / 3600
+
+            local h = math.floor(elapsedSec / 3600)
+            local m = math.floor((elapsedSec % 3600) / 60)
+            local s = math.floor(elapsedSec % 60)
+            if infoUptime and infoUptime.Set then
+                infoUptime.Set(string.format("%02d:%02d:%02d", h, m, s))
+            end
+
+            local gainedFish = math.max(0, curFish - initialFishCaught)
+            local gainedCash = math.max(0, curCash - initialCash)
+            local gainedGems = math.max(0, curGems - initialGems)
+
+            local fishRate = math.floor(gainedFish / math.max(elapsedHours, 1/3600))
+            local cashRate = math.floor(gainedCash / math.max(elapsedHours, 1/3600))
+
+            if infoFishPerHour and infoFishPerHour.Set then
+                infoFishPerHour.Set(tostring(fishRate) .. " con/h")
+            end
+            if infoCashPerHour and infoCashPerHour.Set then
+                infoCashPerHour.Set("$" .. tostring(cashRate) .. " /h")
+            end
+            if infoGemsGained and infoGemsGained.Set then
+                infoGemsGained.Set("+" .. tostring(gainedGems) .. " Gems")
+            end
+
+            if Config.WebhookEnabled and Config.WebhookHourlyStats and (tick() - lastWebhookStatsTime >= (Config.WebhookStatsInterval or 1800)) then
+                lastWebhookStatsTime = tick()
+                SendDiscordWebhook(
+                    "📊 Báo Cáo Định Kỳ - Farm Tracker",
+                    "Báo cáo tiến độ tự động câu cá của tài khoản **" .. LocalPlayer.Name .. "**",
+                    3447003,
+                    {
+                        { name = "⏳ Thời Gian Treo", value = string.format("%02d:%02d:%02d", h, m, s), inline = true },
+                        { name = "🐟 Tổng Cá Đã Bắt", value = tostring(curFish) .. " (+" .. tostring(gainedFish) .. ")", inline = true },
+                        { name = "⚡ Tốc Độ Câu", value = tostring(fishRate) .. " con/giờ", inline = true },
+                        { name = "💰 Tổng Tiền Hiện Tại", value = "$" .. tostring(curCash) .. " (+$" .. tostring(gainedCash) .. ")", inline = true },
+                        { name = "📈 Tốc Độ Kiếm Tiền", value = "$" .. tostring(cashRate) .. " /giờ", inline = true },
+                        { name = "💎 Gems Thu Được", value = "+" .. tostring(gainedGems) .. " Gems", inline = true }
+                    }
+                )
+            end
         end
 
         if Config.AutoSell and (now - lastSellTime >= Config.SellInterval) then
@@ -2936,6 +3210,25 @@ fishRingAdornment.CFrame = CFrame.Angles(math.rad(90), 0, 0)
 fishRingAdornment.Visible = false
 fishRingAdornment.Parent = fishRingAnchor
 
+local fishRingBillboard = Instance.new("BillboardGui")
+fishRingBillboard.Name = "FishRingBillboard"
+fishRingBillboard.Size = UDim2.new(0, 220, 0, 30)
+fishRingBillboard.StudsOffset = Vector3.new(0, 2.5, 0)
+fishRingBillboard.AlwaysOnTop = true
+fishRingBillboard.Adornee = fishRingAnchor
+fishRingBillboard.Parent = fishRingAnchor
+
+local fishRingText = Instance.new("TextLabel", fishRingBillboard)
+fishRingText.Size = UDim2.new(1, 0, 1, 0)
+fishRingText.BackgroundTransparency = 1
+fishRingText.TextColor3 = Color3.fromRGB(255, 230, 90)
+fishRingText.TextStrokeColor3 = Color3.fromRGB(0, 0, 0)
+fishRingText.TextStrokeTransparency = 0.2
+fishRingText.Font = Enum.Font.GothamBold
+fishRingText.TextSize = 13
+fishRingText.Text = ""
+fishRingText.Visible = false
+
 local function AddESP(instance, name, espCategory, color, icon)
     if not instance or activeESP[instance] then return end
     local part = instance:IsA("BasePart") and instance or instance:FindFirstChildWhichIsA("BasePart")
@@ -3117,11 +3410,47 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
         if (isHooked or (fUI and fUI.Visible)) and fishPos then
             fishRingAnchor.Position = fishPos
             fishRingAdornment.Visible = true
+
+            if Config.ShowFishWeightRing then
+                local fName = GetCurrentHookedFishName()
+                local fWeight = char:GetAttribute("FishWeight") or char:GetAttribute("Weight")
+                local fMutation = char:GetAttribute("FishMutation") or char:GetAttribute("Mutation")
+
+                if not fWeight and fUI then
+                    local wLabel = fUI:FindFirstChild("Weight", true) or fUI:FindFirstChild("FishWeight", true)
+                    if wLabel and wLabel:IsA("TextLabel") and wLabel.Text ~= "" then
+                        fWeight = wLabel.Text
+                    end
+                end
+
+                local displayStr = ""
+                if fName then displayStr = tostring(fName) end
+                if fMutation and tostring(fMutation) ~= "" then
+                    displayStr = displayStr .. " [" .. tostring(fMutation) .. "]"
+                end
+                if fWeight then
+                    local wStr = tostring(fWeight)
+                    if tonumber(wStr) then wStr = string.format("%.1f kg", tonumber(wStr)) end
+                    displayStr = displayStr .. " (" .. wStr .. ")"
+                end
+
+                if displayStr ~= "" then
+                    fishRingText.Text = displayStr
+                    fishRingText.Visible = true
+                else
+                    fishRingText.Text = "🎣 Đang Cắn Câu"
+                    fishRingText.Visible = true
+                end
+            else
+                fishRingText.Visible = false
+            end
         else
             fishRingAdornment.Visible = false
+            fishRingText.Visible = false
         end
     else
         if fishRingAdornment.Visible then fishRingAdornment.Visible = false end
+        if fishRingText.Visible then fishRingText.Visible = false end
     end
 end))
 
@@ -3134,4 +3463,4 @@ table.insert(activeConnections, UserInputService.InputBegan:Connect(function(inp
     end
 end))
 
-ShowNotification("VIỆT HOÁ V1.3", "Heavyweight Fishing đã cập nhật Hệ Thống Smart Combo Chiến Thuật!", "SUCCESS", 6)
+ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Totem Thời Tiết, Discord Webhook, Farm Tracker, Khóa Đột Biến & Khiên Nước Axit!", "SUCCESS", 6)
