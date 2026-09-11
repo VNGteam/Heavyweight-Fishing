@@ -3437,6 +3437,41 @@ do
             ShowNotification("Đã Xóa", string.format("Đã xóa vị trí tùy chọn của [%s] (về mặc định).", islandName), "INFO", 4)
         end
     end)
+
+    createButtonRow(customSpotCard, "📋 COPY TOÀN BỘ TỌA ĐỘ (ĐỂ NẠP VÀO SCRIPT GỐC)", "Copy toàn bộ tọa độ bạn đã cài ra mã Lua vào Clipboard để dán vào code gốc cho TẤT CẢ mọi người dùng", "COPY TỌA ĐỘ", function()
+        local lines = {}
+        table.insert(lines, "-- [[ TỌA ĐỘ VỊ TRÍ CÂU SĂN BOSS DO NGƯỜI DÙNG CÀI ĐẶT ]]")
+        local count = 0
+        for _, entry in ipairs(secretBossDatabase) do
+            local custom = Config.CustomBossSpots and Config.CustomBossSpots[entry.islandName]
+            if custom and custom.cframe then
+                count = count + 1
+                local cf = CFrame.new(unpack(custom.cframe))
+                local pos = cf.Position
+                local lookAt = pos + cf.LookVector * 50
+                table.insert(lines, string.format("    -- %s\n    pos = Vector3.new(%.1f, %.1f, %.1f),\n    lookAt = Vector3.new(%.1f, %.1f, %.1f),", entry.islandName, pos.X, pos.Y, pos.Z, lookAt.X, lookAt.Y, lookAt.Z))
+            end
+        end
+        if count == 0 then
+            ShowNotification("Chưa Có Tọa Độ", "Bạn chưa cài tọa độ cho đảo nào cả! Hãy đi đến các đảo và bấm Lưu trước.", "WARN", 5)
+            return
+        end
+        local fullCode = table.concat(lines, "\n\n")
+        print("\n======== [TỌA ĐỘ VỊ TRÍ CÂU SĂN BOSS EXPORT] ========\n" .. fullCode .. "\n====================================================\n")
+        local copied = false
+        if setclipboard then
+            setclipboard(fullCode)
+            copied = true
+        elseif toclipboard then
+            toclipboard(fullCode)
+            copied = true
+        end
+        if copied then
+            ShowNotification("ĐÃ COPY VÀO CLIPBOARD!", string.format("Đã copy tọa độ của %d đảo! Dán vào chat với AI để nạp vào script gốc cho tất cả mọi người cùng dùng.", count), "SUCCESS", 8)
+        else
+            ShowNotification("Xuất Tọa Độ", "Đã in mã tọa độ ra bảng điều khiển Console F9! Hãy mở F9 để copy.", "INFO", 6)
+        end
+    end)
 end
 
 -- Danh sách từng đảo và Secret Boss
