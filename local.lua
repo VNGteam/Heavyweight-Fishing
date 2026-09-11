@@ -1143,8 +1143,136 @@ local weatherTotems = {
 local sessionStartTime = tick()
 local initialCash = nil
 local initialFishCaught = nil
-local initialGems = nil
 local lastWebhookStatsTime = tick()
+
+local gemTracker = {
+    gained = 0,
+    lastKnown = nil,
+    lastFishAwardTime = 0,
+    lastFishAwardAmount = 0,
+    inventoryHooked = false
+}
+
+local fishGemRewardLookup = {
+    ["scarlet fish"] = 3,
+    ["elder scarlet fish"] = 5,
+    ["crimson electric eel"] = 5,
+    ["verdant alligator gar"] = 3,
+    ["verdant grouper"] = 3,
+    ["verdant bonefang"] = 5,
+    ["flying fish empress"] = 10,
+    ["flying fish emperor"] = 10,
+    ["reborn puffer beast"] = 10,
+    ["frost kingfish"] = 10,
+    ["tigerfang whale"] = 5,
+    ["heaven piercer turtle"] = 5,
+    ["draconic koi"] = 5,
+    ["sanguine fish"] = 20,
+    ["primordial kunfish overlord"] = 30,
+    ["warbringer shark"] = 25,
+    ["mountain fish"] = 20,
+    ["octoparasitic fish"] = 50,
+}
+
+local function GetFishGemReward(fishName)
+    if not fishName then return 0 end
+    local clean = tostring(fishName):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if fishGemRewardLookup[clean] then return fishGemRewardLookup[clean] end
+    for k, v in pairs(fishGemRewardLookup) do
+        if clean:find(k, 1, true) then return v end
+    end
+    return 0
+end
+
+local function GetPlayerCurrentGems()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if pData then
+        for _, name in ipairs({"Gems", "Gem", "Diamonds", "Diamond", "Ruby", "Rubies", "Shards", "Crystal"}) do
+            local obj = pData:FindFirstChild(name)
+            if obj and obj:IsA("ValueBase") and tonumber(obj.Value) then
+                return tonumber(obj.Value)
+            end
+        end
+        for _, sub in ipairs({"Currencies", "Currency", "Stats", "Account"}) do
+            local subFolder = pData:FindFirstChild(sub)
+            if subFolder then
+                for _, name in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+                    local obj = subFolder:FindFirstChild(name)
+                    if obj and obj:IsA("ValueBase") and tonumber(obj.Value) then
+                        return tonumber(obj.Value)
+                    end
+                end
+            end
+        end
+        for _, name in ipairs({"Gems", "Gem", "Diamonds", "Diamond", "Ruby"}) do
+            local att = pData:GetAttribute(name)
+            if att and tonumber(att) then return tonumber(att) end
+        end
+    end
+
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        for _, name in ipairs({"Gems", "Gem", "Diamonds", "Diamond", "Ruby"}) do
+            local obj = ls:FindFirstChild(name)
+            if obj and obj:IsA("ValueBase") and tonumber(obj.Value) then
+                return tonumber(obj.Value)
+            end
+        end
+    end
+
+    for _, name in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+        local att = LocalPlayer:GetAttribute(name)
+        if att and tonumber(att) then return tonumber(att) end
+        local obj = LocalPlayer:FindFirstChild(name)
+        if obj and obj:IsA("ValueBase") and tonumber(obj.Value) then return tonumber(obj.Value) end
+    end
+
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        local mg = pg:FindFirstChild("MainGui") or pg:FindFirstChild("Fisher_GUI")
+        if mg then
+            for _, d in ipairs(mg:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Visible then
+                    local pName = d.Parent and d.Parent.Name:lower() or ""
+                    local dName = d.Name:lower()
+                    if dName:find("gem") or dName:find("diamond") or pName:find("gem") or pName:find("diamond") then
+                        local numStr = d.Text:gsub("[^%d]", "")
+                        if #numStr > 0 and tonumber(numStr) then
+                            return tonumber(numStr)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function TrackCaughtFishForGems(child)
+    if not child then return end
+    local fishName = child.Name
+    local reward = GetFishGemReward(fishName)
+    if child:FindFirstChild("Gem") and tonumber(child.Gem.Value) then
+        reward = math.max(reward, tonumber(child.Gem.Value))
+    elseif child:FindFirstChild("Gems") and tonumber(child.Gems.Value) then
+        reward = math.max(reward, tonumber(child.Gems.Value))
+    elseif child:GetAttribute("Gem") and tonumber(child:GetAttribute("Gem")) then
+        reward = math.max(reward, tonumber(child:GetAttribute("Gem")))
+    elseif child:GetAttribute("Gems") and tonumber(child:GetAttribute("Gems")) then
+        reward = math.max(reward, tonumber(child:GetAttribute("Gems")))
+    end
+
+    if reward > 0 then
+        gemTracker.lastFishAwardTime = tick()
+        gemTracker.lastFishAwardAmount = reward
+        gemTracker.gained = gemTracker.gained + reward
+        if infoGemsGained and infoGemsGained.Set then
+            infoGemsGained.Set("+" .. FormatWithSpaces(gemTracker.gained) .. " Gems")
+        end
+        ShowNotification("Thưởng Gems", string.format("Bắt được %s! Nhận được +%d Gems!", fishName, reward), "SUCCESS", 4)
+    end
+end
 
 local function SendDiscordWebhook(title, description, color, fields)
     if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
@@ -4194,9 +4322,37 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
             end
 
+            -- Tự động hook túi đồ để phát hiện cá thưởng Gems khi câu trúng
+            if not gemTracker.inventoryHooked and pData then
+                local inv = pData:FindFirstChild("Inventory")
+                if inv then
+                    gemTracker.inventoryHooked = true
+                    table.insert(activeConnections, inv.ChildAdded:Connect(TrackCaughtFishForGems))
+                end
+                local hotbar = pData:FindFirstChild("Hotbar")
+                if hotbar then
+                    table.insert(activeConnections, hotbar.ChildAdded:Connect(TrackCaughtFishForGems))
+                end
+            end
+
+            -- Đọc Gems từ game (pData / leaderstats / PlayerGui / v.v.)
+            local liveGems = GetPlayerCurrentGems()
+            if liveGems ~= nil then
+                if gemTracker.lastKnown == nil then
+                    gemTracker.lastKnown = liveGems
+                elseif liveGems > gemTracker.lastKnown then
+                    local delta = liveGems - gemTracker.lastKnown
+                    gemTracker.lastKnown = liveGems
+                    if not (tick() - gemTracker.lastFishAwardTime <= 2.5 and delta == gemTracker.lastFishAwardAmount) then
+                        gemTracker.gained = gemTracker.gained + delta
+                    end
+                elseif liveGems < gemTracker.lastKnown then
+                    gemTracker.lastKnown = liveGems
+                end
+            end
+
             local curFish = pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
             local curCash = pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
-            local curGems = (pData:FindFirstChild("Gems") and tonumber(pData.Gems.Value)) or (pData:FindFirstChild("Gem") and tonumber(pData.Gem.Value)) or 0
 
             if infoFishCaught and infoFishCaught.Set then
                 infoFishCaught.Set(FormatWithSpaces(curFish) .. " con")
@@ -4207,7 +4363,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
             if not initialFishCaught then initialFishCaught = curFish end
             if not initialCash then initialCash = curCash end
-            if not initialGems then initialGems = curGems end
 
             local elapsedSec = math.max(1, tick() - sessionStartTime)
             local elapsedHours = elapsedSec / 3600
@@ -4221,7 +4376,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
             local gainedFish = math.max(0, curFish - initialFishCaught)
             local gainedCash = math.max(0, curCash - initialCash)
-            local gainedGems = math.max(0, curGems - initialGems)
+            local gainedGems = gemTracker.gained
 
             local fishRate = math.floor(gainedFish / math.max(elapsedHours, 1/3600))
             local cashRate = math.floor(gainedCash / math.max(elapsedHours, 1/3600))
