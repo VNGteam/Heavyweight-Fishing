@@ -289,6 +289,7 @@ local ConfigLabelMap = {
     ["Tự Dùng Ngọc Tốt Nhất"] = "AutoEquipBestOrb",
 
     -- Săn Secret Boss
+    ["Bật Tự Động Săn Secret Boss"] = "AutoHuntBoss",
     ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
     ["Bật Săn Secret Boss (Chat Sniper)"] = "AutoChatSecretBoss",
     ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
@@ -869,9 +870,6 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
     for _, item in ipairs(rowSearchIndex) do
         if q == "" or item.query:find(q, 1, true) then
             item.frame.Visible = true
-            if q ~= "" and item.frame.Parent and item.frame.Parent.Name == "CardBody" then
-                item.frame.Parent.Visible = true
-            end
         else
             item.frame.Visible = false
         end
@@ -945,59 +943,19 @@ killBtn.MouseButton1Click:Connect(function()
 end)
 
 local function createCategoryHeader(parent, text)
-    local hdr = Instance.new("Frame")
-    hdr.Name = "CategoryHeader_" .. tostring(text)
-    hdr.Size = UDim2.new(1, 0, 0, 26)
-    hdr.BackgroundColor3 = Colors.ControlBg
-    hdr.BorderSizePixel = 0
-    hdr.Parent = parent
-
-    local c = Instance.new("UICorner", hdr); c.CornerRadius = UDim.new(0, 4)
-    local s = Instance.new("UIStroke", hdr); s.Color = Colors.BorderSubtle; s.Thickness = 1
-    local p = Instance.new("UIPadding", hdr); p.PaddingLeft = UDim.new(0, 10); p.PaddingRight = UDim.new(0, 10)
-
-    local lbl = Instance.new("TextLabel")
-    lbl.Size = UDim2.new(1, 0, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.GothamBold
-    lbl.Text = string.upper(text)
-    lbl.TextColor3 = Colors.PurplePrimary
-    lbl.TextSize = 11
-    lbl.TextXAlignment = Enum.TextXAlignment.Left
-    lbl.Parent = hdr
-
+    local hdr = Instance.new("Frame"); hdr.Size = UDim2.new(1, 0, 0, 22); hdr.BackgroundTransparency = 1; hdr.Parent = parent
+    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBold; lbl.Text = string.upper(text); lbl.TextColor3 = Colors.PurplePrimary; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = hdr
     hdr._title = lbl
-    hdr._stroke = s
     hdr._defaultTitle = string.upper(text)
     return hdr
 end
 
 local function createCardGroup(parent)
-    local group = Instance.new("Frame")
-    group.Name = "CardBody"
-    group.Size = UDim2.new(1, 0, 0, 0)
-    group.AutomaticSize = Enum.AutomaticSize.Y
-    group.BackgroundColor3 = Colors.RowNormal
-    group.BorderSizePixel = 0
-    group.Parent = parent
-
-    local s = Instance.new("UIStroke", group); s.Color = Colors.BorderSubtle; s.Thickness = 1
+    local group = Instance.new("Frame"); group.Size = UDim2.new(1, 0, 0, 0); group.AutomaticSize = Enum.AutomaticSize.Y; group.BackgroundColor3 = Colors.RowNormal; group.BorderSizePixel = 0; group.Parent = parent
+    local s = Instance.new("UIStroke"); s.Color = Colors.BorderSubtle; s.Thickness = 1; s.Parent = group
     Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
-    local l = Instance.new("UIListLayout", group); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0)
+    local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
     return group
-end
-
-local function TriggerPrompt(prompt)
-    if not prompt then return end
-    if fireproximityprompt then
-        fireproximityprompt(prompt)
-    else
-        pcall(function()
-            prompt:InputHoldBegin()
-            task.wait(prompt.HoldDuration + 0.05)
-            prompt:InputHoldEnd()
-        end)
-    end
 end
 
 local function createBaseRow(parent, labelText, descText, indexSearch)
@@ -1505,40 +1463,20 @@ local secretBossState = {
 }
 
 local statusLabelSecretBoss = nil
-local weatherInfoRow = nil
 local bossTogglesMap = {}
+local weatherInfoRow = nil
 local islandHeaderMap = {}
 
 local function UpdateIslandWeatherHighlight(activeIslandName, weatherName)
-    for islandName, item in pairs(islandHeaderMap) do
-        local hdr = item.hdr
+    for islandName, hdr in pairs(islandHeaderMap) do
         local isAct = (activeIslandName and activeIslandName == islandName)
-        if isAct then
-            if item.card then item.card._isHighlighted = true end
-            if hdr then
-                hdr.BackgroundColor3 = Color3.fromRGB(16, 50, 28)
-                if hdr._stroke then
-                    hdr._stroke.Color = Color3.fromRGB(0, 255, 136)
-                    hdr._stroke.Thickness = 1.5
-                end
-                if hdr._title then
-                    hdr._title.TextColor3 = Color3.fromRGB(0, 255, 140)
-                    local wDisplay = weatherName or item.entry.weather
-                    hdr._title.Text = "⚡ [ĐANG CÓ BOSS] " .. item.entry.islandName:upper() .. " [" .. tostring(wDisplay):upper() .. "]"
-                end
-            end
-        else
-            if item.card then item.card._isHighlighted = false end
-            if hdr then
-                hdr.BackgroundColor3 = Colors.ControlBg
-                if hdr._stroke then
-                    hdr._stroke.Color = Colors.BorderSubtle
-                    hdr._stroke.Thickness = 1
-                end
-                if hdr._title then
-                    hdr._title.TextColor3 = Colors.PurplePrimary
-                    hdr._title.Text = hdr._defaultTitle or string.upper(string.format("📍 %s [%s]", item.entry.islandName, item.entry.weather))
-                end
+        if hdr and hdr._title then
+            if isAct then
+                hdr._title.TextColor3 = Color3.fromRGB(0, 255, 128)
+                hdr._title.Text = "⚡ [ĐANG CÓ BOSS] " .. (hdr._defaultTitle or islandName)
+            else
+                hdr._title.TextColor3 = Colors.PurplePrimary
+                hdr._title.Text = hdr._defaultTitle or string.upper(islandName)
             end
         end
     end
@@ -1753,10 +1691,9 @@ local function GetCurrentHookedFishName()
     local function matchBossName(rawText)
         if not rawText or typeof(rawText) ~= "string" or #rawText == 0 then return nil end
         local txt = rawText:gsub("^%s+", ""):gsub("%s+$", "")
-        if #txt < 2 or tonumber(txt) or txt:find("%%") then return nil end
         local txtLower = txt:lower()
 
-        -- Bỏ qua từ khóa rác của UI
+        if #txt < 2 or tonumber(txt) or txt:find("%%") then return nil end
         if invalidWords[txtLower] then return nil end
 
         if secretBossLookup[txtLower] then return secretBossLookup[txtLower] end
@@ -1784,7 +1721,7 @@ local function GetCurrentHookedFishName()
             end
         end
 
-        return txt
+        return nil
     end
 
     -- 1. ƯU TIÊN 1: Kiểm tra mô hình cá đang kéo trong Workspace.Fishes (chuẩn xác nhất theo server)
@@ -1863,7 +1800,7 @@ local function GetCurrentHookedFishName()
             end
         end
 
-        -- Scan any visible TextLabel in fUI matching a known secret boss
+        -- Scan any visible TextLabel in fUI matching a known secret boss (loại trừ HPPlayer)
         for _, d in ipairs(fUI:GetDescendants()) do
             if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and not tonumber(d.Text) and not d.Text:find("%%") then
                 if not hpPlayerFrame or not d:IsDescendantOf(hpPlayerFrame) then
@@ -2574,6 +2511,7 @@ function secretBossState.ScanChatHistory()
 
     -- Nếu có tin nhắn Boss xuất hiện và tin Spawn xuất hiện sau tin Despawn (hoặc không có tin despawn nào sau đó)
     if latestSpawn and (latestDespawnIndex < latestSpawnIndex) then
+        UpdateIslandWeatherHighlight(latestSpawn.island.islandName, latestSpawn.island.weather)
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local dist = root and (root.Position - latestSpawn.island.pos).Magnitude or 9999
         if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 70 then
@@ -2581,6 +2519,7 @@ function secretBossState.ScanChatHistory()
         end
         return true
     elseif latestDespawnIndex > latestSpawnIndex and latestDespawnIndex ~= -1 then
+        UpdateIslandWeatherHighlight(nil, nil)
         secretBossState.statusText = "Boss gần nhất đã despawn. Đang chờ đợt mới..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
@@ -2605,7 +2544,7 @@ local tabProfiles  = CreateTab("Cài Đặt")
 SwitchTab("Câu Cá")
 
 
-createCategoryHeader(tabFishing, "📊 Thông Tin Tài Khoản & Thống Kê", true)
+createCategoryHeader(tabFishing, "Thông Tin Tài Khoản & Thống Kê")
 local statsCard = createCardGroup(tabFishing)
 local infoEquippedRod = createInfoRow(statsCard, "Cần Đang Dùng", "Chưa có")
 local infoEquippedBait = createInfoRow(statsCard, "Mồi Đang Dùng", "Chưa có")
@@ -2616,7 +2555,7 @@ local infoFishPerHour = createInfoRow(statsCard, "Tốc Độ Câu (Fish/h)", "0
 local infoCashPerHour = createInfoRow(statsCard, "Tốc Độ Kiếm Tiền", "$0 /h")
 local infoGemsGained = createInfoRow(statsCard, "Gems Thu Được", "+0 Gems")
 
-createCategoryHeader(tabFishing, "🎣 Tự Động Câu Cá Cốt Lõi (Auto Fish)", true)
+createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
 local fishCard = createCardGroup(tabFishing)
 
 createToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
@@ -2627,7 +2566,7 @@ createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
 
-createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)", false)
+createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)")
 local comboCard = createCardGroup(tabFishing)
 
 createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
@@ -2687,7 +2626,7 @@ createToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Qua
     Config.SmartEffectAutoDetect = v
 end)
 
-createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)", false)
+createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
 local trainCard = createCardGroup(tabFishing)
 local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
 createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần phím 1 hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
@@ -3488,7 +3427,7 @@ local function ExportAllPlayerSkills(infoRow, ownedOnly)
     return #skillList
 end
 
-createCategoryHeader(tabFishing, "🎒 Tự Động Đổi Cần & Mồi Câu (Auto Equip)", false)
+createCategoryHeader(tabFishing, "Tự Động Trang Bị Tối Ưu")
 local equipCard = createCardGroup(tabFishing)
 
 local baitOptionsList = {
@@ -3571,7 +3510,7 @@ createButtonRow(equipCard, "Trang Bị Nhanh Set 2", "Trang bị Cần & Mồi �
     end
 end)
 
-createCategoryHeader(tabFishing, "💰 Tự Động Bán Cá & Bảo Vệ Cá Hiếm (Auto Sell)", false)
+createCategoryHeader(tabFishing, "Kinh Tế & Tự Động Bán Cá")
 local sellCard = createCardGroup(tabFishing)
 createToggleRow(sellCard, "Tự Động Bán Cá (Auto Sell)", "Tự động bán toàn bộ cá trong balo theo chu kỳ", Config.AutoSell, function(v) Config.AutoSell = v end)
 createSliderRow(sellCard, "Thời Gian Giãn Cách Bán", "Chu kỳ số giây tự động bán cá 1 lần", 10, 300, Config.SellInterval, false, "s", function(v) Config.SellInterval = v end)
@@ -3596,8 +3535,53 @@ createToggleRow(sellCard, "Tự Động Khóa Secret Boss", "Tự động khóa 
 createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
 createToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
 
+createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)")
+local totemCard = createCardGroup(tabBoss)
 
-createCategoryHeader(tabBoss, "🎯 CHẾ ĐỘ SĂN SECRET BOSS & TỰ ĐỘNG BAY ĐẢO", true)
+for _, t in ipairs(weatherTotems) do
+    createButtonRow(totemCard, t.name, "Bay đến và kích hoạt: " .. t.weather, "Kích Hoạt", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(t.pos + Vector3.new(0, 3, 0))
+            ShowNotification("Bàn Thờ Thời Tiết", "Đã đến " .. t.name .. "! Đang tương tác...", "SUCCESS", 4)
+            task.wait(0.4)
+            pcall(function()
+                for _, d in ipairs(Workspace:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
+                        local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
+                        if (pPos - t.pos).Magnitude <= 35 then
+                            TriggerPrompt(d)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end
+
+createCategoryHeader(tabBoss, "Boss Bạch Tuộc Bí Mật (Octoparasite)")
+local octoCard = createCardGroup(tabBoss)
+
+createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
+createButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(1608.2, 5.0, -218.3)
+        ShowNotification("Dịch Chuyển", "Đã đến Phao Boss Bạch Tuộc!", "SUCCESS")
+    end
+end)
+createButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đến vùng đất câu cá ngầm bí mật", "Bay Đến", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(112.5, -330.0, -30.8)
+        ShowNotification("Dịch Chuyển", "Đã đến Vùng Câu Cá Ngầm!", "SUCCESS")
+    end
+end)
+
+createCategoryHeader(tabBoss, "🎯 CHẾ ĐỘ SĂN SECRET BOSS & LỌC CÁ")
 local chatBossCard = createCardGroup(tabBoss)
 
 createToggleRow(chatBossCard, "Bật Tự Động Săn Secret Boss", "Tự nghe Chat & Thời tiết -> Tự bay đến đảo có Boss -> Tự quăng cần & lọc đúng Boss mục tiêu", Config.AutoHuntBoss or Config.AutoChatSecretBoss, function(v)
@@ -3605,40 +3589,32 @@ createToggleRow(chatBossCard, "Bật Tự Động Săn Secret Boss", "Tự nghe 
     Config.AutoChatSecretBoss = v
     if v then
         secretBossState.active = true
-        secretBossState.statusText = "Đang quét lịch sử chat & thời tiết..."
+        secretBossState.statusText = "Đang quét server & săn boss (Tự bay đảo + tự quăng cần + lọc cá)..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
         end
-        ShowNotification("Săn Secret Boss", "Đã BẬT Săn Boss tự động! Đang nghe Chat, Thời tiết & tự bay đảo...", "SUCCESS", 5)
+        ShowNotification("Săn Boss", "Đã BẬT Tự Động Săn Boss! Tự động bay khi có boss & lọc cá 100%.", "SUCCESS", 5)
         task.spawn(function()
             task.wait(0.3)
-            local found = secretBossState.ScanChatHistory()
-            if not found then
-                local wIsland, wName = secretBossState.DetectWeather()
-                if wIsland then
-                    secretBossState.Teleport(wIsland, wName)
-                else
-                    if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                        statusLabelSecretBoss.Set("Đang lắng nghe Chat & Thời tiết, chờ Boss xuất hiện...")
-                    end
-                end
-            end
+            secretBossState.ScanChatHistory()
         end)
     else
         secretBossState.active = false
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-            statusLabelSecretBoss.Set("Đã tắt chế độ săn Secret Boss.")
+            statusLabelSecretBoss.Set("Đã tắt tự động săn boss.")
         end
-        ShowNotification("Săn Secret Boss", "Đã TẮT Chế Độ Săn Secret Boss.", "INFO")
+        ShowNotification("Săn Boss", "Đã TẮT Tự Động Săn Boss.", "INFO")
     end
+end)
+
+weatherInfoRow = createInfoRow(chatBossCard, "Thời Tiết Hiện Tại", "⚪ Bình thường (Chưa có Boss nào)")
+
+createToggleRow(chatBossCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) các loài Secret Boss khi câu được, chống bị bán mất", Config.AutoLockSecretBoss, function(v)
+    Config.AutoLockSecretBoss = v
 end)
 
 createToggleRow(chatBossCard, "Bỏ Qua Cá Thường (Fast Skip)", "Nếu cắn câu không phải Secret Boss đã chọn thì lập tức giật cần thả lại", Config.FastSkipNonBoss, function(v)
     Config.FastSkipNonBoss = v
-end)
-
-createToggleRow(chatBossCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) các loài Secret Boss khi câu được, chống bị bán mất", Config.AutoLockSecretBoss, function(v)
-    Config.AutoLockSecretBoss = v
 end)
 
 createToggleRow(chatBossCard, "Kiểm Tra Lực Cần (Power Check)", "Cảnh báo nếu cần câu hiện tại không đủ lực yêu cầu của Boss", Config.SecretBossCheckPower, function(v)
@@ -3649,17 +3625,31 @@ createToggleRow(chatBossCard, "Tự Đổi Server Khi Hết Boss (Auto-Hop)", "T
     Config.AutoServerHopOnDespawn = v
 end)
 
-weatherInfoRow = createInfoRow(chatBossCard, "Thời Tiết Server:", "⚪ Bình thường (Chưa có Boss)")
 statusLabelSecretBoss = createInfoRow(chatBossCard, "Trạng Thái Săn:", secretBossState.statusText)
 
-createButtonRow(chatBossCard, "Quét Lại Lịch Sử Chat & Boss", "Kiểm tra lại lịch sử chat và thời tiết xem có Boss nào đang hoạt động không", "Quét Chat", function()
+createButtonRow(chatBossCard, "Quét Lại Lịch Sử Chat & Boss", "Kiểm tra lại lịch sử chat xem có Boss nào đang hoạt động không", "Quét Chat", function()
     local found = secretBossState.ScanChatHistory()
     if not found then
-        local wIsland, wName = secretBossState.DetectWeather()
-        if wIsland then
-            secretBossState.Teleport(wIsland, wName)
+        ShowNotification("Kết Quả Quét", "Không tìm thấy Secret Boss nào đang hoạt động trong lịch sử chat.", "INFO", 5)
+    end
+end)
+
+createButtonRow(chatBossCard, "Dò Tìm & Bay Đến Mép Nước", "Tự động quét tia 360 độ tìm vùng nước và đưa nhân vật ra sát mép bờ câu", "Dò Mép Nước", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        local standPos, lookTarget, waterY, found = secretBossState.FindWaterSpot(root.Position, root.CFrame.Position + root.CFrame.LookVector * 50)
+        if found then
+            root.CFrame = CFrame.lookAt(standPos, lookTarget)
+            local wp = Workspace:FindFirstChild("IdenticalWaterPlatform")
+            if wp then
+                wp.CFrame = CFrame.new(standPos.X, (waterY or standPos.Y) - 1.2, standPos.Z)
+                wp.CanCollide = true
+            end
+            ShowNotification("Mép Nước", "Đã tìm thấy vùng nước và bay ra sát mép bờ câu!", "SUCCESS", 5)
+            CancelAndRecastRod()
         else
-            ShowNotification("Kết Quả Quét", "Không tìm thấy Secret Boss nào đang hoạt động trong lịch sử chat hoặc thời tiết.", "INFO", 5)
+            ShowNotification("Mép Nước", "Không tìm thấy vùng nước trong bán kính 220 studs!", "WARN", 5)
         end
     end
 end)
@@ -3686,7 +3676,7 @@ end)
 
 do
     -- CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM FISHING SPOTS - HỖ TRỢ 3 ĐIỂM/ĐẢO + XÊ DỊCH)
-    createCategoryHeader(tabBoss, "📍 VỊ TRÍ CÂU & CHỐNG ĐÈ NGƯỜI (CUSTOM SPOTS)", true)
+    createCategoryHeader(tabBoss, "📍 CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM SPOTS)")
     local customSpotCard = createCardGroup(tabBoss)
 
     local islandNamesList = {}
@@ -3900,12 +3890,8 @@ end
 -- Danh sách từng đảo và Secret Boss
 for _, entry in ipairs(secretBossDatabase) do
     local islandHdr = createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
+    islandHeaderMap[entry.islandName] = islandHdr
     local islandBossCard = createCardGroup(tabBoss)
-    islandHeaderMap[entry.islandName] = {
-        hdr = islandHdr,
-        card = islandBossCard,
-        entry = entry
-    }
     for _, b in ipairs(entry.bosses) do
         local isEnabled = Config.SecretBossTargets[b.name] == true
         local toggleObj = createToggleRow(islandBossCard, b.name, "Phần thưởng: " .. b.reward, isEnabled, function(v)
@@ -3915,7 +3901,7 @@ for _, entry in ipairs(secretBossDatabase) do
     end
 end
 
-createCategoryHeader(tabBoss, "⚔️ Đấu Trường Boss Enzo (Auto Farm)", false)
+createCategoryHeader(tabBoss, "Đấu Trường Boss Enzo")
 local bossFarmCard = createCardGroup(tabBoss)
 createToggleRow(bossFarmCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và đánh bại boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
 createToggleRow(bossFarmCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
@@ -3928,51 +3914,6 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
         ShowNotification("Dịch Chuyển", "Đã đến Đấu trường Boss Enzo!", "SUCCESS")
     end
 end)
-
-createCategoryHeader(tabBoss, "🐙 Boss Bạch Tuộc Bí Mật (Octoparasite)", false)
-local octoCard = createCardGroup(tabBoss)
-createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
-createButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(1608.2, 5.0, -218.3)
-        ShowNotification("Dịch Chuyển", "Đã đến Phao Boss Bạch Tuộc!", "SUCCESS")
-    end
-end)
-createButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đến vùng đất câu cá ngầm bí mật", "Bay Đến", function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(112.5, -330.0, -30.8)
-        ShowNotification("Dịch Chuyển", "Đã đến Vùng Câu Cá Ngầm!", "SUCCESS")
-    end
-end)
-
-createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)", false)
-local totemCard = createCardGroup(tabBoss)
-
-for _, t in ipairs(weatherTotems) do
-    createButtonRow(totemCard, t.name, "Bay đến và kích hoạt: " .. t.weather, "Kích Hoạt", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = CFrame.new(t.pos + Vector3.new(0, 3, 0))
-            ShowNotification("Bàn Thờ Thời Tiết", "Đã đến " .. t.name .. "! Đang tương tác...", "SUCCESS", 4)
-            task.wait(0.4)
-            pcall(function()
-                for _, d in ipairs(Workspace:GetDescendants()) do
-                    if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
-                        local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
-                        if (pPos - t.pos).Magnitude <= 35 then
-                            TriggerPrompt(d)
-                        end
-                    end
-                end
-            end)
-        end
-    end)
-end
 
 createCategoryHeader(tabGod, "Tương Tác Thần Linh (God Spirit)")
 local godCard = createCardGroup(tabGod)
@@ -4007,6 +3948,17 @@ createButtonRow(godCard, "Bay Đến Đền Thần Linh", "Dịch chuyển đế
     end
 end)
 
+local function TriggerPrompt(prompt)
+    if fireproximityprompt then
+        fireproximityprompt(prompt)
+    else
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(prompt.HoldDuration + 0.05)
+            prompt:InputHoldEnd()
+        end)
+    end
+end
 
 createButtonRow(godCard, "Cầu Nguyện Ngay Lập Tức", "Tương tác với Bàn thờ Thần linh ngay bây giờ", "Cầu Nguyện", function()
     local sp = (Workspace:FindFirstChild("NPC") and Workspace.NPC:FindFirstChild("Spirit")) or (Workspace:FindFirstChild("NPC") and Workspace.NPC:FindFirstChild("God"))
@@ -4829,7 +4781,23 @@ createButtonRow(perfCard, "Mở Khóa Toàn Bộ Sách Cá (Index)", "Mở khóa
     ShowNotification("Mở Khóa Index", string.format("Đã mở khóa %d loài cá trong Sách Cá Index!", count > 0 and count or 109), "SUCCESS")
 end)
 
-createCategoryHeader(tabPlayer, "🏃‍♂️ Di Chuyển & Tốc Độ Nhân Vật (Movement & Speed)", true)
+createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)")
+local exportSkillCard = createCardGroup(tabPlayer)
+local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
+
+createButtonRow(exportSkillCard, "Quét Kỹ Năng Đang Sở Hữu (Chỉ Của Bạn)", "Chỉ quét các kỹ năng bạn thực sự sở hữu trong túi đồ & phím Z,X,C,V", "👤 Skill Của Bạn", function()
+    ExportAllPlayerSkills(infoSkillCount, true)
+end)
+
+createButtonRow(exportSkillCard, "Quét Bách Khoa Toàn Bộ Kỹ Năng Game", "Quét toàn bộ từ điển kỹ năng có trong game (Codex/Shop/Tất cả)", "📚 Toàn Bộ Game", function()
+    ExportAllPlayerSkills(infoSkillCount, false)
+end)
+
+createButtonRow(exportSkillCard, "Mở Bảng Xem Danh Sách Skill", "Mở khung văn bản cuộn trên màn hình để xem và copy", "📜 Mở Bảng Xem", function()
+    ShowSkillTextWindow()
+end)
+
+createCategoryHeader(tabPlayer, "Di Chuyển Nhân Vật")
 local moveCard = createCardGroup(tabPlayer)
 
 createToggleRow(moveCard, "Tăng Tốc Độ Chạy (Speed)", "Chạy nhanh hơn tốc độ mặc định", Config.WalkSpeedEnabled, function(v)
@@ -4852,26 +4820,10 @@ createToggleRow(moveCard, "Đi Trên Mặt Nước", "Đi bộ trên mặt biể
 createToggleRow(moveCard, "Khiên Nước Axit (Acid Shield)", "Tạo sàn nổi kháng sát thương độc/axit tại Đảo Fallout", Config.AcidWaterShield, function(v) Config.AcidWaterShield = v end)
 createToggleRow(moveCard, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua vách núi, tường rào và vật cản", Config.Noclip, function(v) Config.Noclip = v end)
 
-createCategoryHeader(tabPlayer, "🛡️ Chống Văng Game & Treo Máy (Anti-AFK)", true)
+createCategoryHeader(tabPlayer, "Chống Văng Game & Ổn Định")
 local stabCard = createCardGroup(tabPlayer)
 createToggleRow(stabCard, "Chống Văng Game (Anti-AFK)", "Chống bị Roblox kick sau 20 phút treo máy", Config.AntiAFK, function(v) Config.AntiAFK = v end)
 createToggleRow(stabCard, "Tự Động Kết Nối Lại", "Tự động vào lại server nếu bị mất kết nối", Config.AutoRejoin, function(v) Config.AutoRejoin = v end)
-
-createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)", false)
-local exportSkillCard = createCardGroup(tabPlayer)
-local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
-
-createButtonRow(exportSkillCard, "Quét Kỹ Năng Đang Sở Hữu (Chỉ Của Bạn)", "Chỉ quét các kỹ năng bạn thực sự sở hữu trong túi đồ & phím Z,X,C,V", "👤 Skill Của Bạn", function()
-    ExportAllPlayerSkills(infoSkillCount, true)
-end)
-
-createButtonRow(exportSkillCard, "Quét Bách Khoa Toàn Bộ Kỹ Năng Game", "Quét toàn bộ từ điển kỹ năng có trong game (Codex/Shop/Tất cả)", "📚 Toàn Bộ Game", function()
-    ExportAllPlayerSkills(infoSkillCount, false)
-end)
-
-createButtonRow(exportSkillCard, "Mở Bảng Xem Danh Sách Skill", "Mở khung văn bản cuộn trên màn hình để xem và copy", "📜 Mở Bảng Xem", function()
-    ShowSkillTextWindow()
-end)
 
 do
     createCategoryHeader(tabProfiles, "Quản Lý Cấu Hình (Profile)")
@@ -5137,98 +5089,57 @@ local function IsSkillOnCooldown(sk, fUI)
 end
 
 local function GetFishHealth(fUI)
-    -- 1. Tìm mô hình cá trong Workspace.Fishes
-    local uid = tostring(LocalPlayer.UserId)
-    local pName = LocalPlayer.Name
-    local hookedModel = nil
-
-    if Workspace:FindFirstChild("Fishes") then
-        local fishID = LocalPlayer:GetAttribute("FishID")
-        if fishID and Workspace.Fishes:FindFirstChild(tostring(fishID)) then
-            hookedModel = Workspace.Fishes:FindFirstChild(tostring(fishID))
-        end
-        if not hookedModel then
-            for _, f in ipairs(Workspace.Fishes:GetChildren()) do
-                if f:FindFirstChild(uid .. "_PlayerHealth") or f:FindFirstChild(pName .. "_PlayerHealth")
-                   or f:GetAttribute("Owner") == LocalPlayer.UserId or f:GetAttribute("Owner") == pName
-                   or f:GetAttribute("Player") == pName or f:GetAttribute("Player") == LocalPlayer.UserId then
-                    hookedModel = f
-                    break
+    local fishID = LocalPlayer:GetAttribute("FishID")
+    if fishID and Workspace:FindFirstChild("Fishes") then
+        local f = Workspace.Fishes:FindFirstChild(fishID)
+        if f then
+            local hpVal = f:FindFirstChild("Health") or f:FindFirstChild("HP") or f:FindFirstChild("FishHealth")
+            if hpVal and (hpVal:IsA("NumberValue") or hpVal:IsA("IntValue")) then
+                return hpVal.Value
+            end
+            for _, child in ipairs(f:GetChildren()) do
+                if child.Name:find("Health") or child.Name:find("HP") then
+                    if child:IsA("NumberValue") or child:IsA("IntValue") then
+                        return child.Value
+                    end
                 end
             end
         end
     end
 
-    if hookedModel then
-        for _, att in ipairs({"Health", "FishHealth", "HP", "MaxHealth"}) do
-            local v = hookedModel:GetAttribute(att)
-            if v and tonumber(v) and tonumber(v) > 0 then
-                return tonumber(v)
-            end
-        end
-        for _, child in ipairs(hookedModel:GetChildren()) do
-            if not child.Name:find("PlayerHealth") and (child.Name:find("Health") or child.Name:find("HP")) then
-                if child:IsA("NumberValue") or child:IsA("IntValue") then
-                    return child.Value
-                end
-            end
-        end
-    end
-
-    -- 2. Character attributes (chỉ lấy thuộc tính cá, TUYỆT ĐỐI không lấy HP/Health người chơi)
     local char = LocalPlayer.Character
     if char then
-        for _, att in ipairs({"FishHealth", "FishHP", "TargetHealth", "BossHP", "TargetHP"}) do
+        for _, att in ipairs({"FishHealth", "FishHP", "TargetHealth", "BossHP", "TargetHP", "HP"}) do
             local val = char:GetAttribute(att)
             if val and tonumber(val) then return tonumber(val) end
         end
     end
 
-    -- 3. Quét fUI (loại trừ hoàn toàn HPPlayer của người chơi!)
     if fUI then
-        local hpPlayerFrame = fUI:FindFirstChild("HPPlayer")
-        for _, lblName in ipairs({"FishHP", "HPFish", "BossHP", "TargetHP", "FishHealth", "TargetHealth"}) do
+        for _, lblName in ipairs({"FishHP", "HPFish", "Health", "HP", "BossHP", "TargetHP", "Value"}) do
             local d = fUI:FindFirstChild(lblName, true)
             if d and d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
-                if not hpPlayerFrame or not d:IsDescendantOf(hpPlayerFrame) then
-                    local txt = d.Text
-                    local kMatch = txt:match("([%d%.]+)%s*[kK]")
-                    if kMatch and tonumber(kMatch) then
-                        return tonumber(kMatch) * 1000
-                    end
-                    local mMatch = txt:match("([%d%.]+)%s*[mM]")
-                    if mMatch and tonumber(mMatch) then
-                        return tonumber(mMatch) * 1000000
-                    end
-                    local rawNum = txt:match("([%d%s,%._]+)%s*/") or txt:match("([%d%s,%._]+)")
-                    if rawNum then
-                        local cleanNum = rawNum:gsub("[%s,]", "")
-                        if tonumber(cleanNum) then return tonumber(cleanNum) end
-                    end
+                local txt = d.Text
+                -- Xử lý viết tắt dạng 3k / 3.5k HP
+                local kMatch = txt:match("([%d%.]+)%s*[kK]")
+                if kMatch and tonumber(kMatch) then
+                    return tonumber(kMatch) * 1000
                 end
-            end
-        end
-
-        local bossBar = fUI:FindFirstChild("BossFightBar")
-        if bossBar and bossBar.Visible then
-            for _, d in ipairs(bossBar:GetDescendants()) do
-                if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
-                    local txt = d.Text
-                    local kMatch = txt:match("([%d%.]+)%s*[kK]")
-                    if kMatch and tonumber(kMatch) then return tonumber(kMatch) * 1000 end
-                    local mMatch = txt:match("([%d%.]+)%s*[mM]")
-                    if mMatch and tonumber(mMatch) then return tonumber(mMatch) * 1000000 end
-                    local rawNum = txt:match("([%d%s,%._]+)%s*/") or txt:match("([%d%s,%._]+)")
-                    if rawNum then
-                        local cleanNum = rawNum:gsub("[%s,]", "")
-                        if tonumber(cleanNum) and tonumber(cleanNum) > 500 then return tonumber(cleanNum) end
-                    end
+                local mMatch = txt:match("([%d%.]+)%s*[mM]")
+                if mMatch and tonumber(mMatch) then
+                    return tonumber(mMatch) * 1000000
+                end
+                -- Xử lý chuỗi số có dấu cách ngăn cách (3 000 / 3 000) hoặc dấu phẩy
+                local rawNum = txt:match("([%d%s,%._]+)%s*/") or txt:match("([%d%s,%._]+)")
+                if rawNum then
+                    local cleanNum = rawNum:gsub("[%s,]", "")
+                    if tonumber(cleanNum) then return tonumber(cleanNum) end
                 end
             end
         end
     end
 
-    return nil
+    return 999999
 end
 
 local function GetPlayerHealth(fUI)
@@ -5571,7 +5482,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             
             -- XỬ LÝ FAST SKIP KHI SĂN SECRET BOSS (NẾU KHÔNG PHẢI BOSS MỤC TIÊU THÌ GIẬT CẦN THẢ LẠI)
             local skipTriggered = false
-            local isHunting = Config.AutoHuntBoss or Config.AutoChatSecretBoss or secretBossState.active
+            local isHunting = Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
 
             if isHunting and Config.FastSkipNonBoss then
                 if secretBossState.minigameStartTime == 0 then
@@ -5583,73 +5494,25 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 local isTargetBoss = false
                 local bossDisplay = nil
 
-                -- 1. Kiểm tra nếu có BossFightBar đang hiển thị trong fUI (chắc chắn là Boss)
-                local hasBossBar = false
-                if fUI then
+                if hookedFish then
+                    if Config.SecretBossTargets[hookedFish] == true or (secretBossLookup[hookedFish:lower()] and Config.SecretBossTargets[secretBossLookup[hookedFish:lower()]] == true) then
+                        isTargetBoss = true
+                        bossDisplay = hookedFish
+                    end
+                end
+
+                if not isTargetBoss and fUI then
                     for _, bName in ipairs({"BossFightBar", "BossBar", "BossUI", "BossFrame", "BossProgress", "BossHealth"}) do
                         local bBar = fUI:FindFirstChild(bName, true)
                         if bBar and bBar.Visible then
-                            hasBossBar = true
+                            isTargetBoss = true
+                            bossDisplay = hookedFish or "Secret Boss"
                             break
                         end
                     end
                 end
 
-                -- 2. Kiểm tra tên cá với danh sách mục tiêu đã chọn
-                if hookedFish then
-                    local fLower = hookedFish:lower()
-                    if Config.SecretBossTargets[hookedFish] == true or (secretBossLookup[fLower] and Config.SecretBossTargets[secretBossLookup[fLower]] == true) then
-                        isTargetBoss = true
-                        bossDisplay = secretBossLookup[fLower] or hookedFish
-                    else
-                        for _, entry in ipairs(secretBossDatabase) do
-                            for _, b in ipairs(entry.bosses) do
-                                if fLower:find(b.name:lower(), 1, true) and Config.SecretBossTargets[b.name] == true then
-                                    isTargetBoss = true
-                                    bossDisplay = b.name
-                                    break
-                                end
-                            end
-                            if isTargetBoss then break end
-                        end
-                    end
-                end
-
-                -- 3. Nếu thấy BossFightBar, xác định đây là Boss của đảo hiện tại
-                if not isTargetBoss and hasBossBar then
-                    local curIsland = secretBossState.targetIsland
-                    if not curIsland and secretBossState.currentMap then
-                        for _, entry in ipairs(secretBossDatabase) do
-                            if entry.islandName == secretBossState.currentMap then
-                                curIsland = entry
-                                break
-                            end
-                        end
-                    end
-                    if not curIsland then
-                        curIsland = secretBossState.GetNearestIsland()
-                    end
-
-                    local anyBossSelected = false
-                    if curIsland then
-                        for _, b in ipairs(curIsland.bosses) do
-                            if Config.SecretBossTargets[b.name] == true then
-                                anyBossSelected = true
-                                bossDisplay = b.name
-                                break
-                            end
-                        end
-                    else
-                        anyBossSelected = true
-                    end
-
-                    if anyBossSelected then
-                        isTargetBoss = true
-                        bossDisplay = bossDisplay or hookedFish or "Secret Boss"
-                    end
-                end
-
-                -- 4. Máu cá lớn (>= FishHpThreshold hoặc >= 500 HP) -> Chắc chắn không phải cá rác, không bao giờ được skip!
+                -- Máu cá lớn (>= FishHpThreshold hoặc >= 500 HP) -> Chắc chắn không phải cá rác, không bao giờ được skip!
                 if curFishHp and curFishHp >= (Config.FishHpThreshold or 500) and curFishHp < 999990 then
                     isTargetBoss = true
                     if not bossDisplay then
@@ -5677,32 +5540,19 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         )
                     end
                 else
-                    -- TUYỆT ĐỐI KHÔNG SKIP NẾU: Đang có BossFightBar hoặc máu cá lớn
-                    -- Chỉ skip khi:
-                    -- + KHÔNG có BossFightBar
-                    -- + Máu cá (nếu đo được) < FishHpThreshold
-                    -- + Đã qua thời gian chờ an toàn: có tên cá xác nhận không phải Boss (>= 0.6s) HOẶC không có tên sau >= 2.5s
+                    -- TUYỆT ĐỐI KHÔNG SKIP NẾU: Máu cá lớn hơn ngưỡng (ví dụ >= 500 HP hoặc >= FishHpThreshold)
+                    local isConfirmedSmallFish = (curFishHp < (Config.FishHpThreshold or 500))
                     local timeInMinigame = now - secretBossState.minigameStartTime
                     local canSkipNow = (now - secretBossState.lastSkipTime >= 0.8)
-                    local isHpSafeToSkip = (curFishHp == nil) or (curFishHp < (Config.FishHpThreshold or 500))
 
-                    local shouldSkip = false
-                    if not hasBossBar and isHpSafeToSkip and canSkipNow then
-                        if hookedFish and timeInMinigame >= 0.6 then
-                            shouldSkip = true
-                        elseif not hookedFish and timeInMinigame >= 2.5 then
-                            shouldSkip = true
-                        end
-                    end
-
-                    if shouldSkip then
+                    -- Chỉ bỏ qua nếu đã xác nhận là cá nhỏ và đã qua thời gian quét tên
+                    if isConfirmedSmallFish and canSkipNow and ((hookedFish and timeInMinigame >= 0.3) or (timeInMinigame >= 0.8)) then
                         secretBossState.lastSkipTime = now
                         secretBossState.minigameStartTime = 0
                         skipTriggered = true
                         local skipFishName = hookedFish or "Cá thường"
-                        local hpInfo = curFishHp and (" (" .. tostring(curFishHp) .. " HP)") or ""
                         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. hpInfo .. "], đang giật cần...")
+                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. " (" .. tostring(curFishHp) .. " HP)], đang giật cần...")
                         end
                         CancelAndRecastRod()
                     end
@@ -6354,25 +6204,14 @@ pcall(function()
     end
 end)
 
--- TỰ ĐỘNG QUÉT THỜI TIẾT & CHAT ĐỊNH KỲ (MỖI 1.5 GIÂY) ĐỂ CẬP NHẬT GIAO DIỆN & SĂN BOSS
+-- TỰ ĐỘNG QUÉT THỜI TIẾT & CHAT ĐỊNH KỲ (MỖI 2 GIÂY) ĐỂ SĂN BOSS
 task.spawn(function()
     while isRunning do
-        task.wait(1.5)
-        pcall(function()
-            -- 1. Quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
-            local wIsland, wName = secretBossState.DetectWeather()
-            
-            -- Cập nhật màu xanh sáng và trạng thái [ĐANG CÓ BOSS] lên Header của Đảo tương ứng
-            if wIsland then
-                UpdateIslandWeatherHighlight(wIsland.islandName, wName)
-            elseif secretBossState.targetIsland and secretBossState.active then
-                UpdateIslandWeatherHighlight(secretBossState.targetIsland.islandName, secretBossState.targetIsland.weather)
-            else
-                UpdateIslandWeatherHighlight(nil, nil)
-            end
-
-            -- 2. Nếu đang bật Săn Boss tự động thì tự bay đến đảo có boss
-            if (Config.AutoChatSecretBoss or Config.AutoHuntBoss) and isRunning then
+        task.wait(2.0)
+        if (Config.AutoChatSecretBoss or Config.AutoHuntBoss) and isRunning then
+            pcall(function()
+                -- 1. Ưu tiên quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
+                local wIsland, wName = secretBossState.DetectWeather()
                 if wIsland then
                     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     local dist = root and (root.Position - wIsland.pos).Magnitude or 9999
@@ -6380,10 +6219,11 @@ task.spawn(function()
                         secretBossState.Teleport(wIsland, wName)
                     end
                 else
+                    -- 2. Quét thông báo chat và banner màn hình
                     secretBossState.ScanChatHistory()
                 end
-            end
-        end)
+            end)
+        end
     end
 end)
 
