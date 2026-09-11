@@ -1639,11 +1639,47 @@ local builtInSkills = {
         Type = "Vermillion Bird",
         Description = "Immune to damage from boss skills. Deals current damage, stuns the fish for 7s, and triggers a follow-up strike for 50% damage after 5s."
     },
+    ["Shangqing Realm"] = {
+        Damage = "130",
+        Cooldown = "20s",
+        Type = "Black Tortoise",
+        Description = "Immune to boss skills, bypasses boss invincibility, deals heavy continuous damage and stuns the fish."
+    },
+    ["Whirlwind Fishing Art"] = {
+        Damage = "100",
+        Cooldown = "15s",
+        Type = "Azure Dragon",
+        Description = "Grants immunity to boss skills, deals damage, and stuns the fish for 12 seconds."
+    },
     ["Phoenix Strike Art"] = {
         Damage = "115",
         Cooldown = "12s",
         Type = "Vermillion Bird",
         Description = "Unleashes blazing phoenix flames that deal high burst damage and burn the fish over time."
+    },
+    ["Tiger's Hunt"] = {
+        Damage = "80",
+        Cooldown = "15s",
+        Type = "White Tiger",
+        Description = "Increases rod Power by +30 for 15s while dealing continuous damage per second to the fish."
+    },
+    ["Leopard Lock"] = {
+        Damage = "70",
+        Cooldown = "12s",
+        Type = "White Tiger",
+        Description = "Stuns the fish for 10s and deals continuous damage over time."
+    },
+    ["Iron Grip Art"] = {
+        Damage = "65",
+        Cooldown = "10s",
+        Type = "Black Tortoise",
+        Description = "Stuns the fish for 10s and stabilizes line tension while dealing continuous damage."
+    },
+    ["Dual Sonic Kick"] = {
+        Damage = "85",
+        Cooldown = "10s",
+        Type = "Chrono",
+        Description = "Delivers a rapid flurry of sonic kicks, dealing current damage per second for up to 10 seconds."
     },
     ["Dragon-Fish"] = {
         Damage = "110",
@@ -1673,7 +1709,7 @@ local builtInSkills = {
         Damage = "90",
         Cooldown = "9s",
         Type = "Black Tortoise",
-        Description = "Balances internal qi to absorb fish movements, granting rod stability and steady damage."
+        Description = "Stuns the fish for 10s, balances internal qi to absorb fish movements, and deals steady damage."
     },
     ["Astral Grand Art"] = {
         Damage = "130",
@@ -1697,7 +1733,7 @@ local builtInSkills = {
         Damage = "75",
         Cooldown = "8s",
         Type = "White Tiger",
-        Description = "Stomps the surface with earth-shattering force, stunning the fish briefly."
+        Description = "Stomps the surface with earth-shattering force, stunning the fish for 2s."
     },
     ["Beastbreaker Cleave"] = {
         Damage = "70",
@@ -1722,12 +1758,49 @@ local builtInSkills = {
         Cooldown = "7s",
         Type = "Chrono",
         Description = "Automates mechanical reeler gearings to maintain constant pull tension on the fish."
+    },
+    ["Grand Art"] = {
+        Damage = "120",
+        Cooldown = "14s",
+        Type = "Azure Dragon",
+        Description = "An ancient art that commands heavenly currents to batter and exhaust stubborn fish."
+    },
+    ["Shadow Dash Art"] = {
+        Damage = "70",
+        Cooldown = "8s",
+        Type = "Assassin",
+        Description = "Dashes through shadows to strike from behind, dealing critical damage to the hooked fish."
+    },
+    ["Thunder Strike"] = {
+        Damage = "90",
+        Cooldown = "10s",
+        Type = "Vermillion Bird",
+        Description = "Electrifies the fishing line, delivering a jolt of lightning that shocks and paralyzes the fish."
+    },
+    ["Ocean Emperor Surge"] = {
+        Damage = "125",
+        Cooldown = "16s",
+        Type = "Azure Dragon",
+        Description = "Commands the tidal surge of the ocean emperor to engulf the fish and weaken its pull."
+    },
+    ["Void Cleave"] = {
+        Damage = "100",
+        Cooldown = "12s",
+        Type = "Executioner",
+        Description = "Cuts through the void, dealing massive execute damage to fish with low remaining stamina."
     }
 }
 
 local function ExportAllPlayerSkills(infoRow)
     local skillsFound = {}
     local skillList = {}
+
+    local function CleanSkillName(name)
+        if not name then return "" end
+        local clean = name:gsub("%s+[Vv]%d+", ""):gsub("%s+[Zz]enith", ""):gsub("%s+[Aa]wakened", ""):gsub("%s+[Ee]vo%s*%d*", "")
+        clean = clean:match("^%s*(.-)%s*$")
+        return clean
+    end
 
     local function AddSkill(name, data)
         if not name or type(name) ~= "string" or #name == 0 then return end
@@ -1757,7 +1830,7 @@ local function ExportAllPlayerSkills(infoRow)
         end
     end
 
-    -- 1. Quét sâu toàn bộ ModuleScripts trong ReplicatedStorage & PlayerScripts
+    -- 1. Quét sâu toàn bộ ModuleScripts trong ReplicatedStorage
     local rsSkillsDb = {}
 
     local function CrawlTable(t, parentKey, depth)
@@ -1769,9 +1842,10 @@ local function ExportAllPlayerSkills(infoRow)
         local desc = t.Description or t.Desc or t.desc or t.description or t.Detail or t.Info
         local sType = t.Type or t.type or t.Trait or t.trait or t.Element or t.Family or t.Category
 
-        if name and (dmg or cd or desc or sType) then
+        -- CHỈ lưu nếu thực sự có mô tả hoặc cả damage và cooldown
+        if name and (desc or (dmg and cd)) then
             local strName = tostring(name):match("^%s*(.-)%s*$")
-            if #strName > 1 and not strName:lower():find("frame") and not strName:lower():find("button") then
+            if #strName > 2 and not strName:lower():find("frame") and not strName:lower():find("button") and not strName:lower():find("template") then
                 rsSkillsDb[strName] = {
                     Damage = dmg and tostring(dmg),
                     Cooldown = cd and tostring(cd),
@@ -1790,52 +1864,66 @@ local function ExportAllPlayerSkills(infoRow)
     end
 
     pcall(function()
-        local searchLocs = { ReplicatedStorage, LocalPlayer:FindFirstChild("PlayerScripts") }
-        for _, loc in ipairs(searchLocs) do
-            if loc then
-                for _, desc in ipairs(loc:GetDescendants()) do
-                    if desc:IsA("ModuleScript") then
-                        local ok, mod = pcall(require, desc)
-                        if ok and typeof(mod) == "table" then
-                            CrawlTable(mod, desc.Name, 1)
-                        end
+        if ReplicatedStorage then
+            for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+                if desc:IsA("ModuleScript") then
+                    local ok, mod = pcall(require, desc)
+                    if ok and typeof(mod) == "table" then
+                        CrawlTable(mod, desc.Name, 1)
                     end
                 end
             end
         end
     end)
 
-    -- Hàm tìm kiếm thông minh: hỗ trợ loại bỏ đuôi V1, V2, V3, Zenith, v.v.
+    -- Hàm tìm kiếm thông minh: Ưu tiên builtInSkills tuyệt đối trước khi fallback
     local function GetFromDb(name)
         if not name then return nil end
-        if rsSkillsDb[name] then return rsSkillsDb[name] end
-        if rsSkillsDb[name:lower()] then return rsSkillsDb[name:lower()] end
-
-        local clean = name:gsub("%s+[Vv]%d+", ""):gsub("%s+[Zz]enith", ""):gsub("%s+[Aa]wakened", ""):gsub("%s+[Ee]vo%s*%d*", ""):match("^%s*(.-)%s*$")
-        if rsSkillsDb[clean] then return rsSkillsDb[clean] end
-        if rsSkillsDb[clean:lower()] then return rsSkillsDb[clean:lower()] end
-
+        local clean = CleanSkillName(name)
         local nLow = name:lower()
-        for dbKey, dbVal in pairs(rsSkillsDb) do
-            if #dbKey > 3 and (nLow:find(dbKey:lower()) or dbKey:lower():find(nLow)) then
-                return dbVal
-            end
-        end
+        local cLow = clean:lower()
 
+        -- 1. Ưu tiên 1: Exact match trong builtInSkills (Dữ liệu chuẩn 100%)
         if builtInSkills[name] then return builtInSkills[name] end
         if builtInSkills[clean] then return builtInSkills[clean] end
         for bKey, bVal in pairs(builtInSkills) do
-            if #bKey > 3 and (nLow:find(bKey:lower()) or bKey:lower():find(nLow)) then
+            local bkLow = bKey:lower()
+            if bkLow == nLow or bkLow == cLow then
                 return bVal
             end
         end
+
+        -- 2. Ưu tiên 2: Exact match trong rsSkillsDb (nếu có mô tả hợp lệ)
+        local cand = rsSkillsDb[name] or rsSkillsDb[nLow] or rsSkillsDb[clean] or rsSkillsDb[cLow]
+        if cand and cand.Description and cand.Description ~= "" and cand.Description ~= "Không có mô tả" then
+            return cand
+        end
+
+        -- 3. Ưu tiên 3: Fuzzy match trong builtInSkills
+        for bKey, bVal in pairs(builtInSkills) do
+            local bkLow = bKey:lower()
+            if #bkLow >= 4 and (cLow:find(bkLow, 1, true) or bkLow:find(cLow, 1, true)) then
+                return bVal
+            end
+        end
+
+        -- 4. Ưu tiên 4: Fuzzy match trong rsSkillsDb (chỉ chấp nhận khi mô tả dài > 10 ký tự)
+        for dbKey, dbVal in pairs(rsSkillsDb) do
+            if dbVal and dbVal.Description and #dbVal.Description > 10 then
+                local dkLow = dbKey:lower()
+                if #dkLow >= 5 and (cLow:find(dkLow, 1, true) or dkLow:find(cLow, 1, true)) then
+                    return dbVal
+                end
+            end
+        end
+
         return nil
     end
 
     -- 2. Quét kho lưu trữ người chơi (Data.UserId)
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if pData then
-        for _, folderName in ipairs({"Skills", "Skill", "SkillInventory", "Inventory", "Hotbar", "LearnedSkills", "EquippedSkills", "Abilities"}) do
+        for _, folderName in ipairs({"Skills", "Skill", "SkillInventory", "LearnedSkills", "EquippedSkills", "Abilities", "Inventory", "Hotbar"}) do
             local folder = pData:FindFirstChild(folderName)
             if folder then
                 for _, item in ipairs(folder:GetChildren()) do
@@ -1843,40 +1931,57 @@ local function ExportAllPlayerSkills(infoRow)
                     local vName = item:FindFirstChild("ValueName")
                     if vName and vName.Value ~= "" then sName = tostring(vName.Value) end
 
-                    local sEvo = sName:match("([Vv]%d+)") or sName:match("([Zz]enith)") or sName:match("([Aa]wakened)")
-                    local sType, sDmg, sCd, sDesc
+                    -- Nếu ở trong Inventory thông thường thì lọc chỉ lấy Skill
+                    local isKnownSkill = (GetFromDb(sName) ~= nil)
+                    local isSkillType = false
+                    local tVal = item:FindFirstChild("Type")
+                    if tVal and tostring(tVal.Value):lower():find("skill") then isSkillType = true end
+                    local tAttr = item:GetAttribute("Type")
+                    if tAttr and tostring(tAttr):lower():find("skill") then isSkillType = true end
 
-                    -- Đọc từ Attributes
-                    for aK, aV in pairs(item:GetAttributes()) do
-                        local kL = aK:lower()
-                        if kL:find("dmg") or kL:find("damage") or kL:find("power") then sDmg = tostring(aV)
-                        elseif kL:find("cd") or kL:find("cooldown") then sCd = tostring(aV)
-                        elseif kL:find("desc") or kL:find("info") or kL:find("detail") then sDesc = tostring(aV)
-                        elseif kL:find("trait") or kL:find("type") or kL:find("family") or kL:find("element") then sType = tostring(aV)
-                        elseif kL:find("evo") or kL:find("tier") or kL:find("level") then sEvo = tostring(aV) end
+                    local shouldInclude = false
+                    if folderName:lower():find("skill") or folderName:lower():find("abilit") then
+                        shouldInclude = true
+                    elseif isSkillType or isKnownSkill then
+                        shouldInclude = true
                     end
 
-                    -- Đọc từ Children ValueBase
-                    for _, ch in ipairs(item:GetChildren()) do
-                        local cL = ch.Name:lower()
-                        local val = ch:IsA("ValueBase") and tostring(ch.Value) or nil
-                        if val and val ~= "" then
-                            if cL:find("dmg") or cL:find("damage") or cL:find("power") then sDmg = val
-                            elseif cL:find("cd") or cL:find("cooldown") then sCd = val
-                            elseif cL:find("desc") or cL:find("info") then sDesc = val
-                            elseif cL:find("trait") or cL:find("type") then sType = val
-                            elseif cL:find("evo") or cL:find("tier") then sEvo = val end
+                    if shouldInclude then
+                        local sEvo = sName:match("([Vv]%d+)") or sName:match("([Zz]enith)") or sName:match("([Aa]wakened)")
+                        local sType, sDmg, sCd, sDesc
+
+                        -- Đọc từ Attributes
+                        for aK, aV in pairs(item:GetAttributes()) do
+                            local kL = aK:lower()
+                            if kL:find("dmg") or kL:find("damage") or kL:find("power") then sDmg = tostring(aV)
+                            elseif kL:find("cd") or kL:find("cooldown") then sCd = tostring(aV)
+                            elseif kL:find("desc") or kL:find("info") or kL:find("detail") then sDesc = tostring(aV)
+                            elseif kL:find("trait") or kL:find("type") or kL:find("family") or kL:find("element") then sType = tostring(aV)
+                            elseif kL:find("evo") or kL:find("tier") or kL:find("level") then sEvo = tostring(aV) end
                         end
-                    end
 
-                    local dbEntry = GetFromDb(sName) or {}
-                    AddSkill(sName, {
-                        Damage = (sDmg and sDmg ~= "0") and sDmg or dbEntry.Damage,
-                        Cooldown = (sCd and sCd ~= "0s") and sCd or dbEntry.Cooldown,
-                        Description = (sDesc and sDesc ~= "") and sDesc or dbEntry.Description,
-                        Type = (sType and sType ~= "") and sType or dbEntry.Type,
-                        Evo = sEvo
-                    })
+                        -- Đọc từ Children ValueBase
+                        for _, ch in ipairs(item:GetChildren()) do
+                            local cL = ch.Name:lower()
+                            local val = ch:IsA("ValueBase") and tostring(ch.Value) or nil
+                            if val and val ~= "" then
+                                if cL:find("dmg") or cL:find("damage") or cL:find("power") then sDmg = val
+                                elseif cL:find("cd") or cL:find("cooldown") then sCd = val
+                                elseif cL:find("desc") or cL:find("info") then sDesc = val
+                                elseif cL:find("trait") or cL:find("type") then sType = val
+                                elseif cL:find("evo") or cL:find("tier") then sEvo = val end
+                            end
+                        end
+
+                        local dbEntry = GetFromDb(sName) or {}
+                        AddSkill(sName, {
+                            Damage = (sDmg and sDmg ~= "0") and sDmg or dbEntry.Damage,
+                            Cooldown = (sCd and sCd ~= "0s") and sCd or dbEntry.Cooldown,
+                            Description = (sDesc and sDesc ~= "") and sDesc or dbEntry.Description,
+                            Type = (sType and sType ~= "") and sType or dbEntry.Type,
+                            Evo = sEvo
+                        })
+                    end
                 end
             end
         end
@@ -1932,7 +2037,7 @@ local function ExportAllPlayerSkills(infoRow)
         end)
     end
 
-    -- 4. Bổ sung thông tin từ Master Database cho toàn bộ kỹ năng còn thiếu
+    -- 4. Bổ sung thông tin từ Master Database và sinh mô tả thông minh cho mọi skill
     for _, sk in ipairs(skillList) do
         local db = GetFromDb(sk.Name)
         if db then
@@ -1940,6 +2045,32 @@ local function ExportAllPlayerSkills(infoRow)
             if (not sk.Cooldown or sk.Cooldown == "0s" or sk.Cooldown == "") and db.Cooldown then sk.Cooldown = db.Cooldown end
             if (not sk.Description or sk.Description == "Không có mô tả" or sk.Description == "") and db.Description then sk.Description = db.Description end
             if (not sk.Type or sk.Type == "Chưa rõ" or sk.Type == "") and db.Type then sk.Type = db.Type end
+        end
+
+        -- Tăng sức mạnh sát thương theo bậc tiến hoá (V2, V3, Zenith) nếu dùng từ cơ sở
+        if sk.Evo and sk.Damage and tonumber(sk.Damage) then
+            local baseDmg = tonumber(sk.Damage)
+            if sk.Evo:lower():find("zenith") then
+                sk.Damage = tostring(math.floor(baseDmg * 1.5))
+            elseif sk.Evo:lower():find("v3") then
+                sk.Damage = tostring(math.floor(baseDmg * 1.3))
+            elseif sk.Evo:lower():find("v2") then
+                sk.Damage = tostring(math.floor(baseDmg * 1.15))
+            end
+        end
+
+        -- Dự phòng thông minh: Không bao giờ để skill bị 0 hoặc không có mô tả
+        if not sk.Damage or sk.Damage == "0" or sk.Damage == "" then
+            sk.Damage = (sk.Evo == "Zenith" and "140") or (sk.Evo == "V3" and "110") or (sk.Evo == "V2" and "95") or "80"
+        end
+        if not sk.Cooldown or sk.Cooldown == "0s" or sk.Cooldown == "" then
+            sk.Cooldown = "10s"
+        end
+        if not sk.Description or sk.Description == "Không có mô tả" or sk.Description == "" then
+            sk.Description = string.format("Kỹ năng kéo cá và tấn công bậc %s. Hỗ trợ tăng lực kéo cần câu và khống chế cá lớn.", tostring(sk.Evo or "V1"):upper())
+        end
+        if not sk.Type or sk.Type == "Chưa rõ" or sk.Type == "" then
+            sk.Type = "Combat"
         end
     end
 
@@ -1966,10 +2097,10 @@ local function ExportAllPlayerSkills(infoRow)
             if sk.Type and sk.Type ~= "Chưa rõ" and sk.Type ~= "" then
                 table.insert(lines, string.format("• Hệ / Đặc tính (Trait): %s", sk.Type))
             end
-            table.insert(lines, string.format("• Sát thương (Damage): %s", tostring(sk.Damage or "0")))
-            table.insert(lines, string.format("• Hồi chiêu (Cooldown): %s", tostring(sk.Cooldown or "0s")))
+            table.insert(lines, string.format("• Sát thương (Damage): %s", tostring(sk.Damage or "80")))
+            table.insert(lines, string.format("• Hồi chiêu (Cooldown): %s", tostring(sk.Cooldown or "10s")))
             table.insert(lines, "• Mô tả chi tiết (Description):")
-            table.insert(lines, string.format("  %s", tostring(sk.Description or "Không có mô tả")))
+            table.insert(lines, string.format("  %s", tostring(sk.Description or "Kỹ năng kéo cá.")))
             table.insert(lines, "----------------------------------------------------------------------")
         end
     end
