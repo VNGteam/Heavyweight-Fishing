@@ -5609,6 +5609,19 @@ end
 -- Hiển thị trực tiếp vị trí đảo người chơi đang đứng
 local infoCurrentMap = createInfoRow(islandCard, "📍 Vị Trí Bạn Đang Đứng", "Đang nhận diện...")
 
+createButtonRow(islandCard, "📋 Sao Chép Tọa Độ Hiện Tại", "Copy tọa độ đứng hiện tại vào Clipboard để gửi cho AI nạp đảo mới", "Sao Chép", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local pos = root.Position
+    local str = string.format("Vector3.new(%.1f, %.1f, %.1f)", pos.X, pos.Y, pos.Z)
+    pcall(function()
+        if setclipboard then setclipboard(str)
+        elseif toclipboard then toclipboard(str) end
+    end)
+    ShowNotification("TỌA ĐỘ HIỆN TẠI", "Đã copy: " .. str .. " vào Clipboard!", "SUCCESS", 6)
+end)
+
 local islandUpdaters = {}
 UpdateAllIslandStatus = function()
     local curLocName = GetCurrentLocationName()
