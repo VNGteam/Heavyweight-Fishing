@@ -3206,14 +3206,67 @@ createButtonRow(dailyCard, "Nhận Hết Quà 7 Ngày", "Nhận nhanh toàn bộ
     end)
 end)
 
-createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập tất cả mã giftcode còn hạn", "Nhập Code", function()
-    local codes = {"60KLikes", "55KLikes", "50KLikes", "40MVisits", "35MVisits", "TaijiEvo", "NewSeason", "33MVisits", "32MVisits", "31MVisits", "30MVisits", "Taiji", "49KLikes", "48KLikes", "47KLikes", "46KLikes", "13KActives", "HWF", "RELEASE"}
+createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập tất cả mã giftcode mới nhất (PVP, 19KActives, WaitForPeak...)", "Nhập Code", function()
+    local codes = {
+        -- Mã mới nhất & Đang hoạt động
+        "PVP",
+        "19KActives",
+        "WaitForPeak",
+        "36MVisits",
+        "35MVisits",
+        "34MVisits",
+        "60KLikes",
+        "55KLikes",
+        "50KLikes",
+        "AXO",
+        "TaijiEvo",
+        "NewSeason",
+        "40MVisits",
+        "33MVisits",
+        "32MVisits",
+        "31MVisits",
+        "30MVisits",
+        "Taiji",
+        "49KLikes",
+        "48KLikes",
+        "47KLikes",
+        "46KLikes",
+        "13KActives",
+        "17KActives",
+        "HWF",
+        "RELEASE",
+        -- Các mã sự kiện & cột mốc khác
+        "BigUPD",
+        "SorryForShutdown",
+        "UIBUG",
+        "ThanksForNitroBoost",
+        "Enzo",
+        "Enzo2",
+        "CodeBug",
+        "PEAK",
+        "FreeReroll",
+        "FreeReroll2",
+        "BuyAgain",
+        "BUGBUGBUG",
+        "Golden",
+        "Hit5KActives",
+        "Hit4KActives",
+        "Hit3KActives",
+        "Hit2KActives",
+        "ORB",
+        "FreeTicket",
+        "CrystalBugs",
+        "April Fools",
+        "LunarNewYear"
+    }
     if Events and Events:FindFirstChild("RedeemCode") then
-        for _, c in ipairs(codes) do
-            Events.RedeemCode:FireServer(c)
-            task.wait(0.2)
-        end
-        ShowNotification("Giftcode", "Đã nhập tất cả các mã code còn hạn!", "SUCCESS")
+        task.spawn(function()
+            for _, c in ipairs(codes) do
+                Events.RedeemCode:FireServer(c)
+                task.wait(0.25)
+            end
+            ShowNotification("Giftcode", string.format("Đã nạp toàn bộ %d mã code mới nhất vào game!", #codes), "SUCCESS")
+        end)
     end
 end)
 
