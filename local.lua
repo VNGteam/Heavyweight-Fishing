@@ -1849,7 +1849,8 @@ local builtInSkills = {
     }
 }
 
-local function ExportAllPlayerSkills(infoRow)
+local function ExportAllPlayerSkills(infoRow, ownedOnly)
+    if ownedOnly == nil then ownedOnly = true end
     local skillsFound = {}
     local skillList = {}
 
@@ -1858,6 +1859,39 @@ local function ExportAllPlayerSkills(infoRow)
         local clean = name:gsub("%s+[Vv]%d+", ""):gsub("%s+[Zz]enith", ""):gsub("%s+[Aa]wakened", ""):gsub("%s+[Ee]vo%s*%d*", "")
         clean = clean:match("^%s*(.-)%s*$")
         return clean
+    end
+
+    local function IsSkillItemOwned(item)
+        if not item then return false end
+        if item:IsA("BoolValue") then
+            return item.Value == true
+        end
+        if item:IsA("IntValue") or item:IsA("NumberValue") then
+            return item.Value > 0
+        end
+        if item:IsA("StringValue") then
+            return item.Value ~= ""
+        end
+        local oVal = item:FindFirstChild("Owned") or item:FindFirstChild("Unlocked")
+        if oVal and oVal:IsA("ValueBase") then
+            if typeof(oVal.Value) == "boolean" then return oVal.Value == true end
+            if tonumber(oVal.Value) then return tonumber(oVal.Value) > 0 end
+        end
+        local lVal = item:FindFirstChild("Locked")
+        if lVal and lVal:IsA("ValueBase") and lVal.Value == true then
+            return false
+        end
+        local lvlVal = item:FindFirstChild("Level") or item:FindFirstChild("Count") or item:FindFirstChild("Mastery")
+        if lvlVal and lvlVal:IsA("ValueBase") and tonumber(lvlVal.Value) then
+            return tonumber(lvlVal.Value) > 0
+        end
+        if item:GetAttribute("Owned") == true or item:GetAttribute("Unlocked") == true then
+            return true
+        end
+        if item:GetAttribute("Locked") == true then
+            return false
+        end
+        return true
     end
 
     local function AddSkill(name, data)
@@ -1999,14 +2033,24 @@ local function ExportAllPlayerSkills(infoRow)
                     local tAttr = item:GetAttribute("Type")
                     if tAttr and tostring(tAttr):lower():find("skill") then isSkillType = true end
 
-                    local shouldInclude = false
+                    local isSkill = false
                     if folderName:lower():find("skill") or folderName:lower():find("abilit") then
-                        shouldInclude = true
+                        isSkill = true
                     elseif isSkillType or isKnownSkill then
-                        shouldInclude = true
+                        isSkill = true
                     end
 
-                    if shouldInclude then
+                    if sName:find("|") or sName:lower():find("trait:") or sName:lower():find("drop:") or sName:lower() == "upg" then
+                        isSkill = false
+                    end
+
+                    -- Kiểm tra quyền sở hữu nếu người dùng yêu cầu chỉ quét skill của mình
+                    local isOwned = true
+                    if ownedOnly then
+                        isOwned = IsSkillItemOwned(item)
+                    end
+
+                    if isSkill and isOwned then
                         local sEvo = sName:match("([Vv]%d+)") or sName:match("([Zz]enith)") or sName:match("([Aa]wakened)")
                         local sType, sDmg, sCd, sDesc
 
@@ -2047,54 +2091,107 @@ local function ExportAllPlayerSkills(infoRow)
         end
 
         for attName, attVal in pairs(pData:GetAttributes()) do
-            if attName:lower():find("skill") and typeof(attVal) == "string" then
+            if attName:lower():find("skill") and typeof(attVal) == "string" and not attVal:find("|") then
                 local dbEntry = GetFromDb(attVal) or {}
                 AddSkill(attVal, dbEntry)
             end
         end
     end
 
-    -- 3. Quét PlayerGui (Thẻ UI và Tooltip)
+    -- 2.5 Luôn quét các chiêu đang trang bị trên thanh phím nóng Z, X, C, V (100% người chơi đang sở hữu)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
         pcall(function()
             for _, desc in ipairs(pg:GetDescendants()) do
-                if desc:IsA("TextLabel") and desc.Text:find("Damage:") then
-                    local card = desc.Parent
-                    if card then
-                        local rootCard = (card.Parent and (card.Parent:IsA("Frame") or card.Parent:IsA("CanvasGroup"))) and card.Parent or card
-                        local sName, sType, sDamage, sCooldown, sDesc
-
-                        for _, lbl in ipairs(rootCard:GetDescendants()) do
-                            if lbl:IsA("TextLabel") then
-                                local t = lbl.Text:match("^%s*(.-)%s*$")
-                                if t:find("Damage:%s*([%d%.]+)") then
-                                    sDamage = t:match("Damage:%s*([%d%.]+)")
-                                elseif t:find("Cooldown:%s*([%d%.]+)") then
-                                    sCooldown = t:match("Cooldown:%s*([%d%.]+)")
-                                elseif t:lower() == "description" then
-                                    -- header label
-                                elseif #t > 25 and not t:find("Damage:") and not t:find("Cooldown:") then
-                                    sDesc = t
-                                elseif #t > 0 and #t <= 30 and not t:find("Damage:") and not t:find("Cooldown:") and t:lower() ~= "description" then
-                                    if not sName then sName = t
-                                    elseif not sType and t ~= sName then sType = t end
-                                end
+                if desc:IsA("TextLabel") or desc:IsA("TextButton") then
+                    local pName = desc.Parent and desc.Parent.Name:upper() or ""
+                    local gName = desc.Parent and desc.Parent.Parent and desc.Parent.Parent.Name:upper() or ""
+                    if pName == "Z" or pName == "X" or pName == "C" or pName == "V" or
+                       gName == "Z" or gName == "X" or gName == "C" or gName == "V" or
+                       pName:find("SLOT") or gName:find("SLOT") or pName:find("HOTBAR") then
+                        local t = desc.Text:match("^%s*(.-)%s*$")
+                        if #t > 2 and not t:find(":") and not tonumber(t) and t:upper() ~= "Z" and t:upper() ~= "X" and t:upper() ~= "C" and t:upper() ~= "V" and not t:find("|") then
+                            local dbEntry = GetFromDb(t)
+                            if dbEntry or builtInSkills[t] or builtInSkills[CleanSkillName(t)] then
+                                AddSkill(t, dbEntry or {})
                             end
-                        end
-
-                        if sName and (sDamage or sCooldown or sDesc) then
-                            AddSkill(sName, {
-                                Damage = sDamage,
-                                Cooldown = sCooldown,
-                                Description = sDesc,
-                                Type = sType
-                            })
                         end
                     end
                 end
             end
         end)
+    end
+
+    -- 3. Quét PlayerGui (Thẻ UI và Tooltip)
+    if not ownedOnly then
+        -- QUÉT TOÀN BỘ GAME (Bao gồm cả Codex, Sage Shop, Preview)
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then
+            pcall(function()
+                for _, desc in ipairs(pg:GetDescendants()) do
+                    if desc:IsA("TextLabel") and desc.Text:find("Damage:") then
+                        local card = desc.Parent
+                        if card then
+                            local rootCard = (card.Parent and (card.Parent:IsA("Frame") or card.Parent:IsA("CanvasGroup"))) and card.Parent or card
+                            local sName, sType, sDamage, sCooldown, sDesc
+
+                            for _, lbl in ipairs(rootCard:GetDescendants()) do
+                                if lbl:IsA("TextLabel") then
+                                    local t = lbl.Text:match("^%s*(.-)%s*$")
+                                    if t:find("Damage:%s*([%d%.]+)") then
+                                        sDamage = t:match("Damage:%s*([%d%.]+)")
+                                    elseif t:find("Cooldown:%s*([%d%.]+)") then
+                                        sCooldown = t:match("Cooldown:%s*([%d%.]+)")
+                                    elseif t:lower() == "description" then
+                                        -- header label
+                                    elseif #t > 25 and not t:find("Damage:") and not t:find("Cooldown:") then
+                                        sDesc = t
+                                    elseif #t > 0 and #t <= 30 and not t:find("Damage:") and not t:find("Cooldown:") and t:lower() ~= "description" then
+                                        if not sName then sName = t
+                                        elseif not sType and t ~= sName then sType = t end
+                                    end
+                                end
+                            end
+
+                            if sName and (sDamage or sCooldown or sDesc) then
+                                AddSkill(sName, {
+                                    Damage = sDamage,
+                                    Cooldown = sCooldown,
+                                    Description = sDesc,
+                                    Type = sType
+                                })
+                            end
+                        end
+                    end
+                end
+            end)
+        end
+    else
+        -- CHỈ QUÉT TỦ ĐỒ CỦA NGƯỜI CHƠI (Bỏ qua Sage, Shop, Codex, Gacha, Banner)
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then
+            pcall(function()
+                for _, desc in ipairs(pg:GetDescendants()) do
+                    if (desc:IsA("TextButton") or desc:IsA("TextLabel")) and (desc.Text:lower():find("equip") or desc.Text:lower():find("trang bị") or desc.Text:lower():find("unequip")) and not desc.Text:lower():find("buy") and not desc.Text:lower():find("gacha") then
+                        local card = desc.Parent
+                        if card then
+                            local rootCard = (card.Parent and (card.Parent:IsA("Frame") or card.Parent:IsA("CanvasGroup"))) and card.Parent or card
+                            local fullName = rootCard:GetFullName():lower()
+                            if not fullName:find("sage") and not fullName:find("shop") and not fullName:find("banner") and not fullName:find("gacha") and not fullName:find("codex") then
+                                for _, lbl in ipairs(rootCard:GetDescendants()) do
+                                    if lbl:IsA("TextLabel") and #lbl.Text > 2 and #lbl.Text <= 30 then
+                                        local t = lbl.Text:match("^%s*(.-)%s*$")
+                                        if not t:find(":") and (GetFromDb(t) or builtInSkills[t] or builtInSkills[CleanSkillName(t)]) then
+                                            AddSkill(t, GetFromDb(t) or {})
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end)
+        end
     end
 
     -- 4. Bổ sung thông tin từ Master Database và sinh mô tả thông minh cho mọi skill
@@ -2137,17 +2234,22 @@ local function ExportAllPlayerSkills(infoRow)
     -- 5. Định dạng văn bản xuất bản hoàn chỉnh
     local lines = {}
     table.insert(lines, "======================================================================")
-    table.insert(lines, "               DANH SÁCH TOÀN BỘ KỸ NĂNG CỦA BẠN")
+    if ownedOnly then
+        table.insert(lines, "          DANH SÁCH KỸ NĂNG ĐÃ SỞ HỮU (TỦ ĐỒ CỦA BẠN)")
+    else
+        table.insert(lines, "         BÁCH KHOA TOÀN BỘ KỸ NĂNG TRONG GAME (CODEX TOÀN GAME)")
+    end
     table.insert(lines, "======================================================================")
     table.insert(lines, string.format("Người chơi: %s (UserId: %s)", LocalPlayer.Name, tostring(LocalPlayer.UserId)))
     table.insert(lines, string.format("Thời gian xuất: %s", os.date("%H:%M:%S - %d/%m/%Y")))
+    table.insert(lines, string.format("Chế độ quét: %s", ownedOnly and "Chỉ Kỹ Năng Đã Sở Hữu (Tủ đồ)" or "Bách Khoa Toàn Bộ Kỹ Năng Game"))
     table.insert(lines, string.format("Tổng số kỹ năng: %d kỹ năng", #skillList))
     table.insert(lines, "----------------------------------------------------------------------")
     table.insert(lines, "")
 
     if #skillList == 0 then
-        table.insert(lines, "(Chưa phát hiện kỹ năng nào trong kho hoặc trên màn hình!)")
-        table.insert(lines, "💡 Mẹo: Hãy mở bảng Skill/Kỹ Năng trong game lên ít nhất 1 lần để hệ thống đọc toàn bộ các thẻ thông tin.")
+        table.insert(lines, "(Chưa phát hiện kỹ năng nào trong tủ đồ hoặc trên thanh phím nóng!)")
+        table.insert(lines, "💡 Mẹo: Hãy mở túi đồ (Inventory / Skills) trong game lên 1 lần để hệ thống đọc dữ liệu.")
     else
         for i, sk in ipairs(skillList) do
             table.insert(lines, string.format("[%d] %s", i, sk.Name))
@@ -2183,7 +2285,8 @@ local function ExportAllPlayerSkills(infoRow)
 
     pcall(function()
         if writefile then
-            writefile("HeavyweightFishing_AllSkills.txt", fullText)
+            local fName = ownedOnly and "HeavyweightFishing_MySkills.txt" or "HeavyweightFishing_AllSkills.txt"
+            writefile(fName, fullText)
         end
     end)
 
@@ -2982,9 +3085,15 @@ end)
 createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)")
 local exportSkillCard = createCardGroup(tabPlayer)
 local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
-createButtonRow(exportSkillCard, "Quét & Sao Chép Toàn Bộ Skill", "Lấy toàn bộ Tên, Damage, Cooldown, Description vào Clipboard", "📋 Quét & Copy", function()
-    ExportAllPlayerSkills(infoSkillCount)
+
+createButtonRow(exportSkillCard, "Quét Kỹ Năng Đang Sở Hữu (Chỉ Của Bạn)", "Chỉ quét các kỹ năng bạn thực sự sở hữu trong túi đồ & phím Z,X,C,V", "👤 Skill Của Bạn", function()
+    ExportAllPlayerSkills(infoSkillCount, true)
 end)
+
+createButtonRow(exportSkillCard, "Quét Bách Khoa Toàn Bộ Kỹ Năng Game", "Quét toàn bộ từ điển kỹ năng có trong game (Codex/Shop/Tất cả)", "📚 Toàn Bộ Game", function()
+    ExportAllPlayerSkills(infoSkillCount, false)
+end)
+
 createButtonRow(exportSkillCard, "Mở Bảng Xem Danh Sách Skill", "Mở khung văn bản cuộn trên màn hình để xem và copy", "📜 Mở Bảng Xem", function()
     ShowSkillTextWindow()
 end)
