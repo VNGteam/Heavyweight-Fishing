@@ -97,7 +97,7 @@ local Config = {
     AutoSlam = true,
     AutoCharge = true,
     InstantCatch = true,
-    AntiStuckEnabled = true,
+    AntiStuckEnabled = false,
     SmartComboEnabled = false,
     FishHpThreshold = 500,
     QuickCatchSkill = "Z",
@@ -5331,14 +5331,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                 end
 
-                -- Máu cá lớn (>= FishHpThreshold hoặc >= 500 HP) -> Chắc chắn không phải cá rác, không bao giờ được skip!
-                if curFishHp and curFishHp >= (Config.FishHpThreshold or 500) and curFishHp < 999990 then
-                    isTargetBoss = true
-                    if not bossDisplay then
-                        bossDisplay = (hookedFish or "Cá Khổng Lồ / Boss") .. " (" .. tostring(curFishHp) .. " HP)"
-                    end
-                end
-
                 if isTargetBoss then
                     secretBossState.isCatchingTarget = true
                     local displayBossName = bossDisplay or hookedFish or "Secret Boss"
@@ -5359,19 +5351,17 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         )
                     end
                 else
-                    -- TUYỆT ĐỐI KHÔNG SKIP NẾU: Máu cá lớn hơn ngưỡng (ví dụ >= 500 HP hoặc >= FishHpThreshold)
-                    local isConfirmedSmallFish = (curFishHp < (Config.FishHpThreshold or 500))
+                    -- Không phải Secret Boss mục tiêu -> Fast Skip giật cần bỏ cá thường
                     local timeInMinigame = now - secretBossState.minigameStartTime
                     local canSkipNow = (now - secretBossState.lastSkipTime >= 0.8)
 
-                    -- Chỉ bỏ qua nếu đã xác nhận là cá nhỏ và đã qua thời gian quét tên
-                    if isConfirmedSmallFish and canSkipNow and ((hookedFish and timeInMinigame >= 0.3) or (timeInMinigame >= 0.8)) then
+                    if canSkipNow and ((hookedFish and timeInMinigame >= 0.25) or (timeInMinigame >= 0.7)) then
                         secretBossState.lastSkipTime = now
                         secretBossState.minigameStartTime = 0
                         skipTriggered = true
                         local skipFishName = hookedFish or "Cá thường"
                         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. " (" .. tostring(curFishHp) .. " HP)], đang giật cần...")
+                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. (curFishHp and (" - " .. tostring(curFishHp) .. " HP") or "") .. "], đang giật cần thả lại...")
                         end
                         CancelAndRecastRod()
                     end
