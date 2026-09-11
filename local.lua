@@ -1864,6 +1864,8 @@ local function ExportAllPlayerSkills(infoRow)
         if not name or type(name) ~= "string" or #name == 0 then return end
         name = name:match("^%s*(.-)%s*$")
         if #name == 0 or name:lower() == "template" or name:lower() == "button" or name:lower() == "frame" then return end
+        if name:find("|") or name:lower():find("trait:") or name:lower():find("drop:") or name:lower() == "upg" then return end
+        if data and data.Type and tostring(data.Type):lower() == "fish" then return end
 
         if not skillsFound[name] then
             skillsFound[name] = {
