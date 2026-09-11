@@ -1566,13 +1566,37 @@ local function GetCurrentHookedFishName()
     local char = LocalPlayer.Character
     if not char then return nil end
 
+    local function matchBossName(rawText)
+        if not rawText or typeof(rawText) ~= "string" or #rawText == 0 then return nil end
+        local txt = rawText:gsub("^%s+", ""):gsub("%s+$", "")
+        local txtLower = txt:lower()
+
+        if secretBossLookup[txtLower] then return secretBossLookup[txtLower] end
+
+        -- Fuzzy / Substring match với danh sách Secret Boss (bỏ qua prefix đột biến như Shiny, Giant, Albino,...)
+        for _, entry in ipairs(secretBossDatabase) do
+            for _, b in ipairs(entry.bosses) do
+                local bLower = b.name:lower()
+                if txtLower:find(bLower, 1, true) then
+                    return b.name
+                end
+            end
+            if entry.bossPatterns then
+                for _, bp in ipairs(entry.bossPatterns) do
+                    if txtLower:find(bp, 1, true) then
+                        return bp
+                    end
+                end
+            end
+        end
+        return txt
+    end
+
     -- 1. Check Character attributes
     for _, attName in ipairs({"FishName", "TargetFish", "Boss", "Fish", "CurrentFish", "HookedFish"}) do
         local val = char:GetAttribute(attName)
         if val and tostring(val) ~= "" then
-            local valLower = tostring(val):lower()
-            if secretBossLookup[valLower] then return secretBossLookup[valLower] end
-            return tostring(val)
+            return matchBossName(tostring(val))
         end
     end
 
@@ -1583,9 +1607,7 @@ local function GetCurrentHookedFishName()
         for _, lblName in ipairs({"FishName", "Title", "Name", "Fish", "BossName", "Target"}) do
             local label = fUI:FindFirstChild(lblName, true)
             if label and label:IsA("TextLabel") and label.Text ~= "" then
-                local txt = label.Text:gsub("^%s+", ""):gsub("%s+$", "")
-                if secretBossLookup[txt:lower()] then return secretBossLookup[txt:lower()] end
-                return txt
+                return matchBossName(label.Text)
             end
         end
 
@@ -1593,9 +1615,8 @@ local function GetCurrentHookedFishName()
         if bossBar and bossBar.Visible then
             for _, d in ipairs(bossBar:GetDescendants()) do
                 if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and not tonumber(d.Text) and not d.Text:find("%%") then
-                    local txt = d.Text:gsub("^%s+", ""):gsub("%s+$", "")
-                    if secretBossLookup[txt:lower()] then return secretBossLookup[txt:lower()] end
-                    if #txt > 3 then return txt end
+                    local matched = matchBossName(d.Text)
+                    if matched and #matched > 2 then return matched end
                 end
             end
         end
@@ -1603,8 +1624,14 @@ local function GetCurrentHookedFishName()
         -- Scan any visible TextLabel in fUI matching a known secret boss
         for _, d in ipairs(fUI:GetDescendants()) do
             if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and not tonumber(d.Text) and not d.Text:find("%%") then
-                local txt = d.Text:gsub("^%s+", ""):gsub("%s+$", "")
-                if secretBossLookup[txt:lower()] then return secretBossLookup[txt:lower()] end
+                local txtLower = d.Text:lower()
+                for _, entry in ipairs(secretBossDatabase) do
+                    for _, b in ipairs(entry.bosses) do
+                        if txtLower:find(b.name:lower(), 1, true) then
+                            return b.name
+                        end
+                    end
+                end
             end
         end
     end
@@ -4415,47 +4442,69 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
 
                 local hookedFish = GetCurrentHookedFishName()
+                local curFishHp = GetFishHealth(fUI)
                 local isTargetBoss = false
+                local bossDisplay = nil
 
                 if hookedFish then
                     if Config.SecretBossTargets[hookedFish] == true or (secretBossLookup[hookedFish:lower()] and Config.SecretBossTargets[secretBossLookup[hookedFish:lower()]] == true) then
                         isTargetBoss = true
+                        bossDisplay = hookedFish
                     end
                 end
 
-                local bossFightBar = fUI and fUI:FindFirstChild("BossFightBar")
-                if bossFightBar and bossFightBar.Visible then
+                if not isTargetBoss and fUI then
+                    for _, bName in ipairs({"BossFightBar", "BossBar", "BossUI", "BossFrame", "BossProgress", "BossHealth"}) do
+                        local bBar = fUI:FindFirstChild(bName, true)
+                        if bBar and bBar.Visible then
+                            isTargetBoss = true
+                            bossDisplay = hookedFish or "Secret Boss"
+                            break
+                        end
+                    end
+                end
+
+                -- Máu cá lớn (>= FishHpThreshold hoặc >= 500 HP) -> Chắc chắn không phải cá rác, không bao giờ được skip!
+                if curFishHp and curFishHp >= (Config.FishHpThreshold or 500) and curFishHp < 999990 then
                     isTargetBoss = true
+                    if not bossDisplay then
+                        bossDisplay = (hookedFish or "Cá Khổng Lồ / Boss") .. " (" .. tostring(curFishHp) .. " HP)"
+                    end
                 end
 
                 if isTargetBoss then
                     secretBossState.isCatchingTarget = true
+                    local displayBossName = bossDisplay or hookedFish or "Secret Boss"
                     if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                        statusLabelSecretBoss.Set("🎯 ĐANG CÂU BOSS: " .. tostring(hookedFish or "Secret Boss") .. "!")
+                        statusLabelSecretBoss.Set("🎯 ĐANG CÂU BOSS: " .. tostring(displayBossName) .. "!")
                     end
                     if Config.WebhookEnabled and Config.WebhookNotifyBoss and not secretBossState.webhookSentForCurrent then
                         secretBossState.webhookSentForCurrent = true
                         SendDiscordWebhook(
                             "🚨 PHÁT HIỆN SECRET BOSS!",
-                            "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng Secret Boss: **" .. tostring(hookedFish or "Secret Boss") .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
+                            "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng: **" .. tostring(displayBossName) .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
                             15158332,
                             {
-                                { name = "🐟 Boss Mục Tiêu", value = tostring(hookedFish or "Secret Boss"), inline = true },
+                                { name = "🐟 Boss Mục Tiêu", value = tostring(displayBossName), inline = true },
                                 { name = "📍 Bản Đồ", value = tostring(secretBossState.currentMap or "Đảo Hiện Tại"), inline = true },
                                 { name = "⏰ Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
                             }
                         )
                     end
                 else
+                    -- TUYỆT ĐỐI KHÔNG SKIP NẾU: Máu cá lớn hơn ngưỡng (ví dụ >= 500 HP hoặc >= FishHpThreshold)
+                    local isConfirmedSmallFish = (curFishHp < (Config.FishHpThreshold or 500))
                     local timeInMinigame = now - secretBossState.minigameStartTime
                     local canSkipNow = (now - secretBossState.lastSkipTime >= 0.8)
-                    if canSkipNow and ((hookedFish and timeInMinigame >= 0.2) or (timeInMinigame >= 0.6)) then
+
+                    -- Chỉ bỏ qua nếu đã xác nhận là cá nhỏ và đã qua thời gian quét tên
+                    if isConfirmedSmallFish and canSkipNow and ((hookedFish and timeInMinigame >= 0.3) or (timeInMinigame >= 0.8)) then
                         secretBossState.lastSkipTime = now
                         secretBossState.minigameStartTime = 0
                         skipTriggered = true
                         local skipFishName = hookedFish or "Cá thường"
                         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. "], đang giật cần thả lại...")
+                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. " (" .. tostring(curFishHp) .. " HP)], đang giật cần...")
                         end
                         CancelAndRecastRod()
                     end
