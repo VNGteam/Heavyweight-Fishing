@@ -1814,21 +1814,42 @@ local function ScanExistingChatHistory()
     local foundMessages = {}
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
 
-    -- 1. Quét giao diện Chat hiện đại (TextChatService / ExperienceChat)
+    -- 1. Quét giao diện Chat hiện đại (ExperienceChat)
     if pg and pg:FindFirstChild("ExperienceChat") then
+        local labels = {}
         for _, d in ipairs(pg.ExperienceChat:GetDescendants()) do
             if d:IsA("TextLabel") and d.Text ~= "" and #d.Text > 5 then
-                table.insert(foundMessages, d.Text)
+                table.insert(labels, d)
             end
+        end
+        -- Sắp xếp theo thứ tự hiển thị (LayoutOrder hoặc Y position)
+        table.sort(labels, function(a, b)
+            local orderA = (a.Parent and a.Parent.LayoutOrder) or a.LayoutOrder or 0
+            local orderB = (b.Parent and b.Parent.LayoutOrder) or b.LayoutOrder or 0
+            if orderA ~= orderB then return orderA < orderB end
+            return a.AbsolutePosition.Y < b.AbsolutePosition.Y
+        end)
+        for _, lbl in ipairs(labels) do
+            table.insert(foundMessages, lbl.Text)
         end
     end
 
     -- 2. Quét giao diện Chat cổ điển (Legacy Chat)
     if pg and pg:FindFirstChild("Chat") then
+        local labels = {}
         for _, d in ipairs(pg.Chat:GetDescendants()) do
             if d:IsA("TextLabel") and d.Text ~= "" and #d.Text > 5 then
-                table.insert(foundMessages, d.Text)
+                table.insert(labels, d)
             end
+        end
+        table.sort(labels, function(a, b)
+            local orderA = (a.Parent and a.Parent.LayoutOrder) or a.LayoutOrder or 0
+            local orderB = (b.Parent and b.Parent.LayoutOrder) or b.LayoutOrder or 0
+            if orderA ~= orderB then return orderA < orderB end
+            return a.AbsolutePosition.Y < b.AbsolutePosition.Y
+        end)
+        for _, lbl in ipairs(labels) do
+            table.insert(foundMessages, lbl.Text)
         end
     end
 
@@ -1848,21 +1869,25 @@ local function ScanExistingChatHistory()
         end
     end
 
-    -- 4. Quét thực tế trong Workspace (BossSetUp)
+    -- 4. Quét thực tế trong Workspace (BossSetUp / Bosses)
     if Workspace:FindFirstChild("BossSetUp") then
-        for _, b in ipairs(Workspace.BossSetUp:GetChildren()) do
-            local bLower = b.Name:lower()
-            for _, entry in ipairs(secretBossDatabase) do
-                for _, boss in ipairs(entry.bosses) do
-                    if bLower:find(boss.name:lower()) or boss.name:lower():find(bLower) then
-                        table.insert(foundMessages, string.format("Secret boss %s spawned at %s", boss.name, entry.islandName))
+        local bossFolder = Workspace.BossSetUp
+        local children = bossFolder:GetChildren()
+        if #children > 0 then
+            for _, b in ipairs(children) do
+                local bLower = b.Name:lower()
+                for _, entry in ipairs(secretBossDatabase) do
+                    for _, boss in ipairs(entry.bosses) do
+                        if bLower:find(boss.name:lower()) or boss.name:lower():find(bLower) then
+                            table.insert(foundMessages, string.format("Secret bosses have spawned at %s", entry.islandName))
+                        end
                     end
                 end
             end
         end
     end
 
-    -- Phân tích thứ tự thời gian tin nhắn
+    -- Phân tích tin nhắn theo thứ tự từ dưới lên trên (tin mới nhất xuất hiện ở cuối danh sách)
     local latestSpawn = nil
     local latestDespawnIndex = -1
     local latestSpawnIndex = -1
@@ -1882,9 +1907,9 @@ local function ScanExistingChatHistory()
         end
     end
 
-    -- Nếu có tin nhắn Boss xuất hiện và CHƯA BỊ tin nhắn Despawn đè lên
+    -- Nếu có tin nhắn Boss xuất hiện và tin Spawn xuất hiện sau tin Despawn (hoặc không có tin despawn nào sau đó)
     if latestSpawn and (latestDespawnIndex < latestSpawnIndex) then
-        ShowNotification("Phát Hiện Boss Đang Hoạt Động", "Tìm thấy thông báo Boss trong lịch sử chat! Đang tiến hành bay đến săn...", "SUCCESS", 6)
+        ShowNotification("Phát Hiện Boss Hoạt Động", "Tìm thấy thông báo: " .. tostring(latestSpawn.island.islandName) .. "! Đang bay đến đảo...", "SUCCESS", 6)
         HandleIncomingChatMessage(latestSpawn.msg)
         return true
     elseif latestDespawnIndex > latestSpawnIndex and latestDespawnIndex ~= -1 then
@@ -3990,15 +4015,23 @@ local lastSkillTime = 0
 local lastTrainSkillTime = 0
 local isTrainingBusy = false
 local lastGlobalSkillCastTime = 0
-local lastSkillUsedTimes = {
-    ["Z"] = 0,
-    ["X"] = 0,
-    ["C"] = 0,
-    ["V"] = 0
+local comboState = {
+    openerUsedCount = 0,
+    loopIndex = 1,
+    lastCastTime = 0,
+    usedTimes = {
+        ["Z"] = 0,
+        ["X"] = 0,
+        ["C"] = 0,
+        ["V"] = 0
+    },
+    defaultCooldowns = {
+        ["Z"] = 2.5,
+        ["X"] = 3.0,
+        ["C"] = 5.0,
+        ["V"] = 4.0
+    }
 }
-
-local openerUsedCount = 0
-local lastComboSkillCastTime = 0
 
 local function CheckSkillReady(sk, fUI, minCooldown)
     if not sk or sk == "" or sk == "Tắt" then return false end
@@ -4006,14 +4039,15 @@ local function CheckSkillReady(sk, fUI, minCooldown)
     cleanKey = cleanKey:upper()
 
     local now = tick()
-    local lastUsed = lastSkillUsedTimes[cleanKey] or 0
+    local lastUsed = comboState.usedTimes[cleanKey] or 0
     local minCd = minCooldown or 0.8
     if (now - lastUsed < minCd) then
         return false
     end
 
-    -- Nếu đã trôi qua hơn 10 giây kể từ lần cuối cast chiêu này, đảm bảo 100% chiêu đã hồi xong
-    if (now - lastUsed >= 10.0) then
+    -- Nếu đã trôi qua hơn cooldown ước tính kể từ lần cuối cast chiêu này, đảm bảo chiêu đã hồi xong
+    local baseCd = comboState.defaultCooldowns[cleanKey] or 3.5
+    if (now - lastUsed >= baseCd) then
         return true
     end
 
@@ -4027,13 +4061,24 @@ local function CheckSkillReady(sk, fUI, minCooldown)
                 for _, child in ipairs(desc:GetDescendants()) do
                     if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
                         local cName = child.Name:lower()
+                        local isCdLabel = cName:find("cd") or cName:find("cooldown") or cName:find("timer") or cName:find("time")
+                        local txt = child.Text
                         -- Bỏ qua label hiển thị Damage / Power / Level / Name
                         if not cName:find("dmg") and not cName:find("damage") and not cName:find("power") and not cName:find("level") and not cName:find("title") and not cName:find("name") then
-                            local numStr = child.Text:match("^%s*(%d+%.?%d*)%s*s?%s*$")
-                            local num = tonumber(numStr)
-                            -- Cooldown chiêu thực tế từ 0.5s đến 30s. Nếu là số lớn như 80, 103, 132 thì đó là Damage!
-                            if num and num > 0 and num <= 30 then
-                                return false
+                            -- Chỉ nhận diện là cooldown nếu có chữ 's' (ví dụ 3.5s, 10s) hoặc nếu tên label là cooldown/timer
+                            local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
+                            if cdWithS then
+                                local num = tonumber(cdWithS)
+                                if num and num > 0 and num <= 30 then
+                                    return false
+                                end
+                            elseif isCdLabel then
+                                local numStr = txt:match("^%s*(%d+%.?%d*)%s*$")
+                                local num = tonumber(numStr)
+                                -- Bỏ qua các số nguyên 1, 2, 3, 4 nếu đó là phím tắt
+                                if num and num > 0 and num <= 30 and not (num >= 1 and num <= 4 and not txt:find("%.%")) then
+                                    return false
+                                end
                             end
                         end
                     end
@@ -4043,6 +4088,24 @@ local function CheckSkillReady(sk, fUI, minCooldown)
     end
 
     return true
+end
+
+local function ExecuteComboLoop(loopKeys, fUI)
+    if not loopKeys or #loopKeys == 0 then return false end
+    local n = #loopKeys
+    if comboState.loopIndex > n then comboState.loopIndex = 1 end
+
+    for offset = 0, n - 1 do
+        local idx = ((comboState.loopIndex - 1 + offset) % n) + 1
+        local candidateSkill = loopKeys[idx]
+        if candidateSkill and CheckSkillReady(candidateSkill, fUI, 0.8) then
+            if CastSkill(candidateSkill) then
+                comboState.loopIndex = (idx % n) + 1
+                return true
+            end
+        end
+    end
+    return false
 end
 
 local function GetFishHealth(fUI)
@@ -4127,15 +4190,16 @@ end
 
 local function IsCharacterCastingSkill()
     local now = tick()
-    -- Chỉ coi là animation skill trong tối đa 1.4s kể từ khi tung chiêu, tránh bị kẹt vĩnh viễn
-    if (now - lastComboSkillCastTime > 1.4) then
+    -- Chỉ coi là animation skill trong tối đa 0.7s kể từ khi tung chiêu, tránh bị kẹt vĩnh viễn
+    if (now - comboState.lastCastTime > 0.7) then
         return false
     end
 
     local char = LocalPlayer.Character
     if not char then return false end
 
-    for _, att in ipairs({"Casting", "UsingSkill", "SkillActive", "IsAttacking", "CastingSkill"}) do
+    -- Bỏ qua "Casting" vì đó là trạng thái quăng cần câu của game
+    for _, att in ipairs({"UsingSkill", "SkillActive", "IsAttacking", "CastingSkill"}) do
         if char:GetAttribute(att) == true then
             return true
         end
@@ -4149,8 +4213,8 @@ local function IsCharacterCastingSkill()
             for _, tr in ipairs(tracks) do
                 if tr.IsPlaying and (tr.Priority == Enum.AnimationPriority.Action or tr.Priority == Enum.AnimationPriority.Action2 or tr.Priority == Enum.AnimationPriority.Action3 or tr.Priority == Enum.AnimationPriority.Action4) then
                     local animName = tr.Name:lower()
-                    -- Loại bỏ các animation câu cá / quăng cần / cuộn dây (tránh nhận nhầm làm kẹt combo)
-                    if not animName:find("fish") and not animName:find("rod") and not animName:find("reel") and not animName:find("cast") and not animName:find("idle") and not animName:find("hold") then
+                    -- Loại bỏ các animation câu cá / quăng cần / cuộn dây / chạy bộ (tránh nhận nhầm làm kẹt combo)
+                    if not animName:find("fish") and not animName:find("rod") and not animName:find("reel") and not animName:find("cast") and not animName:find("idle") and not animName:find("hold") and not animName:find("walk") and not animName:find("run") then
                         if animName:find("skill") or animName:find("attack") or animName:find("special") or animName:find("slash") then
                             return true
                         end
@@ -4183,8 +4247,8 @@ local function CastSkill(sk)
             vim:SendKeyEvent(false, kCode, false, game)
         end
     end)
-    lastSkillUsedTimes[cleanKey] = tick()
-    lastComboSkillCastTime = tick()
+    comboState.usedTimes[cleanKey] = tick()
+    comboState.lastCastTime = tick()
     return true
 end
 local lastGachaTime = 0
@@ -4400,7 +4464,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
         if isMinigame and not wasMinigame then
             minigameDurationTracker = now
-            openerUsedCount = 0
+            comboState.openerUsedCount = 0
+            comboState.loopIndex = 1
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             if wasMinigame and secretBossState.isCatchingTarget then
@@ -4644,7 +4709,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                     if Config.SmartComboEnabled then
                     local isBusy = false
-                    if (now - lastComboSkillCastTime < (Config.SkillEffectDelay or 1.2)) then
+                    if (now - comboState.lastCastTime < (Config.SkillEffectDelay or 1.2)) then
                         isBusy = true
                     elseif Config.SmartEffectAutoDetect and IsCharacterCastingSkill() then
                         isBusy = true
@@ -4684,21 +4749,15 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         table.insert(loopKeys, k:upper())
                                     end
                                     if #loopKeys == 0 then loopKeys = {"X", "V"} end
-
-                                    for _, sk in ipairs(loopKeys) do
-                                        if CheckSkillReady(sk, fUI, 0.8) then
-                                            CastSkill(sk)
-                                            break
-                                        end
-                                    end
+                                    ExecuteComboLoop(loopKeys, fUI)
                                 end
                             else
                                 -- Máu cá > threshold (Cá to / Boss 3k HP): Bật chuỗi Combo chiến thuật
                                 local openerTriggered = false
-                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and (openerUsedCount < (Config.OpenerMaxCount or 1)) then
+                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and (comboState.openerUsedCount < (Config.OpenerMaxCount or 1)) then
                                     if CheckSkillReady(Config.OpenerSkill, fUI, 0.8) then
                                         CastSkill(Config.OpenerSkill)
-                                        openerUsedCount = openerUsedCount + 1
+                                        comboState.openerUsedCount = comboState.openerUsedCount + 1
                                         openerTriggered = true
                                     end
                                 end
@@ -4710,13 +4769,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         table.insert(loopKeys, k:upper())
                                     end
                                     if #loopKeys == 0 then loopKeys = {"X", "V"} end
-
-                                    for _, sk in ipairs(loopKeys) do
-                                        if CheckSkillReady(sk, fUI, 0.8) then
-                                            CastSkill(sk)
-                                            break
-                                        end
-                                    end
+                                    ExecuteComboLoop(loopKeys, fUI)
                                 end
                             end
                         end
