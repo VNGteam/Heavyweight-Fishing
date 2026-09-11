@@ -409,6 +409,28 @@ notifLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
 notifLayout.Padding = UDim.new(0, 8)
 notifLayout.Parent = notifContainer
 
+local function FormatWithSpaces(val)
+    if not val then return "0" end
+    local s = tostring(val)
+    local prefix = ""
+    if s:sub(1, 1) == "-" then
+        prefix = "-"
+        s = s:sub(2)
+    elseif s:sub(1, 1) == "+" then
+        prefix = "+"
+        s = s:sub(2)
+    end
+    local intPart, decPart = s:match("^(%d+)(%.?.*)$")
+    if not intPart then return prefix .. s end
+    local formatted = intPart
+    local k
+    while true do
+        formatted, k = string.gsub(formatted, "^(%d+)(%d%d%d)", "%1 %2")
+        if k == 0 then break end
+    end
+    return prefix .. formatted .. (decPart or "")
+end
+
 local function ShowNotification(title, text, notifType, duration)
     if not isRunning then return end
     duration = duration or 3.5
@@ -2736,13 +2758,7 @@ local rodShopCard = createCardGroup(tabShop)
 
 local function formatNumber(n)
     if n == 0 then return "FREE" end
-    local formatted = tostring(n)
-    local k
-    while true do
-        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", "%1,%2")
-        if k == 0 then break end
-    end
-    return formatted .. " Cash"
+    return FormatWithSpaces(n) .. " Cash"
 end
 
 local rodShopUpdaters = {}
@@ -4161,8 +4177,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
             if pData:FindFirstChild("FishingRod") and pData.FishingRod.Value ~= "" then infoEquippedRod.Set(pData.FishingRod.Value) end
             if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "" then infoEquippedBait.Set(pData.EquippedBait.Value) end
-            if pData:FindFirstChild("FishCaught") then infoFishCaught.Set(tostring(pData.FishCaught.Value)) end
-            if pData:FindFirstChild("Cash") then infoCash.Set("$" .. tostring(pData.Cash.Value)) end
 
             -- Đồng bộ trạng thái danh sách cần câu trong Shop mỗi 3 giây
             if not lastRodShopSync or (tick() - lastRodShopSync >= 3) then
@@ -4183,6 +4197,13 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local curFish = pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
             local curCash = pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
             local curGems = (pData:FindFirstChild("Gems") and tonumber(pData.Gems.Value)) or (pData:FindFirstChild("Gem") and tonumber(pData.Gem.Value)) or 0
+
+            if infoFishCaught and infoFishCaught.Set then
+                infoFishCaught.Set(FormatWithSpaces(curFish) .. " con")
+            end
+            if infoCash and infoCash.Set then
+                infoCash.Set("$" .. FormatWithSpaces(curCash))
+            end
 
             if not initialFishCaught then initialFishCaught = curFish end
             if not initialCash then initialCash = curCash end
@@ -4206,13 +4227,13 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local cashRate = math.floor(gainedCash / math.max(elapsedHours, 1/3600))
 
             if infoFishPerHour and infoFishPerHour.Set then
-                infoFishPerHour.Set(tostring(fishRate) .. " con/h")
+                infoFishPerHour.Set(FormatWithSpaces(fishRate) .. " con/h")
             end
             if infoCashPerHour and infoCashPerHour.Set then
-                infoCashPerHour.Set("$" .. tostring(cashRate) .. " /h")
+                infoCashPerHour.Set("$" .. FormatWithSpaces(cashRate) .. " /h")
             end
             if infoGemsGained and infoGemsGained.Set then
-                infoGemsGained.Set("+" .. tostring(gainedGems) .. " Gems")
+                infoGemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
             end
 
             if Config.WebhookEnabled and Config.WebhookHourlyStats and (tick() - lastWebhookStatsTime >= (Config.WebhookStatsInterval or 1800)) then
@@ -4223,11 +4244,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     3447003,
                     {
                         { name = "⏳ Thời Gian Treo", value = string.format("%02d:%02d:%02d", h, m, s), inline = true },
-                        { name = "🐟 Tổng Cá Đã Bắt", value = tostring(curFish) .. " (+" .. tostring(gainedFish) .. ")", inline = true },
-                        { name = "⚡ Tốc Độ Câu", value = tostring(fishRate) .. " con/giờ", inline = true },
-                        { name = "💰 Tổng Tiền Hiện Tại", value = "$" .. tostring(curCash) .. " (+$" .. tostring(gainedCash) .. ")", inline = true },
-                        { name = "📈 Tốc Độ Kiếm Tiền", value = "$" .. tostring(cashRate) .. " /giờ", inline = true },
-                        { name = "💎 Gems Thu Được", value = "+" .. tostring(gainedGems) .. " Gems", inline = true }
+                        { name = "🐟 Tổng Cá Đã Bắt", value = FormatWithSpaces(curFish) .. " (+" .. FormatWithSpaces(gainedFish) .. ")", inline = true },
+                        { name = "⚡ Tốc Độ Câu", value = FormatWithSpaces(fishRate) .. " con/giờ", inline = true },
+                        { name = "💰 Tổng Tiền Hiện Tại", value = "$" .. FormatWithSpaces(curCash) .. " (+$" .. FormatWithSpaces(gainedCash) .. ")", inline = true },
+                        { name = "📈 Tốc Độ Kiếm Tiền", value = "$" .. FormatWithSpaces(cashRate) .. " /giờ", inline = true },
+                        { name = "💎 Gems Thu Được", value = "+" .. FormatWithSpaces(gainedGems) .. " Gems", inline = true }
                     }
                 )
             end
