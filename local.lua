@@ -111,6 +111,7 @@ local Config = {
     AutoSkills = false,
     SelectedSkill = "One-Strike Heaven Gate",
     AutoTrainSkill = false,
+    TrainSkill = "Z",
     Train_Z = false,
     Train_X = false,
     Train_C = true,
@@ -1448,25 +1449,17 @@ createToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Qua
     Config.SmartEffectAutoDetect = v
 end)
 
-createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Thức (Skill Mastery Evo)")
+createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
 local trainCard = createCardGroup(tabFishing)
 local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
-createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Tự động dùng các chiêu đã bật khi hết hồi chiêu lúc kéo cá", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
-
--- Chọn riêng từng chiêu (có thể bật cùng lúc C và V, Z và X, v.v.)
-createToggleRow(trainCard, "⚡ Luyện Chiêu Z", "Bật tự dùng chiêu phím Z khi hồi xong", Config.Train_Z, function(v) Config.Train_Z = v end)
-createToggleRow(trainCard, "⚡ Luyện Chiêu X", "Bật tự dùng chiêu phím X khi hồi xong", Config.Train_X, function(v) Config.Train_X = v end)
-createToggleRow(trainCard, "⚡ Luyện Chiêu C", "Bật tự dùng chiêu phím C khi hồi xong", Config.Train_C, function(v) Config.Train_C = v end)
-createToggleRow(trainCard, "⚡ Luyện Chiêu V", "Bật tự dùng chiêu phím V khi hồi xong", Config.Train_V, function(v) Config.Train_V = v end)
-
-createSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
+createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần phím 1 hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
+createDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy nhất muốn luyện (Z, X, C, V)", {"Z", "X", "C", "V"}, Config.TrainSkill or "Z", function(v) Config.TrainSkill = v end)
+createSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa (mặc định 100 lần)", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
     Config.TrainTargetCount = v
     if infoTrainProgress and infoTrainProgress.Set then
         infoTrainProgress.Set(string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
     end
 end)
-createSliderRow(trainCard, "Thời Gian Hồi Chiêu (Cooldown)", "Chỉ tính 1 lần dùng khi chiêu đã thực sự hồi xong", 2.0, 25.0, Config.TrainSkillCooldown, true, "s", function(v) Config.TrainSkillCooldown = v end)
-createToggleRow(trainCard, "Kéo Dài Trận Câu (Giữ Cá Lâu)", "Không kết liễu nhanh để giữ cá trên dây spam chiêu nhiều nhất", Config.TrainDelayCatch, function(v) Config.TrainDelayCatch = v end)
 createButtonRow(trainCard, "Đặt Lại Bộ Đếm (Reset)", "Reset số lần đã luyện về 0", "Đặt Lại", function()
     Config.TrainCurrentCount = 0
     if infoTrainProgress and infoTrainProgress.Set then
@@ -1474,6 +1467,412 @@ createButtonRow(trainCard, "Đặt Lại Bộ Đếm (Reset)", "Reset số lần
     end
     ShowNotification("Luyện Chiêu", "Đã đặt lại số lần luyện chiêu về 0!", "SUCCESS")
 end)
+
+local lastExportedSkillText = ""
+local skillViewerModal = nil
+
+local function ShowSkillTextWindow(customText)
+    local text = customText or lastExportedSkillText
+    if not text or text == "" then
+        text = "Chưa có dữ liệu kỹ năng!\nVui lòng bấm nút [📋 Quét & Copy Tất Cả] để hệ thống trích xuất toàn bộ dữ liệu."
+    end
+
+    if skillViewerModal and skillViewerModal.Parent then
+        skillViewerModal:Destroy()
+        skillViewerModal = nil
+    end
+
+    local modal = Instance.new("Frame")
+    modal.Name = "SkillViewerModal"
+    modal.Size = UDim2.new(0, 560, 0, 440)
+    modal.Position = UDim2.new(0.5, -280, 0.5, -220)
+    modal.BackgroundColor3 = Colors.Background or Color3.fromRGB(15, 17, 24)
+    modal.BorderSizePixel = 0
+    modal.ZIndex = 250
+    modal.Parent = screenGui
+    skillViewerModal = modal
+    table.insert(cleanUpInstances, modal)
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = Colors.PurpleAccent or Color3.fromRGB(130, 80, 240)
+    stroke.Thickness = 1.5
+    stroke.Parent = modal
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 10)
+    corner.Parent = modal
+
+    local tBar = Instance.new("Frame")
+    tBar.Size = UDim2.new(1, 0, 0, 40)
+    tBar.BackgroundColor3 = Colors.SidebarBg or Color3.fromRGB(20, 22, 32)
+    tBar.BorderSizePixel = 0
+    tBar.ZIndex = 251
+    tBar.Parent = modal
+    local tCorner = Instance.new("UICorner"); tCorner.CornerRadius = UDim.new(0, 10); tCorner.Parent = tBar
+
+    local tLabel = Instance.new("TextLabel")
+    tLabel.Size = UDim2.new(1, -160, 1, 0)
+    tLabel.Position = UDim2.new(0, 14, 0, 0)
+    tLabel.BackgroundTransparency = 1
+    tLabel.Font = Enum.Font.GothamBold
+    tLabel.Text = "📜 DANH SÁCH TOÀN BỘ KỸ NĂNG CỦA BẠN"
+    tLabel.TextColor3 = Colors.PurplePrimary or Color3.fromRGB(200, 180, 255)
+    tLabel.TextSize = 13
+    tLabel.TextXAlignment = Enum.TextXAlignment.Left
+    tLabel.ZIndex = 252
+    tLabel.Parent = tBar
+
+    local btnCopy = Instance.new("TextButton")
+    btnCopy.Size = UDim2.new(0, 95, 0, 26)
+    btnCopy.Position = UDim2.new(1, -145, 0.5, -13)
+    btnCopy.BackgroundColor3 = Colors.PurpleAccent or Color3.fromRGB(110, 70, 220)
+    btnCopy.Font = Enum.Font.GothamBold
+    btnCopy.Text = "📋 Sao Chép"
+    btnCopy.TextColor3 = Color3.fromRGB(255, 255, 255)
+    btnCopy.TextSize = 11
+    btnCopy.ZIndex = 252
+    btnCopy.Parent = tBar
+    local cCorner = Instance.new("UICorner"); cCorner.CornerRadius = UDim.new(0, 5); cCorner.Parent = btnCopy
+
+    btnCopy.MouseButton1Click:Connect(function()
+        pcall(function()
+            if setclipboard then setclipboard(text)
+            elseif toclipboard then toclipboard(text) end
+        end)
+        btnCopy.Text = "✅ Đã Chép!"
+        btnCopy.BackgroundColor3 = Colors.Green or Color3.fromRGB(50, 190, 100)
+        task.delay(1.5, function()
+            if btnCopy and btnCopy.Parent then
+                btnCopy.Text = "📋 Sao Chép"
+                btnCopy.BackgroundColor3 = Colors.PurpleAccent or Color3.fromRGB(110, 70, 220)
+            end
+        end)
+    end)
+
+    local btnClose = Instance.new("TextButton")
+    btnClose.Size = UDim2.new(0, 32, 0, 26)
+    btnClose.Position = UDim2.new(1, -42, 0.5, -13)
+    btnClose.BackgroundColor3 = Color3.fromRGB(45, 45, 60)
+    btnClose.Font = Enum.Font.GothamBold
+    btnClose.Text = "✕"
+    btnClose.TextColor3 = Color3.fromRGB(220, 220, 220)
+    btnClose.TextSize = 12
+    btnClose.ZIndex = 252
+    btnClose.Parent = tBar
+    local clCorner = Instance.new("UICorner"); clCorner.CornerRadius = UDim.new(0, 5); clCorner.Parent = btnClose
+    btnClose.MouseButton1Click:Connect(function()
+        modal:Destroy()
+        skillViewerModal = nil
+    end)
+
+    pcall(function()
+        local dragging, dragStart, startPos
+        tBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = true
+                dragStart = input.Position
+                startPos = modal.Position
+            end
+        end)
+        tBar.InputEnded:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                dragging = false
+            end
+        end)
+        UserInputService.InputChanged:Connect(function(input)
+            if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                local delta = input.Position - dragStart
+                modal.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end)
+    end)
+
+    local scroll = Instance.new("ScrollingFrame")
+    scroll.Size = UDim2.new(1, -20, 1, -55)
+    scroll.Position = UDim2.new(0, 10, 0, 46)
+    scroll.BackgroundColor3 = Color3.fromRGB(10, 12, 18)
+    scroll.BorderSizePixel = 0
+    scroll.ScrollBarThickness = 6
+    scroll.ScrollBarImageColor3 = Colors.PurpleAccent or Color3.fromRGB(120, 80, 220)
+    scroll.ZIndex = 251
+    scroll.Parent = modal
+    local sCorner = Instance.new("UICorner"); sCorner.CornerRadius = UDim.new(0, 6); sCorner.Parent = scroll
+
+    local textBox = Instance.new("TextBox")
+    textBox.Size = UDim2.new(1, -12, 1, 0)
+    textBox.Position = UDim2.new(0, 8, 0, 8)
+    textBox.BackgroundTransparency = 1
+    textBox.Font = Enum.Font.RobotoMono
+    textBox.TextSize = 12
+    textBox.TextColor3 = Color3.fromRGB(235, 235, 245)
+    textBox.TextXAlignment = Enum.TextXAlignment.Left
+    textBox.TextYAlignment = Enum.TextYAlignment.Top
+    textBox.ClearTextOnFocus = false
+    textBox.TextEditable = false
+    textBox.MultiLine = true
+    textBox.Text = text
+    textBox.ZIndex = 252
+    textBox.Parent = scroll
+
+    local _, lineCount = text:gsub("\n", "\n")
+    local estimatedHeight = math.max(400, (lineCount + 5) * 17)
+    scroll.CanvasSize = UDim2.new(0, 0, 0, estimatedHeight)
+    textBox.Size = UDim2.new(1, -16, 0, estimatedHeight)
+end
+
+local function ExportAllPlayerSkills(infoRow)
+    local skillsFound = {}
+    local skillList = {}
+
+    local function AddSkill(name, data)
+        if not name or type(name) ~= "string" or #name == 0 then return end
+        name = name:match("^%s*(.-)%s*$")
+        if #name == 0 or name:lower() == "template" or name:lower() == "button" or name:lower() == "frame" then return end
+
+        if not skillsFound[name] then
+            skillsFound[name] = {
+                Name = name,
+                Type = "Chưa rõ",
+                Damage = "0",
+                Cooldown = "0s",
+                Description = "Không có mô tả"
+            }
+            table.insert(skillList, skillsFound[name])
+        end
+
+        local sk = skillsFound[name]
+        data = data or {}
+        if data.Type and data.Type ~= "" and sk.Type == "Chưa rõ" then sk.Type = tostring(data.Type) end
+        if data.Damage and data.Damage ~= "" and (sk.Damage == "0" or sk.Damage == "") then sk.Damage = tostring(data.Damage) end
+        if data.Cooldown and data.Cooldown ~= "" and (sk.Cooldown == "0s" or sk.Cooldown == "") then sk.Cooldown = tostring(data.Cooldown) end
+        if data.Description and data.Description ~= "" and (sk.Description == "Không có mô tả" or #tostring(data.Description) > #sk.Description) then
+            sk.Description = tostring(data.Description)
+        end
+    end
+
+    -- 1. Quét Database Kỹ Năng từ ReplicatedStorage (ModuleScripts)
+    local rsSkillsDb = {}
+    pcall(function()
+        for _, desc in ipairs(ReplicatedStorage:GetDescendants()) do
+            if desc:IsA("ModuleScript") and (desc.Name:lower():find("skill") or desc.Name:lower():find("ability") or desc.Name:lower():find("moveset")) then
+                local ok, mod = pcall(require, desc)
+                if ok and typeof(mod) == "table" then
+                    for k, v in pairs(mod) do
+                        if typeof(v) == "table" then
+                            local sName = tostring(v.Name or v.SkillName or v.Title or k)
+                            local sDmg = v.Damage or v.Dmg or v.BaseDamage or v.Power
+                            local sCd = v.Cooldown or v.CD or v.CoolDown
+                            local sDesc = v.Description or v.Desc or v.Detail or v.Info
+                            local sType = v.Type or v.Element or v.Category or v.Class or v.Tag or v.Family
+                            if sDmg or sCd or sDesc or sType then
+                                rsSkillsDb[sName] = {
+                                    Damage = sDmg and tostring(sDmg),
+                                    Cooldown = sCd and tostring(sCd),
+                                    Description = sDesc and tostring(sDesc),
+                                    Type = sType and tostring(sType)
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
+    -- 2. Quét kho lưu trữ người chơi (Data.UserId)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if pData then
+        for _, folderName in ipairs({"Skills", "Skill", "SkillInventory", "Inventory", "Hotbar", "LearnedSkills", "EquippedSkills", "Abilities"}) do
+            local folder = pData:FindFirstChild(folderName)
+            if folder then
+                for _, item in ipairs(folder:GetChildren()) do
+                    local isSkill = false
+                    local sName = item.Name
+                    local vName = item:FindFirstChild("ValueName")
+                    if vName and vName.Value ~= "" then sName = tostring(vName.Value) end
+
+                    local sType = item:FindFirstChild("Type") and tostring(item.Type.Value) or item:GetAttribute("Type")
+                    local sDmg = item:FindFirstChild("Damage") and tostring(item.Damage.Value) or item:GetAttribute("Damage")
+                    local sCd = item:FindFirstChild("Cooldown") and tostring(item.Cooldown.Value) or item:GetAttribute("Cooldown")
+                    local sDesc = item:FindFirstChild("Description") and tostring(item.Description.Value) or item:GetAttribute("Description")
+
+                    if folderName:lower():find("skill") or sDmg or sCd or (sType and tostring(sType):lower():find("skill")) or rsSkillsDb[sName] then
+                        isSkill = true
+                    end
+
+                    if isSkill then
+                        local dbEntry = rsSkillsDb[sName] or {}
+                        AddSkill(sName, {
+                            Damage = sDmg or dbEntry.Damage,
+                            Cooldown = sCd or dbEntry.Cooldown,
+                            Description = sDesc or dbEntry.Description,
+                            Type = sType or dbEntry.Type
+                        })
+                    end
+                end
+            end
+        end
+
+        for attName, attVal in pairs(pData:GetAttributes()) do
+            if attName:lower():find("skill") and typeof(attVal) == "string" then
+                local dbEntry = rsSkillsDb[attVal] or {}
+                AddSkill(attVal, dbEntry)
+            end
+        end
+    end
+
+    -- 3. Quét PlayerGui (Bảng Kỹ Năng / Thẻ UI / Tooltip hiển thị như ảnh người dùng cung cấp)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg then
+        pcall(function()
+            for _, desc in ipairs(pg:GetDescendants()) do
+                if desc:IsA("TextLabel") and desc.Text:find("Damage:") then
+                    local card = desc.Parent
+                    if card then
+                        local rootCard = (card.Parent and (card.Parent:IsA("Frame") or card.Parent:IsA("CanvasGroup"))) and card.Parent or card
+                        local sName, sType, sDamage, sCooldown, sDesc
+
+                        for _, lbl in ipairs(rootCard:GetDescendants()) do
+                            if lbl:IsA("TextLabel") then
+                                local t = lbl.Text:match("^%s*(.-)%s*$")
+                                if t:find("Damage:%s*([%d%.]+)") then
+                                    sDamage = t:match("Damage:%s*([%d%.]+)")
+                                elseif t:find("Cooldown:%s*([%d%.]+)") then
+                                    sCooldown = t:match("Cooldown:%s*([%d%.]+)")
+                                elseif t:lower() == "description" then
+                                    -- tiêu đề mục Description
+                                elseif #t > 30 and not t:find("Damage:") and not t:find("Cooldown:") then
+                                    sDesc = t
+                                elseif #t > 0 and #t <= 30 and not t:find("Damage:") and not t:find("Cooldown:") and t:lower() ~= "description" then
+                                    if not sName then
+                                        sName = t
+                                    elseif not sType and t ~= sName then
+                                        sType = t
+                                    end
+                                end
+                            end
+                        end
+
+                        if sName and (sDamage or sCooldown or sDesc) then
+                            AddSkill(sName, {
+                                Damage = sDamage,
+                                Cooldown = sCooldown,
+                                Description = sDesc,
+                                Type = sType
+                            })
+                        end
+                    end
+                end
+            end
+        end)
+
+        pcall(function()
+            if pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Menu") then
+                for _, menuChild in ipairs(pg.MainGui.Menu:GetChildren()) do
+                    if menuChild.Name:lower():find("skill") or menuChild.Name:lower():find("ability") then
+                        for _, item in ipairs(menuChild:GetDescendants()) do
+                            if item:IsA("Frame") or item:IsA("ImageButton") or item:IsA("TextButton") then
+                                local tLabel = item:FindFirstChild("Title") or item:FindFirstChild("SkillName") or item:FindFirstChild("NameLabel")
+                                local sName = tLabel and tLabel:IsA("TextLabel") and tLabel.Text or item.Name
+                                if sName and #sName > 1 and not sName:lower():find("frame") and not sName:lower():find("button") then
+                                    local dbEntry = rsSkillsDb[sName] or {}
+                                    local sDmg = item:FindFirstChild("Damage") and tostring(item.Damage.Value) or item:GetAttribute("Damage") or dbEntry.Damage
+                                    local sCd = item:FindFirstChild("Cooldown") and tostring(item.Cooldown.Value) or item:GetAttribute("Cooldown") or dbEntry.Cooldown
+                                    local sDesc = item:FindFirstChild("Description") and tostring(item.Description.Value) or item:GetAttribute("Description") or dbEntry.Description
+                                    local sType = item:FindFirstChild("Type") and tostring(item.Type.Value) or item:GetAttribute("Type") or dbEntry.Type
+                                    AddSkill(sName, {
+                                        Damage = sDmg,
+                                        Cooldown = sCd,
+                                        Description = sDesc,
+                                        Type = sType
+                                    })
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
+    -- 4. Bổ sung thông tin từ Master Database cho các kỹ năng còn thiếu
+    for _, sk in ipairs(skillList) do
+        local db = rsSkillsDb[sk.Name]
+        if db then
+            if (not sk.Damage or sk.Damage == "0" or sk.Damage == "") and db.Damage then sk.Damage = db.Damage end
+            if (not sk.Cooldown or sk.Cooldown == "0s" or sk.Cooldown == "") and db.Cooldown then sk.Cooldown = db.Cooldown end
+            if (not sk.Description or sk.Description == "Không có mô tả" or sk.Description == "") and db.Description then sk.Description = db.Description end
+            if (not sk.Type or sk.Type == "Chưa rõ" or sk.Type == "") and db.Type then sk.Type = db.Type end
+        end
+    end
+
+    -- 5. Định dạng văn bản xuất bản hoàn chỉnh
+    local lines = {}
+    table.insert(lines, "======================================================================")
+    table.insert(lines, "               DANH SÁCH TOÀN BỘ KỸ NĂNG CỦA BẠN")
+    table.insert(lines, "======================================================================")
+    table.insert(lines, string.format("Người chơi: %s (UserId: %s)", LocalPlayer.Name, tostring(LocalPlayer.UserId)))
+    table.insert(lines, string.format("Thời gian xuất: %s", os.date("%H:%M:%S - %d/%m/%Y")))
+    table.insert(lines, string.format("Tổng số kỹ năng: %d kỹ năng", #skillList))
+    table.insert(lines, "----------------------------------------------------------------------")
+    table.insert(lines, "")
+
+    if #skillList == 0 then
+        table.insert(lines, "(Chưa phát hiện kỹ năng nào trong kho hoặc trên màn hình!)")
+        table.insert(lines, "💡 Mẹo: Hãy mở bảng Skill/Kỹ Năng trong game lên ít nhất 1 lần để hệ thống đọc toàn bộ các thẻ thông tin.")
+    else
+        for i, sk in ipairs(skillList) do
+            table.insert(lines, string.format("[%d] %s", i, sk.Name))
+            if sk.Type and sk.Type ~= "Chưa rõ" and sk.Type ~= "" then
+                table.insert(lines, string.format("• Phân loại: %s", sk.Type))
+            end
+            table.insert(lines, string.format("• Sát thương (Damage): %s", tostring(sk.Damage or "0")))
+            table.insert(lines, string.format("• Hồi chiêu (Cooldown): %s", tostring(sk.Cooldown or "0s")))
+            table.insert(lines, "• Mô tả chi tiết (Description):")
+            table.insert(lines, string.format("  %s", tostring(sk.Description or "Không có mô tả")))
+            table.insert(lines, "----------------------------------------------------------------------")
+        end
+    end
+    table.insert(lines, "======================================================================")
+
+    local fullText = table.concat(lines, "\n")
+    lastExportedSkillText = fullText
+
+    -- 6. Sao chép Clipboard & Lưu File
+    local copyOk = false
+    pcall(function()
+        if setclipboard then
+            setclipboard(fullText)
+            copyOk = true
+        elseif toclipboard then
+            toclipboard(fullText)
+            copyOk = true
+        end
+    end)
+
+    pcall(function()
+        if writefile then
+            writefile("HeavyweightFishing_AllSkills.txt", fullText)
+        end
+    end)
+
+    if infoRow and infoRow.Set then
+        infoRow.Set(string.format("%d kỹ năng (Đã sao chép!)", #skillList))
+    end
+
+    if #skillList > 0 then
+        if copyOk then
+            ShowNotification("Xuất Kỹ Năng", string.format("Đã quét %d kỹ năng và sao chép vào Clipboard!", #skillList), "SUCCESS", 6)
+        else
+            ShowNotification("Xuất Kỹ Năng", string.format("Đã quét %d kỹ năng! Đang mở bảng xem trực tiếp...", #skillList), "SUCCESS", 6)
+        end
+    else
+        ShowNotification("Xuất Kỹ Năng", "Chưa thấy kỹ năng nào! Hãy mở Menu Skill trong game rồi bấm lại nhé.", "WARN", 6)
+    end
+
+    ShowSkillTextWindow(fullText)
+    return #skillList
+end
 
 createCategoryHeader(tabFishing, "Tự Động Trang Bị Tối Ưu")
 local equipCard = createCardGroup(tabFishing)
@@ -2122,6 +2521,16 @@ createButtonRow(perfCard, "Mở Khóa Toàn Bộ Sách Cá (Index)", "Mở khóa
     ShowNotification("Mở Khóa Index", string.format("Đã mở khóa %d loài cá trong Sách Cá Index!", count > 0 and count or 109), "SUCCESS")
 end)
 
+createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)")
+local exportSkillCard = createCardGroup(tabPlayer)
+local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
+createButtonRow(exportSkillCard, "Quét & Sao Chép Toàn Bộ Skill", "Lấy toàn bộ Tên, Damage, Cooldown, Description vào Clipboard", "📋 Quét & Copy", function()
+    ExportAllPlayerSkills(infoSkillCount)
+end)
+createButtonRow(exportSkillCard, "Mở Bảng Xem Danh Sách Skill", "Mở khung văn bản cuộn trên màn hình để xem và copy", "📜 Mở Bảng Xem", function()
+    ShowSkillTextWindow()
+end)
+
 createCategoryHeader(tabPlayer, "Di Chuyển Nhân Vật")
 local moveCard = createCardGroup(tabPlayer)
 
@@ -2228,6 +2637,7 @@ local lastCastTime = 0
 local lastSellTime = 0
 local lastSkillTime = 0
 local lastTrainSkillTime = 0
+local isTrainingBusy = false
 local lastGlobalSkillCastTime = 0
 local lastSkillUsedTimes = {
     ["Z"] = 0,
@@ -2246,7 +2656,7 @@ local function CheckSkillReady(sk, fUI, minCooldown)
 
     local now = tick()
     local lastUsed = lastSkillUsedTimes[cleanKey] or 0
-    local minCd = minCooldown or Config.TrainSkillCooldown or 5.0
+    local minCd = minCooldown or Config.TrainSkillCooldown or 1.0
     if (now - lastUsed < minCd) then
         return false
     end
@@ -2479,7 +2889,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local isCD = char:GetAttribute("CDForTheNextThrow") == true
         local isSwimming = char:GetAttribute("Swimming") == true
 
-        if (Config.AutoCast or (Config.AutoChatSecretBoss and secretBossState.active)) and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) then
+        if (Config.AutoCast or Config.AutoTrainSkill or (Config.AutoChatSecretBoss and secretBossState.active)) and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
             lastEquipRodTime = now
             local rodSlot = "1"
             if pData and pData:FindFirstChild("Hotbar") then
@@ -2585,95 +2995,135 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
 
             if not skipTriggered then
-            if fUI and fUI.Visible then
-                -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
-                if (Config.AnchorBar or Config.AutoTrainSkill or (Config.AutoChatSecretBoss and secretBossState.active)) then
-                    local barFrame = fUI:FindFirstChild("BarFrame")
-                    if barFrame and barFrame:FindFirstChild("Bar") then
-                        barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
-                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                if Config.AutoTrainSkill then
+                    if not isTrainingBusy then
+                        isTrainingBusy = true
+                        task.spawn(function()
+                            local chosenSkill = Config.TrainSkill or "Z"
+
+                            -- 1. Khi cá kéo minigame, lập tức bấm dùng ngay skill cần luyện
+                            if Events and Events:FindFirstChild("UseSkill") then
+                                Events.UseSkill:FireServer(chosenSkill)
+                            end
+                            if Events and Events:FindFirstChild("TriggerMinigameSkill") then
+                                Events.TriggerMinigameSkill:FireServer(chosenSkill)
+                            end
+                            pcall(function()
+                                local vim = game:GetService("VirtualInputManager")
+                                local kCode = Enum.KeyCode[chosenSkill]
+                                if vim and kCode then
+                                    vim:SendKeyEvent(true, kCode, false, game)
+                                    task.wait(0.02)
+                                    vim:SendKeyEvent(false, kCode, false, game)
+                                end
+                            end)
+
+                            Config.TrainCurrentCount = Config.TrainCurrentCount + 1
+                            if infoTrainProgress and infoTrainProgress.Set then
+                                infoTrainProgress.Set(string.format("%d / %d lần (Vừa cast: %s)", Config.TrainCurrentCount, Config.TrainTargetCount, chosenSkill))
+                            end
+
+                            if Config.TrainCurrentCount >= Config.TrainTargetCount then
+                                Config.AutoTrainSkill = false
+                                ShowNotification("Luyện Chiêu Hoàn Tất", string.format("Đã luyện đủ %d/%d lần cho chiêu %s!", Config.TrainCurrentCount, Config.TrainTargetCount, chosenSkill), "SUCCESS", 7)
+                                pcall(function()
+                                    if Events and Events:FindFirstChild("ToggleHotbar") then
+                                        Events.ToggleHotbar:InvokeServer("1")
+                                    end
+                                    local c = LocalPlayer.Character
+                                    local h = c and c:FindFirstChildOfClass("Humanoid")
+                                    if h then h:UnequipTools() end
+                                end)
+                                isTrainingBusy = false
+                                return
+                            end
+
+                            -- 2. Đợi server nhận lệnh skill (0.06s) rồi cất cần (ấn phím 1 / đổi tay không) để hủy cá & minigame ngay lập tức
+                            task.wait(0.06)
+                            local rodSlot = "1"
+                            local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+                            if pData and pData:FindFirstChild("Hotbar") then
+                                for _, item in ipairs(pData.Hotbar:GetChildren()) do
+                                    local vName = item:FindFirstChild("ValueName")
+                                    if vName and tostring(vName.Value):lower():find("rod") and not tostring(vName.Value):lower():find("inventory") then
+                                        rodSlot = item.Name
+                                        break
+                                    end
+                                end
+                            end
+
+                            pcall(function()
+                                if Events and Events:FindFirstChild("ToggleHotbar") then
+                                    Events.ToggleHotbar:InvokeServer(rodSlot)
+                                end
+                                local c = LocalPlayer.Character
+                                local h = c and c:FindFirstChildOfClass("Humanoid")
+                                if h then h:UnequipTools() end
+                                local vim = game:GetService("VirtualInputManager")
+                                if vim then
+                                    vim:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                                    task.wait(0.02)
+                                    vim:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                                end
+                            end)
+
+                            -- 3. Đợi 0.25s để server dọn dẹp minigame, sau đó lấy cần ra lại (ấn phím 1)
+                            task.wait(0.25)
+                            pcall(function()
+                                if Events and Events:FindFirstChild("ToggleHotbar") then
+                                    Events.ToggleHotbar:InvokeServer(rodSlot)
+                                end
+                                local vim = game:GetService("VirtualInputManager")
+                                if vim then
+                                    vim:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                                    task.wait(0.02)
+                                    vim:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                                end
+                            end)
+
+                            -- 4. Đợi cần cầm lên tay (0.25s) rồi thả xuống nước lại chờ con cá tiếp theo
+                            task.wait(0.25)
+                            local c2 = LocalPlayer.Character
+                            local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
+                            if r2 and Events and Events:FindFirstChild("Fishing") then
+                                Events.Fishing:FireServer(r2.CFrame)
+                            end
+
+                            -- 5. Cho phép vòng lặp tiếp theo sau khi đã thả cần
+                            task.wait(0.4)
+                            isTrainingBusy = false
+                        end)
                     end
-                end
+                elseif fUI and fUI.Visible then
+                    -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
+                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active)) then
+                        local barFrame = fUI:FindFirstChild("BarFrame")
+                        if barFrame and barFrame:FindFirstChild("Bar") then
+                            barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
+                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                        end
+                    end
 
-                local delayCatch = Config.AutoTrainSkill and Config.TrainDelayCatch
-
-                if not delayCatch then
                     if Config.AutoSlam and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
                         if Events:FindFirstChild("Slam") then
                             Events.Slam:FireServer()
                         end
                     end
-                end
 
-                if Config.AutoCharge and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
-                    if Events:FindFirstChild("Charge") then
-                        Events.Charge:FireServer()
+                    if Config.AutoCharge and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
+                        if Events:FindFirstChild("Charge") then
+                            Events.Charge:FireServer()
+                        end
                     end
-                end
 
-                if not delayCatch then
                     if Config.AnchorBar and (now - lastProgressionTime >= 0.08) then
                         if Events and Events:FindFirstChild("UpdateFishProgression") then
                             Events.UpdateFishProgression:FireServer()
                         end
                         lastProgressionTime = now
                     end
-                else
-                    -- Giữ cá lâu trên dây: chỉ gửi cập nhật rất chậm để cá không đứt dây mà không kéo cá lên nhanh
-                    if (now - lastProgressionTime >= 1.2) then
-                        if Events and Events:FindFirstChild("UpdateFishProgression") then
-                            Events.UpdateFishProgression:FireServer()
-                        end
-                        lastProgressionTime = now
-                    end
-                end
 
-                -- XỬ LÝ AUTO LUYỆN CHIÊU THỨC (SKILL MASTERY CHUẨN XÁC)
-                if Config.AutoTrainSkill then
-                    if (now - lastGlobalSkillCastTime >= 0.4) then
-                        if Config.TrainCurrentCount < Config.TrainTargetCount then
-                            local activeSkills = {}
-                            if Config.Train_Z then table.insert(activeSkills, "Z") end
-                            if Config.Train_X then table.insert(activeSkills, "X") end
-                            if Config.Train_C then table.insert(activeSkills, "C") end
-                            if Config.Train_V then table.insert(activeSkills, "V") end
-
-                            for _, sk in ipairs(activeSkills) do
-                                if CheckSkillReady(sk, fUI) then
-                                    -- Kích hoạt chiêu thức
-                                    if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(sk) end
-                                    if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(sk) end
-                                    pcall(function()
-                                        local vim = game:GetService("VirtualInputManager")
-                                        local kCode = Enum.KeyCode[sk]
-                                        if vim and kCode then
-                                            vim:SendKeyEvent(true, kCode, false, game)
-                                            task.wait(0.02)
-                                            vim:SendKeyEvent(false, kCode, false, game)
-                                        end
-                                    end)
-
-                                    -- Đánh dấu thời gian đã dùng và cộng số lần THỰC TẾ
-                                    lastSkillUsedTimes[sk] = now
-                                    lastGlobalSkillCastTime = now
-                                    Config.TrainCurrentCount = Config.TrainCurrentCount + 1
-
-                                    if infoTrainProgress and infoTrainProgress.Set then
-                                        infoTrainProgress.Set(string.format("%d / %d lần (Vừa cast: %s)", Config.TrainCurrentCount, Config.TrainTargetCount, sk))
-                                    end
-
-                                    if Config.TrainCurrentCount >= Config.TrainTargetCount then
-                                        Config.AutoTrainSkill = false
-                                        ShowNotification("Luyện Chiêu Thành Công", string.format("Đã luyện đủ %d lần kỹ năng!", Config.TrainTargetCount), "SUCCESS", 7)
-                                    end
-
-                                    -- Đợi 0.4s trước khi cast chiêu tiếp theo để không bị nuốt animation
-                                    break
-                                end
-                            end
-                        end
-                    end
-                elseif Config.SmartComboEnabled then
+                    if Config.SmartComboEnabled then
                     local isBusy = false
                     if (now - lastComboSkillCastTime < (Config.SkillEffectDelay or 1.2)) then
                         isBusy = true
@@ -2748,7 +3198,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             secretBossState.minigameStartTime = 0
             lastCastTime = now
         else
-            if (Config.AutoCast or (Config.AutoChatSecretBoss and secretBossState.active)) and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) then
+            if (Config.AutoCast or Config.AutoTrainSkill or (Config.AutoChatSecretBoss and secretBossState.active)) and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
                 local canCast = true
                 if pData and pData:FindFirstChild("InventoryLimit") then
                     local invCount = 0
