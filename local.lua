@@ -177,6 +177,8 @@ local Config = {
     BossSpotAllocationMode = "Tự Động (Theo Acc)",
     BossTeleportJitter = true,
     BossTeleportJitterDist = 1.0,
+    ReturnToHomeWhenClear = true,
+    HomeFarmSpot = nil,
     
     AutoGodSpiritCheck = false,
     AutoPrayGodSpirit = false,
@@ -302,6 +304,7 @@ local ConfigLabelMap = {
     ["Chỉ Săn Khi Đủ Lực Cần (Power Check)"] = "SecretBossCheckPower",
     ["Tự Đổi Server Khi Hết Boss (Auto-Hop)"] = "AutoServerHopOnDespawn",
     ["Đổi Server Khi Hết Secret Boss"] = "AutoServerHopOnDespawn",
+    ["Tự Về Vị Trí Farm Khi Hết Boss / Clear"] = "ReturnToHomeWhenClear",
 
     -- Thần linh
     ["Tự Động Quét Trạng Thái Thần Linh"] = "AutoGodSpiritCheck",
@@ -1929,6 +1932,117 @@ function secretBossState.LoadCustomSpots()
     end)
 end
 
+function secretBossState.SaveHomeSpot()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false, "Không tìm thấy nhân vật!" end
+
+    local cf = root.CFrame
+    local spotData = {
+        x = cf.Position.X,
+        y = cf.Position.Y,
+        z = cf.Position.Z,
+        cframe = {cf:GetComponents()},
+        savedAt = os.date("%H:%M:%S - %d/%m/%Y")
+    }
+    Config.HomeFarmSpot = spotData
+
+    if writefile then
+        pcall(function()
+            local fName = string.format("heavyweight_home_spot_%s.json", tostring(LocalPlayer.UserId))
+            writefile(fName, HttpService:JSONEncode(spotData))
+        end)
+    end
+    return true, spotData
+end
+
+function secretBossState.LoadHomeSpot()
+    if not readfile or not isfile then return end
+    local fName = string.format("heavyweight_home_spot_%s.json", tostring(LocalPlayer.UserId))
+    if not isfile(fName) then return end
+    pcall(function()
+        local content = readfile(fName)
+        if content and #content > 0 then
+            local decoded = HttpService:JSONDecode(content)
+            if type(decoded) == "table" and (decoded.cframe or decoded.x) then
+                Config.HomeFarmSpot = decoded
+            end
+        end
+    end)
+end
+
+function secretBossState.ClearHomeSpot()
+    Config.HomeFarmSpot = nil
+    if delfile and isfile then
+        pcall(function()
+            local fName = string.format("heavyweight_home_spot_%s.json", tostring(LocalPlayer.UserId))
+            if isfile(fName) then delfile(fName) end
+        end)
+    elseif writefile then
+        pcall(function()
+            local fName = string.format("heavyweight_home_spot_%s.json", tostring(LocalPlayer.UserId))
+            writefile(fName, "")
+        end)
+    end
+end
+
+function secretBossState.ReturnToHome()
+    if not Config.HomeFarmSpot then return false end
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local homeCf = nil
+    if Config.HomeFarmSpot.cframe and #Config.HomeFarmSpot.cframe == 12 then
+        homeCf = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+    elseif Config.HomeFarmSpot.x and Config.HomeFarmSpot.y and Config.HomeFarmSpot.z then
+        homeCf = CFrame.new(Config.HomeFarmSpot.x, Config.HomeFarmSpot.y, Config.HomeFarmSpot.z)
+    end
+    if not homeCf then return false end
+
+    local dist = (root.Position - homeCf.Position).Magnitude
+    if dist > 35 then
+        if (tick() - (secretBossState.lastHomeReturnTime or 0)) < 4.0 then
+            return false
+        end
+        secretBossState.lastHomeReturnTime = tick()
+
+        ShowNotification("VỀ VỊ TRÍ FARM", "Thời tiết Clear / Hết Boss! Đang quay về vị trí Farm để câu cá kiếm tiền...", "INFO", 5)
+        if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+            statusLabelSecretBoss.Set("Thời tiết Clear / Hết Boss -> Đã về vị trí Farm câu tiền...")
+        end
+
+        local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
+        if not wp then
+            wp = Instance.new("Part")
+            wp.Name = "IdenticalWaterPlatform"
+            wp.Size = Vector3.new(30, 2, 30)
+            wp.Transparency = 1
+            wp.Anchored = true
+            wp.CanCollide = true
+            wp.Parent = Workspace
+        end
+        wp.CFrame = CFrame.new(homeCf.Position.X, homeCf.Position.Y - 2.8, homeCf.Position.Z)
+        wp.CanCollide = true
+
+        root.CFrame = homeCf + Vector3.new(0, 1.5, 0)
+        task.wait(0.2)
+        root.CFrame = homeCf
+
+        secretBossState.active = false
+        secretBossState.currentMap = "Home Farm"
+        secretBossState.standPos = homeCf.Position
+
+        -- Bắt đầu quăng cần sau 1.5s
+        task.delay(1.5, function()
+            if not isRunning then return end
+            CancelAndRecastRod()
+        end)
+        return true
+    end
+    return false
+end
+
 function secretBossState.GetNearestIsland()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -2268,6 +2382,9 @@ function secretBossState.HandleChatMessage(msg)
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set("Tất cả Secret Boss đã despawn. Chờ đợt mới...")
         end
+        if Config.ReturnToHomeWhenClear and Config.HomeFarmSpot then
+            secretBossState.ReturnToHome()
+        end
         if Config.AutoServerHopOnDespawn then
             ShowNotification("Auto Server Hop", "Secret Boss đã hết! Đang tự động đổi server để săn tiếp...", "WARN", 5)
             task.delay(1.5, function()
@@ -2403,24 +2520,39 @@ function secretBossState.ScanChatHistory()
 
     -- Nếu có tin nhắn Boss xuất hiện và tin Spawn xuất hiện sau tin Despawn (hoặc không có tin despawn nào sau đó)
     if latestSpawn and (latestDespawnIndex < latestSpawnIndex) then
-        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local targetPos = secretBossState.standPos or latestSpawn.island.pos
-        local dist = root and (root.Position - targetPos).Magnitude or 9999
-        if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 150 then
-            secretBossState.Teleport(latestSpawn.island, latestSpawn.bossName)
+        local hasTargetInIsland = false
+        for _, b in ipairs(latestSpawn.island.bosses) do
+            if Config.SecretBossTargets[b.name] then
+                hasTargetInIsland = true
+                break
+            end
         end
-        return true
+        if hasTargetInIsland then
+            local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local targetPos = secretBossState.standPos or latestSpawn.island.pos
+            local dist = root and (root.Position - targetPos).Magnitude or 9999
+            if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 150 then
+                secretBossState.Teleport(latestSpawn.island, latestSpawn.bossName)
+            end
+            return true
+        end
     elseif latestDespawnIndex > latestSpawnIndex and latestDespawnIndex ~= -1 then
         secretBossState.standPos = nil
+        secretBossState.active = false
+        secretBossState.currentMap = nil
         secretBossState.statusText = "Boss gần nhất đã despawn. Đang chờ đợt mới..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
+        end
+        if Config.ReturnToHomeWhenClear and Config.HomeFarmSpot then
+            secretBossState.ReturnToHome()
         end
     end
     return false
 end
 
 pcall(function() secretBossState.LoadCustomSpots() end)
+pcall(function() secretBossState.LoadHomeSpot() end)
 
 
 local tabFishing   = CreateTab("Câu Cá")
@@ -3585,6 +3717,61 @@ createButtonRow(chatBossCard, "Bỏ Chọn Tất Cả", "Tắt săn tất cả S
         end
     end
     ShowNotification("Secret Boss", "Đã bỏ chọn tất cả Secret Boss.", "INFO")
+end)
+
+createCategoryHeader(tabBoss, "🏠 VỊ TRÍ FARM MẶC ĐỊNH KHI HẾT BOSS (HOME SPOT)")
+local homeSpotCard = createCardGroup(tabBoss)
+
+local function GetHomeSpotText()
+    if Config.HomeFarmSpot then
+        local p = Config.HomeFarmSpot
+        return string.format("Đã lưu: X:%.1f, Y:%.1f, Z:%.1f (%s)", p.x or 0, p.y or 0, p.z or 0, p.savedAt or "Đã lưu")
+    end
+    return "Chưa thiết lập (Bấm nút bên dưới để lưu vị trí đang đứng)"
+end
+
+local infoHomeSpot = createInfoRow(homeSpotCard, "Vị Trí Farm Hiện Tại", GetHomeSpotText())
+
+createToggleRow(homeSpotCard, "Tự Về Vị Trí Farm Khi Hết Boss / Clear", "Khi hết Boss hoặc thời tiết Clear, tự bay về vị trí này câu cá farm tiền", Config.ReturnToHomeWhenClear, function(v)
+    Config.ReturnToHomeWhenClear = v
+end)
+
+createButtonRow(homeSpotCard, "Lưu Vị Trí Đang Đứng Làm Home Spot", "Lưu tọa độ & hướng quay hiện tại làm nơi Farm cá mặc định (lưu riêng theo tài khoản)", "Lưu Vị Trí", function()
+    local ok, spot = secretBossState.SaveHomeSpot()
+    if ok then
+        if infoHomeSpot and infoHomeSpot.Set then
+            infoHomeSpot.Set(GetHomeSpotText())
+        end
+        ShowNotification("Vị Trí Farm", "Đã lưu vị trí Farm thành công cho tài khoản này!", "SUCCESS", 5)
+    else
+        ShowNotification("Lỗi Lưu", tostring(spot), "ERROR")
+    end
+end)
+
+createButtonRow(homeSpotCard, "Bay Về Vị Trí Farm Ngay", "Dịch chuyển tức thì về vị trí Farm đã lưu và bắt đầu câu", "Bay Về", function()
+    if not Config.HomeFarmSpot then
+        ShowNotification("Chưa Lưu Vị Trí", "Vui lòng đứng tại nơi muốn câu rồi bấm [Lưu Vị Trí] trước!", "WARN", 5)
+        return
+    end
+    secretBossState.lastHomeReturnTime = 0
+    local ok = secretBossState.ReturnToHome()
+    if not ok then
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root and Config.HomeFarmSpot.cframe then
+            root.CFrame = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+            CancelAndRecastRod()
+        end
+    end
+    ShowNotification("Vị Trí Farm", "Đã bay về vị trí Farm mặc định!", "SUCCESS", 4)
+end)
+
+createButtonRow(homeSpotCard, "Xóa Vị Trí Farm Đã Lưu", "Xóa vị trí farm đã lưu của tài khoản này", "Xóa Vị Trí", function()
+    secretBossState.ClearHomeSpot()
+    if infoHomeSpot and infoHomeSpot.Set then
+        infoHomeSpot.Set(GetHomeSpotText())
+    end
+    ShowNotification("Vị Trí Farm", "Đã xóa vị trí Farm mặc định của tài khoản này.", "INFO")
 end)
 
 do
@@ -5326,7 +5513,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local isCD = char:GetAttribute("CDForTheNextThrow") == true
         local isSwimming = char:GetAttribute("Swimming") == true
 
-        local shouldAutoFish = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+        local shouldAutoFish = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or Config.AutoChatSecretBoss
 
         if shouldAutoFish and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
             lastEquipRodTime = now
@@ -5392,7 +5579,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             
             -- XỬ LÝ FAST SKIP KHI SĂN SECRET BOSS (NẾU KHÔNG PHẢI BOSS MỤC TIÊU THÌ GIẬT CẦN THẢ LẠI)
             local skipTriggered = false
-            local isHunting = Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+            local isHunting = (Config.AutoHuntBoss or Config.AutoChatSecretBoss) and secretBossState.active
 
             if isHunting and Config.FastSkipNonBoss and not Config.AutoTrainSkill then
                 if secretBossState.minigameStartTime == 0 then
@@ -5680,7 +5867,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             secretBossState.minigameStartTime = 0
             lastCastTime = now
         else
-            local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+            local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or Config.AutoChatSecretBoss
             if shouldAutoCast and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
                 local canCast = true
                 if pData and pData:FindFirstChild("InventoryLimit") then
@@ -5722,7 +5909,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         if (now - lastEquipTime >= 2.5) and pData then
             lastEquipTime = now
             if pData:FindFirstChild("Bait") and pData:FindFirstChild("EquippedBait") and Events:FindFirstChild("EquipBait") then
-                local isHuntingBoss = Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+                local isHuntingBoss = (Config.AutoHuntBoss or Config.AutoChatSecretBoss) and secretBossState.active
                 local targetBaitChoice = nil
 
                 if isHuntingBoss and Config.AutoEquipBossBait then
@@ -6108,7 +6295,19 @@ task.spawn(function()
             pcall(function()
                 -- 1. Ưu tiên quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
                 local wIsland, wName = secretBossState.DetectWeather()
+
+                local targetBossInWeather = false
                 if wIsland then
+                    for _, b in ipairs(wIsland.bosses) do
+                        if Config.SecretBossTargets[b.name] then
+                            targetBossInWeather = true
+                            break
+                        end
+                    end
+                end
+
+                if wIsland and targetBossInWeather then
+                    -- Có Boss mục tiêu đang diễn ra theo thời tiết -> Bay qua đảo săn boss
                     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     local targetPos = secretBossState.standPos or wIsland.pos
                     local dist = root and (root.Position - targetPos).Magnitude or 9999
@@ -6116,8 +6315,27 @@ task.spawn(function()
                         secretBossState.Teleport(wIsland, wName)
                     end
                 else
-                    -- 2. Quét thông báo chat và banner màn hình
-                    secretBossState.ScanChatHistory()
+                    -- Không có thời tiết boss mục tiêu (Thời tiết Clear, hoặc thời tiết đảo đó không chọn săn)
+                    -- 2. Quét tiếp thông báo chat và banner màn hình
+                    local chatHasTargetSpawn = secretBossState.ScanChatHistory()
+
+                    if not chatHasTargetSpawn and not targetBossInWeather then
+                        -- Hoàn toàn KHÔNG CÓ BOSS MỤC TIÊU NÀO ĐANG HOẠT ĐỘNG
+                        if secretBossState.active then
+                            secretBossState.active = false
+                            secretBossState.currentMap = nil
+                            secretBossState.targetIsland = nil
+                            secretBossState.standPos = nil
+                            if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+                                statusLabelSecretBoss.Set("Thời tiết Clear / Hết Boss. Đang ở vị trí Farm...")
+                            end
+                        end
+
+                        -- Nếu có bật tự động về Home Farm Spot
+                        if Config.ReturnToHomeWhenClear and Config.HomeFarmSpot then
+                            secretBossState.ReturnToHome()
+                        end
+                    end
                 end
             end)
         end
