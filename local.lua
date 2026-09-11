@@ -289,7 +289,6 @@ local ConfigLabelMap = {
     ["Tự Dùng Ngọc Tốt Nhất"] = "AutoEquipBestOrb",
 
     -- Săn Secret Boss
-    ["Bật Tự Động Săn Secret Boss"] = "AutoHuntBoss",
     ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
     ["Bật Săn Secret Boss (Chat Sniper)"] = "AutoChatSecretBoss",
     ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
@@ -539,22 +538,6 @@ local function getGuiParent()
     if pg then return pg end
     return CoreGui
 end
-
-pcall(function()
-    local targetParent = getGuiParent()
-    if targetParent then
-        local existing = targetParent:FindFirstChild("IdenticalHeavyweightFishing")
-        if existing then existing:Destroy() end
-    end
-    if CoreGui then
-        local existingCore = CoreGui:FindFirstChild("IdenticalHeavyweightFishing")
-        if existingCore then existingCore:Destroy() end
-    end
-    if LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui") then
-        local existingPG = LocalPlayer.PlayerGui:FindFirstChild("IdenticalHeavyweightFishing")
-        if existingPG then existingPG:Destroy() end
-    end
-end)
 
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "IdenticalHeavyweightFishing"
@@ -888,27 +871,7 @@ local tabFrames = {}
 local tabButtons = {}
 
 local function SwitchTab(tabName)
-    for name, frame in pairs(tabFrames) do
-        local isTarget = (name == tabName)
-        frame.Visible = isTarget
-        if isTarget then
-            frame.CanvasPosition = Vector2.new(0, 0)
-            task.defer(function()
-                local pl = frame:FindFirstChildOfClass("UIListLayout")
-                if pl and pl.AbsoluteContentSize.Y > 0 then
-                    frame.CanvasSize = UDim2.new(0, 0, 0, pl.AbsoluteContentSize.Y + 36)
-                end
-                for _, child in ipairs(frame:GetChildren()) do
-                    if child:IsA("Frame") then
-                        local l = child:FindFirstChildOfClass("UIListLayout")
-                        if l and l.AbsoluteContentSize.Y > 0 then
-                            child.Size = UDim2.new(1, 0, 0, l.AbsoluteContentSize.Y)
-                        end
-                    end
-                end
-            end)
-        end
-    end
+    for name, frame in pairs(tabFrames) do frame.Visible = (name == tabName) end
     for name, btn in pairs(tabButtons) do
         if name == tabName then
             TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.PurpleDark, TextColor3 = Colors.TextWhite}):Play()
@@ -928,19 +891,11 @@ local function CreateTab(name)
     Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 2)
     btn.MouseButton1Click:Connect(function() SwitchTab(name) end)
 
-    local page = Instance.new("ScrollingFrame"); page.Name = "TabPage_" .. name; page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Colors.BorderPurple; page.CanvasSize = UDim2.new(0, 0, 0, 800); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = contentArea
-    local pl = Instance.new("UIListLayout"); pl.SortOrder = Enum.SortOrder.LayoutOrder; pl.Padding = UDim.new(0, 10); pl.Parent = page
-    local pp = Instance.new("UIPadding"); pp.PaddingTop = UDim.new(0, 12); pp.PaddingBottom = UDim.new(0, 24); pp.PaddingLeft = UDim.new(0, 14); pp.PaddingRight = UDim.new(0, 14); pp.Parent = page
-
-    local function refreshCanvas()
-        local h = pl.AbsoluteContentSize.Y
-        if h and h > 0 then
-            page.CanvasSize = UDim2.new(0, 0, 0, h + 36)
-        end
+    local page = Instance.new("ScrollingFrame"); page.Name = "TabPage_" .. name; page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Colors.BorderPurple; page.CanvasSize = UDim2.new(0, 0, 0, 0); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = contentArea
+    do
+        local pl = Instance.new("UIListLayout"); pl.SortOrder = Enum.SortOrder.LayoutOrder; pl.Padding = UDim.new(0, 10); pl.Parent = page
+        local pp = Instance.new("UIPadding"); pp.PaddingTop = UDim.new(0, 12); pp.PaddingBottom = UDim.new(0, 16); pp.PaddingLeft = UDim.new(0, 14); pp.PaddingRight = UDim.new(0, 14); pp.Parent = page
     end
-    pl:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshCanvas)
-    page.ChildAdded:Connect(function() task.defer(refreshCanvas) end)
-
     tabFrames[name] = page; tabButtons[name] = btn
     return page
 end
@@ -970,26 +925,9 @@ killBtn.MouseButton1Click:Connect(function()
     UnloadScript()
 end)
 
-local function safeRun(name, fn)
-    local ok, err = pcall(fn)
-    if not ok then
-        warn("[Identical Hub - " .. tostring(name) .. " ERROR]: " .. tostring(err))
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "⚠️ LỖI: " .. tostring(name),
-                Text = tostring(err):sub(1, 100),
-                Duration = 25
-            })
-        end)
-    end
-    return ok
-end
-
 local function createCategoryHeader(parent, text)
     local hdr = Instance.new("Frame"); hdr.Size = UDim2.new(1, 0, 0, 22); hdr.BackgroundTransparency = 1; hdr.Parent = parent
     local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBold; lbl.Text = string.upper(text); lbl.TextColor3 = Colors.PurplePrimary; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = hdr
-    hdr._title = lbl
-    hdr._defaultTitle = string.upper(text)
     return hdr
 end
 
@@ -998,16 +936,6 @@ local function createCardGroup(parent)
     local s = Instance.new("UIStroke"); s.Color = Colors.BorderSubtle; s.Thickness = 1; s.Parent = group
     Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
     local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
-
-    local function refreshGroupSize()
-        local h = l.AbsoluteContentSize.Y
-        if h and h > 0 then
-            group.Size = UDim2.new(1, 0, 0, h)
-        end
-    end
-    l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshGroupSize)
-    group.ChildAdded:Connect(function() task.defer(refreshGroupSize) end)
-
     return group
 end
 
@@ -1517,32 +1445,6 @@ local secretBossState = {
 
 local statusLabelSecretBoss = nil
 local bossTogglesMap = {}
-local weatherInfoRow = nil
-local islandHeaderMap = {}
-
-local function UpdateIslandWeatherHighlight(activeIslandName, weatherName)
-    for islandName, hdr in pairs(islandHeaderMap) do
-        local isAct = (activeIslandName and activeIslandName == islandName)
-        if hdr and hdr._title then
-            if isAct then
-                hdr._title.TextColor3 = Color3.fromRGB(0, 255, 128)
-                hdr._title.Text = "⚡ [ĐANG CÓ BOSS] " .. (hdr._defaultTitle or islandName)
-            else
-                hdr._title.TextColor3 = Colors.PurplePrimary
-                hdr._title.Text = hdr._defaultTitle or string.upper(islandName)
-            end
-        end
-    end
-
-    if weatherInfoRow and weatherInfoRow.Set then
-        if activeIslandName then
-            local wDisp = weatherName or "Thời Tiết Boss"
-            weatherInfoRow.Set("🟢 " .. tostring(wDisp) .. " (" .. tostring(activeIslandName) .. " - ĐANG CÓ BOSS!)")
-        else
-            weatherInfoRow.Set("⚪ Bình thường (Chưa có Boss nào)")
-        end
-    end
-end
 
 local weatherTotems = {
     {name = "Totem Bão Sấm (Bamboo Isle)", island = "Đảo Tre (Bamboo Isle)", weather = "Thunderstorm (Bão Sấm)", pos = Vector3.new(-1242.0, 8.5, -195.0)},
@@ -1733,21 +1635,10 @@ local function GetCurrentHookedFishName()
     local char = LocalPlayer.Character
     if not char then return nil end
 
-    local invalidWords = {
-        ["fishing"] = true, ["minigame"] = true, ["true"] = true, ["false"] = true,
-        ["nil"] = true, ["bar"] = true, ["hitbox"] = true, ["health"] = true,
-        ["player"] = true, ["menu"] = true, ["level"] = true, ["exp"] = true,
-        ["button"] = true, ["charge"] = true, ["perfect"] = true, ["slam"] = true,
-        ["strength"] = true, ["reeling"] = true, ["casting"] = true, ["cancel"] = true
-    }
-
     local function matchBossName(rawText)
         if not rawText or typeof(rawText) ~= "string" or #rawText == 0 then return nil end
         local txt = rawText:gsub("^%s+", ""):gsub("%s+$", "")
         local txtLower = txt:lower()
-
-        if #txt < 2 or tonumber(txt) or txt:find("%%") then return nil end
-        if invalidWords[txtLower] then return nil end
 
         if secretBossLookup[txtLower] then return secretBossLookup[txtLower] end
 
@@ -1762,75 +1653,33 @@ local function GetCurrentHookedFishName()
             if entry.bossPatterns then
                 for _, bp in ipairs(entry.bossPatterns) do
                     if txtLower:find(bp, 1, true) then
-                        return entry.bosses[1].name
+                        return bp
                     end
                 end
             end
         end
-
-        for badWord, _ in pairs(invalidWords) do
-            if txtLower == badWord or txtLower:find("^" .. badWord .. "%s") or txtLower:find("%s" .. badWord .. "$") then
-                return nil
-            end
-        end
-
-        return nil
+        return txt
     end
 
-    -- 1. ƯU TIÊN 1: Kiểm tra mô hình cá đang kéo trong Workspace.Fishes (chuẩn xác nhất theo server)
-    if Workspace:FindFirstChild("Fishes") then
-        local uid = tostring(LocalPlayer.UserId)
-        local pName = LocalPlayer.Name
-        local fishID = LocalPlayer:GetAttribute("FishID")
-        local playerFish = nil
-
-        if fishID and Workspace.Fishes:FindFirstChild(tostring(fishID)) then
-            playerFish = Workspace.Fishes:FindFirstChild(tostring(fishID))
-        end
-        if not playerFish then
-            for _, f in ipairs(Workspace.Fishes:GetChildren()) do
-                if f:FindFirstChild(uid .. "_PlayerHealth") or f:FindFirstChild(pName .. "_PlayerHealth")
-                   or f:GetAttribute("Owner") == LocalPlayer.UserId or f:GetAttribute("Owner") == pName
-                   or f:GetAttribute("Player") == pName or f:GetAttribute("Player") == LocalPlayer.UserId then
-                    playerFish = f
-                    break
-                end
-            end
-        end
-
-        if playerFish then
-            for _, attName in ipairs({"FishName", "Name", "Type", "Species", "FishType", "Boss"}) do
-                local val = playerFish:GetAttribute(attName)
-                if val and typeof(val) == "string" and #val > 1 then
-                    local matched = matchBossName(val)
-                    if matched then return matched end
-                end
-            end
-
-            local modelChild = playerFish:FindFirstChild("Model")
-            if modelChild and modelChild:IsA("Model") and not modelChild.Name:match("^[%d%-]+$") then
-                local matched = matchBossName(modelChild.Name)
-                if matched then return matched end
-            end
-
-            for _, d in ipairs(playerFish:GetDescendants()) do
-                if d:IsA("TextLabel") and d.Text ~= "" and #d.Text > 2 then
-                    local matched = matchBossName(d.Text)
-                    if matched then return matched end
-                end
-            end
-
-            if not playerFish.Name:match("^[%d%-]+$") then
-                local matched = matchBossName(playerFish.Name)
-                if matched then return matched end
-            end
+    -- 1. Check Character attributes
+    for _, attName in ipairs({"FishName", "TargetFish", "Boss", "Fish", "CurrentFish", "HookedFish"}) do
+        local val = char:GetAttribute(attName)
+        if val and tostring(val) ~= "" then
+            return matchBossName(tostring(val))
         end
     end
 
-    -- 2. ƯU TIÊN 2: Kiểm tra BossFightBar trong Fishing UI
+    -- 2. Check PlayerGui.MainGui.Fishing
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     local fUI = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing")
     if fUI and fUI.Visible then
+        for _, lblName in ipairs({"FishName", "Title", "Name", "Fish", "BossName", "Target"}) do
+            local label = fUI:FindFirstChild(lblName, true)
+            if label and label:IsA("TextLabel") and label.Text ~= "" then
+                return matchBossName(label.Text)
+            end
+        end
+
         local bossBar = fUI:FindFirstChild("BossFightBar")
         if bossBar and bossBar.Visible then
             for _, d in ipairs(bossBar:GetDescendants()) do
@@ -1841,42 +1690,17 @@ local function GetCurrentHookedFishName()
             end
         end
 
-        -- 3. ƯU TIÊN 3: Quét các TextLabel hiển thị tên cá trong fUI (loại trừ HPPlayer)
-        local hpPlayerFrame = fUI:FindFirstChild("HPPlayer")
-        for _, lblName in ipairs({"FishName", "FishTitle", "BossName", "TargetFish", "Fish_Name", "CurrentFish", "FishLabel"}) do
-            local label = fUI:FindFirstChild(lblName, true)
-            if label and label:IsA("TextLabel") and label.Visible and label.Text ~= "" then
-                if not hpPlayerFrame or not label:IsDescendantOf(hpPlayerFrame) then
-                    local matched = matchBossName(label.Text)
-                    if matched then return matched end
-                end
-            end
-        end
-
-        -- Scan any visible TextLabel in fUI matching a known secret boss (loại trừ HPPlayer)
+        -- Scan any visible TextLabel in fUI matching a known secret boss
         for _, d in ipairs(fUI:GetDescendants()) do
             if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and not tonumber(d.Text) and not d.Text:find("%%") then
-                if not hpPlayerFrame or not d:IsDescendantOf(hpPlayerFrame) then
-                    local txtLower = d.Text:lower()
-                    for _, entry in ipairs(secretBossDatabase) do
-                        for _, b in ipairs(entry.bosses) do
-                            if txtLower:find(b.name:lower(), 1, true) then
-                                return b.name
-                            end
+                local txtLower = d.Text:lower()
+                for _, entry in ipairs(secretBossDatabase) do
+                    for _, b in ipairs(entry.bosses) do
+                        if txtLower:find(b.name:lower(), 1, true) then
+                            return b.name
                         end
                     end
                 end
-            end
-        end
-    end
-
-    -- 4. ƯU TIÊN 4: Attributes trên LocalPlayer & Character
-    for _, holder in ipairs({LocalPlayer, char}) do
-        for _, attName in ipairs({"FishName", "TargetFish", "CurrentFish", "HookedFish", "BossName", "Boss"}) do
-            local val = holder:GetAttribute(attName)
-            if val and typeof(val) == "string" and #val > 1 then
-                local matched = matchBossName(val)
-                if matched then return matched end
             end
         end
     end
@@ -2564,7 +2388,6 @@ function secretBossState.ScanChatHistory()
 
     -- Nếu có tin nhắn Boss xuất hiện và tin Spawn xuất hiện sau tin Despawn (hoặc không có tin despawn nào sau đó)
     if latestSpawn and (latestDespawnIndex < latestSpawnIndex) then
-        UpdateIslandWeatherHighlight(latestSpawn.island.islandName, latestSpawn.island.weather)
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local dist = root and (root.Position - latestSpawn.island.pos).Magnitude or 9999
         if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 70 then
@@ -2572,7 +2395,6 @@ function secretBossState.ScanChatHistory()
         end
         return true
     elseif latestDespawnIndex > latestSpawnIndex and latestDespawnIndex ~= -1 then
-        UpdateIslandWeatherHighlight(nil, nil)
         secretBossState.statusText = "Boss gần nhất đã despawn. Đang chờ đợt mới..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
@@ -2593,6 +2415,9 @@ local tabTeleports = CreateTab("Dịch Chuyển")
 local tabVisuals   = CreateTab("ESP & Đồ Hoạ")
 local tabPlayer    = CreateTab("Nhân Vật")
 local tabProfiles  = CreateTab("Cài Đặt")
+
+SwitchTab("Câu Cá")
+
 
 createCategoryHeader(tabFishing, "Thông Tin Tài Khoản & Thống Kê")
 local statsCard = createCardGroup(tabFishing)
@@ -3634,30 +3459,48 @@ end)
 createCategoryHeader(tabBoss, "🎯 CHẾ ĐỘ SĂN SECRET BOSS & LỌC CÁ")
 local chatBossCard = createCardGroup(tabBoss)
 
-createToggleRow(chatBossCard, "Bật Tự Động Săn Secret Boss", "Tự nghe Chat & Thời tiết -> Tự bay đến đảo có Boss -> Tự quăng cần & lọc đúng Boss mục tiêu", Config.AutoHuntBoss or Config.AutoChatSecretBoss, function(v)
+createToggleRow(chatBossCard, "Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)", "Tự động quăng cần và giật bỏ cá thường, chỉ câu trúng Boss mục tiêu", Config.AutoHuntBoss, function(v)
     Config.AutoHuntBoss = v
-    Config.AutoChatSecretBoss = v
     if v then
         secretBossState.active = true
-        secretBossState.statusText = "Đang quét server & săn boss (Tự bay đảo + tự quăng cần + lọc cá)..."
+        secretBossState.statusText = "Đang săn boss tại vị trí hiện tại (Tự quăng cần & lọc cá)..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
         end
-        ShowNotification("Săn Boss", "Đã BẬT Tự Động Săn Boss! Tự động bay khi có boss & lọc cá 100%.", "SUCCESS", 5)
-        task.spawn(function()
-            task.wait(0.3)
-            secretBossState.ScanChatHistory()
-        end)
+        ShowNotification("Săn Boss", "Đã BẬT Chế Độ Săn Boss! Tự quăng cần và giật bỏ cá thường.", "SUCCESS", 5)
     else
-        secretBossState.active = false
-        if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-            statusLabelSecretBoss.Set("Đã tắt tự động săn boss.")
+        if not Config.AutoChatSecretBoss then
+            secretBossState.active = false
         end
-        ShowNotification("Săn Boss", "Đã TẮT Tự Động Săn Boss.", "INFO")
+        if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+            statusLabelSecretBoss.Set("Đã tắt chế độ săn boss.")
+        end
+        ShowNotification("Săn Boss", "Đã TẮT Chế Độ Săn Boss.", "INFO")
     end
 end)
 
-weatherInfoRow = createInfoRow(chatBossCard, "Thời Tiết Hiện Tại", "⚪ Bình thường (Chưa có Boss nào)")
+createToggleRow(chatBossCard, "Tự Động Bay Theo Chat (Chat Sniper)", "Tự nghe tin nhắn chat server, khi có boss thì tự bay đến đảo có boss", Config.AutoChatSecretBoss, function(v)
+    Config.AutoChatSecretBoss = v
+    if v then
+        ShowNotification("Chat Sniper", "Đang lắng nghe thông báo Boss từ chat server...", "SUCCESS", 4)
+        task.spawn(function()
+            task.wait(0.3)
+            local found = secretBossState.ScanChatHistory()
+            if not found then
+                if statusLabelSecretBoss and statusLabelSecretBoss.Set and not Config.AutoHuntBoss then
+                    statusLabelSecretBoss.Set("Đang chờ thông báo Boss mới từ Chat...")
+                end
+            end
+        end)
+    else
+        if not Config.AutoHuntBoss then
+            secretBossState.active = false
+            if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+                statusLabelSecretBoss.Set("Đã tắt Chat Sniper.")
+            end
+        end
+    end
+end)
 
 createToggleRow(chatBossCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) các loài Secret Boss khi câu được, chống bị bán mất", Config.AutoLockSecretBoss, function(v)
     Config.AutoLockSecretBoss = v
@@ -3939,8 +3782,7 @@ end
 
 -- Danh sách từng đảo và Secret Boss
 for _, entry in ipairs(secretBossDatabase) do
-    local islandHdr = createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
-    islandHeaderMap[entry.islandName] = islandHdr
+    createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
     local islandBossCard = createCardGroup(tabBoss)
     for _, b in ipairs(entry.bosses) do
         local isEnabled = Config.SecretBossTargets[b.name] == true
@@ -5012,12 +4854,6 @@ createButtonRow(credCard, "🔴 Diệt Toàn Bộ Script (Kill Script)", "Ngắt
     ShowNotification("Diệt Script", "Đang ngắt kết nối và đóng script hoàn toàn...", "WARN", 2)
     task.wait(0.2)
     UnloadScript()
-end)
-
--- Khởi động tab mặc định sau khi mọi controls và cards đã được nạp xong hoàn toàn
-SwitchTab("Câu Cá")
-task.defer(function()
-    SwitchTab("Câu Cá")
 end)
 
 local lastCastTime = 0
