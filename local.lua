@@ -925,6 +925,64 @@ local allRods = {
     {name = "Demonic Rod", price = 0, power = 85, luck = 25},
 }
 
+local function IsRodOwned(rodName)
+    if not rodName or rodName == "" then return false end
+
+    -- 1. Cần đang cầm trên tay hoặc lưu trong pData.FishingRod
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value == rodName then
+        return true
+    end
+
+    -- 2. Kiểm tra trong kho cần câu chính: FishingRodInventory
+    if pData and pData:FindFirstChild("FishingRodInventory") then
+        local rFolder = pData.FishingRodInventory:FindFirstChild(rodName)
+        if rFolder then
+            local oVal = rFolder:FindFirstChild("Owned")
+            if oVal and oVal:IsA("ValueBase") and oVal.Value == true then
+                return true
+            end
+            if rFolder:IsA("BoolValue") and rFolder.Value == true then
+                return true
+            end
+            if rFolder:GetAttribute("Owned") == true then
+                return true
+            end
+            if oVal == nil and not rFolder:FindFirstChild("Locked") then
+                return true
+            end
+        end
+    end
+
+    -- 3. Kiểm tra các thư mục kho phụ (Rods, RodInventory, Inventory, Tools)
+    if pData then
+        for _, fName in ipairs({"Rods", "RodInventory", "Inventory", "Tools"}) do
+            local f = pData:FindFirstChild(fName)
+            if f and f:FindFirstChild(rodName) then
+                local oVal = f[rodName]:FindFirstChild("Owned")
+                if oVal and oVal:IsA("ValueBase") then
+                    if oVal.Value == true then return true end
+                else
+                    return true
+                end
+            end
+        end
+    end
+
+    -- 4. Kiểm tra trong Backpack hoặc Character
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    if bp and bp:FindFirstChild(rodName) then return true end
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChild(rodName) then return true end
+
+    -- 5. Cần mặc định của game (Wooden Rod) luôn đã có
+    if rodName == "Wooden Rod" then
+        return true
+    end
+
+    return false
+end
+
 local secretBossDatabase = {
     {
         islandName = "Đảo Tre (Bamboo Isle)",
@@ -2160,8 +2218,7 @@ createDropdownRow(equipCard, "Set 1: Mồi Câu", "Chọn mồi câu cho Bộ Se
 createButtonRow(equipCard, "Trang Bị Nhanh Set 1", "Trang bị Cần & Mồi đã chọn cho Set 1", "Dùng Set 1", function()
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if pData then
-        local rFolder = pData.FishingRodInventory:FindFirstChild(Config.Loadout1_Rod)
-        local isOwned = rFolder and rFolder:FindFirstChild("Owned") and rFolder.Owned.Value == true
+        local isOwned = IsRodOwned(Config.Loadout1_Rod)
         if isOwned then
             if Events:FindFirstChild("EquipFishingRod") then Events.EquipFishingRod:InvokeServer(Config.Loadout1_Rod) end
             ShowNotification("Bộ Set #1", "Đã trang bị cần: " .. Config.Loadout1_Rod, "SUCCESS")
@@ -2183,8 +2240,7 @@ createDropdownRow(equipCard, "Set 2: Mồi Câu", "Chọn mồi câu cho Bộ Se
 createButtonRow(equipCard, "Trang Bị Nhanh Set 2", "Trang bị Cần & Mồi đã chọn cho Set 2", "Dùng Set 2", function()
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if pData then
-        local rFolder = pData.FishingRodInventory:FindFirstChild(Config.Loadout2_Rod)
-        local isOwned = rFolder and rFolder:FindFirstChild("Owned") and rFolder.Owned.Value == true
+        local isOwned = IsRodOwned(Config.Loadout2_Rod)
         if isOwned then
             if Events:FindFirstChild("EquipFishingRod") then Events.EquipFishingRod:InvokeServer(Config.Loadout2_Rod) end
             ShowNotification("Bộ Set #2", "Đã trang bị cần: " .. Config.Loadout2_Rod, "SUCCESS")
@@ -2554,15 +2610,144 @@ local function formatNumber(n)
     return formatted .. " Cash"
 end
 
+local rodShopUpdaters = {}
+local function UpdateAllRodShopUI()
+    for _, fn in ipairs(rodShopUpdaters) do
+        pcall(fn)
+    end
+end
+
+-- Nút Làm Mới Trạng Thái Cần Câu
+createButtonRow(rodShopCard, "Làm Mới Trạng Thái Cần", "Quét lại túi đồ để cập nhật danh sách cần đã có / chưa có", "Làm Mới", function()
+    UpdateAllRodShopUI()
+    ShowNotification("Shop Cần", "Đã cập nhật trạng thái sở hữu cần câu!", "INFO")
+end)
+
 for _, rod in ipairs(allRods) do
     local pStr = formatNumber(rod.price)
-    local desc = string.format("Lực: %d | May mắn: %d%% | Giá: %s", rod.power, rod.luck, pStr)
-    createButtonRow(rodShopCard, rod.name, desc, "Mua Cần", function()
-        if Events and Events:FindFirstChild("BuyFishingRod") then
-            Events.BuyFishingRod:FireServer(rod.name)
-            ShowNotification("Shop Cần", "Đã gửi yêu cầu mua cần: " .. rod.name, "SUCCESS")
+    local baseDesc = string.format("Lực: %d | May mắn: %d%% | Giá: %s", rod.power, rod.luck, pStr)
+
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 44)
+    row.BackgroundColor3 = Colors.RowNormal
+    row.BorderSizePixel = 0
+    row.Parent = rodShopCard
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = row
+
+    local tf = Instance.new("Frame")
+    tf.Size = UDim2.new(1, -125, 1, 0)
+    tf.BackgroundTransparency = 1
+    tf.Parent = row
+
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, 0, 0, 20)
+    tl.Position = UDim2.new(0, 0, 0, 3)
+    tl.BackgroundTransparency = 1
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = rod.name
+    tl.TextColor3 = Colors.TextWhite
+    tl.TextSize = 12
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.Parent = tf
+
+    local dl = Instance.new("TextLabel")
+    dl.Size = UDim2.new(1, 0, 0, 16)
+    dl.Position = UDim2.new(0, 0, 0, 23)
+    dl.BackgroundTransparency = 1
+    dl.Font = Enum.Font.Gotham
+    dl.Text = baseDesc
+    dl.TextColor3 = Colors.TextMuted
+    dl.TextSize = 10
+    dl.TextXAlignment = Enum.TextXAlignment.Left
+    dl.Parent = tf
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 105, 0, 26)
+    btn.Position = UDim2.new(1, -105, 0.5, -13)
+    btn.BackgroundColor3 = Colors.ControlBg
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = "Mua Cần"
+    btn.TextColor3 = Colors.PurplePrimary
+    btn.TextSize = 11
+    btn.BorderSizePixel = 0
+    btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    row.MouseEnter:Connect(function() TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play() end)
+    row.MouseLeave:Connect(function() TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowNormal}):Play() end)
+
+    table.insert(rowSearchIndex, {frame = row, query = (rod.name .. " " .. baseDesc):lower()})
+
+    local function updateRowVisuals()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local curEq = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value
+        local isEquipped = (curEq == rod.name)
+        local isOwned = isEquipped or IsRodOwned(rod.name)
+
+        if isEquipped then
+            tl.Text = string.format("%s  [ĐANG DÙNG]", rod.name)
+            tl.TextColor3 = Color3.fromRGB(120, 255, 170)
+            dl.Text = string.format("%s • [Trạng thái: Đang Cầm]", baseDesc)
+            dl.TextColor3 = Color3.fromRGB(160, 255, 190)
+
+            btn.Text = "Đang Dùng"
+            btn.BackgroundColor3 = Color3.fromRGB(30, 65, 45)
+            btn.TextColor3 = Color3.fromRGB(120, 255, 170)
+        elseif isOwned then
+            tl.Text = string.format("%s  [ĐÃ CÓ]", rod.name)
+            tl.TextColor3 = Color3.fromRGB(230, 240, 255)
+            dl.Text = string.format("%s • [Trạng thái: ĐÃ CÓ - SẴN SÀNG]", baseDesc)
+            dl.TextColor3 = Color3.fromRGB(100, 220, 255)
+
+            btn.Text = "Trang Bị"
+            btn.BackgroundColor3 = Color3.fromRGB(28, 50, 75)
+            btn.TextColor3 = Color3.fromRGB(100, 220, 255)
+        else
+            tl.Text = string.format("%s  [CHƯA CÓ]", rod.name)
+            tl.TextColor3 = Colors.TextWhite
+            dl.Text = string.format("%s • [Trạng thái: Chưa có]", baseDesc)
+            dl.TextColor3 = Colors.TextMuted
+
+            btn.Text = "Mua Cần"
+            btn.BackgroundColor3 = Colors.ControlBg
+            btn.TextColor3 = Colors.PurplePrimary
         end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local curEq = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value
+        local isEquipped = (curEq == rod.name)
+        local isOwned = isEquipped or IsRodOwned(rod.name)
+
+        if isEquipped then
+            ShowNotification("Cần Câu", "Bạn đang cầm cần " .. rod.name .. " rồi!", "INFO")
+        elseif isOwned then
+            if Events and Events:FindFirstChild("EquipFishingRod") then
+                Events.EquipFishingRod:InvokeServer(rod.name)
+                ShowNotification("Trang Bị Cần", "Đã trang bị cần: " .. rod.name, "SUCCESS")
+                task.delay(0.4, function()
+                    if Events and Events:FindFirstChild("ToggleHotbar") then
+                        Events.ToggleHotbar:InvokeServer("1")
+                    end
+                end)
+            end
+        else
+            if Events and Events:FindFirstChild("BuyFishingRod") then
+                Events.BuyFishingRod:FireServer(rod.name)
+                ShowNotification("Shop Cần", "Đã gửi yêu cầu mua cần: " .. rod.name .. " (" .. pStr .. ")", "SUCCESS")
+            end
+        end
+        task.delay(0.6, UpdateAllRodShopUI)
+        task.delay(1.5, UpdateAllRodShopUI)
     end)
+
+    table.insert(rodShopUpdaters, updateRowVisuals)
+    updateRowVisuals()
 end
 
 createCategoryHeader(tabTeleports, "Dịch Chuyển Đến Đảo (Đảo 1 - 10)")
@@ -3610,12 +3795,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
             end
 
-            if Config.AutoEquipBestRod and pData:FindFirstChild("FishingRodInventory") and pData:FindFirstChild("FishingRod") and Events:FindFirstChild("EquipFishingRod") then
+            if Config.AutoEquipBestRod and pData:FindFirstChild("FishingRod") and Events:FindFirstChild("EquipFishingRod") then
                 local bestRod = nil
                 local bestPower = -1
                 for _, r in ipairs(allRods) do
-                    local rFolder = pData.FishingRodInventory:FindFirstChild(r.name)
-                    local isOwned = rFolder and rFolder:FindFirstChild("Owned") and rFolder.Owned.Value == true
+                    local isOwned = IsRodOwned(r.name)
                     if isOwned and r.power > bestPower then
                         bestPower = r.power
                         bestRod = r.name
@@ -3643,6 +3827,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "" then infoEquippedBait.Set(pData.EquippedBait.Value) end
             if pData:FindFirstChild("FishCaught") then infoFishCaught.Set(tostring(pData.FishCaught.Value)) end
             if pData:FindFirstChild("Cash") then infoCash.Set("$" .. tostring(pData.Cash.Value)) end
+
+            -- Đồng bộ trạng thái danh sách cần câu trong Shop mỗi 3 giây
+            if not lastRodShopSync or (tick() - lastRodShopSync >= 3) then
+                lastRodShopSync = tick()
+                if UpdateAllRodShopUI then
+                    UpdateAllRodShopUI()
+                end
+            end
 
             local curFish = pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
             local curCash = pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
