@@ -122,6 +122,9 @@ local Config = {
     TrainDelayCatch = true,
     
     AutoEquipBestBait = false,
+    BaitChoiceNormal = "Mồi Tốt Nhất (Cao Nhất)",
+    AutoEquipBossBait = true,
+    BaitChoiceBoss = "Mồi Tốt Nhất (Cao Nhất)",
     AutoEquipBestRod = false,
     AutoEquipBestOrb = false,
     Loadout1_Rod = "Wooden Rod",
@@ -268,8 +271,15 @@ local ConfigLabelMap = {
 
     -- Tự trang bị
     ["Tự Động Trang Bị Cần Tốt Nhất"] = "AutoEquipBestRod",
-    ["Tự Động Trang Bị Mồi Tốt Nhất"] = "AutoEquipBestBait",
+    ["Tự Dùng Cần Tốt Nhất"] = "AutoEquipBestRod",
+    ["Tự Động Trang Bị Mồi"] = "AutoEquipBestBait",
+    ["Tự Dùng Mồi (Auto Bait)"] = "AutoEquipBestBait",
+    ["Tự Dùng Mồi Tốt Nhất"] = "AutoEquipBestBait",
+    ["Chọn Mồi Khi Câu Thường"] = "BaitChoiceNormal",
+    ["Tự Đổi Mồi Khi Săn Boss"] = "AutoEquipBossBait",
+    ["Chọn Mồi Săn Boss"] = "BaitChoiceBoss",
     ["Tự Động Trang Bị Pháp Bảo Tốt Nhất"] = "AutoEquipBestOrb",
+    ["Tự Dùng Ngọc Tốt Nhất"] = "AutoEquipBestOrb",
 
     -- Săn Secret Boss
     ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
@@ -2703,7 +2713,36 @@ end
 
 createCategoryHeader(tabFishing, "Tự Động Trang Bị Tối Ưu")
 local equipCard = createCardGroup(tabFishing)
-createToggleRow(equipCard, "Tự Dùng Mồi Tốt Nhất", "Tự động móc loại mồi có may mắn cao nhất trong kho", Config.AutoEquipBestBait, function(v) Config.AutoEquipBestBait = v end)
+
+local baitOptionsList = {
+    "Mồi Tốt Nhất (Cao Nhất)",
+    "Mồi Thấp Nhất (Tiết Kiệm)",
+    "Nameless Bait",
+    "Rainbow Bait",
+    "Frost Bait",
+    "Ancestral Bait",
+    "Elite Bait",
+    "Corrupted Essence Bait",
+    "Crude Mash Bait",
+    "Basic Bait"
+}
+
+createToggleRow(equipCard, "Tự Đổi Mồi Khi Săn Boss", "Tự động đổi sang mồi săn boss tối ưu khi vào chế độ Săn Boss", Config.AutoEquipBossBait, function(v)
+    Config.AutoEquipBossBait = v
+end)
+
+createDropdownRow(equipCard, "Chọn Mồi Săn Boss", "Loại mồi ưu tiên sử dụng khi săn Boss", baitOptionsList, Config.BaitChoiceBoss, function(v)
+    Config.BaitChoiceBoss = v
+end)
+
+createToggleRow(equipCard, "Tự Dùng Mồi (Auto Bait)", "Tự động móc loại mồi đã chọn khi câu cá bình thường", Config.AutoEquipBestBait, function(v)
+    Config.AutoEquipBestBait = v
+end)
+
+createDropdownRow(equipCard, "Chọn Mồi Khi Câu Thường", "Loại mồi sử dụng cho câu cá thông thường", baitOptionsList, Config.BaitChoiceNormal, function(v)
+    Config.BaitChoiceNormal = v
+end)
+
 createToggleRow(equipCard, "Tự Dùng Cần Tốt Nhất", "Tự động cầm cần câu có chỉ số lực mạnh nhất bạn sở hữu", Config.AutoEquipBestRod, function(v) Config.AutoEquipBestRod = v end)
 createToggleRow(equipCard, "Tự Dùng Ngọc Tốt Nhất", "Tự động trang bị viên Ngọc có cấp bậc cao nhất", Config.AutoEquipBestOrb, function(v) Config.AutoEquipBestOrb = v end)
 
@@ -4596,30 +4635,66 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
         end
 
-        if (now - lastEquipTime >= 5.0) and pData then
+        if (now - lastEquipTime >= 2.5) and pData then
             lastEquipTime = now
-            if Config.AutoEquipBestBait and pData:FindFirstChild("Bait") and pData:FindFirstChild("EquippedBait") and Events:FindFirstChild("EquipBait") then
-                local bestBait = nil
-                local bestLuck = -1
-                local baitLuckMap = {
-                    ["Nameless Bait"] = 100,
-                    ["Rainbow Bait"] = 80,
-                    ["Frost Bait"] = 65,
-                    ["Ancestral Bait"] = 50,
-                    ["Elite Bait"] = 30,
-                    ["Corrupted Essence Bait"] = 18,
-                    ["Crude Mash Bait"] = 8,
-                    ["Basic Bait"] = 3
-                }
-                for bName, bLuck in pairs(baitLuckMap) do
-                    local bVal = pData.Bait:FindFirstChild(bName)
-                    if bVal and bVal.Value > 0 and bLuck > bestLuck then
-                        bestLuck = bLuck
-                        bestBait = bName
-                    end
+            if pData:FindFirstChild("Bait") and pData:FindFirstChild("EquippedBait") and Events:FindFirstChild("EquipBait") then
+                local isHuntingBoss = Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+                local targetBaitChoice = nil
+
+                if isHuntingBoss and Config.AutoEquipBossBait then
+                    targetBaitChoice = Config.BaitChoiceBoss or "Mồi Tốt Nhất (Cao Nhất)"
+                elseif Config.AutoEquipBestBait then
+                    targetBaitChoice = Config.BaitChoiceNormal or "Mồi Tốt Nhất (Cao Nhất)"
                 end
-                if bestBait and pData.EquippedBait.Value ~= bestBait then
-                    Events.EquipBait:InvokeServer(bestBait)
+
+                if targetBaitChoice then
+                    local baitTiers = {
+                        "Nameless Bait",
+                        "Rainbow Bait",
+                        "Frost Bait",
+                        "Ancestral Bait",
+                        "Elite Bait",
+                        "Corrupted Essence Bait",
+                        "Crude Mash Bait",
+                        "Basic Bait"
+                    }
+                    local desiredBait = nil
+
+                    if targetBaitChoice == "Mồi Tốt Nhất (Cao Nhất)" then
+                        for _, bName in ipairs(baitTiers) do
+                            local bVal = pData.Bait:FindFirstChild(bName)
+                            if bVal and bVal.Value > 0 then
+                                desiredBait = bName
+                                break
+                            end
+                        end
+                    elseif targetBaitChoice == "Mồi Thấp Nhất (Tiết Kiệm)" then
+                        for i = #baitTiers, 1, -1 do
+                            local bName = baitTiers[i]
+                            local bVal = pData.Bait:FindFirstChild(bName)
+                            if bVal and bVal.Value > 0 then
+                                desiredBait = bName
+                                break
+                            end
+                        end
+                    else
+                        local bVal = pData.Bait:FindFirstChild(targetBaitChoice)
+                        if bVal and bVal.Value > 0 then
+                            desiredBait = targetBaitChoice
+                        else
+                            for _, bName in ipairs(baitTiers) do
+                                local bv = pData.Bait:FindFirstChild(bName)
+                                if bv and bv.Value > 0 then
+                                    desiredBait = bName
+                                    break
+                                end
+                            end
+                        end
+                    end
+
+                    if desiredBait and pData.EquippedBait.Value ~= desiredBait then
+                        Events.EquipBait:InvokeServer(desiredBait)
+                    end
                 end
             end
 
