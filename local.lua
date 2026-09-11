@@ -172,6 +172,10 @@ local Config = {
     },
     CustomBossSpots = {},
     SelectedCustomSpotIsland = "Đảo Tre (Bamboo Isle)",
+    SelectedCustomSpotSlot = 1,
+    BossSpotAllocationMode = "Tự Động (Theo Acc)",
+    BossTeleportJitter = true,
+    BossTeleportJitterDist = 1.0,
     
     AutoGodSpiritCheck = false,
     AutoPrayGodSpirit = false,
@@ -1888,6 +1892,134 @@ function secretBossState.GetNearestIsland()
     return nearest, minDist
 end
 
+function secretBossState.GetIslandSpots(islandName)
+    local spots = {}
+    local custom = Config.CustomBossSpots and Config.CustomBossSpots[islandName]
+    if not custom then return spots end
+
+    if custom.spots and type(custom.spots) == "table" then
+        for i = 1, 3 do
+            local s = custom.spots[i] or custom.spots[tostring(i)]
+            if s and s.cframe then
+                table.insert(spots, { slot = i, cframe = s.cframe, savedAt = s.savedAt })
+            end
+        end
+    end
+
+    if #spots == 0 and custom.cframe then
+        table.insert(spots, { slot = 1, cframe = custom.cframe, savedAt = custom.savedAt })
+    end
+
+    return spots
+end
+
+function secretBossState.GetIslandSlotSpot(islandName, slot)
+    local custom = Config.CustomBossSpots and Config.CustomBossSpots[islandName]
+    if not custom then return nil end
+    if custom.spots and type(custom.spots) == "table" then
+        local s = custom.spots[slot] or custom.spots[tostring(slot)]
+        if s and s.cframe then return s end
+    end
+    if slot == 1 and custom.cframe then
+        return { cframe = custom.cframe, savedAt = custom.savedAt }
+    end
+    return nil
+end
+
+function secretBossState.SaveIslandSlot(islandName, slot, cfComponents)
+    Config.CustomBossSpots = Config.CustomBossSpots or {}
+    local entry = Config.CustomBossSpots[islandName]
+    if not entry then
+        entry = { spots = {} }
+        Config.CustomBossSpots[islandName] = entry
+    elseif not entry.spots then
+        local oldCf = entry.cframe
+        local oldSaved = entry.savedAt
+        entry.spots = {}
+        if oldCf then
+            entry.spots[1] = { cframe = oldCf, savedAt = oldSaved }
+        end
+    end
+
+    entry.spots[slot] = {
+        cframe = cfComponents,
+        savedAt = os.date("%H:%M:%S")
+    }
+    local s1 = entry.spots[1] or entry.spots["1"]
+    entry.cframe = s1 and s1.cframe or cfComponents
+    secretBossState.SaveCustomSpots()
+end
+
+function secretBossState.DeleteIslandSlot(islandName, slot)
+    if not Config.CustomBossSpots or not Config.CustomBossSpots[islandName] then return end
+    local entry = Config.CustomBossSpots[islandName]
+    if not slot or slot == 0 then
+        Config.CustomBossSpots[islandName] = nil
+    else
+        if entry.spots then
+            entry.spots[slot] = nil
+            entry.spots[tostring(slot)] = nil
+        end
+        if slot == 1 then
+            entry.cframe = nil
+        end
+        local hasRemaining = false
+        if entry.spots then
+            for i = 1, 3 do
+                if entry.spots[i] or entry.spots[tostring(i)] then
+                    hasRemaining = true
+                    break
+                end
+            end
+        end
+        if not hasRemaining then
+            Config.CustomBossSpots[islandName] = nil
+        end
+    end
+    secretBossState.SaveCustomSpots()
+end
+
+function secretBossState.ApplyJitter(baseCf)
+    if not Config.BossTeleportJitter then return baseCf end
+    local maxDist = Config.BossTeleportJitterDist or 1.0
+    if maxDist <= 0.1 then return baseCf end
+
+    local dirSign = (math.random(1, 2) == 1) and 1 or -1
+    local minDist = math.min(0.4, maxDist * 0.5)
+    local offsetDist = dirSign * (minDist + math.random() * (maxDist - minDist))
+
+    return baseCf + (baseCf.RightVector * offsetDist)
+end
+
+function secretBossState.GetChosenSpotForPlayer(islandName)
+    local spots = secretBossState.GetIslandSpots(islandName)
+    if #spots == 0 then return nil, nil, 0 end
+
+    local mode = Config.BossSpotAllocationMode or "Tự Động (Theo Acc)"
+    local chosen = nil
+
+    if mode == "Vị Trí 1" then
+        for _, s in ipairs(spots) do if s.slot == 1 then chosen = s; break end end
+    elseif mode == "Vị Trí 2" then
+        for _, s in ipairs(spots) do if s.slot == 2 then chosen = s; break end end
+    elseif mode == "Vị Trí 3" then
+        for _, s in ipairs(spots) do if s.slot == 3 then chosen = s; break end end
+    elseif mode == "Ngẫu Nhiên" then
+        chosen = spots[math.random(1, #spots)]
+    else -- "Tự Động (Theo Acc)"
+        local userId = (LocalPlayer and LocalPlayer.UserId) or 0
+        local idx = (math.abs(userId) % #spots) + 1
+        chosen = spots[idx]
+    end
+
+    if not chosen then
+        chosen = spots[1]
+    end
+
+    local cf = CFrame.new(unpack(chosen.cframe))
+    return cf, chosen.slot, #spots
+end
+
 function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     if not matchedIsland or not matchedIsland.pos then return false end
 
@@ -1929,21 +2061,26 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root and matchedIsland.pos then
-        local custom = Config.CustomBossSpots and Config.CustomBossSpots[matchedIsland.islandName]
+        local customCf, chosenSlot, totalSpots = secretBossState.GetChosenSpotForPlayer(matchedIsland.islandName)
         local standPos = nil
         local waterY = nil
 
-        if custom and custom.cframe then
-            -- 1. Ưu tiên số 1: Tọa độ & hướng nhìn tùy chọn do người chơi tự Set
-            root.CFrame = CFrame.new(unpack(custom.cframe))
+        if customCf then
+            -- 1. Ưu tiên số 1: Tọa độ tùy chọn đã cài đặt (có áp dụng xê dịch trái/phải né người)
+            local finalCf = secretBossState.ApplyJitter(customCf)
+            root.CFrame = finalCf
             standPos = root.Position
             waterY = standPos.Y - 2.5
-            ShowNotification("VỊ TRÍ TÙY CHỌN", string.format("Đã bay vào vị trí câu riêng bạn đã cài đặt tại %s!", matchedIsland.islandName), "SUCCESS", 5)
+            local jitterTag = Config.BossTeleportJitter and " (+ xê dịch)" or ""
+            ShowNotification("VỊ TRÍ TÙY CHỌN", string.format("Đã vào [Vị Trí %d/%d]%s tại %s!", chosenSlot or 1, totalSpots or 1, jitterTag, matchedIsland.islandName), "SUCCESS", 5)
         else
-            -- 2. Dò tìm mép nước tự động
+            -- 2. Dò tìm mép nước tự động (cũng áp dụng xê dịch nếu bật)
             local lookTarget, foundWater
             standPos, lookTarget, waterY, foundWater = secretBossState.FindWaterSpot(matchedIsland.pos, matchedIsland.lookAt)
-            root.CFrame = CFrame.lookAt(standPos, lookTarget)
+            local baseCf = CFrame.lookAt(standPos, lookTarget)
+            local finalCf = secretBossState.ApplyJitter(baseCf)
+            root.CFrame = finalCf
+            standPos = root.Position
             if foundWater then
                 ShowNotification("MÉP NƯỚC CÂU CÁ", string.format("Đã dò thấy vùng nước! Nhân vật đã vào vị trí mép bờ tại %s.", matchedIsland.islandName), "SUCCESS", 5)
             end
@@ -3343,7 +3480,7 @@ createButtonRow(chatBossCard, "Bỏ Chọn Tất Cả", "Tắt săn tất cả S
 end)
 
 do
-    -- CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM FISHING SPOTS)
+    -- CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM FISHING SPOTS - HỖ TRỢ 3 ĐIỂM/ĐẢO + XÊ DỊCH)
     createCategoryHeader(tabBoss, "📍 CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM SPOTS)")
     local customSpotCard = createCardGroup(tabBoss)
 
@@ -3352,111 +3489,192 @@ do
         table.insert(islandNamesList, entry.islandName)
     end
 
-    local function GetSavedSpotCount()
-        local c = 0
+    local function GetSpotStats()
+        local islandCount = 0
+        local spotCount = 0
         if Config.CustomBossSpots then
-            for _, _ in pairs(Config.CustomBossSpots) do c = c + 1 end
+            for _, entry in ipairs(secretBossDatabase) do
+                local spots = secretBossState.GetIslandSpots(entry.islandName)
+                if #spots > 0 then
+                    islandCount = islandCount + 1
+                    spotCount = spotCount + #spots
+                end
+            end
         end
-        return c
+        return islandCount, spotCount
     end
 
-    local infoSavedSpots = createInfoRow(customSpotCard, "Đảo Đã Cài Tọa Độ:", string.format("%d / %d đảo", GetSavedSpotCount(), #islandNamesList))
+    local function GetSlotStatusText(islandName, slot)
+        local spot = secretBossState.GetIslandSlotSpot(islandName, slot)
+        if spot and spot.cframe then
+            local cf = CFrame.new(unpack(spot.cframe))
+            return string.format("ĐÃ LƯU (%s) tại X:%.0f Y:%.0f Z:%.0f", spot.savedAt or "Đã lưu", cf.Position.X, cf.Position.Y, cf.Position.Z)
+        end
+        return "CHƯA CÀI ĐẶT (Đang trống)"
+    end
 
-    local islandDropdown = createDropdownRow(customSpotCard, "Chọn Đảo Cần Cài / Thử", "Chọn hòn đảo mục tiêu để lưu hoặc test vị trí câu", islandNamesList, Config.SelectedCustomSpotIsland or islandNamesList[1], function(v)
+    local islCount, spCount = GetSpotStats()
+    local infoSavedSpots = createInfoRow(customSpotCard, "Tiến Độ Đã Cài:", string.format("%d / %d đảo (Tổng %d vị trí)", islCount, #islandNamesList, spCount))
+
+    local currentIsland = Config.SelectedCustomSpotIsland or islandNamesList[1]
+    local currentSlot = Config.SelectedCustomSpotSlot or 1
+
+    local infoCurrentSlot = nil
+
+    local function RefreshSpotUI()
+        local ic, sc = GetSpotStats()
+        if infoSavedSpots and infoSavedSpots.Set then
+            infoSavedSpots.Set(string.format("%d / %d đảo (Tổng %d vị trí)", ic, #islandNamesList, sc))
+        end
+        if infoCurrentSlot and infoCurrentSlot.Set then
+            infoCurrentSlot.Set(GetSlotStatusText(currentIsland, currentSlot))
+        end
+    end
+
+    local islandDropdown = createDropdownRow(customSpotCard, "Chọn Đảo Cần Cài / Thử", "Chọn hòn đảo mục tiêu để lưu hoặc test vị trí câu", islandNamesList, currentIsland, function(v)
+        currentIsland = v
         Config.SelectedCustomSpotIsland = v
+        RefreshSpotUI()
     end)
 
-    createButtonRow(customSpotCard, "⚡ TỰ NHẬN DIỆN ĐẢO & LƯU VỊ TRÍ", "Đứng ở mép nước trên đảo rồi bấm nút này, script tự biết bạn đang ở đảo nào và lưu vị trí!", "LƯU VỊ TRÍ NÀY", function()
+    local slotOptions = {"Vị Trí 1", "Vị Trí 2", "Vị Trí 3"}
+    local slotDropdown = createDropdownRow(customSpotCard, "Chọn Vị Trí (Slot 1 - 3)", "Mỗi đảo có thể lưu tối đa 3 vị trí câu khác nhau", slotOptions, "Vị Trí " .. tostring(currentSlot), function(v)
+        local num = tonumber(string.match(v, "%d")) or 1
+        currentSlot = num
+        Config.SelectedCustomSpotSlot = num
+        RefreshSpotUI()
+    end)
+
+    infoCurrentSlot = createInfoRow(customSpotCard, "Trạng Thái Vị Trí:", GetSlotStatusText(currentIsland, currentSlot))
+
+    local allocOptions = {
+        "Tự Động (Theo Acc - Tránh Trùng)",
+        "Ngẫu Nhiên (Random Điểm)",
+        "Vị Trí 1",
+        "Vị Trí 2",
+        "Vị Trí 3"
+    }
+    createDropdownRow(customSpotCard, "Phân Bổ Vị Trí Khi Săn Boss", "Nhiều acc cùng server sẽ tự chia nhau các vị trí khác nhau", allocOptions, Config.BossSpotAllocationMode or allocOptions[1], function(v)
+        Config.BossSpotAllocationMode = v
+    end)
+
+    createToggleRow(customSpotCard, "Xê Dịch Ngang Tránh Đè Nhau", "Tự động lệch trái/phải 0.5m - 1.2m dọc bờ biển để không ai bị đứng đè lên nhau", Config.BossTeleportJitter, function(v)
+        Config.BossTeleportJitter = v
+    end)
+
+    local distOptions = {"0.5m (Nhẹ)", "1.0m (Chuẩn)", "1.5m (Rộng)"}
+    local initialDistStr = "1.0m (Chuẩn)"
+    if Config.BossTeleportJitterDist == 0.5 then initialDistStr = "0.5m (Nhẹ)"
+    elseif Config.BossTeleportJitterDist == 1.5 then initialDistStr = "1.5m (Rộng)" end
+
+    createDropdownRow(customSpotCard, "Độ Lệch Xê Dịch Ngang", "Khoảng cách dạt sang trái hoặc phải theo mép nước", distOptions, initialDistStr, function(v)
+        if v:find("0.5") then Config.BossTeleportJitterDist = 0.5
+        elseif v:find("1.5") then Config.BossTeleportJitterDist = 1.5
+        else Config.BossTeleportJitterDist = 1.0 end
+    end)
+
+    createButtonRow(customSpotCard, "⚡ TỰ NHẬN DIỆN & LƯU VÀO VỊ TRÍ TRỐNG TIẾP THEO", "Đứng ở mép nước trên đảo, script tự biết đảo và lưu vào vị trí trống (1 -> 2 -> 3)!", "LƯU ĐIỂM TIẾP THEO", function()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then return end
         local nearestEntry, dist = secretBossState.GetNearestIsland()
         if nearestEntry then
-            Config.CustomBossSpots = Config.CustomBossSpots or {}
-            Config.CustomBossSpots[nearestEntry.islandName] = {
-                cframe = {root.CFrame:GetComponents()},
-                savedAt = os.date("%H:%M:%S")
-            }
-            secretBossState.SaveCustomSpots()
-            if islandDropdown and islandDropdown.Set then
-                islandDropdown.Set(nearestEntry.islandName)
-                Config.SelectedCustomSpotIsland = nearestEntry.islandName
+            local targetIsland = nearestEntry.islandName
+            local targetSlot = 1
+            for i = 1, 3 do
+                local existing = secretBossState.GetIslandSlotSpot(targetIsland, i)
+                if not existing then
+                    targetSlot = i
+                    break
+                end
             end
-            if infoSavedSpots and infoSavedSpots.Set then
-                infoSavedSpots.Set(string.format("%d / %d đảo", GetSavedSpotCount(), #islandNamesList))
-            end
-            ShowNotification("ĐÃ LƯU VỊ TRÍ CÂU!", string.format("Đã lưu tọa độ & hướng nhìn cho: %s! Lần sau có boss ở đảo này sẽ tự bay đúng điểm này.", nearestEntry.islandName), "SUCCESS", 7)
+            secretBossState.SaveIslandSlot(targetIsland, targetSlot, {root.CFrame:GetComponents()})
+            currentIsland = targetIsland
+            currentSlot = targetSlot
+            Config.SelectedCustomSpotIsland = targetIsland
+            Config.SelectedCustomSpotSlot = targetSlot
+            if islandDropdown and islandDropdown.Set then islandDropdown.Set(targetIsland) end
+            if slotDropdown and slotDropdown.Set then slotDropdown.Set("Vị Trí " .. tostring(targetSlot)) end
+            RefreshSpotUI()
+            local totalSaved = #secretBossState.GetIslandSpots(targetIsland)
+            ShowNotification("ĐÃ LƯU VỊ TRÍ CÂU!", string.format("Đã lưu [Vị Trí %d] cho %s! (Đảo này đã có %d/3 vị trí)", targetSlot, targetIsland, totalSaved), "SUCCESS", 7)
         else
             ShowNotification("Lỗi Nhận Diện", "Không xác định được đảo gần nhất!", "ERROR", 5)
         end
     end)
 
-    createButtonRow(customSpotCard, "Lưu Vị Trí Cho Đảo Đang Chọn", "Lưu tọa độ & hướng nhìn hiện tại cho đảo đang chọn ở trên", "Lưu Đảo Này", function()
+    createButtonRow(customSpotCard, "Lưu Vào Đảo & Vị Trí Đang Chọn", "Lưu tọa độ & hướng nhìn hiện tại vào chính xác Slot đang chọn ở trên", "Lưu Vào Slot Này", function()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if not root then return end
-        local islandName = Config.SelectedCustomSpotIsland or islandNamesList[1]
-        Config.CustomBossSpots = Config.CustomBossSpots or {}
-        Config.CustomBossSpots[islandName] = {
-            cframe = {root.CFrame:GetComponents()},
-            savedAt = os.date("%H:%M:%S")
-        }
-        secretBossState.SaveCustomSpots()
-        if infoSavedSpots and infoSavedSpots.Set then
-            infoSavedSpots.Set(string.format("%d / %d đảo", GetSavedSpotCount(), #islandNamesList))
-        end
-        ShowNotification("ĐÃ LƯU VỊ TRÍ CÂU!", string.format("Đã lưu vị trí câu cho [%s] thành công!", islandName), "SUCCESS", 6)
+        secretBossState.SaveIslandSlot(currentIsland, currentSlot, {root.CFrame:GetComponents()})
+        RefreshSpotUI()
+        local totalSaved = #secretBossState.GetIslandSpots(currentIsland)
+        ShowNotification("ĐÃ LƯU VỊ TRÍ CÂU!", string.format("Đã lưu [Vị Trí %d] cho %s! (Đảo này đã có %d/3 vị trí)", currentSlot, currentIsland, totalSaved), "SUCCESS", 6)
     end)
 
-    createButtonRow(customSpotCard, "Bay Thử Đến Vị Trí Đã Lưu", "Bay đến vị trí câu bạn đã cài đặt cho đảo đang chọn để kiểm tra", "Bay Thử", function()
-        local islandName = Config.SelectedCustomSpotIsland or islandNamesList[1]
-        local custom = Config.CustomBossSpots and Config.CustomBossSpots[islandName]
+    createButtonRow(customSpotCard, "Bay Thử Vị Trí Đang Chọn", "Bay đến vị trí đang chọn để kiểm tra (có kèm xê dịch nếu đang bật)", "Bay Thử", function()
+        local spot = secretBossState.GetIslandSlotSpot(currentIsland, currentSlot)
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root and custom and custom.cframe then
-            root.CFrame = CFrame.new(unpack(custom.cframe))
+        if root and spot and spot.cframe then
+            local baseCf = CFrame.new(unpack(spot.cframe))
+            local finalCf = secretBossState.ApplyJitter(baseCf)
+            root.CFrame = finalCf
             local wp = Workspace:FindFirstChild("IdenticalWaterPlatform")
             if wp then
                 wp.CFrame = CFrame.new(root.Position.X, root.Position.Y - 2.5 - 1.2, root.Position.Z)
                 wp.CanCollide = true
             end
-            ShowNotification("Bay Thử Vị Trí", string.format("Đã bay đến vị trí cài đặt của [%s]!", islandName), "SUCCESS", 4)
+            local jitterMsg = Config.BossTeleportJitter and " (+ xê dịch né người)" or ""
+            ShowNotification("Bay Thử Vị Trí", string.format("Đã bay đến [Vị Trí %d] của [%s]%s!", currentSlot, currentIsland, jitterMsg), "SUCCESS", 5)
         else
-            ShowNotification("Chưa Cài Đặt", string.format("Bạn chưa lưu vị trí nào cho [%s]!", islandName), "WARN", 5)
+            ShowNotification("Chưa Cài Đặt", string.format("Bạn chưa lưu [Vị Trí %d] cho [%s]!", currentSlot, currentIsland), "WARN", 5)
         end
     end)
 
-    createButtonRow(customSpotCard, "Xóa Vị Trí Đã Lưu (Về Mặc Định)", "Xóa vị trí tùy chọn của đảo đang chọn để dùng tọa độ gốc", "Xóa Điểm", function()
-        local islandName = Config.SelectedCustomSpotIsland or islandNamesList[1]
-        if Config.CustomBossSpots and Config.CustomBossSpots[islandName] then
-            Config.CustomBossSpots[islandName] = nil
-            secretBossState.SaveCustomSpots()
-            if infoSavedSpots and infoSavedSpots.Set then
-                infoSavedSpots.Set(string.format("%d / %d đảo", GetSavedSpotCount(), #islandNamesList))
-            end
-            ShowNotification("Đã Xóa", string.format("Đã xóa vị trí tùy chọn của [%s] (về mặc định).", islandName), "INFO", 4)
-        end
+    createButtonRow(customSpotCard, "Xóa Vị Trí Đang Chọn", "Xóa chỉ riêng vị trí (Slot) đang chọn này của đảo", "Xóa Slot Này", function()
+        secretBossState.DeleteIslandSlot(currentIsland, currentSlot)
+        RefreshSpotUI()
+        ShowNotification("Đã Xóa Vị Trí", string.format("Đã xóa [Vị Trí %d] của [%s].", currentSlot, currentIsland), "INFO", 4)
     end)
 
-    createButtonRow(customSpotCard, "📋 COPY TOÀN BỘ TỌA ĐỘ (ĐỂ NẠP VÀO SCRIPT GỐC)", "Copy toàn bộ tọa độ bạn đã cài ra mã Lua vào Clipboard để dán vào code gốc cho TẤT CẢ mọi người dùng", "COPY TỌA ĐỘ", function()
+    createButtonRow(customSpotCard, "Xóa Hết Cả 3 Vị Trí Của Đảo Này", "Xóa toàn bộ các vị trí đã lưu của đảo đang chọn để dùng dò tìm mép nước gốc", "Xóa Cả Đảo", function()
+        secretBossState.DeleteIslandSlot(currentIsland, 0)
+        RefreshSpotUI()
+        ShowNotification("Đã Xóa Hết", string.format("Đã xóa toàn bộ vị trí tùy chọn của [%s].", currentIsland), "INFO", 4)
+    end)
+
+    createButtonRow(customSpotCard, "📋 COPY TOÀN BỘ TỌA ĐỘ (ĐỂ NẠP VÀO SCRIPT GỐC)", "Copy toàn bộ 2-3 vị trí đã cài của tất cả các đảo ra mã Lua để dán vào code gốc cho TẤT CẢ mọi người dùng chung", "COPY TỌA ĐỘ", function()
         local lines = {}
-        table.insert(lines, "-- [[ TỌA ĐỘ VỊ TRÍ CÂU SĂN BOSS DO NGƯỜI DÙNG CÀI ĐẶT ]]")
-        local count = 0
+        table.insert(lines, "-- [[ TỌA ĐỘ VỊ TRÍ CÂU SĂN BOSS DO NGƯỜI DÙNG CÀI ĐẶT (ĐA ĐIỂM + HƯỚNG NHÌN) ]]")
+        table.insert(lines, "-- Dán bảng này gửi lại cho AI để nhúng thẳng vào script gốc cho TẤT CẢ mọi người dùng chung:")
+        table.insert(lines, "local customBossSpotsBake = {")
+        local totalIslands = 0
+        local totalSpots = 0
         for _, entry in ipairs(secretBossDatabase) do
-            local custom = Config.CustomBossSpots and Config.CustomBossSpots[entry.islandName]
-            if custom and custom.cframe then
-                count = count + 1
-                local cf = CFrame.new(unpack(custom.cframe))
-                local pos = cf.Position
-                local lookAt = pos + cf.LookVector * 50
-                table.insert(lines, string.format("    -- %s\n    pos = Vector3.new(%.1f, %.1f, %.1f),\n    lookAt = Vector3.new(%.1f, %.1f, %.1f),", entry.islandName, pos.X, pos.Y, pos.Z, lookAt.X, lookAt.Y, lookAt.Z))
+            local spots = secretBossState.GetIslandSpots(entry.islandName)
+            if #spots > 0 then
+                totalIslands = totalIslands + 1
+                totalSpots = totalSpots + #spots
+                table.insert(lines, string.format("    [%q] = {", entry.islandName))
+                table.insert(lines, "        spots = {")
+                for _, s in ipairs(spots) do
+                    local cf = CFrame.new(unpack(s.cframe))
+                    local pos = cf.Position
+                    local lookAt = pos + (cf.LookVector * 50)
+                    table.insert(lines, string.format("            [%d] = {\n                pos = Vector3.new(%.1f, %.1f, %.1f),\n                lookAt = Vector3.new(%.1f, %.1f, %.1f),\n            },", s.slot, pos.X, pos.Y, pos.Z, lookAt.X, lookAt.Y, lookAt.Z))
+                end
+                table.insert(lines, "        },")
+                table.insert(lines, "    },")
             end
         end
-        if count == 0 then
+        table.insert(lines, "}")
+        if totalSpots == 0 then
             ShowNotification("Chưa Có Tọa Độ", "Bạn chưa cài tọa độ cho đảo nào cả! Hãy đi đến các đảo và bấm Lưu trước.", "WARN", 5)
             return
         end
-        local fullCode = table.concat(lines, "\n\n")
+        local fullCode = table.concat(lines, "\n")
         print("\n======== [TỌA ĐỘ VỊ TRÍ CÂU SĂN BOSS EXPORT] ========\n" .. fullCode .. "\n====================================================\n")
         local copied = false
         if setclipboard then
@@ -3467,7 +3685,7 @@ do
             copied = true
         end
         if copied then
-            ShowNotification("ĐÃ COPY VÀO CLIPBOARD!", string.format("Đã copy tọa độ của %d đảo! Dán vào chat với AI để nạp vào script gốc cho tất cả mọi người cùng dùng.", count), "SUCCESS", 8)
+            ShowNotification("ĐÃ COPY VÀO CLIPBOARD!", string.format("Đã copy tọa độ của %d đảo (%d vị trí)! Dán vào chat với AI để nạp vào script gốc cho tất cả mọi người dùng chung.", totalIslands, totalSpots), "SUCCESS", 8)
         else
             ShowNotification("Xuất Tọa Độ", "Đã in mã tọa độ ra bảng điều khiển Console F9! Hãy mở F9 để copy.", "INFO", 6)
         end
