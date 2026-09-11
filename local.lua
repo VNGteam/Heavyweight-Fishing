@@ -2590,6 +2590,61 @@ createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
 
+createCategoryHeader(tabFishing, "🏠 Vị Trí Trở Về Nếu Săn Boss (Home Spot)")
+local returnSpotCard = createCardGroup(tabFishing)
+
+local function GetHomeSpotText()
+    if Config.HomeFarmSpot then
+        local p = Config.HomeFarmSpot
+        return string.format("Đã lưu: X:%.1f, Y:%.1f, Z:%.1f (%s)", p.x or 0, p.y or 0, p.z or 0, p.savedAt or "Đã lưu")
+    end
+    return "Chưa thiết lập (Bấm nút bên dưới để lưu vị trí đang đứng)"
+end
+
+local infoHomeSpot = createInfoRow(returnSpotCard, "Vị Trí Trở Về Hiện Tại", GetHomeSpotText())
+
+createToggleRow(returnSpotCard, "Tự Về Vị Trí Này Khi Hết Boss / Clear", "Khi hết Boss hoặc thời tiết Clear, tự bay về vị trí này câu cá farm tiền", Config.ReturnToHomeWhenClear, function(v)
+    Config.ReturnToHomeWhenClear = v
+end)
+
+createButtonRow(returnSpotCard, "Lưu Vị Trí Đang Đứng Làm Điểm Trở Về", "Lưu tọa độ & hướng quay hiện tại làm nơi Farm cá mặc định (lưu riêng theo tài khoản)", "Lưu Vị Trí", function()
+    local ok, spot = secretBossState.SaveHomeSpot()
+    if ok then
+        if infoHomeSpot and infoHomeSpot.Set then
+            infoHomeSpot.Set(GetHomeSpotText())
+        end
+        ShowNotification("Vị Trí Trở Về", "Đã lưu vị trí trở về thành công cho tài khoản này!", "SUCCESS", 5)
+    else
+        ShowNotification("Lỗi Lưu", tostring(spot), "ERROR")
+    end
+end)
+
+createButtonRow(returnSpotCard, "Bay Về Điểm Trở Về Ngay", "Dịch chuyển tức thì về vị trí trở về đã lưu và bắt đầu câu", "Bay Về", function()
+    if not Config.HomeFarmSpot then
+        ShowNotification("Chưa Lưu Vị Trí", "Vui lòng đứng tại nơi muốn câu rồi bấm [Lưu Vị Trí] trước!", "WARN", 5)
+        return
+    end
+    secretBossState.lastHomeReturnTime = 0
+    local ok = secretBossState.ReturnToHome()
+    if not ok then
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root and Config.HomeFarmSpot.cframe then
+            root.CFrame = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+            CancelAndRecastRod()
+        end
+    end
+    ShowNotification("Vị Trí Trở Về", "Đã bay về vị trí trở về mặc định!", "SUCCESS", 4)
+end)
+
+createButtonRow(returnSpotCard, "Xóa Điểm Trở Về Đã Lưu", "Xóa vị trí trở về của tài khoản này", "Xóa Vị Trí", function()
+    secretBossState.ClearHomeSpot()
+    if infoHomeSpot and infoHomeSpot.Set then
+        infoHomeSpot.Set(GetHomeSpotText())
+    end
+    ShowNotification("Vị Trí Trở Về", "Đã xóa vị trí trở về của tài khoản này.", "INFO")
+end)
+
 createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)")
 local comboCard = createCardGroup(tabFishing)
 
@@ -3717,61 +3772,6 @@ createButtonRow(chatBossCard, "Bỏ Chọn Tất Cả", "Tắt săn tất cả S
         end
     end
     ShowNotification("Secret Boss", "Đã bỏ chọn tất cả Secret Boss.", "INFO")
-end)
-
-createCategoryHeader(tabBoss, "🏠 VỊ TRÍ FARM MẶC ĐỊNH KHI HẾT BOSS (HOME SPOT)")
-local homeSpotCard = createCardGroup(tabBoss)
-
-local function GetHomeSpotText()
-    if Config.HomeFarmSpot then
-        local p = Config.HomeFarmSpot
-        return string.format("Đã lưu: X:%.1f, Y:%.1f, Z:%.1f (%s)", p.x or 0, p.y or 0, p.z or 0, p.savedAt or "Đã lưu")
-    end
-    return "Chưa thiết lập (Bấm nút bên dưới để lưu vị trí đang đứng)"
-end
-
-local infoHomeSpot = createInfoRow(homeSpotCard, "Vị Trí Farm Hiện Tại", GetHomeSpotText())
-
-createToggleRow(homeSpotCard, "Tự Về Vị Trí Farm Khi Hết Boss / Clear", "Khi hết Boss hoặc thời tiết Clear, tự bay về vị trí này câu cá farm tiền", Config.ReturnToHomeWhenClear, function(v)
-    Config.ReturnToHomeWhenClear = v
-end)
-
-createButtonRow(homeSpotCard, "Lưu Vị Trí Đang Đứng Làm Home Spot", "Lưu tọa độ & hướng quay hiện tại làm nơi Farm cá mặc định (lưu riêng theo tài khoản)", "Lưu Vị Trí", function()
-    local ok, spot = secretBossState.SaveHomeSpot()
-    if ok then
-        if infoHomeSpot and infoHomeSpot.Set then
-            infoHomeSpot.Set(GetHomeSpotText())
-        end
-        ShowNotification("Vị Trí Farm", "Đã lưu vị trí Farm thành công cho tài khoản này!", "SUCCESS", 5)
-    else
-        ShowNotification("Lỗi Lưu", tostring(spot), "ERROR")
-    end
-end)
-
-createButtonRow(homeSpotCard, "Bay Về Vị Trí Farm Ngay", "Dịch chuyển tức thì về vị trí Farm đã lưu và bắt đầu câu", "Bay Về", function()
-    if not Config.HomeFarmSpot then
-        ShowNotification("Chưa Lưu Vị Trí", "Vui lòng đứng tại nơi muốn câu rồi bấm [Lưu Vị Trí] trước!", "WARN", 5)
-        return
-    end
-    secretBossState.lastHomeReturnTime = 0
-    local ok = secretBossState.ReturnToHome()
-    if not ok then
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root and Config.HomeFarmSpot.cframe then
-            root.CFrame = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
-            CancelAndRecastRod()
-        end
-    end
-    ShowNotification("Vị Trí Farm", "Đã bay về vị trí Farm mặc định!", "SUCCESS", 4)
-end)
-
-createButtonRow(homeSpotCard, "Xóa Vị Trí Farm Đã Lưu", "Xóa vị trí farm đã lưu của tài khoản này", "Xóa Vị Trí", function()
-    secretBossState.ClearHomeSpot()
-    if infoHomeSpot and infoHomeSpot.Set then
-        infoHomeSpot.Set(GetHomeSpotText())
-    end
-    ShowNotification("Vị Trí Farm", "Đã xóa vị trí Farm mặc định của tài khoản này.", "INFO")
 end)
 
 do
