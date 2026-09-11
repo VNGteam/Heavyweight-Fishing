@@ -225,23 +225,158 @@ local Config = {
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End,
     ActiveProfile = "default",
-    AutoLoadProfile = true
+    AutoLoadProfile = false
 }
 
-local PROFILE_DIR = "Identical/HeavyweightFishing"
+local UIControllers = {}
 
-local function EnsureProfileDir()
-    if makefolder then
+local ConfigLabelMap = {
+    -- Câu cá cốt lõi
+    ["Tự Động Quăng Cần (Auto Cast)"] = "AutoCast",
+    ["Độ Trễ Quăng Cần"] = "CastDelay",
+    ["Giữ Thanh Minigame (Anchor Bar)"] = "AnchorBar",
+    ["Tự Dùng Kỹ Năng Cần"] = "AutoSkills",
+    ["Tự Động Đập Cần (Auto Slam)"] = "AutoSlam",
+    ["Tự Động Sạc Dây (Auto Charge)"] = "AutoCharge",
+    ["Tự Động Chống Kẹt Cần (Anti-Stuck)"] = "AntiStuckEnabled",
+
+    -- Smart Combo
+    ["Bật Combo Kỹ Năng Tự Động"] = "SmartComboEnabled",
+    ["Ngưỡng Máu Cá Phân Loại"] = "FishHpThreshold",
+    ["Chiêu Bắt Nhanh (<= Ngưỡng HP)"] = "QuickCatchSkill",
+    ["Chiêu Mở Màn (> Ngưỡng HP)"] = "OpenerSkill",
+    ["Số Lần Dùng Chiêu Mở Màn"] = "OpenerMaxCount",
+    ["Chuỗi Đảo Chiêu Luân Phiên"] = "LoopSkills",
+    ["Chiêu Hồi Máu / Cứu Nguy"] = "EmergencyHealSkill",
+    ["Kích Hoạt Hồi Máu Khi HP Dưới"] = "EmergencyHealHp",
+    ["Thời Gian Chờ Ra Chiêu"] = "SkillEffectDelay",
+    ["Tự Động Nhận Diện Hết Hiệu Ứng"] = "SmartEffectAutoDetect",
+
+    -- Auto Luyện Chiêu
+    ["Bật Auto Luyện Chiêu"] = "AutoTrainSkill",
+    ["Chọn Chiêu Cần Luyện"] = "TrainSkill",
+    ["Mục Tiêu Số Lần Dùng"] = "TrainTargetCount",
+
+    -- Bán cá & Bảo vệ
+    ["Tự Động Bán Cá Khi Đầy Túi"] = "AutoSell",
+    ["Giãn Cách Bán Cá Tự Động"] = "SellInterval",
+    ["Tự Động Khóa Cá Đột Biến (Mutations)"] = "AutoProtectMutations",
+    ["Tự Động Gom Cá Nguyên Liệu (Crafting)"] = "MaterialFarming",
+    ["Tự Động Khóa Cá Yêu Thích"] = "AutoFavouriteFish",
+    ["Tên Loài Cá Cần Khóa"] = "FavouriteFishName",
+
+    -- Tự trang bị
+    ["Tự Động Trang Bị Cần Tốt Nhất"] = "AutoEquipBestRod",
+    ["Tự Động Trang Bị Mồi Tốt Nhất"] = "AutoEquipBestBait",
+    ["Tự Động Trang Bị Pháp Bảo Tốt Nhất"] = "AutoEquipBestOrb",
+
+    -- Săn Secret Boss
+    ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
+    ["Bỏ Qua Cá Thường (Fast Skip)"] = "FastSkipNonBoss",
+    ["Chỉ Săn Khi Đủ Lực Cần (Power Check)"] = "SecretBossCheckPower",
+    ["Đổi Server Khi Hết Secret Boss"] = "AutoServerHopOnDespawn",
+
+    -- Thần linh
+    ["Tự Động Quét Trạng Thái Thần Linh"] = "AutoGodSpiritCheck",
+    ["Tự Động Cầu Nguyện Thần Linh"] = "AutoPrayGodSpirit",
+    ["Đổi Server Tìm Thần Linh"] = "AutoServerHopGod",
+    ["Đổi Server Tìm Maoshan"] = "AutoServerHopMaoshan",
+    ["Đổi Server Tìm Đạo Sĩ (Taoist)"] = "AutoServerHopTaoist",
+
+    -- Nhiệm vụ & Gacha
+    ["Tự Động Nộp Vé Nhiệm Vụ (Tickets)"] = "AutoTicketQuest",
+    ["Chọn Độ Khó Vé Nhiệm Vụ"] = "TicketDifficulty",
+    ["Tự Động Nhận Thưởng Hàng Ngày (Daily)"] = "AutoClaimDaily",
+    ["Vòng Quay May Mắn (Auto Gacha)"] = "AutoGacha",
+    ["Chọn Vòng Quay Gacha"] = "GachaBanner",
+    ["Số Vé Mỗi Lần Quay"] = "GachaPullsPerAction",
+
+    -- ESP & Thị giác
+    ["ESP Thần Linh (God Spirit)"] = "ESP_GodSpirit",
+    ["ESP Cần Câu Bí Mật"] = "ESP_SecretRod",
+    ["ESP Thuyền Bè"] = "ESP_Boats",
+    ["ESP Maoshan"] = "ESP_Maoshan",
+    ["ESP Đạo Sĩ (Taoist)"] = "ESP_Taoist",
+    ["ESP Trùm Boss"] = "ESP_Boss",
+    ["ESP Người Chơi"] = "ESP_Players",
+    ["Vòng Tròn Định Vị Cá"] = "FishRedRing",
+    ["Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ"] = "ShowFishWeightRing",
+    ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
+    ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
+    ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
+    ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
+
+    -- Nhân vật
+    ["Tăng Tốc Độ Chạy (Speed)"] = "WalkSpeedEnabled",
+    ["Chỉnh Tốc Độ"] = "WalkSpeedValue",
+    ["Bay Lượn Tự Do (Fly)"] = "FlyEnabled",
+    ["Tốc Độ Bay"] = "FlySpeed",
+    ["Nhảy Vô Hạn (Infinite Jump)"] = "InfiniteJump",
+    ["Đi Trên Mặt Nước"] = "WalkOnWater",
+    ["Khiên Nước Axit (Acid Shield)"] = "AcidWaterShield",
+    ["Đi Xuyên Tường (Noclip)"] = "Noclip",
+    ["Chống Văng Game (Anti-AFK)"] = "AntiAFK",
+    ["Tự Động Kết Nối Lại"] = "AutoRejoin",
+
+    -- Discord Webhook
+    ["Webhook URL"] = "WebhookUrl",
+    ["Bật Webhook"] = "WebhookEnabled",
+    ["Thông Báo Bắt Được Boss"] = "WebhookNotifyBoss",
+    ["Báo Cáo Tiến Độ Mỗi Giờ"] = "WebhookHourlyStats",
+    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval"
+}
+
+local function GetAccountConfigDir()
+    local accName = (LocalPlayer and LocalPlayer.Name) or "DefaultUser"
+    local safeAcc = accName:gsub("[^%w_]", "")
+    if #safeAcc == 0 then safeAcc = "DefaultUser" end
+    return "Identical/HeavyweightFishing/Configs/" .. safeAcc
+end
+
+local function EnsureAccountConfigDir()
+    if makefolder and isfolder then
         pcall(function()
             if not isfolder("Identical") then makefolder("Identical") end
-            if not isfolder(PROFILE_DIR) then makefolder(PROFILE_DIR) end
+            if not isfolder("Identical/HeavyweightFishing") then makefolder("Identical/HeavyweightFishing") end
+            if not isfolder("Identical/HeavyweightFishing/Configs") then makefolder("Identical/HeavyweightFishing/Configs") end
+            local accDir = GetAccountConfigDir()
+            if not isfolder(accDir) then makefolder(accDir) end
         end)
     end
 end
 
-local function SaveProfile(name)
-    EnsureProfileDir()
-    local path = PROFILE_DIR .. "/" .. (name or Config.ActiveProfile) .. ".json"
+local function GetSavedConfigList()
+    EnsureAccountConfigDir()
+    local accDir = GetAccountConfigDir()
+    local list = {}
+    if listfiles and isfolder and isfolder(accDir) then
+        local ok, files = pcall(function() return listfiles(accDir) end)
+        if ok and files then
+            for _, path in ipairs(files) do
+                local fileName = path:match("([^/\\]+)%.json$")
+                if fileName and #fileName > 0 then
+                    table.insert(list, fileName)
+                end
+            end
+        end
+    end
+    table.sort(list)
+    return list
+end
+
+local function SaveAccountConfig(cfgName)
+    if not cfgName or cfgName:gsub("%s+", "") == "" then
+        return false, "Vui lòng nhập tên cấu hình!"
+    end
+    local safeName = cfgName:gsub("[^%w_%-%s]", ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if #safeName == 0 then
+        return false, "Tên cấu hình không hợp lệ!"
+    end
+
+    EnsureAccountConfigDir()
+    local accDir = GetAccountConfigDir()
+    local filePath = accDir .. "/" .. safeName .. ".json"
+
     local data = {}
     for k, v in pairs(Config) do
         if typeof(v) == "EnumItem" then
@@ -250,39 +385,86 @@ local function SaveProfile(name)
             data[k] = v
         end
     end
+
     local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
-    if ok and writefile then
-        pcall(function() writefile(path, encoded) end)
-        return true
+    if not ok or not encoded then
+        return false, "Lỗi mã hóa dữ liệu cấu hình!"
     end
-    return false
+
+    if writefile then
+        local wOk, err = pcall(function() writefile(filePath, encoded) end)
+        if wOk then
+            return true, safeName
+        else
+            return false, "Lỗi khi ghi file: " .. tostring(err)
+        end
+    else
+        return false, "Executor của bạn không hỗ trợ hàm writefile!"
+    end
 end
 
-local function LoadProfile(name)
-    local path = PROFILE_DIR .. "/" .. (name or Config.ActiveProfile) .. ".json"
-    if readfile then
-        local ok, content = pcall(function() return readfile(path) end)
-        if ok and content and #content > 0 then
-            local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
-            if decOk and type(decoded) == "table" then
-                for k, v in pairs(decoded) do
-                    if type(v) == "table" and v.__enum then
-                        local enumType, enumName = v.__enum:match("Enum%.(%w+)%.(%w+)")
-                        if enumType and enumName and Enum[enumType] and Enum[enumType][enumName] then
-                            Config[k] = Enum[enumType][enumName]
-                        end
-                    elseif Config[k] ~= nil then
-                        Config[k] = v
-                    end
-                end
-                return true
+local function LoadAccountConfig(cfgName)
+    if not cfgName or cfgName == "" or cfgName == "Chưa có config nào" then
+        return false, "Vui lòng chọn cấu hình cần nạp!"
+    end
+    EnsureAccountConfigDir()
+    local accDir = GetAccountConfigDir()
+    local filePath = accDir .. "/" .. cfgName .. ".json"
+
+    if not isfile or not isfile(filePath) then
+        return false, "File cấu hình không tồn tại!"
+    end
+
+    local ok, content = pcall(function() return readfile(filePath) end)
+    if not ok or not content or #content == 0 then
+        return false, "Không thể đọc nội dung file cấu hình!"
+    end
+
+    local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(decoded) ~= "table" then
+        return false, "File cấu hình bị lỗi định dạng!"
+    end
+
+    -- 1. Cập nhật vào bảng Config
+    for k, v in pairs(decoded) do
+        if type(v) == "table" and v.__enum then
+            local enumType, enumName = v.__enum:match("Enum%.(%w+)%.(%w+)")
+            if enumType and enumName and Enum[enumType] and Enum[enumType][enumName] then
+                Config[k] = Enum[enumType][enumName]
             end
+        else
+            Config[k] = v
         end
     end
-    return false
+
+    -- 2. Đồng bộ hóa toàn bộ giao diện UI tương ứng
+    for key, ctrl in pairs(UIControllers) do
+        if Config[key] ~= nil and ctrl and ctrl.Set then
+            pcall(function()
+                ctrl.Set(Config[key])
+            end)
+        end
+    end
+
+    return true, cfgName
 end
 
-if Config.AutoLoadProfile then pcall(LoadProfile, "default") end
+local function DeleteAccountConfig(cfgName)
+    if not cfgName or cfgName == "" or cfgName == "Chưa có config nào" then
+        return false, "Vui lòng chọn cấu hình cần xóa!"
+    end
+    EnsureAccountConfigDir()
+    local accDir = GetAccountConfigDir()
+    local filePath = accDir .. "/" .. cfgName .. ".json"
+
+    if isfile and isfile(filePath) then
+        if delfile then
+            local ok = pcall(function() delfile(filePath) end)
+            if ok then return true, cfgName end
+        end
+    end
+    return false, "Không thể xóa file cấu hình!"
+end
 
 local Colors = {
     Background       = Color3.fromRGB(15, 12, 22),
@@ -767,7 +949,10 @@ local function createToggleRow(parent, labelText, descText, initialVal, callback
         updateVisuals()
         if type(callback) == "function" then callback(state) end
     end)
-    return {frame = row, Set = function(val) state = val; updateVisuals() end, Get = function() return state end}
+    local ret = {frame = row, Set = function(val) state = val; updateVisuals(); if type(callback) == "function" then callback(state) end end, Get = function() return state end}
+    local key = ConfigLabelMap[labelText]
+    if key then UIControllers[key] = ret end
+    return ret
 end
 
 local function createSliderRow(parent, labelText, descText, minVal, maxVal, initialVal, isFloat, suffix, callback, indexSearch)
@@ -793,15 +978,19 @@ local function createSliderRow(parent, labelText, descText, minVal, maxVal, init
     track.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = true; updateFromX(input.Position.X) end end)
     UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end end)
     table.insert(activeConnections, UserInputService.InputChanged:Connect(function(input) if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then updateFromX(input.Position.X) end end))
-    return {
+    local ret = {
         frame = row,
         Set = function(val)
             currentVal = math.clamp(val, minVal, maxVal)
             local p2 = (currentVal - minVal) / (maxVal - minVal)
             fill.Size = UDim2.new(p2, 0, 1, 0)
             valLabel.Text = isFloat and string.format("%.2f", currentVal)..suffix or tostring(math.floor(currentVal))..suffix
+            if type(callback) == "function" then callback(currentVal) end
         end
     }
+    local key = ConfigLabelMap[labelText]
+    if key then UIControllers[key] = ret end
+    return ret
 end
 
 local function createDropdownRow(parent, labelText, descText, options, initialVal, callback, indexSearch)
@@ -846,11 +1035,12 @@ local function createDropdownRow(parent, labelText, descText, options, initialVa
     header.MouseEnter:Connect(function() TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play() end)
     header.MouseLeave:Connect(function() TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowNormal}):Play() end)
     if indexSearch ~= false then table.insert(rowSearchIndex, {frame = row, query = (labelText .. " " .. (descText or "")):lower()}) end
-    return {
+    local ret = {
         frame = row,
         Set = function(opt)
             selected = opt; ddBtn.Text = tostring(opt) .. "  v"
             for oN, b in pairs(optButtons) do b.BackgroundColor3 = (oN == opt) and Colors.DropdownSelected or Colors.InputBg; b.TextColor3 = (oN == opt) and Colors.PurplePrimary or Colors.TextWhite; b.Text = (oN == opt and "> " or "   ") .. tostring(oN) end
+            if type(callback) == "function" then pcall(callback, opt) end
         end,
         Get = function() return selected end,
         Refresh = function(newOpts, keepCurrent)
@@ -868,6 +1058,11 @@ local function createDropdownRow(parent, labelText, descText, options, initialVa
             ddBtn.Text = (selected ~= "" and tostring(selected) or "Không có") .. "  v"
         end
     }
+    local mappedKey = ConfigLabelMap[labelText]
+    if mappedKey then
+        UIControllers[mappedKey] = ret
+    end
+    return ret
 end
 
 local function createButtonRow(parent, labelText, descText, btnText, callback, indexSearch)
@@ -921,7 +1116,19 @@ local function createInputRow(parent, labelText, descText, initialVal, callback,
     tb.FocusLost:Connect(function(enterPressed)
         if type(callback) == "function" then callback(tb.Text) end
     end)
-    return {frame = row, Set = function(val) tb.Text = val end, Get = function() return tb.Text end}
+    local ret = {
+        frame = row,
+        Set = function(val)
+            tb.Text = tostring(val or "")
+            if type(callback) == "function" then pcall(callback, tb.Text) end
+        end,
+        Get = function() return tb.Text end
+    }
+    local mappedKey = ConfigLabelMap[labelText]
+    if mappedKey then
+        UIControllers[mappedKey] = ret
+    end
+    return ret
 end
 
 -- ============================================================
@@ -3495,26 +3702,91 @@ local stabCard = createCardGroup(tabPlayer)
 createToggleRow(stabCard, "Chống Văng Game (Anti-AFK)", "Chống bị Roblox kick sau 20 phút treo máy", Config.AntiAFK, function(v) Config.AntiAFK = v end)
 createToggleRow(stabCard, "Tự Động Kết Nối Lại", "Tự động vào lại server nếu bị mất kết nối", Config.AutoRejoin, function(v) Config.AutoRejoin = v end)
 
-createCategoryHeader(tabProfiles, "Quản Lý Cấu Hình (Profile)")
-local profCard = createCardGroup(tabProfiles)
+do
+    createCategoryHeader(tabProfiles, "Quản Lý Cấu Hình (Profile)")
+    local profCard = createCardGroup(tabProfiles)
 
-createButtonRow(profCard, "Lưu Cấu Hình (Save)", "Lưu lại toàn bộ cài đặt vào file JSON", "Lưu Cấu Hình", function()
-    if SaveProfile() then
-        ShowNotification("Cài Đặt", "Đã lưu cấu hình thành công!", "SUCCESS")
-    else
-        ShowNotification("Lỗi", "Không thể lưu file cấu hình.", "ERROR")
+    local curAccName = (LocalPlayer and LocalPlayer.Name) or "DefaultUser"
+    createInfoRow(profCard, "Tài Khoản Hiện Tại", curAccName)
+    createInfoRow(profCard, "Khởi Động Script", "Mặc Định (Luôn Default)")
+
+    local initialConfigs = GetSavedConfigList()
+    local selectedConfigName = initialConfigs[1] or ""
+    local newConfigInputName = ""
+
+    local configDropdown = createDropdownRow(profCard, "Chọn Cấu Hình Đã Lưu", "Danh sách toàn bộ cấu hình riêng của tài khoản " .. curAccName, #initialConfigs > 0 and initialConfigs or {"(Chưa có cấu hình)"}, function(val)
+        selectedConfigName = val
+    end)
+
+    local function RefreshProfileDropdown(preferredSelect)
+        local updatedList = GetSavedConfigList()
+        if #updatedList == 0 then
+            configDropdown.Refresh({"(Chưa có cấu hình)"})
+            selectedConfigName = ""
+        else
+            configDropdown.Refresh(updatedList)
+            if preferredSelect and table.find(updatedList, preferredSelect) then
+                configDropdown.Set(preferredSelect)
+                selectedConfigName = preferredSelect
+            else
+                selectedConfigName = configDropdown.Get()
+            end
+        end
     end
-end)
 
-createButtonRow(profCard, "Nạp Cấu Hình (Load)", "Tải lại các cài đặt đã lưu trước đó", "Nạp Cấu Hình", function()
-    if LoadProfile() then
-        ShowNotification("Cài Đặt", "Đã nạp cấu hình thành công!", "SUCCESS")
-    else
-        ShowNotification("Cảnh Báo", "Chưa có file cấu hình nào được lưu trước đó.", "WARN")
-    end
-end)
+    createInputRow(profCard, "Đặt Tên Cấu Hình Mới", "Nhập tên bất kỳ để lưu không giới hạn cấu hình", "", function(txt)
+        newConfigInputName = txt
+    end)
 
-createToggleRow(profCard, "Tự Nạp Khi Chạy Script", "Tự động nạp cài đặt đã lưu khi mở script", Config.AutoLoadProfile, function(v) Config.AutoLoadProfile = v end)
+    createButtonRow(profCard, "Lưu Cấu Hình Mới", "Lưu toàn bộ cài đặt hiện tại thành một file cấu hình mới", "💾 Lưu Config", function()
+        local targetName = newConfigInputName:gsub("^%s+", ""):gsub("%s+$", "")
+        if #targetName == 0 then
+            ShowNotification("Lưu Config", "Vui lòng nhập tên cấu hình mới vào ô phía trên!", "WARN")
+            return
+        end
+        local ok, res = SaveAccountConfig(targetName)
+        if ok then
+            ShowNotification("Lưu Config", "Đã lưu cấu hình [" .. res .. "] cho tài khoản " .. curAccName .. "!", "SUCCESS")
+            RefreshProfileDropdown(res)
+        else
+            ShowNotification("Lưu Thất Bại", tostring(res), "ERROR")
+        end
+    end)
+
+    createButtonRow(profCard, "Áp Dụng Cấu Hình (Load)", "Tải và đồng bộ hóa toàn bộ cài đặt từ cấu hình đã chọn", "🚀 Nạp Config", function()
+        local curSel = configDropdown.Get() or selectedConfigName
+        if not curSel or curSel == "" or curSel == "(Chưa có cấu hình)" then
+            ShowNotification("Nạp Config", "Tài khoản " .. curAccName .. " chưa chọn hoặc chưa có cấu hình nào!", "WARN")
+            return
+        end
+        local ok, res = LoadAccountConfig(curSel)
+        if ok then
+            ShowNotification("Nạp Config", "Đã nạp và đồng bộ giao diện cấu hình [" .. res .. "]!", "SUCCESS")
+        else
+            ShowNotification("Nạp Thất Bại", tostring(res), "ERROR")
+        end
+    end)
+
+    createButtonRow(profCard, "Làm Mới Danh Sách", "Quét lại tất cả các file cấu hình hiện có của tài khoản", "🔄 Làm Mới", function()
+        RefreshProfileDropdown()
+        ShowNotification("Danh Sách Config", "Đã cập nhật lại danh sách cấu hình của " .. curAccName .. "!", "INFO")
+    end)
+
+    createButtonRow(profCard, "Xóa Cấu Hình Đã Chọn", "Xóa vĩnh viễn file cấu hình đang được chọn khỏi máy", "🗑️ Xóa Config", function()
+        local curSel = configDropdown.Get() or selectedConfigName
+        if not curSel or curSel == "" or curSel == "(Chưa có cấu hình)" then
+            ShowNotification("Xóa Config", "Chưa chọn file cấu hình hợp lệ để xóa!", "WARN")
+            return
+        end
+        local ok, res = DeleteAccountConfig(curSel)
+        if ok then
+            ShowNotification("Xóa Config", "Đã xóa cấu hình [" .. res .. "] thành công!", "SUCCESS")
+            RefreshProfileDropdown()
+        else
+            ShowNotification("Xóa Thất Bại", tostring(res), "ERROR")
+        end
+    end)
+end
 
 createCategoryHeader(tabProfiles, "📢 Discord Webhook Báo Cáo Từ Xa")
 local hookCard = createCardGroup(tabProfiles)
