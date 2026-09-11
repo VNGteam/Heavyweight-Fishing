@@ -41,6 +41,13 @@ if ok and content and #content > 0 then
     end)
     if not runOk then
         warn("[Identical Loader] Lỗi thực thi script:", runErr)
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "❌ Lỗi Chạy Script!",
+                Text = tostring(runErr):sub(1, 100),
+                Duration = 20
+            })
+        end)
     end
 else
     warn("[Identical Loader] Không thể tải script từ link! Vui lòng kiểm tra lại đường dẫn SCRIPT_URL.")

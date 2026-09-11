@@ -888,7 +888,27 @@ local tabFrames = {}
 local tabButtons = {}
 
 local function SwitchTab(tabName)
-    for name, frame in pairs(tabFrames) do frame.Visible = (name == tabName) end
+    for name, frame in pairs(tabFrames) do
+        local isTarget = (name == tabName)
+        frame.Visible = isTarget
+        if isTarget then
+            frame.CanvasPosition = Vector2.new(0, 0)
+            task.defer(function()
+                local pl = frame:FindFirstChildOfClass("UIListLayout")
+                if pl and pl.AbsoluteContentSize.Y > 0 then
+                    frame.CanvasSize = UDim2.new(0, 0, 0, pl.AbsoluteContentSize.Y + 36)
+                end
+                for _, child in ipairs(frame:GetChildren()) do
+                    if child:IsA("Frame") then
+                        local l = child:FindFirstChildOfClass("UIListLayout")
+                        if l and l.AbsoluteContentSize.Y > 0 then
+                            child.Size = UDim2.new(1, 0, 0, l.AbsoluteContentSize.Y)
+                        end
+                    end
+                end
+            end)
+        end
+    end
     for name, btn in pairs(tabButtons) do
         if name == tabName then
             TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.PurpleDark, TextColor3 = Colors.TextWhite}):Play()
@@ -908,11 +928,19 @@ local function CreateTab(name)
     Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 2)
     btn.MouseButton1Click:Connect(function() SwitchTab(name) end)
 
-    local page = Instance.new("ScrollingFrame"); page.Name = "TabPage_" .. name; page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Colors.BorderPurple; page.CanvasSize = UDim2.new(0, 0, 0, 0); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = contentArea
-    do
-        local pl = Instance.new("UIListLayout"); pl.SortOrder = Enum.SortOrder.LayoutOrder; pl.Padding = UDim.new(0, 10); pl.Parent = page
-        local pp = Instance.new("UIPadding"); pp.PaddingTop = UDim.new(0, 12); pp.PaddingBottom = UDim.new(0, 16); pp.PaddingLeft = UDim.new(0, 14); pp.PaddingRight = UDim.new(0, 14); pp.Parent = page
+    local page = Instance.new("ScrollingFrame"); page.Name = "TabPage_" .. name; page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Colors.BorderPurple; page.CanvasSize = UDim2.new(0, 0, 0, 800); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = contentArea
+    local pl = Instance.new("UIListLayout"); pl.SortOrder = Enum.SortOrder.LayoutOrder; pl.Padding = UDim.new(0, 10); pl.Parent = page
+    local pp = Instance.new("UIPadding"); pp.PaddingTop = UDim.new(0, 12); pp.PaddingBottom = UDim.new(0, 24); pp.PaddingLeft = UDim.new(0, 14); pp.PaddingRight = UDim.new(0, 14); pp.Parent = page
+
+    local function refreshCanvas()
+        local h = pl.AbsoluteContentSize.Y
+        if h and h > 0 then
+            page.CanvasSize = UDim2.new(0, 0, 0, h + 36)
+        end
     end
+    pl:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshCanvas)
+    page.ChildAdded:Connect(function() task.defer(refreshCanvas) end)
+
     tabFrames[name] = page; tabButtons[name] = btn
     return page
 end
@@ -942,6 +970,21 @@ killBtn.MouseButton1Click:Connect(function()
     UnloadScript()
 end)
 
+local function safeRun(name, fn)
+    local ok, err = pcall(fn)
+    if not ok then
+        warn("[Identical Hub - " .. tostring(name) .. " ERROR]: " .. tostring(err))
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "⚠️ LỖI: " .. tostring(name),
+                Text = tostring(err):sub(1, 100),
+                Duration = 25
+            })
+        end)
+    end
+    return ok
+end
+
 local function createCategoryHeader(parent, text)
     local hdr = Instance.new("Frame"); hdr.Size = UDim2.new(1, 0, 0, 22); hdr.BackgroundTransparency = 1; hdr.Parent = parent
     local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBold; lbl.Text = string.upper(text); lbl.TextColor3 = Colors.PurplePrimary; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = hdr
@@ -955,6 +998,16 @@ local function createCardGroup(parent)
     local s = Instance.new("UIStroke"); s.Color = Colors.BorderSubtle; s.Thickness = 1; s.Parent = group
     Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
     local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
+
+    local function refreshGroupSize()
+        local h = l.AbsoluteContentSize.Y
+        if h and h > 0 then
+            group.Size = UDim2.new(1, 0, 0, h)
+        end
+    end
+    l:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(refreshGroupSize)
+    group.ChildAdded:Connect(function() task.defer(refreshGroupSize) end)
+
     return group
 end
 
@@ -2540,9 +2593,6 @@ local tabTeleports = CreateTab("Dịch Chuyển")
 local tabVisuals   = CreateTab("ESP & Đồ Hoạ")
 local tabPlayer    = CreateTab("Nhân Vật")
 local tabProfiles  = CreateTab("Cài Đặt")
-
-SwitchTab("Câu Cá")
-
 
 createCategoryHeader(tabFishing, "Thông Tin Tài Khoản & Thống Kê")
 local statsCard = createCardGroup(tabFishing)
@@ -4962,6 +5012,12 @@ createButtonRow(credCard, "🔴 Diệt Toàn Bộ Script (Kill Script)", "Ngắt
     ShowNotification("Diệt Script", "Đang ngắt kết nối và đóng script hoàn toàn...", "WARN", 2)
     task.wait(0.2)
     UnloadScript()
+end)
+
+-- Khởi động tab mặc định sau khi mọi controls và cards đã được nạp xong hoàn toàn
+SwitchTab("Câu Cá")
+task.defer(function()
+    SwitchTab("Câu Cá")
 end)
 
 local lastCastTime = 0
