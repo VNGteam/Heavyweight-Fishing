@@ -999,6 +999,7 @@ local function createCardGroup(parent, customText, defaultExpanded)
     titleLbl.TextColor3 = Colors.PurplePrimary
     titleLbl.TextSize = 11
     titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.Active = false
     titleLbl.Parent = headerBtn
 
     local toggleBadge = Instance.new("TextLabel")
@@ -1006,10 +1007,11 @@ local function createCardGroup(parent, customText, defaultExpanded)
     toggleBadge.Position = UDim2.new(1, -70, 0.5, -10)
     toggleBadge.BackgroundColor3 = isExpanded and Colors.PurpleDark or Colors.RowNormal
     toggleBadge.Font = Enum.Font.GothamBold
-    toggleBadge.Text = isExpanded and "▼ Mở" or "▶ Thu gọn"
+    toggleBadge.Text = isExpanded and "▼ Thu gọn" or "▶ Mở rộng"
     toggleBadge.TextColor3 = isExpanded and Colors.PurpleAccent or Colors.TextMuted
     toggleBadge.TextSize = 10
     toggleBadge.BorderSizePixel = 0
+    toggleBadge.Active = false
     toggleBadge.Parent = headerBtn
     Instance.new("UICorner", toggleBadge).CornerRadius = UDim.new(0, 4)
 
@@ -1040,14 +1042,14 @@ local function createCardGroup(parent, customText, defaultExpanded)
         isExpanded = not isExpanded
         group.Visible = isExpanded
         if not group._isHighlighted then
-            toggleBadge.Text = isExpanded and "▼ Mở" or "▶ Thu gọn"
+            toggleBadge.Text = isExpanded and "▼ Thu gọn" or "▶ Mở rộng"
             toggleBadge.TextColor3 = isExpanded and Colors.PurpleAccent or Colors.TextMuted
             toggleBadge.BackgroundColor3 = isExpanded and Colors.PurpleDark or Colors.RowNormal
             TweenService:Create(headerBtn, TweenInfo.new(0.15), {
                 BackgroundColor3 = isExpanded and Colors.ControlBg or Colors.SidebarBg
             }):Play()
         else
-            toggleBadge.Text = isExpanded and "🟢 Mở (Có Boss)" or "🟢 CÓ BOSS"
+            toggleBadge.Text = isExpanded and "🟢 Thu gọn (Boss)" or "🟢 Mở (Boss)"
         end
     end
 
@@ -1608,7 +1610,7 @@ local function UpdateIslandWeatherHighlight(activeIslandName, weatherName)
             h.title.TextColor3 = Color3.fromRGB(0, 255, 140)
             local wDisplay = weatherName or item.entry.weather
             h.title.Text = "⚡ [ĐANG CÓ BOSS] " .. item.entry.islandName:upper() .. " [" .. tostring(wDisplay):upper() .. "]"
-            h.badge.Text = h.getExpanded() and "🟢 Mở (Có Boss)" or "🟢 CÓ BOSS"
+            h.badge.Text = h.getExpanded() and "🟢 Thu gọn (Boss)" or "🟢 CÓ BOSS"
             h.badge.TextColor3 = Color3.fromRGB(0, 255, 136)
             h.badge.BackgroundColor3 = Color3.fromRGB(10, 60, 28)
         else
@@ -1618,7 +1620,7 @@ local function UpdateIslandWeatherHighlight(activeIslandName, weatherName)
             h.stroke.Thickness = 1
             h.title.TextColor3 = Colors.PurplePrimary
             h.title.Text = h.defaultTitle
-            h.badge.Text = h.getExpanded() and "▼ Mở" or "▶ Thu gọn"
+            h.badge.Text = h.getExpanded() and "▼ Thu gọn" or "▶ Mở rộng"
             h.badge.TextColor3 = h.getExpanded() and Colors.PurpleAccent or Colors.TextMuted
             h.badge.BackgroundColor3 = h.getExpanded() and Colors.PurpleDark or Colors.RowNormal
         end
@@ -2708,7 +2710,7 @@ createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
 
-createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)", false)
+createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)", true)
 local comboCard = createCardGroup(tabFishing)
 
 createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
@@ -2768,7 +2770,7 @@ createToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Qua
     Config.SmartEffectAutoDetect = v
 end)
 
-createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)", false)
+createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)", true)
 local trainCard = createCardGroup(tabFishing)
 local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
 createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần phím 1 hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
@@ -3569,7 +3571,7 @@ local function ExportAllPlayerSkills(infoRow, ownedOnly)
     return #skillList
 end
 
-createCategoryHeader(tabFishing, "🎒 Tự Động Đổi Cần & Mồi Câu (Auto Equip)", false)
+createCategoryHeader(tabFishing, "🎒 Tự Động Đổi Cần & Mồi Câu (Auto Equip)", true)
 local equipCard = createCardGroup(tabFishing)
 
 local baitOptionsList = {
@@ -3652,7 +3654,7 @@ createButtonRow(equipCard, "Trang Bị Nhanh Set 2", "Trang bị Cần & Mồi �
     end
 end)
 
-createCategoryHeader(tabFishing, "💰 Tự Động Bán Cá & Bảo Vệ Cá Hiếm (Auto Sell)", false)
+createCategoryHeader(tabFishing, "💰 Tự Động Bán Cá & Bảo Vệ Cá Hiếm (Auto Sell)", true)
 local sellCard = createCardGroup(tabFishing)
 createToggleRow(sellCard, "Tự Động Bán Cá (Auto Sell)", "Tự động bán toàn bộ cá trong balo theo chu kỳ", Config.AutoSell, function(v) Config.AutoSell = v end)
 createSliderRow(sellCard, "Thời Gian Giãn Cách Bán", "Chu kỳ số giây tự động bán cá 1 lần", 10, 300, Config.SellInterval, false, "s", function(v) Config.SellInterval = v end)
@@ -3978,9 +3980,9 @@ do
     end)
 end
 
--- Danh sách từng đảo và Secret Boss (Mỗi đảo thu gọn mặc định)
+-- Danh sách từng đảo và Secret Boss
 for _, entry in ipairs(secretBossDatabase) do
-    createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather), false)
+    createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather), true)
     local islandBossCard = createCardGroup(tabBoss)
     if islandBossCard and islandBossCard._header then
         islandHeaderMap[entry.islandName] = {
@@ -3998,7 +4000,7 @@ for _, entry in ipairs(secretBossDatabase) do
     end
 end
 
-createCategoryHeader(tabBoss, "⚔️ Đấu Trường Boss Enzo (Auto Farm)", false)
+createCategoryHeader(tabBoss, "⚔️ Đấu Trường Boss Enzo (Auto Farm)", true)
 local bossFarmCard = createCardGroup(tabBoss)
 createToggleRow(bossFarmCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và đánh bại boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
 createToggleRow(bossFarmCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
@@ -4012,7 +4014,7 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
     end
 end)
 
-createCategoryHeader(tabBoss, "🐙 Boss Bạch Tuộc Bí Mật (Octoparasite)", false)
+createCategoryHeader(tabBoss, "🐙 Boss Bạch Tuộc Bí Mật (Octoparasite)", true)
 local octoCard = createCardGroup(tabBoss)
 createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
 createButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
@@ -4032,7 +4034,7 @@ createButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đ�
     end
 end)
 
-createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)", false)
+createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)", true)
 local totemCard = createCardGroup(tabBoss)
 
 for _, t in ipairs(weatherTotems) do
@@ -4940,7 +4942,7 @@ local stabCard = createCardGroup(tabPlayer)
 createToggleRow(stabCard, "Chống Văng Game (Anti-AFK)", "Chống bị Roblox kick sau 20 phút treo máy", Config.AntiAFK, function(v) Config.AntiAFK = v end)
 createToggleRow(stabCard, "Tự Động Kết Nối Lại", "Tự động vào lại server nếu bị mất kết nối", Config.AutoRejoin, function(v) Config.AutoRejoin = v end)
 
-createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)", false)
+createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)", true)
 local exportSkillCard = createCardGroup(tabPlayer)
 local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
 
