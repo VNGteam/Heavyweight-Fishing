@@ -112,6 +112,7 @@ local Config = {
     SelectedSkill = "One-Strike Heaven Gate",
     AutoTrainSkill = false,
     TrainSkill = "Z",
+    TrainCancelDelay = 0.45,
     Train_Z = false,
     Train_X = false,
     Train_C = true,
@@ -266,6 +267,7 @@ local ConfigLabelMap = {
     -- Auto Luyện Chiêu
     ["Bật Auto Luyện Chiêu"] = "AutoTrainSkill",
     ["Chọn Chiêu Cần Luyện"] = "TrainSkill",
+    ["Nhịp Chờ Xuất Chiêu (Cancel Delay)"] = "TrainCancelDelay",
     ["Mục Tiêu Số Lần Dùng"] = "TrainTargetCount",
 
     -- Bán cá & Bảo vệ
@@ -2519,8 +2521,11 @@ end)
 createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
 local trainCard = createCardGroup(tabFishing)
 local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
-createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần phím 1 hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
+createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
 createDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy nhất muốn luyện (Z, X, C, V)", {"Z", "X", "C", "V"}, Config.TrainSkill or "Z", function(v) Config.TrainSkill = v end)
+createSliderRow(trainCard, "Nhịp Chờ Xuất Chiêu (Cancel Delay)", "Thời gian chờ nhân vật bắt đầu xuất chiêu trước khi cất cần (0.2s - 1.2s)", 0.2, 1.2, Config.TrainCancelDelay or 0.45, true, "s", function(v)
+    Config.TrainCancelDelay = v
+end)
 createSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa (mặc định 100 lần)", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
     Config.TrainTargetCount = v
     if infoTrainProgress and infoTrainProgress.Set then
@@ -5389,7 +5394,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local skipTriggered = false
             local isHunting = Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
 
-            if isHunting and Config.FastSkipNonBoss then
+            if isHunting and Config.FastSkipNonBoss and not Config.AutoTrainSkill then
                 if secretBossState.minigameStartTime == 0 then
                     secretBossState.minigameStartTime = now
                 end
@@ -5457,13 +5462,16 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
 
             if not skipTriggered then
-                if Config.AutoTrainSkill and not Config.SmartComboEnabled then
+                if Config.AutoTrainSkill then
                     if not isTrainingBusy then
                         isTrainingBusy = true
                         task.spawn(function()
                             local chosenSkill = Config.TrainSkill or "Z"
 
-                            -- 1. Khi cá kéo minigame, lập tức bấm dùng ngay skill cần luyện
+                            -- 1. Chờ nhịp minigame ổn định (0.08s) để game nhận lệnh skill
+                            task.wait(0.08)
+
+                            -- 2. Nhấn tung chiêu luyện
                             if Events and Events:FindFirstChild("UseSkill") then
                                 Events.UseSkill:FireServer(chosenSkill)
                             end
@@ -5475,7 +5483,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 local kCode = Enum.KeyCode[chosenSkill]
                                 if vim and kCode then
                                     vim:SendKeyEvent(true, kCode, false, game)
-                                    task.wait(0.02)
+                                    task.wait(0.03)
                                     vim:SendKeyEvent(false, kCode, false, game)
                                 end
                             end)
@@ -5489,9 +5497,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 Config.AutoTrainSkill = false
                                 ShowNotification("Luyện Chiêu Hoàn Tất", string.format("Đã luyện đủ %d/%d lần cho chiêu %s!", Config.TrainCurrentCount, Config.TrainTargetCount, chosenSkill), "SUCCESS", 7)
                                 pcall(function()
-                                    if Events and Events:FindFirstChild("ToggleHotbar") then
-                                        Events.ToggleHotbar:InvokeServer("1")
-                                    end
                                     local c = LocalPlayer.Character
                                     local h = c and c:FindFirstChildOfClass("Humanoid")
                                     if h then h:UnequipTools() end
@@ -5500,8 +5505,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 return
                             end
 
-                            -- 2. Đợi server nhận lệnh skill (0.06s) rồi cất cần (ấn phím 1 / đổi tay không) để hủy cá & minigame ngay lập tức
-                            task.wait(0.06)
+                            -- 3. Nhịp chờ skill bắt đầu thi triển và server ghi nhận đòn đánh (0.x giây theo cấu hình, mặc định 0.45s)
+                            local cancelDelay = tonumber(Config.TrainCancelDelay) or 0.45
+                            task.wait(cancelDelay)
+
+                            -- 4. Cất cần vào túi (UnequipTools) để hủy cá & đóng minigame ngay lập tức
                             local rodSlot = "1"
                             local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
                             if pData and pData:FindFirstChild("Hotbar") then
@@ -5515,44 +5523,37 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             end
 
                             pcall(function()
-                                if Events and Events:FindFirstChild("ToggleHotbar") then
-                                    Events.ToggleHotbar:InvokeServer(rodSlot)
-                                end
                                 local c = LocalPlayer.Character
                                 local h = c and c:FindFirstChildOfClass("Humanoid")
                                 if h then h:UnequipTools() end
-                                local vim = game:GetService("VirtualInputManager")
-                                if vim then
-                                    vim:SendKeyEvent(true, Enum.KeyCode.One, false, game)
-                                    task.wait(0.02)
-                                    vim:SendKeyEvent(false, Enum.KeyCode.One, false, game)
-                                end
                             end)
 
-                            -- 3. Đợi 0.25s để server dọn dẹp minigame, sau đó lấy cần ra lại (ấn phím 1)
+                            -- 5. Đợi 0.25s để server dọn dẹp minigame, sau đó lấy cần ra lại
                             task.wait(0.25)
                             pcall(function()
                                 if Events and Events:FindFirstChild("ToggleHotbar") then
                                     Events.ToggleHotbar:InvokeServer(rodSlot)
-                                end
-                                local vim = game:GetService("VirtualInputManager")
-                                if vim then
-                                    vim:SendKeyEvent(true, Enum.KeyCode.One, false, game)
-                                    task.wait(0.02)
-                                    vim:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                                else
+                                    local vim = game:GetService("VirtualInputManager")
+                                    if vim then
+                                        vim:SendKeyEvent(true, Enum.KeyCode.One, false, game)
+                                        task.wait(0.02)
+                                        vim:SendKeyEvent(false, Enum.KeyCode.One, false, game)
+                                    end
                                 end
                             end)
 
-                            -- 4. Đợi cần cầm lên tay (0.25s) rồi thả xuống nước lại chờ con cá tiếp theo
+                            -- 6. Đợi cần cầm lên tay hoàn tất (0.25s) rồi quăng cần xuống nước câu lại ngay
                             task.wait(0.25)
                             local c2 = LocalPlayer.Character
                             local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
                             if r2 and Events and Events:FindFirstChild("Fishing") then
                                 Events.Fishing:FireServer(r2.CFrame)
+                                lastCastTime = tick()
                             end
 
-                            -- 5. Cho phép vòng lặp tiếp theo sau khi đã thả cần
-                            task.wait(0.4)
+                            -- 7. Cho phép vòng lặp tiếp theo sau khi đã quăng cần xong
+                            task.wait(0.35)
                             isTrainingBusy = false
                         end)
                     end
