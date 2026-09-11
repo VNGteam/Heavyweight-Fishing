@@ -1437,38 +1437,103 @@ for _, entry in ipairs(secretBossDatabase) do
     end
 end
 
-local craftMaterialFish = {
-    ["Mountain Fish"] = true,
-    ["Catfish"] = true,
-    ["Crimson Catfish"] = true,
-    ["Scarlet Fish"] = true,
-    ["Elder Scarlet Fish"] = true,
-    ["Octoparasitic Fish"] = true,
-    ["Tiger Mirefish"] = true,
-    ["Mirage Lanternfish"] = true,
-    ["Golden Guardian Fish"] = true,
-    ["Frost Kingfish"] = true,
-    ["Frost Queenfish"] = true,
-    ["Rainbow Dragonfish"] = true,
-    ["Sanguine Fish"] = true,
-    ["Verdant Bonefang"] = true,
-    ["Verdant Alligator Gar"] = true,
-    ["Draconic Koi"] = true,
-    ["Heaven Piercer Turtle"] = true,
-    ["Flying Fish Empress"] = true,
-    ["Flying Fish Emperor"] = true,
+local Wiki = {
+    craftMaterialFish = {
+        ["Mountain Fish"] = true,
+        ["Catfish"] = true,
+        ["Crimson Catfish"] = true,
+        ["Scarlet Fish"] = true,
+        ["Elder Scarlet Fish"] = true,
+        ["Octoparasitic Fish"] = true,
+        ["Tiger Mirefish"] = true,
+        ["Mirage Lanternfish"] = true,
+        ["Golden Guardian Fish"] = true,
+        ["Frost Kingfish"] = true,
+        ["Frost Queenfish"] = true,
+        ["Rainbow Dragonfish"] = true,
+        ["Sanguine Fish"] = true,
+        ["Verdant Bonefang"] = true,
+        ["Verdant Alligator Gar"] = true,
+        ["Draconic Koi"] = true,
+        ["Heaven Piercer Turtle"] = true,
+        ["Flying Fish Empress"] = true,
+        ["Flying Fish Emperor"] = true,
+    },
+    rarityColors = {
+        ["Mythic"]    = Color3.fromRGB(248, 113, 113),  -- Đỏ neon Thần Thoại
+        ["Legendary"] = Color3.fromRGB(250, 204, 21),   -- Vàng hoàng kim Huyền Thoại
+        ["Epic"]      = Color3.fromRGB(192, 132, 252),  -- Tím mộng mơ Sử Thi
+        ["Rare"]      = Color3.fromRGB(96, 165, 250),   -- Xanh dương Hiếm
+        ["Uncommon"]  = Color3.fromRGB(52, 211, 153),   -- Xanh lục Đặc Biệt
+        ["Common"]    = Color3.fromRGB(168, 150, 200),  -- Xám bạc Phổ Thông
+    },
+    wikiFishData = {
+        -- 1. Thần Thoại (Mythic) & Secret Boss
+        {name = "Primordial Kunfish Overlord", rarity = "Mythic", keep = true, use = "💎 +30 Gems • Vũ khí Thần Thoại • Boss Realm • BẢO VỆ TUYỆT ĐỐI", origin = "Đấu Trường Boss Realm", icon = "rbxassetid://10709791437"},
+        {name = "Warbringer Shark", rarity = "Mythic", keep = true, use = "💎 +25 Gems • Vũ khí Chiến Tranh • Boss Realm • BẢO VỆ TUYỆT ĐỐI", origin = "Đấu Trường Boss Realm", icon = "rbxassetid://10709791437"},
+        {name = "Octoparasitic Fish", rarity = "Mythic", keep = true, use = "💎 +50 Gems • Đổi Cần Thần • Event Nameless Bait • KHÔNG ĐƯỢC BÁN", origin = "Sự Kiện Bạch Tuộc Biển", icon = "rbxassetid://10709791437"},
+        {name = "Mountain Fish", rarity = "Mythic", keep = true, use = "💎 +20 Gems • Rơi Kỹ Năng 5% • Nguyên liệu chế đồ thần • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
+        {name = "Sanguine Fish", rarity = "Mythic", keep = true, use = "💎 +20 Gems • Secret Boss Trời Nắng Gắt • Cực hiếm • KHÔNG BÁN", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Frost Kingfish", rarity = "Mythic", keep = true, use = "💎 +10 Gems • Rơi Bí Kíp Võ Công • Boss Bão Tuyết • KHÔNG BÁN", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Tigerfang Whale", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Rơi Kỹ Năng Đòn Đánh • Boss Sương Mù • KHÔNG BÁN", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Verdant Bonefang", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Rơi Kỹ Năng 5% • Boss Trời Mưa • KHÔNG BÁN", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Electric Eel", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Luyện Cooldown & Gems • Boss Bão Sấm • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Elder Scarlet Fish", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Nguyên liệu chế Cần Huyết Long • Boss Bão Sấm • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Flying Fish Emperor", rarity = "Mythic", keep = true, use = "💎 +10 Gems • Rơi Kỹ Năng 10% • Boss Trời Gió • KHÔNG BÁN", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Rainbow Dragonfish", rarity = "Mythic", keep = true, use = "💎 Thần Ngư Cực Hiếm • Chế tác Cần Thần Hoàng Kim • KHÔNG BÁN", origin = "Vùng Nước Ngầm Lòng Đất", icon = "rbxassetid://10709791437"},
+
+        -- 2. Huyền Thoại (Legendary)
+        {name = "Reborn Puffer Beast", rarity = "Legendary", keep = true, use = "💎 +10 Gems • Secret Boss Bão Tuyết • KHÔNG ĐƯỢC BÁN", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Flying Fish Empress", rarity = "Legendary", keep = true, use = "💎 +10 Gems • Rơi Kỹ Năng 10% • Boss Trời Gió • KHÔNG BÁN", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Draconic Koi", rarity = "Legendary", keep = true, use = "💎 +5 Gems • Long Ngư Hổ Phách • Boss Nắng Gắt • KHÔNG BÁN", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Heaven Piercer Turtle", rarity = "Legendary", keep = true, use = "💎 +5 Gems • Thần Quy Xuyên Trời • Boss Sương Mù • KHÔNG BÁN", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Verdant Alligator Gar", rarity = "Legendary", keep = true, use = "💎 +3 Gems • Rơi Kỹ Năng 25% • Boss Trời Mưa • KHÔNG BÁN", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Scarlet Fish", rarity = "Legendary", keep = true, use = "💎 +3 Gems • Chế tạo Cần Huyết Long • Boss Bão Sấm • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Verdant Grouper", rarity = "Legendary", keep = true, use = "💎 +3 Gems • Rơi Kỹ Năng 25% • Boss Trời Mưa • KHÔNG BÁN", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+
+        -- 3. Sử Thi (Epic)
+        {name = "Frost Queenfish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu chế Cần Băng Giá Hoàng Kim • KHÔNG BÁN", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Golden Guardian Fish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu chế Cần Vàng Hộ Vệ • KHÔNG BÁN", origin = "Đảo Thống Trị (Sovereign Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Tiger Mirefish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu tinh luyện Cần Hổ Trảo • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
+        {name = "Mirage Lanternfish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu chế Cần Ảo Ảnh Quang Học • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Catfish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu đúc Cần Huyết Long V2 • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Catfish", rarity = "Rare", keep = true, use = "⭐ Nguyên liệu cơ bản ghép Cần Câu Sơ Cấp • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Colossal Tigerfish", rarity = "Epic", keep = false, use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Chiến Trường (Battlefield)", icon = "rbxassetid://10709791437"},
+        {name = "Sunburst Trout", rarity = "Epic", keep = false, use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
+
+        -- 4. Hiếm (Rare)
+        {name = "Ascended Perch", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Glacial Trout", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền mua mồi và phụ kiện", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Tropical Angelfish", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền trang trải mua Cần mới", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Amber Koi", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng mua đồ shop", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Bladefin Snapper", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền mua vật phẩm hỗ trợ", origin = "Đảo Chiến Trường (Battlefield)", icon = "rbxassetid://10709791437"},
+        {name = "Mist Salmon", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng làm giàu", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
+        {name = "Glow Perch", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng trang trải", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Crowned Trout", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng nâng cấp", origin = "Đảo Thống Trị (Sovereign Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Flying Fish", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng mua sắm", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Salmon", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng cơ bản", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+
+        -- 5. Đặc Biệt (Uncommon)
+        {name = "Coconut Crabfish", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Sovereign Fish", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Thống Trị (Sovereign Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Silver Bass", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Armored Carp", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Chiến Trường (Battlefield)", icon = "rbxassetid://10709791437"},
+        {name = "Toxic Trout", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Green Carp", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Bass", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+        {name = "Trout", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+
+        -- 6. Phổ Thông (Common)
+        {name = "Carp", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+        {name = "Perch", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+        {name = "Minnow", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+        {name = "Bamboo Fish", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Radioactive Carp", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+        {name = "Ice Fish", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
+    }
 }
 
-local rarityColors = {
-    ["Mythic"]    = Color3.fromRGB(248, 113, 113),  -- Đỏ neon Thần Thoại
-    ["Legendary"] = Color3.fromRGB(250, 204, 21),   -- Vàng hoàng kim Huyền Thoại
-    ["Epic"]      = Color3.fromRGB(192, 132, 252),  -- Tím mộng mơ Sử Thi
-    ["Rare"]      = Color3.fromRGB(96, 165, 250),   -- Xanh dương Hiếm
-    ["Uncommon"]  = Color3.fromRGB(52, 211, 153),   -- Xanh lục Đặc Biệt
-    ["Common"]    = Color3.fromRGB(168, 150, 200),  -- Xám bạc Phổ Thông
-}
-
-local function IsItemFavorited(item)
+function Wiki.IsItemFavorited(item)
     if not item then return false end
     local favVal = item:FindFirstChild("Favorite")
     if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
@@ -1479,7 +1544,7 @@ local function IsItemFavorited(item)
     return false
 end
 
-local function IsSecretBossFish(item)
+function Wiki.IsSecretBossFish(item)
     if not item then return false end
     local rawName = tostring(item.Name or "")
     local lowerName = rawName:lower()
@@ -6163,18 +6228,18 @@ local wasMinigame = false
 
 
 local function ProtectInventoryItem(item, showNotify)
-    if not item or IsItemFavorited(item) then return false end
+    if not item or Wiki.IsItemFavorited(item) then return false end
     local itemName = item.Name
     local shouldProtect = false
     local reason = ""
 
-    if Config.AutoLockSecretBoss and IsSecretBossFish(item) then
+    if Config.AutoLockSecretBoss and Wiki.IsSecretBossFish(item) then
         shouldProtect = true
         reason = "Secret Boss"
-    elseif Config.AutoProtectMutations and IsMutatedFish(item) then
+    elseif Config.AutoProtectMutations and Wiki.IsMutatedFish(item) then
         shouldProtect = true
         reason = "Cá Đột Biến"
-    elseif Config.MaterialFarming and craftMaterialFish[itemName] then
+    elseif Config.MaterialFarming and Wiki.craftMaterialFish[itemName] then
         shouldProtect = true
         reason = "Nguyên Liệu"
     elseif Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then
