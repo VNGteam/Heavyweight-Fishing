@@ -1767,47 +1767,55 @@ function Wiki.ToggleLockSpecificFish(fishName, targetKeepState)
 end
 
 function Wiki.ResolveFishIcon(fishName, defaultIcon)
-    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-    if pData then
-        for _, fName in ipairs({"Inventory", "Hotbar"}) do
-            local f = pData:FindFirstChild(fName)
-            if f then
-                for _, it in ipairs(f:GetChildren()) do
-                    local rawName = GetItemRawName(it)
-                    if rawName == fishName or it.Name == fishName then
-                        for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
-                            local p = it:FindFirstChild(prop)
-                            if p and p:IsA("StringValue") and #p.Value > 0 then
-                                return p.Value
-                            end
-                            local att = it:GetAttribute(prop)
-                            if att and #tostring(att) > 0 then
-                                return tostring(att)
+    local ok, icon = pcall(function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        if pData then
+            for _, fName in ipairs({"Inventory", "Hotbar"}) do
+                local f = pData:FindFirstChild(fName)
+                if f then
+                    for _, it in ipairs(f:GetChildren()) do
+                        local rawName = Wiki.GetItemRawName(it)
+                        if rawName == fishName or it.Name == fishName then
+                            for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
+                                local p = it:FindFirstChild(prop)
+                                if p and p:IsA("StringValue") and #p.Value > 0 then
+                                    return p.Value
+                                end
+                                local att = it:GetAttribute(prop)
+                                if att and #tostring(att) > 0 then
+                                    return tostring(att)
+                                end
                             end
                         end
                     end
                 end
             end
         end
-    end
 
-    if ReplicatedStorage then
-        local found = ReplicatedStorage:FindFirstChild(fishName, true)
-        if found then
-            for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
-                local p = found:FindFirstChild(prop)
-                if p and p:IsA("StringValue") and #p.Value > 0 then
-                    return p.Value
+        if ReplicatedStorage then
+            local found = ReplicatedStorage:FindFirstChild(fishName, true)
+            if found then
+                for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
+                    local p = found:FindFirstChild(prop)
+                    if p and p:IsA("StringValue") and #p.Value > 0 then
+                        return p.Value
+                    end
+                    local att = found:GetAttribute(prop)
+                    if att and #tostring(att) > 0 then
+                        return tostring(att)
+                    end
                 end
-                local att = found:GetAttribute(prop)
-                if att and #tostring(att) > 0 then
-                    return tostring(att)
+                if found:IsA("Decal") or found:IsA("Texture") then
+                    return found.Texture
                 end
-            end
-            if found:IsA("Decal") or found:IsA("Texture") then
-                return found.Texture
             end
         end
+
+        return nil
+    end)
+
+    if ok and icon and #tostring(icon) > 0 then
+        return tostring(icon)
     end
 
     return defaultIcon or "rbxassetid://10709791437"
@@ -4716,7 +4724,11 @@ do
         img.Size = UDim2.new(1, -6, 1, -6)
         img.Position = UDim2.new(0, 3, 0, 3)
         img.BackgroundTransparency = 1
-        img.Image = Wiki.ResolveFishIcon(f.name, f.icon)
+        local cardIcon = f.icon or "rbxassetid://10709791437"
+        pcall(function()
+            cardIcon = Wiki.ResolveFishIcon(f.name, f.icon)
+        end)
+        img.Image = cardIcon
         img.ScaleType = Enum.ScaleType.Fit
         img.Parent = iconFrame
 
