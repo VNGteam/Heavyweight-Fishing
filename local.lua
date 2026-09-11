@@ -539,6 +539,22 @@ local function getGuiParent()
     return CoreGui
 end
 
+pcall(function()
+    local targetParent = getGuiParent()
+    if targetParent then
+        local existing = targetParent:FindFirstChild("IdenticalHeavyweightFishing")
+        if existing then existing:Destroy() end
+    end
+    if CoreGui then
+        local existingCore = CoreGui:FindFirstChild("IdenticalHeavyweightFishing")
+        if existingCore then existingCore:Destroy() end
+    end
+    if LocalPlayer and LocalPlayer:FindFirstChild("PlayerGui") then
+        local existingPG = LocalPlayer.PlayerGui:FindFirstChild("IdenticalHeavyweightFishing")
+        if existingPG then existingPG:Destroy() end
+    end
+end)
+
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "IdenticalHeavyweightFishing"
 screenGui.ResetOnSpawn = false
