@@ -2182,6 +2182,11 @@ function secretBossState.DetectIsland(text)
     if not text or typeof(text) ~= "string" then return nil, nil end
     local lower = text:lower()
 
+    -- Bỏ qua nếu là thông báo người chơi câu được cá (KHÔNG PHẢI BOSS XUẤT HIỆN)
+    if lower:find("caught") or lower:find("has caught") or lower:find("câu được") or lower:find("đã câu") or lower:find("bắt được") or lower:find("obtained") then
+        return nil, nil
+    end
+
     -- 0. Nếu văn bản là thời tiết Clear / bình thường -> Bỏ qua, không phải đảo boss nào
     if lower:find("clear") or lower:find("sunny") or lower:find("trong xanh") or lower:find("bình thường") or lower:find("binh thuong") then
         return nil, "Clear"
@@ -2203,21 +2208,25 @@ function secretBossState.DetectIsland(text)
         end
     end
 
-    -- 2. Khớp theo TÊN ĐẢO rõ ràng
-    for _, entry in ipairs(secretBossDatabase) do
-        for _, pat in ipairs(entry.patterns) do
-            if lower:find(pat, 1, true) then
-                return entry, nil
-            end
-        end
-    end
-
-    -- 3. Khớp theo TÊN THỜI TIẾT (Weather Patterns)
+    -- 2. Khớp theo TÊN THỜI TIẾT (Weather Patterns)
     for _, entry in ipairs(secretBossDatabase) do
         if entry.weatherPatterns then
             for _, wp in ipairs(entry.weatherPatterns) do
                 if lower:find(wp, 1, true) then
                     return entry, entry.weather
+                end
+            end
+        end
+    end
+
+    -- 3. Khớp theo TÊN ĐẢO rõ ràng (Chỉ khi văn bản có kèm từ khóa liên quan đến boss/thời tiết/xuất hiện)
+    local hasContext = lower:find("boss") or lower:find("secret") or lower:find("spawn") or lower:find("appear")
+        or lower:find("xuất hiện") or lower:find("weather") or lower:find("thời tiết") or lower:find("bão")
+    if hasContext then
+        for _, entry in ipairs(secretBossDatabase) do
+            for _, pat in ipairs(entry.patterns) do
+                if lower:find(pat, 1, true) then
+                    return entry, nil
                 end
             end
         end
@@ -2824,6 +2833,11 @@ function secretBossState.HandleChatMessage(msg)
     if typeof(msg) ~= "string" or #msg == 0 then return end
     local lower = msg:lower()
 
+    -- Bỏ qua nếu là thông báo người chơi câu được cá (KHÔNG PHẢI BOSS XUẤT HIỆN)
+    if lower:find("caught") or lower:find("has caught") or lower:find("câu được") or lower:find("đã câu") or lower:find("bắt được") or lower:find("obtained") then
+        return
+    end
+
     -- 1. Check for Despawn Announcement: "all secret bosses have been despawned", "weather ended", etc.
     if (lower:find("all secret bosses") and (lower:find("despawn") or lower:find("gone") or lower:find("disappear")))
        or lower:find("secret bosses have been despawned")
@@ -2841,6 +2855,7 @@ function secretBossState.HandleChatMessage(msg)
         secretBossState.currentMap = nil
         secretBossState.targetIsland = nil
         secretBossState.standPos = nil
+        secretBossState.activeChatBoss = nil
         secretBossState.statusText = "Tất cả Secret Boss đã despawn. Chờ đợt mới..."
         ShowNotification("Secret Boss Despawn", "Tất cả Secret Boss đã biến mất! Hệ thống đang chờ đợt xuất hiện tiếp theo.", "WARN", 7)
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
@@ -2860,15 +2875,14 @@ function secretBossState.HandleChatMessage(msg)
         return
     end
 
-    -- 2. Check for Spawn Announcement: Chứa secret / boss / spawn / appear / weather / thời tiết
-    local hasTriggerWord = lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear")
-        or lower:find("weather") or lower:find("thời tiết") or lower:find("started") or lower:find("active")
-        or lower:find("bão") or lower:find("mưa") or lower:find("gió") or lower:find("tuyết") or lower:find("sương") or lower:find("nắng")
-        or lower:find("thunder") or lower:find("blizzard") or lower:find("storm") or lower:find("gale")
+    -- 2. Check for Spawn Announcement: Chứa từ khóa xuất hiện thực sự
+    local isSpawnWord = lower:find("spawn") or lower:find("appear") or lower:find("xuất hiện")
+        or lower:find("started") or lower:find("bắt đầu") or lower:find("active")
+        or lower:find("has arrived") or lower:find("đã đến") or lower:find("secret boss")
 
-    if hasTriggerWord then
+    if isSpawnWord then
         local matchedIsland, detectedName = secretBossState.DetectIsland(msg)
-        if matchedIsland then
+        if matchedIsland and detectedName ~= "Clear" then
             -- Kiểm tra xem có boss mục tiêu nào trên đảo này được bật trong cài đặt săn không
             local hasTargetInIsland = false
             for _, b in ipairs(matchedIsland.bosses) do
@@ -2884,6 +2898,13 @@ function secretBossState.HandleChatMessage(msg)
             if powMatch then
                 reqPower = tonumber(powMatch) or 0
             end
+
+            secretBossState.activeChatBoss = {
+                island = matchedIsland,
+                bossName = detectedName,
+                time = tick(),
+                reqPower = reqPower
+            }
             secretBossState.Teleport(matchedIsland, detectedName, reqPower)
         end
     end
@@ -2893,7 +2914,7 @@ function secretBossState.ScanChatHistory()
     local foundMessages = {}
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
 
-    -- 1. Quét giao diện Chat hiện đại (ExperienceChat) - Chỉ lấy tối đa 15 tin gần nhất
+    -- 1. Quét giao diện Chat hiện đại (ExperienceChat) - Chỉ lấy tối đa 10 tin gần nhất
     if pg and pg:FindFirstChild("ExperienceChat") then
         local labels = {}
         for _, d in ipairs(pg.ExperienceChat:GetDescendants()) do
@@ -2907,13 +2928,13 @@ function secretBossState.ScanChatHistory()
             if orderA ~= orderB then return orderA < orderB end
             return a.AbsolutePosition.Y < b.AbsolutePosition.Y
         end)
-        local startIdx = math.max(1, #labels - 14)
+        local startIdx = math.max(1, #labels - 9)
         for i = startIdx, #labels do
             table.insert(foundMessages, labels[i].Text)
         end
     end
 
-    -- 2. Quét giao diện Chat cổ điển (Legacy Chat) - Chỉ lấy tối đa 15 tin gần nhất
+    -- 2. Quét giao diện Chat cổ điển (Legacy Chat) - Chỉ lấy tối đa 10 tin gần nhất
     if pg and pg:FindFirstChild("Chat") then
         local labels = {}
         for _, d in ipairs(pg.Chat:GetDescendants()) do
@@ -2927,32 +2948,13 @@ function secretBossState.ScanChatHistory()
             if orderA ~= orderB then return orderA < orderB end
             return a.AbsolutePosition.Y < b.AbsolutePosition.Y
         end)
-        local startIdx = math.max(1, #labels - 14)
+        local startIdx = math.max(1, #labels - 9)
         for i = startIdx, #labels do
             table.insert(foundMessages, labels[i].Text)
         end
     end
 
-    -- 3. Quét các thông báo Banner / Pop-up trên màn hình
-    if pg then
-        for _, gui in ipairs(pg:GetChildren()) do
-            if gui:IsA("ScreenGui") and gui.Name ~= "IdenticalHeavyweightFishing" and gui.Name ~= "ExperienceChat" and gui.Name ~= "Chat" then
-                for _, d in ipairs(gui:GetDescendants()) do
-                    if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text > 5 then
-                        local lower = d.Text:lower()
-                        if lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("despawn")
-                           or lower:find("weather") or lower:find("thời tiết") or lower:find("started") or lower:find("active")
-                           or lower:find("bão") or lower:find("mưa") or lower:find("gió") or lower:find("tuyết") or lower:find("sương") or lower:find("nắng")
-                           or lower:find("blizzard") or lower:find("thunder") or lower:find("storm") then
-                            table.insert(foundMessages, d.Text)
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- TUYỆT ĐỐI KHÔNG quét Workspace.BossSetUp ở đây vì BossSetUp chứa sẵn các folder model boss của game, gây ra tin nhắn ảo khiến script liên tục dịch chuyển nhầm về Đảo Băng Giá!
+    -- TUYỆT ĐỐI KHÔNG quét PlayerGui / Workspace.BossSetUp ở đây để tránh nhầm UI game thành tin thông báo!
 
     -- Phân tích tin nhắn theo thứ tự từ dưới lên trên (tin mới nhất xuất hiện ở cuối danh sách)
     local latestSpawn = nil
@@ -2974,14 +2976,15 @@ function secretBossState.ScanChatHistory()
            or lower:find("thời tiết đã hết")
            or lower:find("kết thúc") then
             latestDespawnIndex = idx
-        elseif lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear")
-            or lower:find("weather") or lower:find("thời tiết") or lower:find("started") or lower:find("active")
-            or lower:find("bão") or lower:find("mưa") or lower:find("gió") or lower:find("tuyết") or lower:find("sương") or lower:find("nắng")
-            or lower:find("blizzard") or lower:find("thunder") or lower:find("storm") then
-            local entry, bName = secretBossState.DetectIsland(msg)
-            if entry and bName ~= "Clear" then
-                latestSpawn = {msg = msg, island = entry, index = idx, bossName = bName}
-                latestSpawnIndex = idx
+        elseif not (lower:find("caught") or lower:find("has caught") or lower:find("câu được") or lower:find("đã câu") or lower:find("bắt được")) then
+            local isSpawnKw = lower:find("spawn") or lower:find("appear") or lower:find("xuất hiện")
+                or lower:find("started") or lower:find("bắt đầu") or lower:find("secret boss")
+            if isSpawnKw then
+                local entry, bName = secretBossState.DetectIsland(msg)
+                if entry and bName ~= "Clear" then
+                    latestSpawn = {msg = msg, island = entry, index = idx, bossName = bName}
+                    latestSpawnIndex = idx
+                end
             end
         end
     end
@@ -3002,6 +3005,7 @@ function secretBossState.ScanChatHistory()
         secretBossState.standPos = nil
         secretBossState.active = false
         secretBossState.currentMap = nil
+        secretBossState.activeChatBoss = nil
         secretBossState.statusText = "Boss gần nhất đã despawn. Đang chờ đợt mới..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
@@ -7208,7 +7212,7 @@ task.spawn(function()
             pcall(function()
                 -- 1. Ưu tiên quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
                 local wIsland, wName = secretBossState.DetectWeather()
-                local isWeatherClear = (wName == "Clear")
+                local isWeatherClear = (wIsland == nil) or (wName == "Clear")
 
                 local targetBossInWeather = false
                 if wIsland and not isWeatherClear then
@@ -7230,14 +7234,31 @@ task.spawn(function()
                     end
                 else
                     -- Không có thời tiết boss mục tiêu (Thời tiết Clear, hoặc thời tiết đảo đó không chọn săn)
-                    -- 2. Quét tiếp thông báo chat và banner màn hình (CHỈ quét khi thời tiết KHÔNG PHẢI Clear)
+                    -- 2. Kiểm tra xem có Boss Chat nào còn trong thời gian hiệu lực không (tối đa 300 giây)
                     local chatSpawn = nil
-                    if not isWeatherClear then
-                        chatSpawn = secretBossState.ScanChatHistory()
+                    if secretBossState.activeChatBoss then
+                        if (tick() - (secretBossState.activeChatBoss.time or 0)) < 300 then
+                            local isTarget = false
+                            if secretBossState.activeChatBoss.island then
+                                for _, b in ipairs(secretBossState.activeChatBoss.island.bosses) do
+                                    if Config.SecretBossTargets[b.name] then
+                                        isTarget = true
+                                        break
+                                    end
+                                end
+                            end
+                            if isTarget then
+                                chatSpawn = secretBossState.activeChatBoss
+                            else
+                                secretBossState.activeChatBoss = nil
+                            end
+                        else
+                            secretBossState.activeChatBoss = nil
+                        end
                     end
 
                     if chatSpawn and chatSpawn.island then
-                        -- Có boss xuất hiện theo thông báo chat gần nhất
+                        -- Có boss xuất hiện theo thông báo chat còn hiệu lực
                         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                         local targetPos = secretBossState.standPos or chatSpawn.island.pos
                         local dist = root and (root.Position - targetPos).Magnitude or 9999
@@ -7245,7 +7266,7 @@ task.spawn(function()
                             secretBossState.Teleport(chatSpawn.island, chatSpawn.bossName)
                         end
                     else
-                        -- Hoàn toàn KHÔNG CÓ BOSS MỤC TIÊU NÀO ĐANG HOẠT ĐỘNG (hoặc Thời tiết Clear)
+                        -- Hoàn toàn KHÔNG CÓ BOSS MỤC TIÊU NÀO ĐANG HOẠT ĐỘNG (Thời tiết Clear / Hết Boss)
                         if secretBossState.active then
                             secretBossState.active = false
                             secretBossState.currentMap = nil
