@@ -830,7 +830,21 @@ local function createDropdownRow(parent, labelText, descText, options, initialVa
             selected = opt; ddBtn.Text = tostring(opt) .. "  v"
             for oN, b in pairs(optButtons) do b.BackgroundColor3 = (oN == opt) and Colors.DropdownSelected or Colors.InputBg; b.TextColor3 = (oN == opt) and Colors.PurplePrimary or Colors.TextWhite; b.Text = (oN == opt and "> " or "   ") .. tostring(oN) end
         end,
-        Get = function() return selected end
+        Get = function() return selected end,
+        Refresh = function(newOpts, keepCurrent)
+            options = newOpts or {}
+            populate(options)
+            local found = false
+            if keepCurrent and selected then
+                for _, opt in ipairs(options) do
+                    if opt == selected then found = true; break end
+                end
+            end
+            if not found then
+                selected = options[1] or ""
+            end
+            ddBtn.Text = (selected ~= "" and tostring(selected) or "Không có") .. "  v"
+        end
     }
 end
 
@@ -2871,31 +2885,137 @@ for _, rod in ipairs(allRods) do
     updateRowVisuals()
 end
 
+local UpdateAllIslandStatus = nil
+do
 createCategoryHeader(tabTeleports, "Dịch Chuyển Đến Đảo (Đảo 1 - 10)")
 local islandCard = createCardGroup(tabTeleports)
 
 local islands = {
-    {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9)},
-    {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1)},
-    {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3)},
-    {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7)},
-    {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4)},
-    {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4)},
-    {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6)},
-    {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5)},
-    {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6)},
-    {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7)},
+    {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9), radius = 450},
+    {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1), radius = 450},
+    {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3), radius = 450},
+    {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7), radius = 450},
+    {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4), radius = 450},
+    {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4), radius = 450},
+    {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6), radius = 450},
+    {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5), radius = 450},
+    {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6), radius = 450},
+    {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7), radius = 450},
 }
 
+local bossRealms = {
+    {name = "Boss Bạch Tuộc (Phao Biển)", pos = Vector3.new(1608.2, 5.0, -218.3), radius = 350},
+    {name = "Vùng Câu Cá Ngầm Lòng Đất", pos = Vector3.new(112.5, -330.0, -30.8), radius = 350},
+    {name = "Đấu Trường Boss Enzo", pos = Vector3.new(-115.3, 9.2, 1349.5), radius = 350},
+}
+
+local function GetCurrentLocationName()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return "Đang tải vị trí...", nil end
+    local myPos = root.Position
+
+    if myPos.Y < -150 then
+        return "Vùng Câu Cá Ngầm Lòng Đất", "underground"
+    end
+
+    local bestName = "Đang ở giữa biển"
+    local bestObj = nil
+    local minDist = 999999
+
+    for _, isl in ipairs(islands) do
+        local dist = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(isl.pos.X, 0, isl.pos.Z)).Magnitude
+        if dist < (isl.radius or 450) and dist < minDist then
+            minDist = dist
+            bestName = isl.name
+            bestObj = isl
+        end
+    end
+
+    for _, br in ipairs(bossRealms) do
+        local dist = (myPos - br.pos).Magnitude
+        if dist < (br.radius or 350) and dist < minDist then
+            minDist = dist
+            bestName = br.name
+            bestObj = br
+        end
+    end
+
+    return bestName, bestObj, minDist
+end
+
+-- Hiển thị trực tiếp vị trí đảo người chơi đang đứng
+local infoCurrentMap = createInfoRow(islandCard, "📍 Vị Trí Bạn Đang Đứng", "Đang nhận diện...")
+
+local islandUpdaters = {}
+UpdateAllIslandStatus = function()
+    local curLocName = GetCurrentLocationName()
+    if infoCurrentMap and infoCurrentMap.Set then
+        infoCurrentMap.Set(curLocName)
+    end
+    for _, fn in ipairs(islandUpdaters) do
+        pcall(fn, curLocName)
+    end
+end
+
 for _, isl in ipairs(islands) do
-    createButtonRow(islandCard, isl.name, "Dịch chuyển đến " .. isl.name, "Bay Đến", function()
+    local row = Instance.new("Frame"); row.Size = UDim2.new(1, 0, 0, 42); row.BackgroundColor3 = Colors.RowNormal; row.BorderSizePixel = 0; row.Parent = islandCard
+    local pad = Instance.new("UIPadding"); pad.PaddingLeft = UDim.new(0, 10); pad.PaddingRight = UDim.new(0, 10); pad.Parent = row
+    local tf = Instance.new("Frame"); tf.Size = UDim2.new(1, -125, 1, 0); tf.BackgroundTransparency = 1; tf.Parent = row
+    local tl = Instance.new("TextLabel"); tl.Size = UDim2.new(1, 0, 0, 18); tl.Position = UDim2.new(0, 0, 0, 4); tl.BackgroundTransparency = 1; tl.Font = Enum.Font.GothamBold; tl.Text = isl.name; tl.TextColor3 = Colors.TextWhite; tl.TextSize = 12; tl.TextXAlignment = Enum.TextXAlignment.Left; tl.Parent = tf
+    local dl = Instance.new("TextLabel"); dl.Size = UDim2.new(1, 0, 0, 14); dl.Position = UDim2.new(0, 0, 0, 22); dl.BackgroundTransparency = 1; dl.Font = Enum.Font.Gotham; dl.Text = "Dịch chuyển đến " .. isl.name; dl.TextColor3 = Colors.TextMuted; dl.TextSize = 10; dl.TextXAlignment = Enum.TextXAlignment.Left; dl.Parent = tf
+
+    local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0, 105, 0, 24); btn.Position = UDim2.new(1, -105, 0.5, -12); btn.BackgroundColor3 = Colors.ControlBg; btn.Font = Enum.Font.GothamBold; btn.Text = "Bay Đến"; btn.TextColor3 = Colors.PurplePrimary; btn.TextSize = 11; btn.BorderSizePixel = 0; btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    row.MouseEnter:Connect(function() TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play() end)
+    row.MouseLeave:Connect(function() TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowNormal}):Play() end)
+    table.insert(rowSearchIndex, {frame = row, query = (isl.name .. " dịch chuyển đến đảo"):lower()})
+
+    local function updateVisuals(curLocName)
+        local isHere = (curLocName == isl.name)
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local dist = root and math.floor((root.Position - isl.pos).Magnitude) or 0
+
+        if isHere then
+            tl.Text = string.format("%s  [BẠN ĐANG Ở ĐÂY]", isl.name)
+            tl.TextColor3 = Color3.fromRGB(120, 255, 170)
+            dl.Text = "Vị trí hiện tại của bạn • Khoảng cách: 0m (Đã ở đây)"
+            dl.TextColor3 = Color3.fromRGB(160, 255, 190)
+
+            btn.Text = "Đang Ở Đây"
+            btn.BackgroundColor3 = Color3.fromRGB(30, 65, 45)
+            btn.TextColor3 = Color3.fromRGB(120, 255, 170)
+        else
+            tl.Text = isl.name
+            tl.TextColor3 = Colors.TextWhite
+            dl.Text = string.format("Dịch chuyển đến %s • Cách bạn: ~%dm", isl.name, dist)
+            dl.TextColor3 = Colors.TextMuted
+
+            btn.Text = "Bay Đến"
+            btn.BackgroundColor3 = Colors.ControlBg
+            btn.TextColor3 = Colors.PurplePrimary
+        end
+    end
+
+    btn.MouseButton1Click:Connect(function()
+        local curLocName = GetCurrentLocationName()
+        if curLocName == isl.name then
+            ShowNotification("Dịch Chuyển", "Bạn đang ở ngay " .. isl.name .. " rồi!", "INFO")
+            return
+        end
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
         if root then
             root.CFrame = CFrame.new(isl.pos + Vector3.new(0, 3, 0))
-            ShowNotification("Teleport", "Arrived at " .. isl.name .. "!", "SUCCESS")
+            ShowNotification("Dịch Chuyển", "Đã đến " .. isl.name .. "!", "SUCCESS")
+            task.delay(0.4, UpdateAllIslandStatus)
         end
     end)
+
+    table.insert(islandUpdaters, updateVisuals)
+    updateVisuals(GetCurrentLocationName())
 end
 
 createCategoryHeader(tabTeleports, "Đấu Trường Boss & Vùng Đất Bí Mật")
@@ -2966,11 +3086,89 @@ for _, sr in ipairs(secretRods) do
     end)
 end
 
-createCategoryHeader(tabTeleports, "Dịch Chuyển Người Chơi & Server")
+createCategoryHeader(tabTeleports, "👥 Dịch Chuyển Đến Người Chơi Trong Map")
 local srvCard = createCardGroup(tabTeleports)
 
+local playerLookup = {}
+local selectedPlayerKey = nil
+
+local function BuildPlayerList()
+    local list = {}
+    table.clear(playerLookup)
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    local myPos = myRoot and myRoot.Position
+
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            local distStr = ""
+            if myPos and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                local d = math.floor((p.Character.HumanoidRootPart.Position - myPos).Magnitude)
+                distStr = string.format(" [%dm]", d)
+            end
+            local key = string.format("%s (@%s)%s", p.DisplayName, p.Name, distStr)
+            table.insert(list, key)
+            playerLookup[key] = p
+        end
+    end
+
+    if #list == 0 then
+        table.insert(list, "Không có người chơi khác")
+    end
+    return list
+end
+
+local initialPlayerList = BuildPlayerList()
+selectedPlayerKey = initialPlayerList[1]
+
+local playerDropdown = createDropdownRow(srvCard, "Chọn Người Chơi", "Danh sách người chơi đang có mặt trong server", initialPlayerList, selectedPlayerKey, function(v)
+    selectedPlayerKey = v
+end)
+
+local function RefreshPlayerDropdown()
+    local newList = BuildPlayerList()
+    if playerDropdown and playerDropdown.Refresh then
+        playerDropdown.Refresh(newList, true)
+        selectedPlayerKey = playerDropdown.Get()
+    end
+end
+
+createButtonRow(srvCard, "Bay Đến Người Chơi Đã Chọn", "Dịch chuyển tức thì đến ngay bên cạnh người chơi đang chọn", "🚀 Bay Đến", function()
+    local targetPlayer = playerLookup[selectedPlayerKey]
+    if not targetPlayer then
+        local uName = selectedPlayerKey and selectedPlayerKey:match("@([%w_]+)")
+        if uName then
+            targetPlayer = Players:FindFirstChild(uName)
+        end
+    end
+
+    if not targetPlayer or not targetPlayer.Parent then
+        ShowNotification("Dịch Chuyển", "Vui lòng chọn người chơi hợp lệ!", "WARN")
+        RefreshPlayerDropdown()
+        return
+    end
+
+    local tChar = targetPlayer.Character
+    local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+    if myRoot and tRoot then
+        myRoot.CFrame = tRoot.CFrame + Vector3.new(0, 2, 3)
+        ShowNotification("Dịch Chuyển", "Đã bay đến người chơi: " .. targetPlayer.DisplayName, "SUCCESS")
+        RefreshPlayerDropdown()
+    else
+        ShowNotification("Dịch Chuyển", "Người chơi này chưa hồi sinh hoặc không có nhân vật!", "WARN")
+    end
+end)
+
+createButtonRow(srvCard, "Làm Mới Danh Sách Người Chơi", "Cập nhật danh sách người chơi vừa tham gia hoặc rời server", "🔄 Làm Mới", function()
+    RefreshPlayerDropdown()
+    ShowNotification("Danh Sách", "Đã cập nhật danh sách người chơi trong map!", "INFO")
+end)
+
 local lastTpTarget = nil
-createButtonRow(srvCard, "Bay Đến Người Chơi Ngẫu Nhiên", "Dịch chuyển tức thì đến vị trí của một người chơi khác", "Bay Đến", function()
+createButtonRow(srvCard, "Bay Đến Người Chơi Ngẫu Nhiên", "Dịch chuyển tức thì đến vị trí của một người chơi bất kỳ", "🎲 Ngẫu Nhiên", function()
     local targets = {}
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
@@ -2993,8 +3191,19 @@ createButtonRow(srvCard, "Bay Đến Người Chơi Ngẫu Nhiên", "Dịch chuy
     if root and selected.Character and selected.Character:FindFirstChild("HumanoidRootPart") then
         root.CFrame = selected.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2, 3)
         ShowNotification("Dịch Chuyển", "Đã bay đến người chơi: " .. selected.DisplayName, "SUCCESS")
+        RefreshPlayerDropdown()
     end
 end)
+
+table.insert(activeConnections, Players.PlayerAdded:Connect(function()
+    task.wait(1)
+    RefreshPlayerDropdown()
+end))
+table.insert(activeConnections, Players.PlayerRemoving:Connect(function()
+    task.wait(0.5)
+    RefreshPlayerDropdown()
+end))
+end
 
 createCategoryHeader(tabVisuals, "ESP Nhìn Xuyên Tường")
 local espCard = createCardGroup(tabVisuals)
@@ -3960,6 +4169,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 lastRodShopSync = tick()
                 if UpdateAllRodShopUI then
                     UpdateAllRodShopUI()
+                end
+            end
+
+            -- Tự động nhận diện map/đảo hiện tại của người chơi mỗi 2 giây
+            if not lastIslandCheck or (tick() - lastIslandCheck >= 2) then
+                lastIslandCheck = tick()
+                if UpdateAllIslandStatus then
+                    pcall(UpdateAllIslandStatus)
                 end
             end
 
