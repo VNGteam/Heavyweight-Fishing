@@ -1250,6 +1250,7 @@ local secretBossDatabase = {
         islandName = "Đảo Tre (Bamboo Isle)",
         weather = "Thunderstorm (Bão Sấm)",
         patterns = {"bamboo", "đảo tre", "dao tre", "đảo 2", "dao 2"},
+        weatherPatterns = {"thunderstorm", "bão sấm", "bao sam", "thunder", "sấm", "lightning"},
         bossPatterns = {"scarlet fish", "elder scarlet", "crimson electric eel", "electric eel"},
         pos = Vector3.new(-1236.8, 8.5, -174.1),
         lookAt = Vector3.new(-1250.0, 7.0, -220.0),
@@ -1263,6 +1264,7 @@ local secretBossDatabase = {
         islandName = "Đảo Phóng Xạ (Fallout Isle)",
         weather = "Rainy (Trời Mưa)",
         patterns = {"fallout", "phóng xạ", "phong xa", "đảo 3", "dao 3"},
+        weatherPatterns = {"rainy", "trời mưa", "troi mua", "heavy rain", "mưa", "rain"},
         bossPatterns = {"alligator gar", "verdant alligator", "verdant grouper", "verdant bonefang", "bonefang"},
         pos = Vector3.new(138.4, 9.5, 1179.7),
         lookAt = Vector3.new(165.0, 7.5, 1220.0),
@@ -1276,6 +1278,7 @@ local secretBossDatabase = {
         islandName = "Đảo Cá Chép (Perch Isle)",
         weather = "Windy (Trời Gió)",
         patterns = {"perch", "cá chép", "ca chep", "đảo 5", "dao 5"},
+        weatherPatterns = {"windy", "trời gió", "troi gio", "gale", "gió", "wind"},
         bossPatterns = {"flying fish empress", "flying fish emperor", "flying fish"},
         pos = Vector3.new(-9.5, 9.5, -1330.0),
         lookAt = Vector3.new(15.0, 7.5, -1370.0),
@@ -1288,6 +1291,7 @@ local secretBossDatabase = {
         islandName = "Đảo Băng Giá (Frost Isle)",
         weather = "Snowy (Bão Tuyết)",
         patterns = {"frost", "băng giá", "bang gia", "đảo băng", "dao bang", "đảo 6", "dao 6"},
+        weatherPatterns = {"snowy", "bão tuyết", "bao tuyet", "blizzard", "tuyết", "snow", "frosty"},
         bossPatterns = {"reborn puffer beast", "puffer beast", "frost kingfish"},
         pos = Vector3.new(-1400.4, 9.5, -1490.6),
         lookAt = Vector3.new(-1430.0, 7.5, -1530.0),
@@ -1300,6 +1304,7 @@ local secretBossDatabase = {
         islandName = "Đảo Quả Dừa (Coconut Isle)",
         weather = "Foggy (Sương Mù)",
         patterns = {"coconut", "quả dừa", "qua dua", "đảo dừa", "dao dua", "đảo 7", "dao 7"},
+        weatherPatterns = {"foggy", "sương mù", "suong mu", "dense fog", "mist", "sương", "fog"},
         bossPatterns = {"tigerfang whale", "tigerfang", "heaven piercer turtle", "piercer turtle"},
         pos = Vector3.new(1446.0, 9.5, -1408.0),
         lookAt = Vector3.new(1465.0, 7.5, -1445.0),
@@ -1312,6 +1317,7 @@ local secretBossDatabase = {
         islandName = "Đảo Hổ Phách (Amber Isle)",
         weather = "Blazing Sun (Nắng Gắt)",
         patterns = {"amber", "hổ phách", "ho phach", "đảo 8", "dao 8"},
+        weatherPatterns = {"blazing sun", "nắng gắt", "nang gat", "blazing", "heatwave", "nắng", "sun"},
         bossPatterns = {"draconic koi", "draconic", "sanguine fish", "sanguine"},
         pos = Vector3.new(1292.7, 8.5, 1497.4),
         lookAt = Vector3.new(1315.0, 7.0, 1535.0),
@@ -1324,6 +1330,7 @@ local secretBossDatabase = {
         islandName = "Đảo Chiến Trường (Battlefield)",
         weather = "Boss Realm",
         patterns = {"battlefield", "chiến trường", "chien truong", "đảo 9", "dao 9"},
+        weatherPatterns = {"boss realm", "realm"},
         bossPatterns = {"primordial kunfish", "kunfish overlord", "kunfish", "warbringer shark", "warbringer"},
         pos = Vector3.new(1393.5, 11.5, 169.6),
         lookAt = Vector3.new(1425.0, 8.0, 195.0),
@@ -1336,6 +1343,7 @@ local secretBossDatabase = {
         islandName = "Đảo Đỉnh Sương Mù (Mistpeak)",
         weather = "Mountain Peak",
         patterns = {"mistpeak", "đỉnh sương mù", "dinh suong mu", "đảo 10", "dao 10"},
+        weatherPatterns = {"mountain peak", "mistpeak", "đỉnh núi"},
         bossPatterns = {"mountain fish"},
         pos = Vector3.new(2660.2, 9.0, -86.7),
         lookAt = Vector3.new(2685.0, 7.0, -110.0),
@@ -1347,6 +1355,7 @@ local secretBossDatabase = {
         islandName = "Vùng Biển Sâu (Secret Ocean)",
         weather = "Special Event",
         patterns = {"octo", "bạch tuộc", "bach tuoc", "phao", "buoy", "secret ocean"},
+        weatherPatterns = {"special event", "octo", "bạch tuộc"},
         bossPatterns = {"octoparasitic fish", "octoparasitic", "octoparasite"},
         pos = Vector3.new(1608.2, 5.5, -218.3),
         lookAt = Vector3.new(1635.0, 5.0, -235.0),
@@ -1680,7 +1689,7 @@ local function CancelAndRecastRod()
     end)
 end
 
-local function DetectIslandFromText(text)
+function secretBossState.DetectIsland(text)
     if not text or typeof(text) ~= "string" then return nil, nil end
     local lower = text:lower()
 
@@ -1700,7 +1709,7 @@ local function DetectIslandFromText(text)
         end
     end
 
-    -- 2. Nếu không có tên Boss, khớp theo TÊN ĐẢO rõ ràng
+    -- 2. Khớp theo TÊN ĐẢO rõ ràng
     for _, entry in ipairs(secretBossDatabase) do
         for _, pat in ipairs(entry.patterns) do
             if lower:find(pat, 1, true) then
@@ -1709,11 +1718,131 @@ local function DetectIslandFromText(text)
         end
     end
 
+    -- 3. Khớp theo TÊN THỜI TIẾT (Weather Patterns)
+    for _, entry in ipairs(secretBossDatabase) do
+        if entry.weatherPatterns then
+            for _, wp in ipairs(entry.weatherPatterns) do
+                if lower:find(wp, 1, true) then
+                    return entry, entry.weather
+                end
+            end
+        end
+    end
+
     return nil, nil
 end
 
-local function HandleIncomingChatMessage(msg)
-    if not Config.AutoChatSecretBoss then return end
+function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
+    if not matchedIsland or not matchedIsland.pos then return false end
+
+    -- Kiểm tra nếu người chơi có chọn săn ít nhất 1 boss ở đảo này không
+    local hasTargetInIsland = false
+    for _, b in ipairs(matchedIsland.bosses) do
+        if Config.SecretBossTargets[b.name] then
+            hasTargetInIsland = true
+            break
+        end
+    end
+
+    if not hasTargetInIsland then
+        ShowNotification("Bỏ Qua Boss", string.format("Phát hiện tại %s nhưng bạn không chọn săn boss ở đảo này.", matchedIsland.islandName), "INFO", 4)
+        return false
+    end
+
+    local powerReq = reqPower or 0
+    local curPower = GetPlayerRodPower()
+    if Config.SecretBossCheckPower and powerReq > 0 and curPower < powerReq then
+        ShowNotification("CẢNH BÁO LỰC CẦN", string.format("Boss yêu cầu %d Power! Cần của bạn chỉ có %d Power.", powerReq, curPower), "WARN", 8)
+    end
+
+    -- Cập nhật trạng thái săn
+    secretBossState.active = true
+    secretBossState.currentMap = matchedIsland.islandName
+    secretBossState.targetIsland = matchedIsland
+    secretBossState.requiredPower = powerReq
+    secretBossState.statusText = string.format("Đang săn tại %s [%s]", matchedIsland.islandName, matchedIsland.weather or "Thời Tiết")
+
+    local alertName = detectedName and string.upper(tostring(detectedName)) or "SECRET BOSS / THỜI TIẾT"
+    ShowNotification("PHÁT HIỆN " .. alertName .. "!", string.format("Đang bay đến %s để câu boss...", matchedIsland.islandName), "SUCCESS", 7)
+
+    if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+        statusLabelSecretBoss.Set(secretBossState.statusText)
+    end
+
+    -- Dịch chuyển nhân vật đến bờ biển câu
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root and matchedIsland.pos then
+        -- 1. Đặt góc nhìn quay mặt thẳng ra biển nước lớn
+        if matchedIsland.lookAt then
+            root.CFrame = CFrame.lookAt(matchedIsland.pos + Vector3.new(0, 2.5, 0), matchedIsland.lookAt)
+        else
+            root.CFrame = CFrame.new(matchedIsland.pos + Vector3.new(0, 2.5, 0))
+        end
+
+        -- 2. Đặt sàn an toàn dưới chân nếu gần mặt nước
+        if waterPlatform then
+            waterPlatform.CFrame = CFrame.new(matchedIsland.pos.X, matchedIsland.pos.Y - 1.2, matchedIsland.pos.Z)
+            waterPlatform.CanCollide = true
+        end
+
+        -- 3. Khởi động quăng cần câu sau 2.5s hạ cánh
+        lastCastTime = tick() + 2.5
+        CancelAndRecastRod()
+    end
+    return true
+end
+
+function secretBossState.DetectWeather()
+    -- 1. Quét Workspace Attributes hoặc Objects
+    local wsWeather = Workspace:GetAttribute("Weather") or Workspace:GetAttribute("CurrentWeather") or Workspace:GetAttribute("ActiveWeather")
+    if typeof(wsWeather) == "string" and #wsWeather > 0 then
+        local matched, wName = secretBossState.DetectIsland(wsWeather)
+        if matched then return matched, wName or wsWeather end
+    end
+    if Workspace:FindFirstChild("Weather") then
+        local wObj = Workspace.Weather
+        if wObj:IsA("StringValue") and #wObj.Value > 0 then
+            local matched, wName = secretBossState.DetectIsland(wObj.Value)
+            if matched then return matched, wName or wObj.Value end
+        end
+    end
+
+    -- 2. Quét ReplicatedStorage
+    if ReplicatedStorage then
+        local rsWeather = ReplicatedStorage:GetAttribute("Weather") or ReplicatedStorage:GetAttribute("CurrentWeather")
+        if typeof(rsWeather) == "string" and #rsWeather > 0 then
+            local matched, wName = secretBossState.DetectIsland(rsWeather)
+            if matched then return matched, wName or rsWeather end
+        end
+        if ReplicatedStorage:FindFirstChild("Weather") then
+            local rwObj = ReplicatedStorage.Weather
+            if rwObj:IsA("StringValue") and #rwObj.Value > 0 then
+                local matched, wName = secretBossState.DetectIsland(rwObj.Value)
+                if matched then return matched, wName or rwObj.Value end
+            end
+        end
+    end
+
+    -- 3. Quét PlayerGui (HUD thời tiết trên màn hình game)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg and pg:FindFirstChild("MainGui") then
+        for _, d in ipairs(pg.MainGui:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text >= 3 and #d.Text <= 45 then
+                local dName = d.Name:lower()
+                if dName:find("weather") or dName:find("cloud") or dName:find("climate") or dName:find("season") or dName:find("island") or dName:find("map") then
+                    local matched, wName = secretBossState.DetectIsland(d.Text)
+                    if matched then return matched, wName or d.Text end
+                end
+            end
+        end
+    end
+
+    return nil, nil
+end
+
+function secretBossState.HandleChatMessage(msg)
+    if not (Config.AutoChatSecretBoss or Config.AutoHuntBoss) then return end
     if typeof(msg) ~= "string" or #msg == 0 then return end
     local lower = msg:lower()
 
@@ -1740,77 +1869,26 @@ local function HandleIncomingChatMessage(msg)
         return
     end
 
-    -- 2. Check for Spawn Announcement: Contains secret / boss / map name
-    if lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear") then
-        local matchedIsland, detectedBossName = DetectIslandFromText(msg)
+    -- 2. Check for Spawn Announcement: Chứa secret / boss / spawn / appear / weather / thời tiết
+    local hasTriggerWord = lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear")
+        or lower:find("weather") or lower:find("thời tiết") or lower:find("started") or lower:find("active")
+        or lower:find("bão") or lower:find("mưa") or lower:find("gió") or lower:find("tuyết") or lower:find("sương") or lower:find("nắng")
+        or lower:find("thunder") or lower:find("blizzard") or lower:find("storm") or lower:find("gale")
 
+    if hasTriggerWord then
+        local matchedIsland, detectedName = secretBossState.DetectIsland(msg)
         if matchedIsland then
-            -- Check if user selected any boss from this island
-            local hasTargetInIsland = false
-            for _, b in ipairs(matchedIsland.bosses) do
-                if Config.SecretBossTargets[b.name] then
-                    hasTargetInIsland = true
-                    break
-                end
-            end
-
-            if not hasTargetInIsland then
-                ShowNotification("Bỏ Qua Boss", string.format("Boss xuất hiện tại %s nhưng bạn không chọn săn boss ở đảo này.", matchedIsland.islandName), "INFO", 4)
-                return
-            end
-
-            -- Parse required power
             local reqPower = 0
             local powMatch = lower:match("power%s*[:=]?%s*(%d+)") or lower:match("(%d+)%s*power")
             if powMatch then
                 reqPower = tonumber(powMatch) or 0
             end
-
-            local curPower = GetPlayerRodPower()
-            if Config.SecretBossCheckPower and reqPower > 0 and curPower < reqPower then
-                ShowNotification("CẢNH BÁO LỰC CẦN", string.format("Boss yêu cầu %d Power! Cần của bạn chỉ có %d Power.", reqPower, curPower), "WARN", 8)
-            end
-
-            -- Set state
-            secretBossState.active = true
-            secretBossState.currentMap = matchedIsland.islandName
-            secretBossState.targetIsland = matchedIsland
-            secretBossState.requiredPower = reqPower
-            secretBossState.statusText = string.format("Đang săn tại %s (Y/c Power: %d)", matchedIsland.islandName, reqPower)
-            
-            local bossAlertName = detectedBossName and string.upper(detectedBossName) or "SECRET BOSS"
-            ShowNotification("PHÁT HIỆN " .. bossAlertName .. "!", string.format("Boss xuất hiện tại %s! Đang bay đến mép nước câu...", matchedIsland.islandName), "SUCCESS", 7)
-            
-            if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                statusLabelSecretBoss.Set(secretBossState.statusText)
-            end
-
-            -- Teleport to sea-facing pier / fishing shore
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root and matchedIsland.pos then
-                -- 1. Đặt góc nhìn quay mặt thẳng ra biển nước lớn
-                if matchedIsland.lookAt then
-                    root.CFrame = CFrame.lookAt(matchedIsland.pos + Vector3.new(0, 2.5, 0), matchedIsland.lookAt)
-                else
-                    root.CFrame = CFrame.new(matchedIsland.pos + Vector3.new(0, 2.5, 0))
-                end
-
-                -- 2. Đặt sàn an toàn dưới chân nếu gần mặt nước
-                if waterPlatform then
-                    waterPlatform.CFrame = CFrame.new(matchedIsland.pos.X, matchedIsland.pos.Y - 1.2, matchedIsland.pos.Z)
-                    waterPlatform.CanCollide = true
-                end
-
-                -- 3. Đặt delay 2.5s trước khi quăng cần để nhân vật đứng yên và hướng mặt ra biển
-                lastCastTime = tick() + 2.5
-                CancelAndRecastRod()
-            end
+            secretBossState.Teleport(matchedIsland, detectedName, reqPower)
         end
     end
 end
 
-local function ScanExistingChatHistory()
+function secretBossState.ScanChatHistory()
     local foundMessages = {}
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
 
@@ -1860,7 +1938,10 @@ local function ScanExistingChatHistory()
                 for _, d in ipairs(gui:GetDescendants()) do
                     if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text > 5 then
                         local lower = d.Text:lower()
-                        if lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("despawn") then
+                        if lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("despawn")
+                           or lower:find("weather") or lower:find("thời tiết") or lower:find("started") or lower:find("active")
+                           or lower:find("bão") or lower:find("mưa") or lower:find("gió") or lower:find("tuyết") or lower:find("sương") or lower:find("nắng")
+                           or lower:find("blizzard") or lower:find("thunder") or lower:find("storm") then
                             table.insert(foundMessages, d.Text)
                         end
                     end
@@ -1898,8 +1979,11 @@ local function ScanExistingChatHistory()
            or lower:find("secret bosses have been despawned")
            or lower:find("secret bosses have despawned") then
             latestDespawnIndex = idx
-        elseif lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear") then
-            local entry, bName = DetectIslandFromText(msg)
+        elseif lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear")
+            or lower:find("weather") or lower:find("thời tiết") or lower:find("started") or lower:find("active")
+            or lower:find("bão") or lower:find("mưa") or lower:find("gió") or lower:find("tuyết") or lower:find("sương") or lower:find("nắng")
+            or lower:find("blizzard") or lower:find("thunder") or lower:find("storm") then
+            local entry, bName = secretBossState.DetectIsland(msg)
             if entry then
                 latestSpawn = {msg = msg, island = entry, index = idx, bossName = bName}
                 latestSpawnIndex = idx
@@ -1909,8 +1993,11 @@ local function ScanExistingChatHistory()
 
     -- Nếu có tin nhắn Boss xuất hiện và tin Spawn xuất hiện sau tin Despawn (hoặc không có tin despawn nào sau đó)
     if latestSpawn and (latestDespawnIndex < latestSpawnIndex) then
-        ShowNotification("Phát Hiện Boss Hoạt Động", "Tìm thấy thông báo: " .. tostring(latestSpawn.island.islandName) .. "! Đang bay đến đảo...", "SUCCESS", 6)
-        HandleIncomingChatMessage(latestSpawn.msg)
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        local dist = root and (root.Position - latestSpawn.island.pos).Magnitude or 9999
+        if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 70 then
+            secretBossState.Teleport(latestSpawn.island, latestSpawn.bossName)
+        end
         return true
     elseif latestDespawnIndex > latestSpawnIndex and latestDespawnIndex ~= -1 then
         secretBossState.statusText = "Boss gần nhất đã despawn. Đang chờ đợt mới..."
@@ -3001,7 +3088,7 @@ createToggleRow(chatBossCard, "Tự Động Bay Theo Chat (Chat Sniper)", "Tự 
         ShowNotification("Chat Sniper", "Đang lắng nghe thông báo Boss từ chat server...", "SUCCESS", 4)
         task.spawn(function()
             task.wait(0.3)
-            local found = ScanExistingChatHistory()
+            local found = secretBossState.ScanChatHistory()
             if not found then
                 if statusLabelSecretBoss and statusLabelSecretBoss.Set and not Config.AutoHuntBoss then
                     statusLabelSecretBoss.Set("Đang chờ thông báo Boss mới từ Chat...")
@@ -3037,7 +3124,7 @@ end)
 statusLabelSecretBoss = createInfoRow(chatBossCard, "Trạng Thái Săn:", secretBossState.statusText)
 
 createButtonRow(chatBossCard, "Quét Lại Lịch Sử Chat & Boss", "Kiểm tra lại lịch sử chat xem có Boss nào đang hoạt động không", "Quét Chat", function()
-    local found = ScanExistingChatHistory()
+    local found = secretBossState.ScanChatHistory()
     if not found then
         ShowNotification("Kết Quả Quét", "Không tìm thấy Secret Boss nào đang hoạt động trong lịch sử chat.", "INFO", 5)
     end
@@ -5359,7 +5446,7 @@ pcall(function()
         local conn = TextChatService.MessageReceived:Connect(function(textChatMessage)
             if not isRunning then return end
             if textChatMessage and textChatMessage.Text then
-                HandleIncomingChatMessage(textChatMessage.Text)
+                secretBossState.HandleChatMessage(textChatMessage.Text)
             end
         end)
         table.insert(activeConnections, conn)
@@ -5372,10 +5459,33 @@ pcall(function()
         local conn = chatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
             if not isRunning then return end
             if data and data.Message then
-                HandleIncomingChatMessage(tostring(data.Message))
+                secretBossState.HandleChatMessage(tostring(data.Message))
             end
         end)
         table.insert(activeConnections, conn)
+    end
+end)
+
+-- TỰ ĐỘNG QUÉT THỜI TIẾT & CHAT ĐỊNH KỲ (MỖI 2 GIÂY) ĐỂ SĂN BOSS
+task.spawn(function()
+    while isRunning do
+        task.wait(2.0)
+        if (Config.AutoChatSecretBoss or Config.AutoHuntBoss) and isRunning then
+            pcall(function()
+                -- 1. Ưu tiên quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
+                local wIsland, wName = secretBossState.DetectWeather()
+                if wIsland then
+                    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local dist = root and (root.Position - wIsland.pos).Magnitude or 9999
+                    if secretBossState.currentMap ~= wIsland.islandName or dist > 70 then
+                        secretBossState.Teleport(wIsland, wName)
+                    end
+                else
+                    -- 2. Quét thông báo chat và banner màn hình
+                    secretBossState.ScanChatHistory()
+                end
+            end)
+        end
     end
 end)
 
@@ -5399,10 +5509,11 @@ pcall(function()
     end)
 end)
 
-local espFolder = Instance.new("Folder")
-espFolder.Name = "IdenticalESP"
-espFolder.Parent = Workspace
-table.insert(cleanUpInstances, espFolder)
+do
+    local espFolder = Instance.new("Folder")
+    espFolder.Name = "IdenticalESP"
+    espFolder.Parent = Workspace
+    table.insert(cleanUpInstances, espFolder)
 
 local activeESP = {}
 
@@ -5672,6 +5783,7 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
         if fishRingText.Visible then fishRingText.Visible = false end
     end
 end))
+end
 
 table.insert(activeConnections, UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
