@@ -2023,6 +2023,16 @@ end
 function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     if not matchedIsland or not matchedIsland.pos then return false end
 
+    -- Nếu nhân vật đã ở đúng đảo mục tiêu và đã đứng tại vị trí câu rồi thì KHÔNG teleport lại tránh gián đoạn cần câu
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root and secretBossState.currentMap == matchedIsland.islandName and secretBossState.standPos then
+        local d = (root.Position - secretBossState.standPos).Magnitude
+        if d < 70 then
+            return true
+        end
+    end
+
     -- Kiểm tra nếu người chơi có chọn săn ít nhất 1 boss ở đảo này không
     local hasTargetInIsland = false
     for _, b in ipairs(matchedIsland.bosses) do
@@ -2093,6 +2103,8 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
             wp.CanCollide = true
         end
 
+        secretBossState.standPos = standPos
+
         -- Khởi động quăng cần câu sau 2.5s hạ cánh
         lastCastTime = tick() + 2.5
         CancelAndRecastRod()
@@ -2160,6 +2172,7 @@ function secretBossState.HandleChatMessage(msg)
         secretBossState.active = false
         secretBossState.currentMap = nil
         secretBossState.targetIsland = nil
+        secretBossState.standPos = nil
         secretBossState.statusText = "Tất cả Secret Boss đã despawn. Chờ đợt mới..."
         ShowNotification("Secret Boss Despawn", "Tất cả Secret Boss đã biến mất! Hệ thống đang chờ đợt xuất hiện tiếp theo.", "WARN", 7)
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
@@ -2301,12 +2314,14 @@ function secretBossState.ScanChatHistory()
     -- Nếu có tin nhắn Boss xuất hiện và tin Spawn xuất hiện sau tin Despawn (hoặc không có tin despawn nào sau đó)
     if latestSpawn and (latestDespawnIndex < latestSpawnIndex) then
         local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-        local dist = root and (root.Position - latestSpawn.island.pos).Magnitude or 9999
-        if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 70 then
+        local targetPos = secretBossState.standPos or latestSpawn.island.pos
+        local dist = root and (root.Position - targetPos).Magnitude or 9999
+        if secretBossState.currentMap ~= latestSpawn.island.islandName or dist > 150 then
             secretBossState.Teleport(latestSpawn.island, latestSpawn.bossName)
         end
         return true
     elseif latestDespawnIndex > latestSpawnIndex and latestDespawnIndex ~= -1 then
+        secretBossState.standPos = nil
         secretBossState.statusText = "Boss gần nhất đã despawn. Đang chờ đợt mới..."
         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
             statusLabelSecretBoss.Set(secretBossState.statusText)
@@ -6018,8 +6033,9 @@ task.spawn(function()
                 local wIsland, wName = secretBossState.DetectWeather()
                 if wIsland then
                     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-                    local dist = root and (root.Position - wIsland.pos).Magnitude or 9999
-                    if secretBossState.currentMap ~= wIsland.islandName or dist > 70 then
+                    local targetPos = secretBossState.standPos or wIsland.pos
+                    local dist = root and (root.Position - targetPos).Magnitude or 9999
+                    if secretBossState.currentMap ~= wIsland.islandName or dist > 150 then
                         secretBossState.Teleport(wIsland, wName)
                     end
                 else
