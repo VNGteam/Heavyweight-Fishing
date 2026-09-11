@@ -1249,8 +1249,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Tre (Bamboo Isle)",
         weather = "Thunderstorm (Bão Sấm)",
-        patterns = {"bamboo", "tre", "thunderstorm"},
-        pos = Vector3.new(-1223.0, 7.3, -24.1),
+        patterns = {"bamboo", "đảo tre", "dao tre", "đảo 2", "dao 2"},
+        bossPatterns = {"scarlet fish", "elder scarlet", "crimson electric eel", "electric eel"},
+        pos = Vector3.new(-1236.8, 8.5, -174.1),
+        lookAt = Vector3.new(-1250.0, 7.0, -220.0),
         bosses = {
             {name = "Scarlet Fish", reward = "+3 Gems"},
             {name = "Elder Scarlet Fish", reward = "+5 Gems"},
@@ -1260,8 +1262,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Phóng Xạ (Fallout Isle)",
         weather = "Rainy (Trời Mưa)",
-        patterns = {"fallout", "phóng xạ", "rainy"},
-        pos = Vector3.new(65.5, 8.8, 1181.3),
+        patterns = {"fallout", "phóng xạ", "phong xa", "đảo 3", "dao 3"},
+        bossPatterns = {"alligator gar", "verdant alligator", "verdant grouper", "verdant bonefang", "bonefang"},
+        pos = Vector3.new(138.4, 9.5, 1179.7),
+        lookAt = Vector3.new(165.0, 7.5, 1220.0),
         bosses = {
             {name = "Verdant Alligator Gar", reward = "+3 Gems | Skill 25%"},
             {name = "Verdant Grouper", reward = "+3 Gems | Skill 25%"},
@@ -1271,8 +1275,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Cá Chép (Perch Isle)",
         weather = "Windy (Trời Gió)",
-        patterns = {"perch", "cá chép", "windy"},
-        pos = Vector3.new(-62.0, 11.9, -1321.4),
+        patterns = {"perch", "cá chép", "ca chep", "đảo 5", "dao 5"},
+        bossPatterns = {"flying fish empress", "flying fish emperor", "flying fish"},
+        pos = Vector3.new(-9.5, 9.5, -1330.0),
+        lookAt = Vector3.new(15.0, 7.5, -1370.0),
         bosses = {
             {name = "Flying Fish Empress", reward = "+10 Gems | Skill 10%"},
             {name = "Flying Fish Emperor", reward = "+10 Gems | Skill 10%"},
@@ -1281,8 +1287,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Băng Giá (Frost Isle)",
         weather = "Snowy (Bão Tuyết)",
-        patterns = {"frost", "băng", "snowy"},
-        pos = Vector3.new(-1366.0, 11.9, -1495.4),
+        patterns = {"frost", "băng giá", "bang gia", "đảo băng", "dao bang", "đảo 6", "dao 6"},
+        bossPatterns = {"reborn puffer beast", "puffer beast", "frost kingfish"},
+        pos = Vector3.new(-1400.4, 9.5, -1490.6),
+        lookAt = Vector3.new(-1430.0, 7.5, -1530.0),
         bosses = {
             {name = "Reborn Puffer Beast", reward = "+10 Gems"},
             {name = "Frost Kingfish", reward = "+10 Gems | Skill Drop"},
@@ -1291,8 +1299,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Quả Dừa (Coconut Isle)",
         weather = "Foggy (Sương Mù)",
-        patterns = {"coconut", "dừa", "foggy"},
-        pos = Vector3.new(1493.6, 9.1, -1430.6),
+        patterns = {"coconut", "quả dừa", "qua dua", "đảo dừa", "dao dua", "đảo 7", "dao 7"},
+        bossPatterns = {"tigerfang whale", "tigerfang", "heaven piercer turtle", "piercer turtle"},
+        pos = Vector3.new(1446.0, 9.5, -1408.0),
+        lookAt = Vector3.new(1465.0, 7.5, -1445.0),
         bosses = {
             {name = "Tigerfang Whale", reward = "+5 Gems | Skill Drop"},
             {name = "Heaven Piercer Turtle", reward = "+5 Gems"},
@@ -1301,8 +1311,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Hổ Phách (Amber Isle)",
         weather = "Blazing Sun (Nắng Gắt)",
-        patterns = {"amber", "hổ phách", "blazing sun", "blazing"},
-        pos = Vector3.new(1259.4, 9.1, 1401.5),
+        patterns = {"amber", "hổ phách", "ho phach", "đảo 8", "dao 8"},
+        bossPatterns = {"draconic koi", "draconic", "sanguine fish", "sanguine"},
+        pos = Vector3.new(1292.7, 8.5, 1497.4),
+        lookAt = Vector3.new(1315.0, 7.0, 1535.0),
         bosses = {
             {name = "Draconic Koi", reward = "+5 Gems"},
             {name = "Sanguine Fish", reward = "+20 Gems | Skill 10%"},
@@ -1311,8 +1323,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Chiến Trường (Battlefield)",
         weather = "Boss Realm",
-        patterns = {"battlefield", "chiến trường"},
-        pos = Vector3.new(1393.5, 11.3, 169.6),
+        patterns = {"battlefield", "chiến trường", "chien truong", "đảo 9", "dao 9"},
+        bossPatterns = {"primordial kunfish", "kunfish overlord", "kunfish", "warbringer shark", "warbringer"},
+        pos = Vector3.new(1393.5, 11.5, 169.6),
+        lookAt = Vector3.new(1425.0, 8.0, 195.0),
         bosses = {
             {name = "Primordial Kunfish Overlord", reward = "+30 Gems"},
             {name = "Warbringer Shark", reward = "+25 Gems"},
@@ -1321,8 +1335,10 @@ local secretBossDatabase = {
     {
         islandName = "Đảo Đỉnh Sương Mù (Mistpeak)",
         weather = "Mountain Peak",
-        patterns = {"mistpeak", "sương mù"},
-        pos = Vector3.new(2660.2, 8.8, -86.7),
+        patterns = {"mistpeak", "đỉnh sương mù", "dinh suong mu", "đảo 10", "dao 10"},
+        bossPatterns = {"mountain fish"},
+        pos = Vector3.new(2660.2, 9.0, -86.7),
+        lookAt = Vector3.new(2685.0, 7.0, -110.0),
         bosses = {
             {name = "Mountain Fish", reward = "+20 Gems | Skill 5%"},
         }
@@ -1330,8 +1346,10 @@ local secretBossDatabase = {
     {
         islandName = "Vùng Biển Sâu (Secret Ocean)",
         weather = "Special Event",
-        patterns = {"octo", "bạch tuộc", "octoparasite", "buoy"},
-        pos = Vector3.new(1608.2, 5.0, -218.3),
+        patterns = {"octo", "bạch tuộc", "bach tuoc", "phao", "buoy", "secret ocean"},
+        bossPatterns = {"octoparasitic fish", "octoparasitic", "octoparasite"},
+        pos = Vector3.new(1608.2, 5.5, -218.3),
+        lookAt = Vector3.new(1635.0, 5.0, -235.0),
         bosses = {
             {name = "Octoparasitic Fish", reward = "+50 Gems | Secret"},
         }
@@ -1635,6 +1653,38 @@ local function CancelAndRecastRod()
     end)
 end
 
+local function DetectIslandFromText(text)
+    if not text or typeof(text) ~= "string" then return nil, nil end
+    local lower = text:lower()
+
+    -- 1. ƯU TIÊN CAO NHẤT: Khớp theo TÊN CHÍNH XÁC của Boss
+    for _, entry in ipairs(secretBossDatabase) do
+        if entry.bossPatterns then
+            for _, bp in ipairs(entry.bossPatterns) do
+                if lower:find(bp, 1, true) then
+                    return entry, bp
+                end
+            end
+        end
+        for _, b in ipairs(entry.bosses) do
+            if lower:find(b.name:lower(), 1, true) then
+                return entry, b.name
+            end
+        end
+    end
+
+    -- 2. Nếu không có tên Boss, khớp theo TÊN ĐẢO rõ ràng
+    for _, entry in ipairs(secretBossDatabase) do
+        for _, pat in ipairs(entry.patterns) do
+            if lower:find(pat, 1, true) then
+                return entry, nil
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 local function HandleIncomingChatMessage(msg)
     if not Config.AutoChatSecretBoss then return end
     if typeof(msg) ~= "string" or #msg == 0 then return end
@@ -1664,17 +1714,8 @@ local function HandleIncomingChatMessage(msg)
     end
 
     -- 2. Check for Spawn Announcement: Contains secret / boss / map name
-    if lower:find("secret") or lower:find("boss") or lower:find("spawned") or lower:find("appeared") then
-        local matchedIsland = nil
-        for _, entry in ipairs(secretBossDatabase) do
-            for _, pat in ipairs(entry.patterns) do
-                if lower:find(pat) then
-                    matchedIsland = entry
-                    break
-                end
-            end
-            if matchedIsland then break end
-        end
+    if lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear") then
+        local matchedIsland, detectedBossName = DetectIslandFromText(msg)
 
         if matchedIsland then
             -- Check if user selected any boss from this island
@@ -1710,17 +1751,33 @@ local function HandleIncomingChatMessage(msg)
             secretBossState.requiredPower = reqPower
             secretBossState.statusText = string.format("Đang săn tại %s (Y/c Power: %d)", matchedIsland.islandName, reqPower)
             
-            ShowNotification("PHÁT HIỆN SECRET BOSS!", string.format("Boss xuất hiện tại %s (Y/c: %d Power)! Đang bay đến câu...", matchedIsland.islandName, reqPower), "SUCCESS", 7)
+            local bossAlertName = detectedBossName and string.upper(detectedBossName) or "SECRET BOSS"
+            ShowNotification("PHÁT HIỆN " .. bossAlertName .. "!", string.format("Boss xuất hiện tại %s! Đang bay đến mép nước câu...", matchedIsland.islandName), "SUCCESS", 7)
             
             if statusLabelSecretBoss and statusLabelSecretBoss.Set then
                 statusLabelSecretBoss.Set(secretBossState.statusText)
             end
 
-            -- Teleport to island fishing area
+            -- Teleport to sea-facing pier / fishing shore
             local char = LocalPlayer.Character
             local root = char and char:FindFirstChild("HumanoidRootPart")
             if root and matchedIsland.pos then
-                root.CFrame = CFrame.new(matchedIsland.pos + Vector3.new(0, 3, 0))
+                -- 1. Đặt góc nhìn quay mặt thẳng ra biển nước lớn
+                if matchedIsland.lookAt then
+                    root.CFrame = CFrame.lookAt(matchedIsland.pos + Vector3.new(0, 2.5, 0), matchedIsland.lookAt)
+                else
+                    root.CFrame = CFrame.new(matchedIsland.pos + Vector3.new(0, 2.5, 0))
+                end
+
+                -- 2. Đặt sàn an toàn dưới chân nếu gần mặt nước
+                if waterPlatform then
+                    waterPlatform.CFrame = CFrame.new(matchedIsland.pos.X, matchedIsland.pos.Y - 1.2, matchedIsland.pos.Z)
+                    waterPlatform.CanCollide = true
+                end
+
+                -- 3. Đặt delay 2.5s trước khi quăng cần để nhân vật đứng yên và hướng mặt ra biển
+                lastCastTime = tick() + 2.5
+                CancelAndRecastRod()
             end
         end
     end
@@ -1789,16 +1846,11 @@ local function ScanExistingChatHistory()
            or lower:find("secret bosses have been despawned")
            or lower:find("secret bosses have despawned") then
             latestDespawnIndex = idx
-        elseif lower:find("secret") or lower:find("boss") or lower:find("spawned") or lower:find("appeared") then
-            for _, entry in ipairs(secretBossDatabase) do
-                for _, pat in ipairs(entry.patterns) do
-                    if lower:find(pat) then
-                        latestSpawn = {msg = msg, island = entry, index = idx}
-                        latestSpawnIndex = idx
-                        break
-                    end
-                end
-                if latestSpawn and latestSpawn.index == idx then break end
+        elseif lower:find("secret") or lower:find("boss") or lower:find("spawn") or lower:find("appear") then
+            local entry, bName = DetectIslandFromText(msg)
+            if entry then
+                latestSpawn = {msg = msg, island = entry, index = idx, bossName = bName}
+                latestSpawnIndex = idx
             end
         end
     end
