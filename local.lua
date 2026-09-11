@@ -98,6 +98,16 @@ local Config = {
     AutoCharge = true,
     InstantCatch = true,
     AntiStuckEnabled = true,
+    SmartComboEnabled = false,
+    FishHpThreshold = 500,
+    QuickCatchSkill = "Z",
+    OpenerSkill = "Z",
+    OpenerMaxCount = 1,
+    LoopSkills = "X, C",
+    EmergencyHealSkill = "V",
+    EmergencyHealHp = 40,
+    SkillEffectDelay = 1.2,
+    SmartEffectAutoDetect = true,
     AutoSkills = false,
     SelectedSkill = "One-Strike Heaven Gate",
     AutoTrainSkill = false,
@@ -1313,6 +1323,50 @@ createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
 
+createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)")
+local comboCard = createCardGroup(tabFishing)
+
+createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
+    Config.SmartComboEnabled = v
+end)
+
+createSliderRow(comboCard, "Ngưỡng Máu Cá Phân Loại", "Máu cá <= mức này sẽ kết liễu nhanh; > mức này sẽ bật combo", 100, 3000, Config.FishHpThreshold, false, " HP", function(v)
+    Config.FishHpThreshold = v
+end)
+
+createDropdownRow(comboCard, "Chiêu Bắt Nhanh (<= Ngưỡng HP)", "Tung 1 hit kết liễu ngay khi cá yếu / cá thường", {"Tắt", "Z", "X", "C", "V"}, Config.QuickCatchSkill, function(v)
+    Config.QuickCatchSkill = v
+end)
+
+createDropdownRow(comboCard, "Chiêu Mở Màn (> Ngưỡng HP)", "Chiêu tung 1 lần duy nhất đầu trận khi gặp cá to / boss", {"Tắt", "Z", "X", "C", "V"}, Config.OpenerSkill, function(v)
+    Config.OpenerSkill = v
+end)
+
+createSliderRow(comboCard, "Số Lần Dùng Chiêu Mở Màn", "Số lần tung chiêu mở màn trước khi chuyển sang đảo chiêu", 1, 3, Config.OpenerMaxCount, false, " lần", function(v)
+    Config.OpenerMaxCount = v
+end)
+
+local loopOptions = {"X, C", "X, C, V", "Z, X, C", "Z, X, C, V", "C, V", "Z, X"}
+createDropdownRow(comboCard, "Chuỗi Đảo Chiêu Luân Phiên", "Các chiêu đánh xoay vòng liên tục, tự bỏ qua chiêu đang hồi", loopOptions, Config.LoopSkills, function(v)
+    Config.LoopSkills = v
+end)
+
+createDropdownRow(comboCard, "Chiêu Hồi Máu / Cứu Nguy", "Ưu tiên tung chiêu này khi máu người chơi xuống thấp", {"Tắt", "Z", "X", "C", "V"}, Config.EmergencyHealSkill, function(v)
+    Config.EmergencyHealSkill = v
+end)
+
+createSliderRow(comboCard, "Kích Hoạt Hồi Máu Khi HP Dưới", "Ngưỡng máu người chơi cần cứu nguy khẩn cấp", 10, 80, Config.EmergencyHealHp, false, "%", function(v)
+    Config.EmergencyHealHp = v
+end)
+
+createSliderRow(comboCard, "Thời Gian Chờ Ra Chiêu", "Thời gian tối thiểu chờ hết hiệu ứng trước khi tung chiêu tiếp theo", 0.5, 3.5, Config.SkillEffectDelay, true, "s", function(v)
+    Config.SkillEffectDelay = v
+end)
+
+createToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Quan sát hoạt ảnh đòn đánh trên nhân vật để chống nuốt chiêu 100%", Config.SmartEffectAutoDetect, function(v)
+    Config.SmartEffectAutoDetect = v
+end)
+
 createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Thức (Skill Mastery Evo)")
 local trainCard = createCardGroup(tabFishing)
 local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
@@ -2028,18 +2082,25 @@ local lastSkillUsedTimes = {
     ["V"] = 0
 }
 
-local function CheckSkillReady(sk, fUI)
+local openerUsedCount = 0
+local lastComboSkillCastTime = 0
+
+local function CheckSkillReady(sk, fUI, minCooldown)
+    if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = sk:match("([ZXCVzxcv])") or sk
+    cleanKey = cleanKey:upper()
+
     local now = tick()
-    local lastUsed = lastSkillUsedTimes[sk] or 0
-    local minCooldown = Config.TrainSkillCooldown or 5.0
-    if (now - lastUsed < minCooldown) then
+    local lastUsed = lastSkillUsedTimes[cleanKey] or 0
+    local minCd = minCooldown or Config.TrainSkillCooldown or 5.0
+    if (now - lastUsed < minCd) then
         return false
     end
 
     if fUI then
         for _, desc in ipairs(fUI:GetDescendants()) do
             local nameUpper = desc.Name:upper()
-            if nameUpper == sk or (nameUpper:find("SKILL") and nameUpper:find(sk)) or (nameUpper:find("SLOT") and nameUpper:find(sk)) then
+            if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
                 if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
                     return false
                 end
@@ -2054,6 +2115,129 @@ local function CheckSkillReady(sk, fUI)
         end
     end
 
+    return true
+end
+
+local function GetFishHealth(fUI)
+    local fishID = LocalPlayer:GetAttribute("FishID")
+    if fishID and Workspace:FindFirstChild("Fishes") then
+        local f = Workspace.Fishes:FindFirstChild(fishID)
+        if f then
+            local hpVal = f:FindFirstChild("Health") or f:FindFirstChild("HP") or f:FindFirstChild("FishHealth")
+            if hpVal and (hpVal:IsA("NumberValue") or hpVal:IsA("IntValue")) then
+                return hpVal.Value
+            end
+            for _, child in ipairs(f:GetChildren()) do
+                if child.Name:find("Health") or child.Name:find("HP") then
+                    if child:IsA("NumberValue") or child:IsA("IntValue") then
+                        return child.Value
+                    end
+                end
+            end
+        end
+    end
+
+    local char = LocalPlayer.Character
+    if char then
+        for _, att in ipairs({"FishHealth", "FishHP", "TargetHealth", "BossHP", "TargetHP", "HP"}) do
+            local val = char:GetAttribute(att)
+            if val and tonumber(val) then return tonumber(val) end
+        end
+    end
+
+    if fUI then
+        for _, lblName in ipairs({"FishHP", "HPFish", "Health", "HP", "BossHP", "TargetHP"}) do
+            local d = fUI:FindFirstChild(lblName, true)
+            if d and d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
+                local num = d.Text:match("(%d+[,%d*]*)%s*/") or d.Text:match("(%d+[,%d*]*)")
+                if num then
+                    local cleanNum = num:gsub(",", "")
+                    if tonumber(cleanNum) then return tonumber(cleanNum) end
+                end
+            end
+        end
+    end
+
+    return 999999
+end
+
+local function GetPlayerHealth(fUI)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and hum.MaxHealth > 0 then
+        return (hum.Health / hum.MaxHealth) * 100
+    end
+
+    if fUI and fUI:FindFirstChild("HPPlayer") then
+        local hpP = fUI.HPPlayer
+        local pBar = hpP:FindFirstChild("ProgressionBar")
+        if pBar and pBar:FindFirstChild("Bar") then
+            return pBar.Bar.Size.X.Scale * 100
+        end
+        for _, d in ipairs(hpP:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
+                local cur, max = d.Text:match("(%d+)%s*/%s*(%d+)")
+                if cur and max and tonumber(max) > 0 then
+                    return (tonumber(cur) / tonumber(max)) * 100
+                end
+            end
+        end
+    end
+
+    return 100
+end
+
+local function IsCharacterCastingSkill()
+    local char = LocalPlayer.Character
+    if not char then return false end
+
+    for _, att in ipairs({"Casting", "UsingSkill", "SkillActive", "IsAttacking", "CastingSkill"}) do
+        if char:GetAttribute(att) == true then
+            return true
+        end
+    end
+
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local anim = hum and hum:FindFirstChildOfClass("Animator")
+    if anim then
+        local ok, tracks = pcall(function() return anim:GetPlayingAnimationTracks() end)
+        if ok and tracks then
+            for _, tr in ipairs(tracks) do
+                if tr.IsPlaying and (tr.Priority == Enum.AnimationPriority.Action or tr.Priority == Enum.AnimationPriority.Action2 or tr.Priority == Enum.AnimationPriority.Action3 or tr.Priority == Enum.AnimationPriority.Action4) then
+                    local animName = tr.Name:lower()
+                    if animName:find("skill") or animName:find("attack") or animName:find("cast") or animName:find("strike") or animName:find("special") then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    return false
+end
+
+local function CastSkill(sk)
+    if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = sk:match("([ZXCVzxcv])") or sk
+    cleanKey = cleanKey:upper()
+
+    if Events:FindFirstChild("UseSkill") then
+        Events.UseSkill:FireServer(cleanKey)
+    end
+    if Events:FindFirstChild("TriggerMinigameSkill") then
+        Events.TriggerMinigameSkill:FireServer(cleanKey)
+    end
+    pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        local kCode = Enum.KeyCode[cleanKey]
+        if vim and kCode then
+            vim:SendKeyEvent(true, kCode, false, game)
+            task.wait(0.02)
+            vim:SendKeyEvent(false, kCode, false, game)
+        end
+    end)
+    lastSkillUsedTimes[cleanKey] = tick()
+    lastComboSkillCastTime = tick()
     return true
 end
 local lastGachaTime = 0
@@ -2163,6 +2347,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
         if isMinigame and not wasMinigame then
             minigameDurationTracker = now
+            openerUsedCount = 0
         elseif not isMinigame then
             minigameDurationTracker = 0
         end
@@ -2311,6 +2496,68 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                     -- Đợi 0.4s trước khi cast chiêu tiếp theo để không bị nuốt animation
                                     break
+                                end
+                            end
+                        end
+                    end
+                elseif Config.SmartComboEnabled then
+                    local isBusy = false
+                    if (now - lastComboSkillCastTime < (Config.SkillEffectDelay or 1.2)) then
+                        isBusy = true
+                    elseif Config.SmartEffectAutoDetect and IsCharacterCastingSkill() then
+                        isBusy = true
+                    end
+
+                    if not isBusy then
+                        -- BƯỚC 1: CỨU NGUY HỒI MÁU KHI HP NGƯỜI CHƠI THẤP
+                        local healTriggered = false
+                        if Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" then
+                            local playerHp = GetPlayerHealth(fUI)
+                            if playerHp <= (Config.EmergencyHealHp or 40) then
+                                if CheckSkillReady(Config.EmergencyHealSkill, fUI, 1.0) then
+                                    CastSkill(Config.EmergencyHealSkill)
+                                    healTriggered = true
+                                end
+                            end
+                        end
+
+                        if not healTriggered then
+                            -- BƯỚC 2: PHÂN LOẠI THEO MÁU CÁ
+                            local fishHp = GetFishHealth(fUI)
+                            local threshold = Config.FishHpThreshold or 500
+
+                            if fishHp <= threshold then
+                                -- Máu cá <= 500 HP: Cá nhỏ/thường/yếu -> Tung ngay chiêu dứt điểm nhanh (Quick Catch)
+                                if Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" then
+                                    if CheckSkillReady(Config.QuickCatchSkill, fUI, 1.0) then
+                                        CastSkill(Config.QuickCatchSkill)
+                                    end
+                                end
+                            else
+                                -- Máu cá > 500 HP: Cá to/Boss -> Bật chuỗi Combo chiến thuật
+                                local openerTriggered = false
+                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and (openerUsedCount < (Config.OpenerMaxCount or 1)) then
+                                    if CheckSkillReady(Config.OpenerSkill, fUI, 1.0) then
+                                        CastSkill(Config.OpenerSkill)
+                                        openerUsedCount = openerUsedCount + 1
+                                        openerTriggered = true
+                                    end
+                                end
+
+                                if not openerTriggered then
+                                    -- Chuỗi đảo chiêu luân phiên (Core Loop)
+                                    local loopKeys = {}
+                                    for k in string.gmatch(Config.LoopSkills or "X, C", "([ZXCVzxcv])") do
+                                        table.insert(loopKeys, k:upper())
+                                    end
+                                    if #loopKeys == 0 then loopKeys = {"X", "C"} end
+
+                                    for _, sk in ipairs(loopKeys) do
+                                        if CheckSkillReady(sk, fUI, 1.0) then
+                                            CastSkill(sk)
+                                            break
+                                        end
+                                    end
                                 end
                             end
                         end
@@ -2887,4 +3134,4 @@ table.insert(activeConnections, UserInputService.InputBegan:Connect(function(inp
     end
 end))
 
-ShowNotification("VIỆT HOÁ V1.2", "Heavyweight Fishing đã cập nhật Cần Bí Mật, Mồi Thần Thoại & Anti-Stuck!", "SUCCESS", 6)
+ShowNotification("VIỆT HOÁ V1.3", "Heavyweight Fishing đã cập nhật Hệ Thống Smart Combo Chiến Thuật!", "SUCCESS", 6)
