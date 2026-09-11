@@ -4149,6 +4149,7 @@ local comboState = {
     openerUsedCount = 0,
     loopIndex = 1,
     lastCastTime = 0,
+    minigameStartTime = 0,
     usedTimes = {
         ["Z"] = 0,
         ["X"] = 0,
@@ -4596,6 +4597,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             minigameDurationTracker = now
             comboState.openerUsedCount = 0
             comboState.loopIndex = 1
+            comboState.minigameStartTime = now
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             if wasMinigame and secretBossState.isCatchingTarget then
@@ -4837,80 +4839,72 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         lastProgressionTime = now
                     end
 
-                    if Config.SmartComboEnabled then
-                    local isBusy = false
-                    if (now - comboState.lastCastTime < (Config.SkillEffectDelay or 1.2)) then
-                        isBusy = true
-                    elseif Config.SmartEffectAutoDetect and IsCharacterCastingSkill() then
-                        isBusy = true
-                    end
+                    if Config.SmartComboEnabled and (now - lastSkillTime >= 0.15) then
+                        local playerHp = GetPlayerHealth(fUI)
 
-                    if not isBusy then
-                        -- BƯỚC 1: CỨU NGUY HỒI MÁU KHI HP NGƯỜI CHƠI THẤP
-                        local healTriggered = false
-                        if Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" then
-                            local playerHp = GetPlayerHealth(fUI)
-                            if playerHp <= (Config.EmergencyHealHp or 40) then
-                                if CheckSkillReady(Config.EmergencyHealSkill, fUI, 0.8) then
-                                    CastSkill(Config.EmergencyHealSkill)
-                                    healTriggered = true
-                                end
+                        -- BƯỚC 1: CỨU NGUY HỒI MÁU (Khi máu người chơi <= EmergencyHealHp, ví dụ <= 31%)
+                        local isHealing = false
+                        if Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" and playerHp <= (Config.EmergencyHealHp or 31) then
+                            local hKey = Config.EmergencyHealSkill:match("([ZXCVzxcv])")
+                            if hKey then
+                                hKey = hKey:upper()
+                                if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(hKey) end
+                                if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(hKey) end
+                                isHealing = true
                             end
                         end
 
-                        if not healTriggered then
+                        if not isHealing then
                             -- BƯỚC 2: PHÂN LOẠI THEO MÁU CÁ
                             local fishHp = GetFishHealth(fUI)
-                            local threshold = Config.FishHpThreshold or 500
+                            local threshold = Config.FishHpThreshold or 1304
 
                             if fishHp <= threshold then
-                                -- Máu cá <= threshold (ví dụ <= 900 HP): Ưu tiên tung chiêu kết liễu
-                                local finisherCasted = false
+                                -- Máu cá <= Ngưỡng: Tung chiêu kết liễu và các chiêu dứt điểm nhanh
                                 if Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" then
-                                    if CheckSkillReady(Config.QuickCatchSkill, fUI, 0.8) then
-                                        CastSkill(Config.QuickCatchSkill)
-                                        finisherCasted = true
+                                    local qKey = Config.QuickCatchSkill:match("([ZXCVzxcv])")
+                                    if qKey then
+                                        qKey = qKey:upper()
+                                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(qKey) end
+                                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(qKey) end
                                     end
                                 end
-                                -- Nếu chiêu kết liễu đang hồi, tiếp tục tung chuỗi chiêu Loop (X, V) để dứt điểm cá, không đứng im!
-                                if not finisherCasted then
-                                    local loopKeys = {}
-                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
-                                        table.insert(loopKeys, k:upper())
-                                    end
-                                    if #loopKeys == 0 then loopKeys = {"X", "V"} end
-                                    ExecuteComboLoop(loopKeys, fUI)
+                                for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
+                                    local lk = k:upper()
+                                    if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(lk) end
+                                    if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(lk) end
                                 end
                             else
-                                -- Máu cá > threshold (Cá to / Boss 3k HP): Bật chuỗi Combo chiến thuật
-                                local openerTriggered = false
-                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and (comboState.openerUsedCount < (Config.OpenerMaxCount or 1)) then
-                                    if CheckSkillReady(Config.OpenerSkill, fUI, 0.8) then
-                                        CastSkill(Config.OpenerSkill)
-                                        comboState.openerUsedCount = comboState.openerUsedCount + 1
-                                        openerTriggered = true
-                                    end
-                                end
+                                -- Máu cá > Ngưỡng (Cá to / Boss):
+                                -- Giai đoạn mở màn: Tung chiêu mở màn trong khoảng thời gian đầu trận
+                                local minigameElapsed = now - (comboState.minigameStartTime or now)
+                                local openerDuration = (Config.SkillEffectDelay or 1.2) * (Config.OpenerMaxCount or 1)
 
-                                if not openerTriggered then
-                                    -- Chuỗi đảo chiêu luân phiên (Core Loop: X, V)
-                                    local loopKeys = {}
-                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
-                                        table.insert(loopKeys, k:upper())
+                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and minigameElapsed < openerDuration then
+                                    local opKey = Config.OpenerSkill:match("([ZXCVzxcv])")
+                                    if opKey then
+                                        opKey = opKey:upper()
+                                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(opKey) end
+                                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(opKey) end
                                     end
-                                    if #loopKeys == 0 then loopKeys = {"X", "V"} end
-                                    ExecuteComboLoop(loopKeys, fUI)
+                                else
+                                    -- Giai đoạn đảo chiêu luân phiên: CHỈ gửi các chiêu trong Config.LoopSkills (ví dụ X, V)
+                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
+                                        local lk = k:upper()
+                                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(lk) end
+                                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(lk) end
+                                    end
                                 end
                             end
                         end
+                        lastSkillTime = now
+                    elseif Config.AutoSkills and (now - lastSkillTime >= 0.15) then
+                        for _, sk in ipairs({"Z", "X", "C", "V"}) do
+                            if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(sk) end
+                            if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(sk) end
+                        end
+                        lastSkillTime = now
                     end
-                elseif Config.AutoSkills and (now - lastSkillTime >= 0.15) then
-                    for _, sk in ipairs({"Z", "X", "C", "V"}) do
-                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(sk) end
-                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(sk) end
-                    end
-                    lastSkillTime = now
-                end
             end
             end -- Kết thúc check not skipTriggered
         elseif isFishing then
