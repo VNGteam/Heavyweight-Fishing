@@ -1732,6 +1732,112 @@ function secretBossState.DetectIsland(text)
     return nil, nil
 end
 
+function secretBossState.FindWaterSpot(centerPos, preferredLookAt)
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.IgnoreWater = false
+
+    local filterList = {}
+    if LocalPlayer.Character then table.insert(filterList, LocalPlayer.Character) end
+    local wp = Workspace:FindFirstChild("IdenticalWaterPlatform")
+    if wp then table.insert(filterList, wp) end
+    rp.FilterDescendantsInstances = filterList
+
+    -- 1. Hướng nhìn ưu tiên
+    local preferredDir = nil
+    if preferredLookAt then
+        local pDir = Vector3.new(preferredLookAt.X - centerPos.X, 0, preferredLookAt.Z - centerPos.Z)
+        if pDir.Magnitude > 0.1 then
+            preferredDir = pDir.Unit
+        end
+    end
+
+    local angles = {}
+    local baseAngle = 0
+    if preferredDir then
+        baseAngle = math.atan2(preferredDir.Z, preferredDir.X)
+    end
+
+    -- Đặt góc ưu tiên lên đầu tiên, sau đó tỏa ra xung quanh theo nan hoa 16 hướng
+    table.insert(angles, baseAngle)
+    for i = 1, 8 do
+        local offset = (i * math.pi / 8)
+        table.insert(angles, baseAngle + offset)
+        if offset < math.pi then
+            table.insert(angles, baseAngle - offset)
+        end
+    end
+
+    -- Bán kính quét mở rộng từ gần đến xa (15 đến 220 studs)
+    local testDistances = {15, 30, 50, 75, 105, 140, 180, 220}
+    local bestWaterHit = nil
+
+    for _, dist in ipairs(testDistances) do
+        for _, ang in ipairs(angles) do
+            local dirX = math.cos(ang)
+            local dirZ = math.sin(ang)
+            local sampleX = centerPos.X + dirX * dist
+            local sampleZ = centerPos.Z + dirZ * dist
+
+            -- Bắn tia từ trên trời xuống để tìm Nước
+            local hit = Workspace:Raycast(Vector3.new(sampleX, 45, sampleZ), Vector3.new(0, -75, 0), rp)
+            if hit then
+                local isWater = (hit.Material == Enum.Material.Water)
+                if not isWater and hit.Instance then
+                    local nameLower = hit.Instance.Name:lower()
+                    if nameLower:find("water") or nameLower:find("ocean") or nameLower:find("sea") then
+                        isWater = true
+                    end
+                end
+
+                if isWater then
+                    bestWaterHit = hit
+                    break
+                end
+            end
+        end
+        if bestWaterHit then break end
+    end
+
+    -- Nếu tìm thấy vùng nước:
+    if bestWaterHit then
+        local waterPos = bestWaterHit.Position
+        local waterLevel = waterPos.Y
+        -- Hướng từ tâm đảo ra vùng nước
+        local outwardDir = Vector3.new(waterPos.X - centerPos.X, 0, waterPos.Z - centerPos.Z)
+        if outwardDir.Magnitude > 0.1 then
+            outwardDir = outwardDir.Unit
+        else
+            outwardDir = preferredDir or Vector3.new(0, 0, 1)
+        end
+
+        -- Dò ngược từ vùng nước về phía tâm đảo để tìm mép bờ đất (Shoreline)
+        local shorePos = nil
+        for backStep = 1, 25 do
+            local testBackPos = waterPos - outwardDir * (backStep * 2.0)
+            local groundHit = Workspace:Raycast(Vector3.new(testBackPos.X, 45, testBackPos.Z), Vector3.new(0, -75, 0), rp)
+            if groundHit and groundHit.Material ~= Enum.Material.Water then
+                -- Tìm thấy bờ đất liền kề nước!
+                shorePos = Vector3.new(groundHit.Position.X, groundHit.Position.Y + 2.5, groundHit.Position.Z)
+                break
+            end
+        end
+
+        -- Điểm đứng lý tưởng:
+        -- Nếu tìm được mép bờ, đứng ở mép bờ nhìn thẳng ra biển
+        -- Nếu không tìm được mép bờ (đảo phẳng chìm hoặc xa bờ), đứng ngay sát mép nước
+        local standPos = shorePos or Vector3.new(waterPos.X - outwardDir.X * 4, waterLevel + 2.5, waterPos.Z - outwardDir.Z * 4)
+        local lookTarget = standPos + outwardDir * 50
+
+        return standPos, lookTarget, waterLevel, true
+    end
+
+    -- Fallback: Nếu không quét ra tia nước, dùng vị trí mặc định
+    local fallbackStand = centerPos + Vector3.new(0, 2.5, 0)
+    local fallbackLook = preferredLookAt or (centerPos + Vector3.new(0, 2.5, 50))
+    return fallbackStand, fallbackLook, centerPos.Y, false
+end
+
 function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     if not matchedIsland or not matchedIsland.pos then return false end
 
@@ -1763,7 +1869,7 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     secretBossState.statusText = string.format("Đang săn tại %s [%s]", matchedIsland.islandName, matchedIsland.weather or "Thời Tiết")
 
     local alertName = detectedName and string.upper(tostring(detectedName)) or "SECRET BOSS / THỜI TIẾT"
-    ShowNotification("PHÁT HIỆN " .. alertName .. "!", string.format("Đang bay đến %s để câu boss...", matchedIsland.islandName), "SUCCESS", 7)
+    ShowNotification("PHÁT HIỆN " .. alertName .. "!", string.format("Đang bay đến %s và tự động dò mép nước câu...", matchedIsland.islandName), "SUCCESS", 7)
 
     if statusLabelSecretBoss and statusLabelSecretBoss.Set then
         statusLabelSecretBoss.Set(secretBossState.statusText)
@@ -1773,17 +1879,20 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root and matchedIsland.pos then
-        -- 1. Đặt góc nhìn quay mặt thẳng ra biển nước lớn
-        if matchedIsland.lookAt then
-            root.CFrame = CFrame.lookAt(matchedIsland.pos + Vector3.new(0, 2.5, 0), matchedIsland.lookAt)
-        else
-            root.CFrame = CFrame.new(matchedIsland.pos + Vector3.new(0, 2.5, 0))
-        end
+        -- 1. Quét tìm mép nước thực tế trên đảo
+        local standPos, lookTarget, waterY, foundWater = secretBossState.FindWaterSpot(matchedIsland.pos, matchedIsland.lookAt)
+
+        root.CFrame = CFrame.lookAt(standPos, lookTarget)
 
         -- 2. Đặt sàn an toàn dưới chân nếu gần mặt nước
-        if waterPlatform then
-            waterPlatform.CFrame = CFrame.new(matchedIsland.pos.X, matchedIsland.pos.Y - 1.2, matchedIsland.pos.Z)
-            waterPlatform.CanCollide = true
+        local wp = Workspace:FindFirstChild("IdenticalWaterPlatform")
+        if wp then
+            wp.CFrame = CFrame.new(standPos.X, (waterY or standPos.Y) - 1.2, standPos.Z)
+            wp.CanCollide = true
+        end
+
+        if foundWater then
+            ShowNotification("MÉP NƯỚC CÂU CÁ", string.format("Đã dò thấy vùng nước! Nhân vật đã vào vị trí mép bờ tại %s.", matchedIsland.islandName), "SUCCESS", 5)
         end
 
         -- 3. Khởi động quăng cần câu sau 2.5s hạ cánh
@@ -3127,6 +3236,26 @@ createButtonRow(chatBossCard, "Quét Lại Lịch Sử Chat & Boss", "Kiểm tra
     local found = secretBossState.ScanChatHistory()
     if not found then
         ShowNotification("Kết Quả Quét", "Không tìm thấy Secret Boss nào đang hoạt động trong lịch sử chat.", "INFO", 5)
+    end
+end)
+
+createButtonRow(chatBossCard, "Dò Tìm & Bay Đến Mép Nước", "Tự động quét tia 360 độ tìm vùng nước và đưa nhân vật ra sát mép bờ câu", "Dò Mép Nước", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        local standPos, lookTarget, waterY, found = secretBossState.FindWaterSpot(root.Position, root.CFrame.Position + root.CFrame.LookVector * 50)
+        if found then
+            root.CFrame = CFrame.lookAt(standPos, lookTarget)
+            local wp = Workspace:FindFirstChild("IdenticalWaterPlatform")
+            if wp then
+                wp.CFrame = CFrame.new(standPos.X, (waterY or standPos.Y) - 1.2, standPos.Z)
+                wp.CanCollide = true
+            end
+            ShowNotification("Mép Nước", "Đã tìm thấy vùng nước và bay ra sát mép bờ câu!", "SUCCESS", 5)
+            CancelAndRecastRod()
+        else
+            ShowNotification("Mép Nước", "Không tìm thấy vùng nước trong bán kính 220 studs!", "WARN", 5)
+        end
     end
 end)
 
