@@ -140,7 +140,8 @@ local Config = {
     AutoFarmSecretBoss = false,
     SelectedBoss = "Enzo",
     
-    -- TỰ ĐỘNG SĂN SECRET BOSS THEO CHAT
+    -- TỰ ĐỘNG SĂN SECRET BOSS THEO CHAT & TẠI ĐẢO
+    AutoHuntBoss = false,
     AutoChatSecretBoss = false,
     AutoServerHopOnDespawn = false,
     FastSkipNonBoss = true,
@@ -271,9 +272,14 @@ local ConfigLabelMap = {
     ["Tự Động Trang Bị Pháp Bảo Tốt Nhất"] = "AutoEquipBestOrb",
 
     -- Săn Secret Boss
+    ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
+    ["Bật Săn Secret Boss (Chat Sniper)"] = "AutoChatSecretBoss",
     ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
+    ["Giật Cần Thả Lại (Fast Skip Cá Thường)"] = "FastSkipNonBoss",
     ["Bỏ Qua Cá Thường (Fast Skip)"] = "FastSkipNonBoss",
+    ["Kiểm Tra Lực Cần (Power Check)"] = "SecretBossCheckPower",
     ["Chỉ Săn Khi Đủ Lực Cần (Power Check)"] = "SecretBossCheckPower",
+    ["Tự Đổi Server Khi Hết Boss (Auto-Hop)"] = "AutoServerHopOnDespawn",
     ["Đổi Server Khi Hết Secret Boss"] = "AutoServerHopOnDespawn",
 
     -- Thần linh
@@ -2819,39 +2825,53 @@ createButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đ�
     end
 end)
 
-createCategoryHeader(tabBoss, "🎯 TỰ ĐỘNG SĂN SECRET BOSS THEO CHAT")
+createCategoryHeader(tabBoss, "🎯 CHẾ ĐỘ SĂN SECRET BOSS & LỌC CÁ")
 local chatBossCard = createCardGroup(tabBoss)
 
-createToggleRow(chatBossCard, "Bật Săn Secret Boss (Chat Sniper)", "Tự nghe tin nhắn chat server, bay đến đảo và săn boss", Config.AutoChatSecretBoss, function(v)
+createToggleRow(chatBossCard, "Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)", "Tự động quăng cần và giật bỏ cá thường, chỉ câu trúng Boss mục tiêu", Config.AutoHuntBoss, function(v)
+    Config.AutoHuntBoss = v
+    if v then
+        secretBossState.active = true
+        secretBossState.statusText = "Đang săn boss tại vị trí hiện tại (Tự quăng cần & lọc cá)..."
+        if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+            statusLabelSecretBoss.Set(secretBossState.statusText)
+        end
+        ShowNotification("Săn Boss", "Đã BẬT Chế Độ Săn Boss! Tự quăng cần và giật bỏ cá thường.", "SUCCESS", 5)
+    else
+        if not Config.AutoChatSecretBoss then
+            secretBossState.active = false
+        end
+        if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+            statusLabelSecretBoss.Set("Đã tắt chế độ săn boss.")
+        end
+        ShowNotification("Săn Boss", "Đã TẮT Chế Độ Săn Boss.", "INFO")
+    end
+end)
+
+createToggleRow(chatBossCard, "Tự Động Bay Theo Chat (Chat Sniper)", "Tự nghe tin nhắn chat server, khi có boss thì tự bay đến đảo có boss", Config.AutoChatSecretBoss, function(v)
     Config.AutoChatSecretBoss = v
     if v then
-        ShowNotification("Săn Secret Boss", "Đang kiểm tra lịch sử chat và lắng nghe thông báo Server...", "SUCCESS", 5)
-        -- TỰ ĐỘNG KIỂM TRA LỊCH SỬ CHAT TRƯỚC ĐÓ XEM BOSS CÒN KHÔNG
+        ShowNotification("Chat Sniper", "Đang lắng nghe thông báo Boss từ chat server...", "SUCCESS", 4)
         task.spawn(function()
             task.wait(0.3)
             local found = ScanExistingChatHistory()
             if not found then
-                if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                    statusLabelSecretBoss.Set("Đang chờ thông báo Boss mới...")
+                if statusLabelSecretBoss and statusLabelSecretBoss.Set and not Config.AutoHuntBoss then
+                    statusLabelSecretBoss.Set("Đang chờ thông báo Boss mới từ Chat...")
                 end
             end
         end)
     else
-        secretBossState.active = false
-        if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-            statusLabelSecretBoss.Set("Đã tắt chế độ săn.")
+        if not Config.AutoHuntBoss then
+            secretBossState.active = false
+            if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+                statusLabelSecretBoss.Set("Đã tắt Chat Sniper.")
+            end
         end
     end
 end)
 
-createButtonRow(chatBossCard, "Quét Lại Lịch Sử Chat & Boss", "Kiểm tra lại lịch sử chat xem có Boss nào đang hoạt động không", "Quét Ngay", function()
-    local found = ScanExistingChatHistory()
-    if not found then
-        ShowNotification("Kết Quả Quét", "Không tìm thấy Secret Boss nào đang hoạt động trong lịch sử chat.", "INFO", 5)
-    end
-end)
-
-createToggleRow(chatBossCard, "Giật Cần Thả Lại (Fast Skip Cá Thường)", "Nếu cắn câu không phải Secret Boss đã chọn thì lập tức giật cần thả lại", Config.FastSkipNonBoss, function(v)
+createToggleRow(chatBossCard, "Bỏ Qua Cá Thường (Fast Skip)", "Nếu cắn câu không phải Secret Boss đã chọn thì lập tức giật cần thả lại", Config.FastSkipNonBoss, function(v)
     Config.FastSkipNonBoss = v
 end)
 
@@ -2864,6 +2884,13 @@ createToggleRow(chatBossCard, "Tự Đổi Server Khi Hết Boss (Auto-Hop)", "T
 end)
 
 statusLabelSecretBoss = createInfoRow(chatBossCard, "Trạng Thái Săn:", secretBossState.statusText)
+
+createButtonRow(chatBossCard, "Quét Lại Lịch Sử Chat & Boss", "Kiểm tra lại lịch sử chat xem có Boss nào đang hoạt động không", "Quét Chat", function()
+    local found = ScanExistingChatHistory()
+    if not found then
+        ShowNotification("Kết Quả Quét", "Không tìm thấy Secret Boss nào đang hoạt động trong lịch sử chat.", "INFO", 5)
+    end
+end)
 
 createButtonRow(chatBossCard, "Chọn Tất Cả Secret Boss", "Bật săn toàn bộ các loài Secret Boss trên mọi đảo", "Chọn Hết", function()
     for bName, _ in pairs(Config.SecretBossTargets) do
@@ -2883,16 +2910,6 @@ createButtonRow(chatBossCard, "Bỏ Chọn Tất Cả", "Tắt săn tất cả S
         end
     end
     ShowNotification("Secret Boss", "Đã bỏ chọn tất cả Secret Boss.", "INFO")
-end)
-
-createButtonRow(chatBossCard, "Test Săn Thử Tại Đảo Hiện Tại", "Giả lập bắt đầu săn Secret Boss ngay tại vị trí bạn đang đứng", "Test Ngay", function()
-    secretBossState.active = true
-    secretBossState.currentMap = "Đảo Hiện Tại (Test)"
-    secretBossState.statusText = "Đang săn thử nghiệm tại Đảo Hiện Tại..."
-    if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-        statusLabelSecretBoss.Set(secretBossState.statusText)
-    end
-    ShowNotification("Test Săn Boss", "Đã kích hoạt chế độ săn tại đảo hiện tại! Hãy thả cần thử.", "SUCCESS", 5)
 end)
 
 -- Danh sách từng đảo và Secret Boss
@@ -4129,7 +4146,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local isCD = char:GetAttribute("CDForTheNextThrow") == true
         local isSwimming = char:GetAttribute("Swimming") == true
 
-        if (Config.AutoCast or Config.AutoTrainSkill or (Config.AutoChatSecretBoss and secretBossState.active)) and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
+        local shouldAutoFish = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+
+        if shouldAutoFish and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
             lastEquipRodTime = now
             local rodSlot = "1"
             if pData and pData:FindFirstChild("Hotbar") then
@@ -4160,6 +4179,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         elseif not isMinigame then
             minigameDurationTracker = 0
             secretBossState.webhookSentForCurrent = false
+            secretBossState.isCatchingTarget = false
+            secretBossState.minigameStartTime = 0
         end
         wasMinigame = isMinigame
 
@@ -4182,54 +4203,55 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             
             -- XỬ LÝ FAST SKIP KHI SĂN SECRET BOSS (NẾU KHÔNG PHẢI BOSS MỤC TIÊU THÌ GIẬT CẦN THẢ LẠI)
             local skipTriggered = false
-            -- Tuyệt đối KHÔNG tự động giật cần nếu người dùng đang bật Smart Combo hoặc khi con cá là cá to (> threshold)
-            local curFishHp = GetFishHealth(fUI)
-            local isBigFish = (curFishHp > (Config.FishHpThreshold or 500)) and (curFishHp < 999990)
+            local isHunting = Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
 
-            if Config.AutoChatSecretBoss and secretBossState.active and Config.FastSkipNonBoss and not Config.SmartComboEnabled and not isBigFish then
+            if isHunting and Config.FastSkipNonBoss then
                 if secretBossState.minigameStartTime == 0 then
                     secretBossState.minigameStartTime = now
                 end
-                
+
                 local hookedFish = GetCurrentHookedFishName()
-                if (now - secretBossState.minigameStartTime >= 0.25) and (now - secretBossState.lastSkipTime >= 1.0) then
-                    if hookedFish then
-                        if Config.SecretBossTargets[hookedFish] == true then
-                            -- Đúng Secret Boss mục tiêu!
-                            secretBossState.isCatchingTarget = true
-                            if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                                statusLabelSecretBoss.Set("🎯 ĐANG CÂU BOSS: " .. hookedFish .. "!")
-                            end
-                            if Config.WebhookEnabled and Config.WebhookNotifyBoss and not secretBossState.webhookSentForCurrent then
-                                secretBossState.webhookSentForCurrent = true
-                                SendDiscordWebhook(
-                                    "🚨 PHÁT HIỆN SECRET BOSS!",
-                                    "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng Secret Boss: **" .. tostring(hookedFish) .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
-                                    15158332,
-                                    {
-                                        { name = "🐟 Boss Mục Tiêu", value = tostring(hookedFish), inline = true },
-                                        { name = "📍 Bản Đồ", value = tostring(secretBossState.currentMap or "Đảo Hiện Tại"), inline = true },
-                                        { name = "⏰ Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
-                                    }
-                                )
-                            end
-                        else
-                            -- Không phải Secret Boss -> Giật cần thả lại ngay!
-                            secretBossState.lastSkipTime = now
-                            secretBossState.minigameStartTime = 0
-                            skipTriggered = true
-                            if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                                statusLabelSecretBoss.Set("Bỏ qua cá thường (" .. hookedFish .. "), đang giật cần thả lại...")
-                            end
-                            CancelAndRecastRod()
-                        end
-                    elseif (now - secretBossState.minigameStartTime >= 0.8) then
-                        -- Sau 0.8s vẫn không phát hiện Secret Boss nào -> Cá thường, giật cần thả lại!
+                local isTargetBoss = false
+
+                if hookedFish then
+                    if Config.SecretBossTargets[hookedFish] == true or (secretBossLookup[hookedFish:lower()] and Config.SecretBossTargets[secretBossLookup[hookedFish:lower()]] == true) then
+                        isTargetBoss = true
+                    end
+                end
+
+                local bossFightBar = fUI and fUI:FindFirstChild("BossFightBar")
+                if bossFightBar and bossFightBar.Visible then
+                    isTargetBoss = true
+                end
+
+                if isTargetBoss then
+                    secretBossState.isCatchingTarget = true
+                    if statusLabelSecretBoss and statusLabelSecretBoss.Set then
+                        statusLabelSecretBoss.Set("🎯 ĐANG CÂU BOSS: " .. tostring(hookedFish or "Secret Boss") .. "!")
+                    end
+                    if Config.WebhookEnabled and Config.WebhookNotifyBoss and not secretBossState.webhookSentForCurrent then
+                        secretBossState.webhookSentForCurrent = true
+                        SendDiscordWebhook(
+                            "🚨 PHÁT HIỆN SECRET BOSS!",
+                            "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng Secret Boss: **" .. tostring(hookedFish or "Secret Boss") .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
+                            15158332,
+                            {
+                                { name = "🐟 Boss Mục Tiêu", value = tostring(hookedFish or "Secret Boss"), inline = true },
+                                { name = "📍 Bản Đồ", value = tostring(secretBossState.currentMap or "Đảo Hiện Tại"), inline = true },
+                                { name = "⏰ Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
+                            }
+                        )
+                    end
+                else
+                    local timeInMinigame = now - secretBossState.minigameStartTime
+                    local canSkipNow = (now - secretBossState.lastSkipTime >= 0.8)
+                    if canSkipNow and ((hookedFish and timeInMinigame >= 0.2) or (timeInMinigame >= 0.6)) then
                         secretBossState.lastSkipTime = now
                         secretBossState.minigameStartTime = 0
                         skipTriggered = true
+                        local skipFishName = hookedFish or "Cá thường"
                         if statusLabelSecretBoss and statusLabelSecretBoss.Set then
-                            statusLabelSecretBoss.Set("Không phải Boss, đang giật cần thả lại...")
+                            statusLabelSecretBoss.Set("Bỏ qua [" .. skipFishName .. "], đang giật cần thả lại...")
                         end
                         CancelAndRecastRod()
                     end
@@ -4340,7 +4362,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                 elseif fUI and fUI.Visible then
                     -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
-                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active)) then
+                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss) then
                         local barFrame = fUI:FindFirstChild("BarFrame")
                         if barFrame and barFrame:FindFirstChild("Bar") then
                             barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
@@ -4459,7 +4481,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             secretBossState.minigameStartTime = 0
             lastCastTime = now
         else
-            if (Config.AutoCast or Config.AutoTrainSkill or (Config.AutoChatSecretBoss and secretBossState.active)) and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
+            local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or (Config.AutoChatSecretBoss and secretBossState.active)
+            if shouldAutoCast and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
                 local canCast = true
                 if pData and pData:FindFirstChild("InventoryLimit") then
                     local invCount = 0
