@@ -1437,6 +1437,317 @@ for _, entry in ipairs(secretBossDatabase) do
     end
 end
 
+local craftMaterialFish = {
+    ["Mountain Fish"] = true,
+    ["Catfish"] = true,
+    ["Crimson Catfish"] = true,
+    ["Scarlet Fish"] = true,
+    ["Elder Scarlet Fish"] = true,
+    ["Octoparasitic Fish"] = true,
+    ["Tiger Mirefish"] = true,
+    ["Mirage Lanternfish"] = true,
+    ["Golden Guardian Fish"] = true,
+    ["Frost Kingfish"] = true,
+    ["Frost Queenfish"] = true,
+    ["Rainbow Dragonfish"] = true,
+    ["Sanguine Fish"] = true,
+    ["Verdant Bonefang"] = true,
+    ["Verdant Alligator Gar"] = true,
+    ["Draconic Koi"] = true,
+    ["Heaven Piercer Turtle"] = true,
+    ["Flying Fish Empress"] = true,
+    ["Flying Fish Emperor"] = true,
+}
+
+local rarityColors = {
+    ["Mythic"]    = Color3.fromRGB(248, 113, 113),  -- Đỏ neon Thần Thoại
+    ["Legendary"] = Color3.fromRGB(250, 204, 21),   -- Vàng hoàng kim Huyền Thoại
+    ["Epic"]      = Color3.fromRGB(192, 132, 252),  -- Tím mộng mơ Sử Thi
+    ["Rare"]      = Color3.fromRGB(96, 165, 250),   -- Xanh dương Hiếm
+    ["Uncommon"]  = Color3.fromRGB(52, 211, 153),   -- Xanh lục Đặc Biệt
+    ["Common"]    = Color3.fromRGB(168, 150, 200),  -- Xám bạc Phổ Thông
+}
+
+local function IsItemFavorited(item)
+    if not item then return false end
+    local favVal = item:FindFirstChild("Favorite")
+    if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
+    if item:GetAttribute("Favorite") == true then return true end
+    local lockVal = item:FindFirstChild("Locked")
+    if lockVal and (lockVal.Value == true or lockVal.Value == 1) then return true end
+    if item:GetAttribute("Locked") == true then return true end
+    return false
+end
+
+local function IsSecretBossFish(item)
+    if not item then return false end
+    local rawName = tostring(item.Name or "")
+    local lowerName = rawName:lower()
+
+    for bLower, _ in pairs(secretBossLookup) do
+        if lowerName:find(bLower, 1, true) then
+            return true
+        end
+    end
+
+    if item:GetAttribute("Boss") == true or item:GetAttribute("Secret") == true or item:GetAttribute("IsBoss") == true then
+        return true
+    end
+
+    return false
+end
+
+function Wiki.IsMutatedFish(item)
+    if not item then return false end
+    local name = tostring(item.Name or "")
+    for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
+        if name:find(kw) then return true end
+    end
+    local mutVal = item:FindFirstChild("Mutation")
+    if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
+        return true
+    end
+    for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
+        local v = item:GetAttribute(attr)
+        if v and tostring(v) ~= "" and tostring(v) ~= "None" then
+            return true
+        end
+    end
+    return false
+end
+
+function Wiki.GetItemRawName(item)
+    if not item then return "" end
+    local v = item:FindFirstChild("ValueName")
+    if v and v:IsA("StringValue") and #v.Value > 0 then
+        return v.Value
+    end
+    local attName = item:GetAttribute("FishName") or item:GetAttribute("Name") or item:GetAttribute("ItemName")
+    if attName and #tostring(attName) > 0 then
+        return tostring(attName)
+    end
+    return tostring(item.Name or "")
+end
+
+function Wiki.GetPlayerFishCount(fishName)
+    local count = 0
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then return 0 end
+    local fishLower = tostring(fishName or ""):lower()
+
+    local function checkFolder(folder)
+        if not folder then return end
+        for _, item in ipairs(folder:GetChildren()) do
+            local rawName = Wiki.GetItemRawName(item):lower()
+            local instName = tostring(item.Name or ""):lower()
+            if rawName == fishLower or instName == fishLower or rawName:find(fishLower, 1, true) or instName:find(fishLower, 1, true) then
+                local qtyVal = item:FindFirstChild("Quantity") or item:FindFirstChild("Count") or item:FindFirstChild("Amount") or item:FindFirstChild("Stack")
+                local qty = (qtyVal and tonumber(qtyVal.Value)) or 1
+                count = count + qty
+            end
+        end
+    end
+
+    checkFolder(pData:FindFirstChild("Inventory"))
+    checkFolder(pData:FindFirstChild("Hotbar"))
+    return count
+end
+
+function Wiki.IsEssentialKeepItem(item)
+    if not item then return false end
+    if Wiki.IsSecretBossFish(item) then return true end
+    if Wiki.IsMutatedFish(item) then return true end
+
+    local itName = tostring(item.Name or "")
+    local vName = item:FindFirstChild("ValueName") and tostring(item.ValueName.Value or "") or ""
+    if Wiki.craftMaterialFish[itName] or Wiki.craftMaterialFish[vName] then return true end
+
+    if Config.AutoFavouriteFish and (itName == Config.FavouriteFishName or vName == Config.FavouriteFishName) then
+        return true
+    end
+
+    local itLower = itName:lower()
+    local vLower = vName:lower()
+
+    for _, f in ipairs(Wiki.wikiFishData) do
+        if f.keep then
+            local fLower = f.name:lower()
+            if itLower == fLower or vLower == fLower or itLower:find(fLower, 1, true) or (vLower ~= "" and vLower:find(fLower, 1, true)) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function Wiki.UnlockAllUnnecessaryFish()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then
+        ShowNotification("Mở Khóa Balo", "Không tìm thấy dữ liệu túi đồ người chơi!", "WARN", 4)
+        return 0
+    end
+
+    local toUnlock = {}
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            if Wiki.IsItemFavorited(item) then
+                if not Wiki.IsEssentialKeepItem(item) then
+                    table.insert(toUnlock, item)
+                end
+            end
+        end
+    end
+
+    if #toUnlock == 0 then
+        ShowNotification("Mở Khóa Balo", "Không có cá không cần thiết nào đang bị khóa trong balo.", "INFO", 4)
+        return 0
+    end
+
+    local unlockedCount = 0
+    for _, item in ipairs(toUnlock) do
+        if Events and Events:FindFirstChild("FavoriteItem") then
+            Events.FavoriteItem:FireServer(item)
+            unlockedCount = unlockedCount + 1
+            task.wait(0.04)
+        end
+    end
+
+    ShowNotification("MỞ KHÓA THÀNH CÔNG", string.format("Đã mở khóa %d con cá không cần thiết! AutoSell có thể bán ngay.", unlockedCount), "SUCCESS", 6)
+    return unlockedCount
+end
+
+function Wiki.LockAllKeepFish()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then
+        ShowNotification("Khóa Bảo Vệ", "Không tìm thấy dữ liệu túi đồ!", "WARN", 4)
+        return 0
+    end
+
+    local toLock = {}
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            if not Wiki.IsItemFavorited(item) then
+                if Wiki.IsEssentialKeepItem(item) then
+                    table.insert(toLock, item)
+                end
+            end
+        end
+    end
+
+    if #toLock == 0 then
+        ShowNotification("Khóa Bảo Vệ", "Tất cả cá cần giữ trong balo đã được khóa an toàn.", "INFO", 4)
+        return 0
+    end
+
+    local lockedCount = 0
+    for _, item in ipairs(toLock) do
+        if Events and Events:FindFirstChild("FavoriteItem") then
+            Events.FavoriteItem:FireServer(item)
+            lockedCount = lockedCount + 1
+            task.wait(0.04)
+        end
+    end
+
+    ShowNotification("KHÓA THÀNH CÔNG", string.format("Đã khóa bảo vệ an toàn %d con cá quý / boss / nguyên liệu!", lockedCount), "SUCCESS", 6)
+    return lockedCount
+end
+
+function Wiki.ToggleLockSpecificFish(fishName, targetKeepState)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then return end
+    local fishLower = fishName:lower()
+    local toggled = 0
+
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            local rawName = Wiki.GetItemRawName(item):lower()
+            local instName = tostring(item.Name or ""):lower()
+            if rawName == fishLower or instName == fishLower or rawName:find(fishLower, 1, true) then
+                local isFav = Wiki.IsItemFavorited(item)
+                if targetKeepState and not isFav then
+                    if Events and Events:FindFirstChild("FavoriteItem") then
+                        Events.FavoriteItem:FireServer(item)
+                        toggled = toggled + 1
+                        task.wait(0.04)
+                    end
+                elseif not targetKeepState and isFav then
+                    if Events and Events:FindFirstChild("FavoriteItem") then
+                        Events.FavoriteItem:FireServer(item)
+                        toggled = toggled + 1
+                        task.wait(0.04)
+                    end
+                end
+            end
+        end
+    end
+
+    local actText = targetKeepState and "Đã khóa bảo vệ" or "Đã mở khóa"
+    if toggled > 0 then
+        ShowNotification("Thao Tác Cá", string.format("%s %d con [%s] thành công!", actText, toggled, fishName), "SUCCESS", 5)
+    else
+        ShowNotification("Thao Tác Cá", string.format("Không có con [%s] nào cần chuyển trạng thái trong túi.", fishName), "INFO", 4)
+    end
+end
+
+function Wiki.ResolveFishIcon(fishName, defaultIcon)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if pData then
+        for _, fName in ipairs({"Inventory", "Hotbar"}) do
+            local f = pData:FindFirstChild(fName)
+            if f then
+                for _, it in ipairs(f:GetChildren()) do
+                    local rawName = GetItemRawName(it)
+                    if rawName == fishName or it.Name == fishName then
+                        for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
+                            local p = it:FindFirstChild(prop)
+                            if p and p:IsA("StringValue") and #p.Value > 0 then
+                                return p.Value
+                            end
+                            local att = it:GetAttribute(prop)
+                            if att and #tostring(att) > 0 then
+                                return tostring(att)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    if ReplicatedStorage then
+        local found = ReplicatedStorage:FindFirstChild(fishName, true)
+        if found then
+            for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
+                local p = found:FindFirstChild(prop)
+                if p and p:IsA("StringValue") and #p.Value > 0 then
+                    return p.Value
+                end
+                local att = found:GetAttribute(prop)
+                if att and #tostring(att) > 0 then
+                    return tostring(att)
+                end
+            end
+            if found:IsA("Decal") or found:IsA("Texture") then
+                return found.Texture
+            end
+        end
+    end
+
+    return defaultIcon or "rbxassetid://10709791437"
+end
+
 local secretBossState = {
     active = false,
     currentMap = nil,
@@ -2557,6 +2868,7 @@ pcall(function() secretBossState.LoadHomeSpot() end)
 
 local tabFishing   = CreateTab("Câu Cá")
 local tabBoss      = CreateTab("Săn Boss")
+local tabWiki      = CreateTab("Wiki")
 local tabGod       = CreateTab("Thần Linh")
 local tabQuests    = CreateTab("Nhiệm Vụ")
 local tabShop      = CreateTab("Shop & Chế Mồi")
@@ -4012,6 +4324,435 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
     end
 end)
 
+do
+    createCategoryHeader(tabWiki, "⚡ THAO TÁC NHANH TÚI ĐỒ (BAG QUICK ACTIONS)")
+    local wikiActionCard = createCardGroup(tabWiki)
+
+    local RefreshWikiBagCounts
+
+    local btnUnlockUnnecessary = createButtonRow(wikiActionCard, "Mở Khóa Toàn Bộ Cá Không Cần Thiết", "Mở khóa tất cả cá thường để AutoSell tự động bán dọn trống balo", "🔓 Mở Khóa", function()
+        Wiki.UnlockAllUnnecessaryFish()
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+    end)
+    btnUnlockUnnecessary.Size = UDim2.new(0, 110, 0, 26)
+    btnUnlockUnnecessary.Position = UDim2.new(1, -110, 0.5, -13)
+    btnUnlockUnnecessary.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
+    btnUnlockUnnecessary.TextColor3 = Colors.TextWhite
+
+    local btnLockAllKeep = createButtonRow(wikiActionCard, "Khóa Bảo Vệ Toàn Bộ Cá Cần Giữ", "Khóa bảo vệ tất cả Secret Boss, Cá Nguyên Liệu và Cá Đột Biến", "🔒 Khóa Bảo Vệ", function()
+        Wiki.LockAllKeepFish()
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+    end)
+    btnLockAllKeep.Size = UDim2.new(0, 110, 0, 26)
+    btnLockAllKeep.Position = UDim2.new(1, -110, 0.5, -13)
+    btnLockAllKeep.BackgroundColor3 = Colors.PurpleDark
+    btnLockAllKeep.TextColor3 = Colors.TextWhite
+
+    createButtonRow(wikiActionCard, "Đồng Bộ & Làm Mới Balo", "Quét lại toàn bộ túi đồ và cập nhật số lượng từng loại cá", "🔄 Cập Nhật", function()
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+        ShowNotification("Wiki Balo", "Đã cập nhật số lượng cá mới nhất từ túi đồ!", "SUCCESS", 3)
+    end)
+
+    local infoBagSummary = createInfoRow(wikiActionCard, "Sức Chứa Balo & Phân Loại Cá", "Đang kiểm tra...", false)
+
+    createCategoryHeader(tabWiki, "🔍 BỘ LỌC & TÌM KIẾM CÁ")
+    local wikiFilterCard = createCardGroup(tabWiki)
+
+    -- Row 1: Search Box
+    local searchRow = createBaseRow(wikiFilterCard, "Tìm Kiếm Cá", "Gõ tên loài cá, bản đồ hoặc công dụng để tìm kiếm", false)
+    local searchTb = Instance.new("TextBox")
+    searchTb.Size = UDim2.new(0, 200, 0, 26)
+    searchTb.Position = UDim2.new(1, -200, 0.5, -13)
+    searchTb.BackgroundColor3 = Colors.InputBg
+    searchTb.Font = Enum.Font.Gotham
+    searchTb.PlaceholderText = "Nhập tên cá, map, công dụng..."
+    searchTb.PlaceholderColor3 = Colors.TextMuted
+    searchTb.Text = ""
+    searchTb.TextColor3 = Colors.TextWhite
+    searchTb.TextSize = 11
+    searchTb.ClearTextOnFocus = false
+    searchTb.BorderSizePixel = 0
+    searchTb.Parent = searchRow
+    Instance.new("UICorner", searchTb).CornerRadius = UDim.new(0, 4)
+    local searchStroke = Instance.new("UIStroke", searchTb)
+    searchStroke.Color = Colors.BorderSubtle
+    searchStroke.Thickness = 1
+
+    -- Row 2: Filter Buttons (All, Keep, Sell, InBag)
+    local filterRow = createBaseRow(wikiFilterCard, "Chế Độ Lọc", "Chọn danh mục cá muốn tra cứu", false)
+    local filterBtnContainer = Instance.new("Frame")
+    filterBtnContainer.Size = UDim2.new(0, 280, 0, 26)
+    filterBtnContainer.Position = UDim2.new(1, -280, 0.5, -13)
+    filterBtnContainer.BackgroundTransparency = 1
+    filterBtnContainer.Parent = filterRow
+    local fLayout = Instance.new("UIListLayout")
+    fLayout.FillDirection = Enum.FillDirection.Horizontal
+    fLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    fLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    fLayout.Padding = UDim.new(0, 4)
+    fLayout.Parent = filterBtnContainer
+
+    local filterButtons = {}
+    local currentWikiFilter = "ALL"
+    local currentWikiSearch = ""
+
+    local function makeFilterBtn(name, text, width)
+        local b = Instance.new("TextButton")
+        b.Size = UDim2.new(0, width or 65, 1, 0)
+        b.BackgroundColor3 = (currentWikiFilter == name) and Colors.PurpleAccent or Colors.ControlBg
+        b.Font = Enum.Font.GothamBold
+        b.Text = text
+        b.TextColor3 = (currentWikiFilter == name) and Colors.TextWhite or Colors.PurplePrimary
+        b.TextSize = 10
+        b.BorderSizePixel = 0
+        b.Parent = filterBtnContainer
+        Instance.new("UICorner", b).CornerRadius = UDim.new(0, 4)
+        filterButtons[name] = b
+        return b
+    end
+
+    local btnFAll   = makeFilterBtn("ALL", "Tất Cả (51)", 66)
+    local btnFKeep  = makeFilterBtn("KEEP", "⭐ Cần Giữ", 70)
+    local btnFSell  = makeFilterBtn("SELL", "💰 Nên Bán", 70)
+    local btnFInBag = makeFilterBtn("IN_BAG", "🎒 Trong Túi", 70)
+
+    createCategoryHeader(tabWiki, "📖 BÁCH KHOA TOÀN THƯ CÁ (FISH ENCYCLOPEDIA)")
+    local wikiListContainer = Instance.new("Frame")
+    wikiListContainer.Size = UDim2.new(1, 0, 0, 0)
+    wikiListContainer.AutomaticSize = Enum.AutomaticSize.Y
+    wikiListContainer.BackgroundTransparency = 1
+    wikiListContainer.Parent = tabWiki
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 6)
+    listLayout.Parent = wikiListContainer
+
+    local cardEntries = {}
+
+    local function UpdateCardFilter()
+        local q = currentWikiSearch:lower():gsub("^%s+", ""):gsub("%s+$", "")
+        for _, entry in ipairs(cardEntries) do
+            local f = entry.fishData
+            local matchQ = true
+            if #q > 0 then
+                local fName = f.name:lower()
+                local fOrigin = f.origin:lower()
+                local fUse = f.use:lower()
+                local fRarity = f.rarity:lower()
+                matchQ = fName:find(q, 1, true) or fOrigin:find(q, 1, true) or fUse:find(q, 1, true) or fRarity:find(q, 1, true)
+            end
+
+            local matchF = true
+            if currentWikiFilter == "KEEP" then
+                matchF = (f.keep == true)
+            elseif currentWikiFilter == "SELL" then
+                matchF = (f.keep == false)
+            elseif currentWikiFilter == "IN_BAG" then
+                matchF = (entry.currentCount > 0)
+            end
+
+            entry.cardFrame.Visible = matchQ and matchF
+        end
+    end
+
+    local function SetFilterMode(mode)
+        currentWikiFilter = mode
+        for m, b in pairs(filterButtons) do
+            local isActive = (m == mode)
+            b.BackgroundColor3 = isActive and Colors.PurpleAccent or Colors.ControlBg
+            b.TextColor3 = isActive and Colors.TextWhite or Colors.PurplePrimary
+        end
+        UpdateCardFilter()
+    end
+
+    btnFAll.MouseButton1Click:Connect(function() SetFilterMode("ALL") end)
+    btnFKeep.MouseButton1Click:Connect(function() SetFilterMode("KEEP") end)
+    btnFSell.MouseButton1Click:Connect(function() SetFilterMode("SELL") end)
+    btnFInBag.MouseButton1Click:Connect(function() SetFilterMode("IN_BAG") end)
+
+    searchTb:GetPropertyChangedSignal("Text"):Connect(function()
+        currentWikiSearch = searchTb.Text
+        UpdateCardFilter()
+    end)
+
+    RefreshWikiBagCounts = function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local totalItems = 0
+        local totalKeepInBag = 0
+        local totalSellInBag = 0
+        local invLimit = 100
+
+        if pData then
+            if pData:FindFirstChild("InventoryLimit") then
+                invLimit = tonumber(pData.InventoryLimit.Value) or 100
+            end
+            local folders = {}
+            if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+            if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+            for _, folder in ipairs(folders) do
+                for _, item in ipairs(folder:GetChildren()) do
+                    local qVal = item:FindFirstChild("Quantity") or item:FindFirstChild("Count") or item:FindFirstChild("Amount")
+                    local qty = (qVal and tonumber(qVal.Value)) or 1
+                    totalItems = totalItems + qty
+                    if Wiki.IsEssentialKeepItem(item) then
+                        totalKeepInBag = totalKeepInBag + qty
+                    else
+                        totalSellInBag = totalSellInBag + qty
+                    end
+                end
+            end
+        end
+
+        if infoBagSummary and infoBagSummary.Set then
+            infoBagSummary.Set(string.format("%d / %d ô (%d cá cần giữ | %d cá nên bán)", totalItems, invLimit, totalKeepInBag, totalSellInBag))
+        end
+
+        local typesInBagCount = 0
+        for _, entry in ipairs(cardEntries) do
+            local f = entry.fishData
+            local cnt = Wiki.GetPlayerFishCount(f.name)
+            entry.currentCount = cnt
+            if cnt > 0 then typesInBagCount = typesInBagCount + 1 end
+            if entry.countLabel then
+                if cnt > 0 then
+                    entry.countLabel.Text = string.format("Đang có: %d con", cnt)
+                    entry.countLabel.TextColor3 = f.keep and Colors.AccentYellow or Colors.AccentGreen
+                    if entry.countBox then
+                        entry.countBox.BackgroundColor3 = Colors.ControlBg
+                    end
+                else
+                    entry.countLabel.Text = "Đang có: 0 con"
+                    entry.countLabel.TextColor3 = Colors.TextMuted
+                    if entry.countBox then
+                        entry.countBox.BackgroundColor3 = Colors.InputBg
+                    end
+                end
+            end
+        end
+
+        btnFInBag.Text = string.format("🎒 Trong Túi (%d)", typesInBagCount)
+        UpdateCardFilter()
+    end
+
+    -- Tạo từng Thẻ Cá (Card) trong Bách Khoa Toàn Thư
+    for idx, f in ipairs(Wiki.wikiFishData) do
+        local rColor = Wiki.rarityColors[f.rarity] or Colors.PurplePrimary
+
+        local card = Instance.new("Frame")
+        card.Name = "FishCard_" .. f.name:gsub("%s+", "_")
+        card.Size = UDim2.new(1, 0, 0, 74)
+        card.BackgroundColor3 = Colors.RowNormal
+        card.BorderSizePixel = 0
+        card.LayoutOrder = idx
+        card.Parent = wikiListContainer
+        Instance.new("UICorner", card).CornerRadius = UDim.new(0, 6)
+        local cardStroke = Instance.new("UIStroke", card)
+        cardStroke.Color = Colors.BorderSubtle
+        cardStroke.Thickness = 1
+
+        card.MouseEnter:Connect(function()
+            TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play()
+        end)
+        card.MouseLeave:Connect(function()
+            TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowNormal}):Play()
+        end)
+
+        -- 1. Icon & Rarity (Trái)
+        local iconFrame = Instance.new("Frame")
+        iconFrame.Size = UDim2.new(0, 50, 0, 50)
+        iconFrame.Position = UDim2.new(0, 10, 0.5, -25)
+        iconFrame.BackgroundColor3 = Colors.InputBg
+        iconFrame.BorderSizePixel = 0
+        iconFrame.Parent = card
+        Instance.new("UICorner", iconFrame).CornerRadius = UDim.new(0, 6)
+        local iconStroke = Instance.new("UIStroke", iconFrame)
+        iconStroke.Color = rColor
+        iconStroke.Thickness = 1.2
+
+        local img = Instance.new("ImageLabel")
+        img.Size = UDim2.new(1, -6, 1, -6)
+        img.Position = UDim2.new(0, 3, 0, 3)
+        img.BackgroundTransparency = 1
+        img.Image = Wiki.ResolveFishIcon(f.name, f.icon)
+        img.ScaleType = Enum.ScaleType.Fit
+        img.Parent = iconFrame
+
+        local rarityTag = Instance.new("TextLabel")
+        rarityTag.Size = UDim2.new(1, 0, 0, 12)
+        rarityTag.Position = UDim2.new(0, 0, 1, -12)
+        rarityTag.BackgroundColor3 = Color3.fromRGB(15, 10, 20)
+        rarityTag.BackgroundTransparency = 0.3
+        rarityTag.Font = Enum.Font.GothamBold
+        rarityTag.Text = f.rarity:upper()
+        rarityTag.TextColor3 = rColor
+        rarityTag.TextSize = 8
+        rarityTag.Parent = iconFrame
+
+        -- 2. Chi Tiết Cá & Công Dụng (Giữa)
+        local infoContainer = Instance.new("Frame")
+        infoContainer.Size = UDim2.new(1, -195, 1, -12)
+        infoContainer.Position = UDim2.new(0, 68, 0, 6)
+        infoContainer.BackgroundTransparency = 1
+        infoContainer.Parent = card
+
+        local headerLine = Instance.new("Frame")
+        headerLine.Size = UDim2.new(1, 0, 0, 18)
+        headerLine.BackgroundTransparency = 1
+        headerLine.Parent = infoContainer
+
+        local nameLbl = Instance.new("TextLabel")
+        nameLbl.Size = UDim2.new(1, -85, 1, 0)
+        nameLbl.BackgroundTransparency = 1
+        nameLbl.Font = Enum.Font.GothamBold
+        nameLbl.Text = f.name
+        nameLbl.TextColor3 = rColor
+        nameLbl.TextSize = 12
+        nameLbl.TextXAlignment = Enum.TextXAlignment.Left
+        nameLbl.Parent = headerLine
+
+        local badge = Instance.new("Frame")
+        badge.Size = UDim2.new(0, 78, 0, 16)
+        badge.Position = UDim2.new(1, -78, 0.5, -8)
+        badge.BackgroundColor3 = f.keep and Color3.fromRGB(16, 45, 25) or Color3.fromRGB(45, 25, 15)
+        badge.BorderSizePixel = 0
+        badge.Parent = headerLine
+        Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+        local bStroke = Instance.new("UIStroke", badge)
+        bStroke.Color = f.keep and Colors.AccentGreen or Colors.AccentOrange
+        bStroke.Thickness = 0.8
+        local badgeTxt = Instance.new("TextLabel")
+        badgeTxt.Size = UDim2.new(1, 0, 1, 0)
+        badgeTxt.BackgroundTransparency = 1
+        badgeTxt.Font = Enum.Font.GothamBold
+        badgeTxt.Text = f.keep and "⭐ NÊN GIỮ" or "💰 NÊN BÁN"
+        badgeTxt.TextColor3 = f.keep and Colors.AccentGreen or Colors.AccentOrange
+        badgeTxt.TextSize = 9
+        badgeTxt.Parent = badge
+
+        local originLbl = Instance.new("TextLabel")
+        originLbl.Size = UDim2.new(1, 0, 0, 14)
+        originLbl.Position = UDim2.new(0, 0, 0, 18)
+        originLbl.BackgroundTransparency = 1
+        originLbl.Font = Enum.Font.Gotham
+        originLbl.Text = "📍 " .. f.origin
+        originLbl.TextColor3 = Colors.TextMuted
+        originLbl.TextSize = 10
+        originLbl.TextXAlignment = Enum.TextXAlignment.Left
+        originLbl.Parent = infoContainer
+
+        local useLbl = Instance.new("TextLabel")
+        useLbl.Size = UDim2.new(1, 0, 0, 26)
+        useLbl.Position = UDim2.new(0, 0, 0, 32)
+        useLbl.BackgroundTransparency = 1
+        useLbl.Font = Enum.Font.Gotham
+        useLbl.Text = f.use
+        useLbl.TextColor3 = Colors.TextSubtle
+        useLbl.TextSize = 10
+        useLbl.TextXAlignment = Enum.TextXAlignment.Left
+        useLbl.TextWrapped = true
+        useLbl.Parent = infoContainer
+
+        -- 3. Số Lượng Balo & Nút Thao Tác (Phải)
+        local actionContainer = Instance.new("Frame")
+        actionContainer.Size = UDim2.new(0, 110, 1, -12)
+        actionContainer.Position = UDim2.new(1, -118, 0, 6)
+        actionContainer.BackgroundTransparency = 1
+        actionContainer.Parent = card
+
+        local countBox = Instance.new("Frame")
+        countBox.Size = UDim2.new(1, 0, 0, 24)
+        countBox.Position = UDim2.new(0, 0, 0, 2)
+        countBox.BackgroundColor3 = Colors.InputBg
+        countBox.BorderSizePixel = 0
+        countBox.Parent = actionContainer
+        Instance.new("UICorner", countBox).CornerRadius = UDim.new(0, 4)
+        local countStroke = Instance.new("UIStroke", countBox)
+        countStroke.Color = Colors.BorderSubtle
+        countStroke.Thickness = 0.8
+
+        local countLbl = Instance.new("TextLabel")
+        countLbl.Size = UDim2.new(1, 0, 1, 0)
+        countLbl.BackgroundTransparency = 1
+        countLbl.Font = Enum.Font.GothamBold
+        countLbl.Text = "Đang có: 0 con"
+        countLbl.TextColor3 = Colors.TextMuted
+        countLbl.TextSize = 10
+        countLbl.Parent = countBox
+
+        local singleBtn = Instance.new("TextButton")
+        singleBtn.Size = UDim2.new(1, 0, 0, 24)
+        singleBtn.Position = UDim2.new(0, 0, 1, -26)
+        singleBtn.BackgroundColor3 = f.keep and Colors.ControlBg or Color3.fromRGB(36, 20, 20)
+        singleBtn.Font = Enum.Font.GothamBold
+        singleBtn.Text = f.keep and "🔒 Khóa Này" or "🔓 Mở Này"
+        singleBtn.TextColor3 = f.keep and Colors.PurplePrimary or Colors.AccentOrange
+        singleBtn.TextSize = 10
+        singleBtn.BorderSizePixel = 0
+        singleBtn.Parent = actionContainer
+        Instance.new("UICorner", singleBtn).CornerRadius = UDim.new(0, 4)
+        local btnStroke = Instance.new("UIStroke", singleBtn)
+        btnStroke.Color = f.keep and Colors.BorderPurple or Colors.AccentOrange
+        btnStroke.Thickness = 0.8
+
+        singleBtn.MouseEnter:Connect(function()
+            TweenService:Create(singleBtn, TweenInfo.new(0.15), {
+                BackgroundColor3 = f.keep and Colors.PurpleDark or Color3.fromRGB(55, 25, 25),
+                TextColor3 = Colors.TextWhite
+            }):Play()
+        end)
+        singleBtn.MouseLeave:Connect(function()
+            TweenService:Create(singleBtn, TweenInfo.new(0.15), {
+                BackgroundColor3 = f.keep and Colors.ControlBg or Color3.fromRGB(36, 20, 20),
+                TextColor3 = f.keep and Colors.PurplePrimary or Colors.AccentOrange
+            }):Play()
+        end)
+
+        singleBtn.MouseButton1Click:Connect(function()
+            Wiki.ToggleLockSpecificFish(f.name, f.keep)
+            task.delay(0.3, RefreshWikiBagCounts)
+        end)
+
+        table.insert(cardEntries, {
+            cardFrame = card,
+            fishData = f,
+            countBox = countBox,
+            countLabel = countLbl,
+            countStroke = countStroke,
+            singleBtn = singleBtn,
+            currentCount = 0
+        })
+    end
+
+    -- Lắng nghe khi mở Tab Wiki thì tự động làm mới số lượng
+    if tabButtons and tabButtons["Wiki"] then
+        tabButtons["Wiki"].MouseButton1Click:Connect(function()
+            task.spawn(RefreshWikiBagCounts)
+        end)
+    end
+
+    -- Tự động làm mới khi có cá mới thêm vào hoặc bán bớt trong balo
+    task.spawn(function()
+        local pDataInit = ReplicatedStorage:WaitForChild("Data", 10)
+        local userFolder = pDataInit and pDataInit:WaitForChild(tostring(LocalPlayer.UserId), 10)
+        local invFolder = userFolder and userFolder:WaitForChild("Inventory", 10)
+        if invFolder then
+            table.insert(activeConnections, invFolder.ChildAdded:Connect(function()
+                task.wait(0.4)
+                pcall(RefreshWikiBagCounts)
+            end))
+            table.insert(activeConnections, invFolder.ChildRemoved:Connect(function()
+                task.wait(0.4)
+                pcall(RefreshWikiBagCounts)
+            end))
+        end
+    end)
+
+    -- Khởi tạo lần đầu
+    task.delay(1.0, function()
+        pcall(RefreshWikiBagCounts)
+    end)
+end
+
 createCategoryHeader(tabGod, "Tương Tác Thần Linh (God Spirit)")
 local godCard = createCardGroup(tabGod)
 
@@ -5341,75 +6082,7 @@ local wasFishing = false
 local minigameDurationTracker = 0
 local wasMinigame = false
 
-local craftMaterialFish = {
-    ["Mountain Fish"] = true,
-    ["Catfish"] = true,
-    ["Crimson Catfish"] = true,
-    ["Scarlet Fish"] = true,
-    ["Elder Scarlet Fish"] = true,
-    ["Octoparasitic Fish"] = true,
-    ["Tiger Mirefish"] = true,
-    ["Mirage Lanternfish"] = true,
-    ["Golden Guardian Fish"] = true,
-    ["Frost Kingfish"] = true,
-    ["Frost Queenfish"] = true,
-    ["Rainbow Dragonfish"] = true,
-    ["Sanguine Fish"] = true,
-    ["Verdant Bonefang"] = true,
-    ["Verdant Alligator Gar"] = true,
-    ["Draconic Koi"] = true,
-    ["Heaven Piercer Turtle"] = true,
-    ["Flying Fish Empress"] = true,
-    ["Flying Fish Emperor"] = true,
-}
 
-local function IsItemFavorited(item)
-    if not item then return false end
-    local favVal = item:FindFirstChild("Favorite")
-    if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
-    if item:GetAttribute("Favorite") == true then return true end
-    local lockVal = item:FindFirstChild("Locked")
-    if lockVal and (lockVal.Value == true or lockVal.Value == 1) then return true end
-    if item:GetAttribute("Locked") == true then return true end
-    return false
-end
-
-local function IsSecretBossFish(item)
-    if not item then return false end
-    local rawName = tostring(item.Name or "")
-    local lowerName = rawName:lower()
-
-    for bLower, _ in pairs(secretBossLookup) do
-        if lowerName:find(bLower, 1, true) then
-            return true
-        end
-    end
-
-    if item:GetAttribute("Boss") == true or item:GetAttribute("Secret") == true or item:GetAttribute("IsBoss") == true then
-        return true
-    end
-
-    return false
-end
-
-local function IsMutatedFish(item)
-    if not item then return false end
-    local name = tostring(item.Name or "")
-    for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
-        if name:find(kw) then return true end
-    end
-    local mutVal = item:FindFirstChild("Mutation")
-    if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
-        return true
-    end
-    for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
-        local v = item:GetAttribute(attr)
-        if v and tostring(v) ~= "" and tostring(v) ~= "None" then
-            return true
-        end
-    end
-    return false
-end
 
 local function ProtectInventoryItem(item, showNotify)
     if not item or IsItemFavorited(item) then return false end
