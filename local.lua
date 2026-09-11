@@ -4876,11 +4876,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
                             else
                                 -- Máu cá > Ngưỡng (Cá to / Boss):
-                                -- Giai đoạn mở màn: Tung chiêu mở màn trong khoảng thời gian đầu trận
                                 local minigameElapsed = now - (comboState.minigameStartTime or now)
-                                local openerDuration = (Config.SkillEffectDelay or 1.2) * (Config.OpenerMaxCount or 1)
 
-                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and minigameElapsed < openerDuration then
+                                -- 1. Gửi lệnh kích hoạt chiêu mở màn trong 0.35s đầu trận để đảm bảo Server nhận 100%
+                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and minigameElapsed <= 0.35 then
                                     local opKey = Config.OpenerSkill:match("([ZXCVzxcv])")
                                     if opKey then
                                         opKey = opKey:upper()
@@ -4888,7 +4887,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(opKey) end
                                     end
                                 else
-                                    -- Giai đoạn đảo chiêu luân phiên: CHỈ gửi các chiêu trong Config.LoopSkills (ví dụ X, V)
+                                    -- 2. Ngay sau đó, liên tục gửi chuỗi đảo chiêu (X, V).
+                                    -- Server của game sẽ tự động đón nhận chiêu X ngay khi chiêu Z kết thúc hoạt ảnh (dù Z dài 1s hay 10s),
+                                    -- rồi tự động đón nhận chiêu V ngay khi X kết thúc mà không cần phải phỏng đoán thời gian!
                                     for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
                                         local lk = k:upper()
                                         if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(lk) end
