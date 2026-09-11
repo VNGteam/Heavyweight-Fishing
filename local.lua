@@ -853,6 +853,9 @@ searchBox:GetPropertyChangedSignal("Text"):Connect(function()
     for _, item in ipairs(rowSearchIndex) do
         if q == "" or item.query:find(q, 1, true) then
             item.frame.Visible = true
+            if q ~= "" and item.frame.Parent and item.frame.Parent.Name == "CardBody" then
+                item.frame.Parent.Visible = true
+            end
         else
             item.frame.Visible = false
         end
@@ -925,18 +928,140 @@ killBtn.MouseButton1Click:Connect(function()
     UnloadScript()
 end)
 
-local function createCategoryHeader(parent, text)
-    local hdr = Instance.new("Frame"); hdr.Size = UDim2.new(1, 0, 0, 22); hdr.BackgroundTransparency = 1; hdr.Parent = parent
-    local lbl = Instance.new("TextLabel"); lbl.Size = UDim2.new(1, 0, 1, 0); lbl.BackgroundTransparency = 1; lbl.Font = Enum.Font.GothamBold; lbl.Text = string.upper(text); lbl.TextColor3 = Colors.PurplePrimary; lbl.TextSize = 11; lbl.TextXAlignment = Enum.TextXAlignment.Left; lbl.Parent = hdr
-    return hdr
+local pendingCategory = nil
+
+local function createCategoryHeader(parent, text, defaultExpanded)
+    pendingCategory = {
+        parent = parent,
+        text = text,
+        defaultExpanded = (defaultExpanded == nil and true or defaultExpanded)
+    }
+    return nil
 end
 
-local function createCardGroup(parent)
-    local group = Instance.new("Frame"); group.Size = UDim2.new(1, 0, 0, 0); group.AutomaticSize = Enum.AutomaticSize.Y; group.BackgroundColor3 = Colors.RowNormal; group.BorderSizePixel = 0; group.Parent = parent
-    local s = Instance.new("UIStroke"); s.Color = Colors.BorderSubtle; s.Thickness = 1; s.Parent = group
+local function createCardGroup(parent, customText, defaultExpanded)
+    local headerInfo = pendingCategory
+    pendingCategory = nil
+
+    local titleText = customText or (headerInfo and headerInfo.text)
+    local isExpanded = true
+    if defaultExpanded ~= nil then
+        isExpanded = defaultExpanded
+    elseif headerInfo and headerInfo.defaultExpanded ~= nil then
+        isExpanded = headerInfo.defaultExpanded
+    end
+
+    if not titleText or #titleText == 0 then
+        local group = Instance.new("Frame")
+        group.Size = UDim2.new(1, 0, 0, 0)
+        group.AutomaticSize = Enum.AutomaticSize.Y
+        group.BackgroundColor3 = Colors.RowNormal
+        group.BorderSizePixel = 0
+        group.Parent = parent
+        local s = Instance.new("UIStroke"); s.Color = Colors.BorderSubtle; s.Thickness = 1; s.Parent = group
+        Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
+        local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
+        return group
+    end
+
+    local sectionContainer = Instance.new("Frame")
+    sectionContainer.Name = "Section_" .. tostring(titleText)
+    sectionContainer.Size = UDim2.new(1, 0, 0, 0)
+    sectionContainer.AutomaticSize = Enum.AutomaticSize.Y
+    sectionContainer.BackgroundTransparency = 1
+    sectionContainer.BorderSizePixel = 0
+    sectionContainer.Parent = parent
+
+    local scLayout = Instance.new("UIListLayout")
+    scLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    scLayout.Padding = UDim.new(0, 4)
+    scLayout.Parent = sectionContainer
+
+    local headerBtn = Instance.new("TextButton")
+    headerBtn.Name = "HeaderBtn"
+    headerBtn.Size = UDim2.new(1, 0, 0, 32)
+    headerBtn.BackgroundColor3 = Colors.ControlBg
+    headerBtn.BorderSizePixel = 0
+    headerBtn.AutoButtonColor = false
+    headerBtn.Text = ""
+    headerBtn.LayoutOrder = 1
+    headerBtn.Parent = sectionContainer
+
+    local hCorner = Instance.new("UICorner", headerBtn); hCorner.CornerRadius = UDim.new(0, 6)
+    local hStroke = Instance.new("UIStroke", headerBtn); hStroke.Color = Colors.BorderSubtle; hStroke.Thickness = 1
+    local hPad = Instance.new("UIPadding", headerBtn); hPad.PaddingLeft = UDim.new(0, 10); hPad.PaddingRight = UDim.new(0, 10)
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, -75, 1, 0)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.Text = string.upper(titleText)
+    titleLbl.TextColor3 = Colors.PurplePrimary
+    titleLbl.TextSize = 11
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.Parent = headerBtn
+
+    local toggleBadge = Instance.new("TextLabel")
+    toggleBadge.Size = UDim2.new(0, 70, 0, 20)
+    toggleBadge.Position = UDim2.new(1, -70, 0.5, -10)
+    toggleBadge.BackgroundColor3 = isExpanded and Colors.PurpleDark or Colors.RowNormal
+    toggleBadge.Font = Enum.Font.GothamBold
+    toggleBadge.Text = isExpanded and "▼ Mở" or "▶ Thu gọn"
+    toggleBadge.TextColor3 = isExpanded and Colors.PurpleAccent or Colors.TextMuted
+    toggleBadge.TextSize = 10
+    toggleBadge.BorderSizePixel = 0
+    toggleBadge.Parent = headerBtn
+    Instance.new("UICorner", toggleBadge).CornerRadius = UDim.new(0, 4)
+
+    local group = Instance.new("Frame")
+    group.Name = "CardBody"
+    group.Size = UDim2.new(1, 0, 0, 0)
+    group.AutomaticSize = Enum.AutomaticSize.Y
+    group.BackgroundColor3 = Colors.RowNormal
+    group.BorderSizePixel = 0
+    group.Visible = isExpanded
+    group.LayoutOrder = 2
+    group.Parent = sectionContainer
+
+    local gStroke = Instance.new("UIStroke", group); gStroke.Color = Colors.BorderSubtle; gStroke.Thickness = 1
     Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
-    local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
+    local gLayout = Instance.new("UIListLayout", group); gLayout.SortOrder = Enum.SortOrder.LayoutOrder; gLayout.Padding = UDim.new(0, 0)
+
+    local function ToggleExpand()
+        isExpanded = not isExpanded
+        group.Visible = isExpanded
+        toggleBadge.Text = isExpanded and "▼ Mở" or "▶ Thu gọn"
+        toggleBadge.TextColor3 = isExpanded and Colors.PurpleAccent or Colors.TextMuted
+        toggleBadge.BackgroundColor3 = isExpanded and Colors.PurpleDark or Colors.RowNormal
+        TweenService:Create(headerBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = isExpanded and Colors.ControlBg or Colors.SidebarBg
+        }):Play()
+    end
+
+    headerBtn.MouseButton1Click:Connect(ToggleExpand)
+    headerBtn.MouseEnter:Connect(function()
+        TweenService:Create(headerBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play()
+    end)
+    headerBtn.MouseLeave:Connect(function()
+        TweenService:Create(headerBtn, TweenInfo.new(0.15), {
+            BackgroundColor3 = isExpanded and Colors.ControlBg or Colors.SidebarBg
+        }):Play()
+    end)
+
     return group
+end
+
+local function TriggerPrompt(prompt)
+    if not prompt then return end
+    if fireproximityprompt then
+        fireproximityprompt(prompt)
+    else
+        pcall(function()
+            prompt:InputHoldBegin()
+            task.wait(prompt.HoldDuration + 0.05)
+            prompt:InputHoldEnd()
+        end)
+    end
 end
 
 local function createBaseRow(parent, labelText, descText, indexSearch)
@@ -2419,7 +2544,7 @@ local tabProfiles  = CreateTab("Cài Đặt")
 SwitchTab("Câu Cá")
 
 
-createCategoryHeader(tabFishing, "Thông Tin Tài Khoản & Thống Kê")
+createCategoryHeader(tabFishing, "📊 Thông Tin Tài Khoản & Thống Kê", true)
 local statsCard = createCardGroup(tabFishing)
 local infoEquippedRod = createInfoRow(statsCard, "Cần Đang Dùng", "Chưa có")
 local infoEquippedBait = createInfoRow(statsCard, "Mồi Đang Dùng", "Chưa có")
@@ -2430,7 +2555,7 @@ local infoFishPerHour = createInfoRow(statsCard, "Tốc Độ Câu (Fish/h)", "0
 local infoCashPerHour = createInfoRow(statsCard, "Tốc Độ Kiếm Tiền", "$0 /h")
 local infoGemsGained = createInfoRow(statsCard, "Gems Thu Được", "+0 Gems")
 
-createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
+createCategoryHeader(tabFishing, "🎣 Tự Động Câu Cá Cốt Lõi (Auto Fish)", true)
 local fishCard = createCardGroup(tabFishing)
 
 createToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
@@ -2441,7 +2566,7 @@ createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
 
-createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)")
+createCategoryHeader(tabFishing, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos)", false)
 local comboCard = createCardGroup(tabFishing)
 
 createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
@@ -2501,7 +2626,7 @@ createToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Qua
     Config.SmartEffectAutoDetect = v
 end)
 
-createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
+createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)", false)
 local trainCard = createCardGroup(tabFishing)
 local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
 createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần phím 1 hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
@@ -3302,7 +3427,7 @@ local function ExportAllPlayerSkills(infoRow, ownedOnly)
     return #skillList
 end
 
-createCategoryHeader(tabFishing, "Tự Động Trang Bị Tối Ưu")
+createCategoryHeader(tabFishing, "🎒 Tự Động Đổi Cần & Mồi Câu (Auto Equip)", false)
 local equipCard = createCardGroup(tabFishing)
 
 local baitOptionsList = {
@@ -3385,7 +3510,7 @@ createButtonRow(equipCard, "Trang Bị Nhanh Set 2", "Trang bị Cần & Mồi �
     end
 end)
 
-createCategoryHeader(tabFishing, "Kinh Tế & Tự Động Bán Cá")
+createCategoryHeader(tabFishing, "💰 Tự Động Bán Cá & Bảo Vệ Cá Hiếm (Auto Sell)", false)
 local sellCard = createCardGroup(tabFishing)
 createToggleRow(sellCard, "Tự Động Bán Cá (Auto Sell)", "Tự động bán toàn bộ cá trong balo theo chu kỳ", Config.AutoSell, function(v) Config.AutoSell = v end)
 createSliderRow(sellCard, "Thời Gian Giãn Cách Bán", "Chu kỳ số giây tự động bán cá 1 lần", 10, 300, Config.SellInterval, false, "s", function(v) Config.SellInterval = v end)
@@ -3410,53 +3535,8 @@ createToggleRow(sellCard, "Tự Động Khóa Secret Boss", "Tự động khóa 
 createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
 createToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
 
-createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)")
-local totemCard = createCardGroup(tabBoss)
 
-for _, t in ipairs(weatherTotems) do
-    createButtonRow(totemCard, t.name, "Bay đến và kích hoạt: " .. t.weather, "Kích Hoạt", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            root.CFrame = CFrame.new(t.pos + Vector3.new(0, 3, 0))
-            ShowNotification("Bàn Thờ Thời Tiết", "Đã đến " .. t.name .. "! Đang tương tác...", "SUCCESS", 4)
-            task.wait(0.4)
-            pcall(function()
-                for _, d in ipairs(Workspace:GetDescendants()) do
-                    if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
-                        local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
-                        if (pPos - t.pos).Magnitude <= 35 then
-                            TriggerPrompt(d)
-                        end
-                    end
-                end
-            end)
-        end
-    end)
-end
-
-createCategoryHeader(tabBoss, "Boss Bạch Tuộc Bí Mật (Octoparasite)")
-local octoCard = createCardGroup(tabBoss)
-
-createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
-createButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(1608.2, 5.0, -218.3)
-        ShowNotification("Dịch Chuyển", "Đã đến Phao Boss Bạch Tuộc!", "SUCCESS")
-    end
-end)
-createButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đến vùng đất câu cá ngầm bí mật", "Bay Đến", function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(112.5, -330.0, -30.8)
-        ShowNotification("Dịch Chuyển", "Đã đến Vùng Câu Cá Ngầm!", "SUCCESS")
-    end
-end)
-
-createCategoryHeader(tabBoss, "🎯 CHẾ ĐỘ SĂN SECRET BOSS & LỌC CÁ")
+createCategoryHeader(tabBoss, "🎯 CHẾ ĐỘ SĂN SECRET BOSS & TỰ ĐỘNG BAY ĐẢO", true)
 local chatBossCard = createCardGroup(tabBoss)
 
 createToggleRow(chatBossCard, "Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)", "Tự động quăng cần và giật bỏ cá thường, chỉ câu trúng Boss mục tiêu", Config.AutoHuntBoss, function(v)
@@ -3569,7 +3649,7 @@ end)
 
 do
     -- CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM FISHING SPOTS - HỖ TRỢ 3 ĐIỂM/ĐẢO + XÊ DỊCH)
-    createCategoryHeader(tabBoss, "📍 CÀI ĐẶT VỊ TRÍ CÂU TÙY CHỌN (CUSTOM SPOTS)")
+    createCategoryHeader(tabBoss, "📍 VỊ TRÍ CÂU & CHỐNG ĐÈ NGƯỜI (CUSTOM SPOTS)", true)
     local customSpotCard = createCardGroup(tabBoss)
 
     local islandNamesList = {}
@@ -3780,9 +3860,9 @@ do
     end)
 end
 
--- Danh sách từng đảo và Secret Boss
+-- Danh sách từng đảo và Secret Boss (Mỗi đảo thu gọn mặc định)
 for _, entry in ipairs(secretBossDatabase) do
-    createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
+    createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather), false)
     local islandBossCard = createCardGroup(tabBoss)
     for _, b in ipairs(entry.bosses) do
         local isEnabled = Config.SecretBossTargets[b.name] == true
@@ -3793,7 +3873,7 @@ for _, entry in ipairs(secretBossDatabase) do
     end
 end
 
-createCategoryHeader(tabBoss, "Đấu Trường Boss Enzo")
+createCategoryHeader(tabBoss, "⚔️ Đấu Trường Boss Enzo (Auto Farm)", false)
 local bossFarmCard = createCardGroup(tabBoss)
 createToggleRow(bossFarmCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và đánh bại boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
 createToggleRow(bossFarmCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
@@ -3806,6 +3886,51 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
         ShowNotification("Dịch Chuyển", "Đã đến Đấu trường Boss Enzo!", "SUCCESS")
     end
 end)
+
+createCategoryHeader(tabBoss, "🐙 Boss Bạch Tuộc Bí Mật (Octoparasite)", false)
+local octoCard = createCardGroup(tabBoss)
+createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
+createButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(1608.2, 5.0, -218.3)
+        ShowNotification("Dịch Chuyển", "Đã đến Phao Boss Bạch Tuộc!", "SUCCESS")
+    end
+end)
+createButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đến vùng đất câu cá ngầm bí mật", "Bay Đến", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        root.CFrame = CFrame.new(112.5, -330.0, -30.8)
+        ShowNotification("Dịch Chuyển", "Đã đến Vùng Câu Cá Ngầm!", "SUCCESS")
+    end
+end)
+
+createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)", false)
+local totemCard = createCardGroup(tabBoss)
+
+for _, t in ipairs(weatherTotems) do
+    createButtonRow(totemCard, t.name, "Bay đến và kích hoạt: " .. t.weather, "Kích Hoạt", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(t.pos + Vector3.new(0, 3, 0))
+            ShowNotification("Bàn Thờ Thời Tiết", "Đã đến " .. t.name .. "! Đang tương tác...", "SUCCESS", 4)
+            task.wait(0.4)
+            pcall(function()
+                for _, d in ipairs(Workspace:GetDescendants()) do
+                    if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
+                        local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
+                        if (pPos - t.pos).Magnitude <= 35 then
+                            TriggerPrompt(d)
+                        end
+                    end
+                end
+            end)
+        end
+    end)
+end
 
 createCategoryHeader(tabGod, "Tương Tác Thần Linh (God Spirit)")
 local godCard = createCardGroup(tabGod)
@@ -3840,17 +3965,6 @@ createButtonRow(godCard, "Bay Đến Đền Thần Linh", "Dịch chuyển đế
     end
 end)
 
-local function TriggerPrompt(prompt)
-    if fireproximityprompt then
-        fireproximityprompt(prompt)
-    else
-        pcall(function()
-            prompt:InputHoldBegin()
-            task.wait(prompt.HoldDuration + 0.05)
-            prompt:InputHoldEnd()
-        end)
-    end
-end
 
 createButtonRow(godCard, "Cầu Nguyện Ngay Lập Tức", "Tương tác với Bàn thờ Thần linh ngay bây giờ", "Cầu Nguyện", function()
     local sp = (Workspace:FindFirstChild("NPC") and Workspace.NPC:FindFirstChild("Spirit")) or (Workspace:FindFirstChild("NPC") and Workspace.NPC:FindFirstChild("God"))
@@ -4673,23 +4787,7 @@ createButtonRow(perfCard, "Mở Khóa Toàn Bộ Sách Cá (Index)", "Mở khóa
     ShowNotification("Mở Khóa Index", string.format("Đã mở khóa %d loài cá trong Sách Cá Index!", count > 0 and count or 109), "SUCCESS")
 end)
 
-createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)")
-local exportSkillCard = createCardGroup(tabPlayer)
-local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
-
-createButtonRow(exportSkillCard, "Quét Kỹ Năng Đang Sở Hữu (Chỉ Của Bạn)", "Chỉ quét các kỹ năng bạn thực sự sở hữu trong túi đồ & phím Z,X,C,V", "👤 Skill Của Bạn", function()
-    ExportAllPlayerSkills(infoSkillCount, true)
-end)
-
-createButtonRow(exportSkillCard, "Quét Bách Khoa Toàn Bộ Kỹ Năng Game", "Quét toàn bộ từ điển kỹ năng có trong game (Codex/Shop/Tất cả)", "📚 Toàn Bộ Game", function()
-    ExportAllPlayerSkills(infoSkillCount, false)
-end)
-
-createButtonRow(exportSkillCard, "Mở Bảng Xem Danh Sách Skill", "Mở khung văn bản cuộn trên màn hình để xem và copy", "📜 Mở Bảng Xem", function()
-    ShowSkillTextWindow()
-end)
-
-createCategoryHeader(tabPlayer, "Di Chuyển Nhân Vật")
+createCategoryHeader(tabPlayer, "🏃‍♂️ Di Chuyển & Tốc Độ Nhân Vật (Movement & Speed)", true)
 local moveCard = createCardGroup(tabPlayer)
 
 createToggleRow(moveCard, "Tăng Tốc Độ Chạy (Speed)", "Chạy nhanh hơn tốc độ mặc định", Config.WalkSpeedEnabled, function(v)
@@ -4712,10 +4810,26 @@ createToggleRow(moveCard, "Đi Trên Mặt Nước", "Đi bộ trên mặt biể
 createToggleRow(moveCard, "Khiên Nước Axit (Acid Shield)", "Tạo sàn nổi kháng sát thương độc/axit tại Đảo Fallout", Config.AcidWaterShield, function(v) Config.AcidWaterShield = v end)
 createToggleRow(moveCard, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua vách núi, tường rào và vật cản", Config.Noclip, function(v) Config.Noclip = v end)
 
-createCategoryHeader(tabPlayer, "Chống Văng Game & Ổn Định")
+createCategoryHeader(tabPlayer, "🛡️ Chống Văng Game & Treo Máy (Anti-AFK)", true)
 local stabCard = createCardGroup(tabPlayer)
 createToggleRow(stabCard, "Chống Văng Game (Anti-AFK)", "Chống bị Roblox kick sau 20 phút treo máy", Config.AntiAFK, function(v) Config.AntiAFK = v end)
 createToggleRow(stabCard, "Tự Động Kết Nối Lại", "Tự động vào lại server nếu bị mất kết nối", Config.AutoRejoin, function(v) Config.AutoRejoin = v end)
+
+createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)", false)
+local exportSkillCard = createCardGroup(tabPlayer)
+local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
+
+createButtonRow(exportSkillCard, "Quét Kỹ Năng Đang Sở Hữu (Chỉ Của Bạn)", "Chỉ quét các kỹ năng bạn thực sự sở hữu trong túi đồ & phím Z,X,C,V", "👤 Skill Của Bạn", function()
+    ExportAllPlayerSkills(infoSkillCount, true)
+end)
+
+createButtonRow(exportSkillCard, "Quét Bách Khoa Toàn Bộ Kỹ Năng Game", "Quét toàn bộ từ điển kỹ năng có trong game (Codex/Shop/Tất cả)", "📚 Toàn Bộ Game", function()
+    ExportAllPlayerSkills(infoSkillCount, false)
+end)
+
+createButtonRow(exportSkillCard, "Mở Bảng Xem Danh Sách Skill", "Mở khung văn bản cuộn trên màn hình để xem và copy", "📜 Mở Bảng Xem", function()
+    ShowSkillTextWindow()
+end)
 
 do
     createCategoryHeader(tabProfiles, "Quản Lý Cấu Hình (Profile)")
