@@ -3206,12 +3206,13 @@ createButtonRow(dailyCard, "Nhận Hết Quà 7 Ngày", "Nhận nhanh toàn bộ
     end)
 end)
 
-createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập tất cả mã giftcode mới nhất (PVP, 19KActives, WaitForPeak...)", "Nhập Code", function()
+createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập toàn bộ hơn 90 mã giftcode (PVP, SoTamOrb, 19KActives, mốc Likes & Visits...)", "Nhập Code", function()
     local codes = {
         -- Mã mới nhất & Đang hoạt động
         "PVP",
         "19KActives",
         "WaitForPeak",
+        "SoTamOrb",
         "36MVisits",
         "35MVisits",
         "34MVisits",
@@ -3227,17 +3228,73 @@ createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập t�
         "31MVisits",
         "30MVisits",
         "Taiji",
+        "Balanced",
         "49KLikes",
         "48KLikes",
         "47KLikes",
         "46KLikes",
         "13KActives",
         "17KActives",
+        "9KActives",
         "HWF",
         "RELEASE",
-        -- Các mã sự kiện & cột mốc khác
+        -- Toàn bộ mốc Likes lịch sử
+        "45KLikes",
+        "44KLikes",
+        "43KLikes",
+        "42KLikes",
+        "41KLikes",
+        "40KLikes",
+        "39KLikes",
+        "38KLikes",
+        "37KLikes",
+        "36KLikes",
+        "35KLikes",
+        "34KLikes",
+        "31KLikes",
+        "30KLikes",
+        "29KLikes",
+        "28KLikes",
+        "26KLikes",
+        "25KLikes",
+        "22KLikes",
+        "21KLikes",
+        -- Toàn bộ mốc Visits lịch sử
+        "29MVisits",
+        "28MVisits",
+        "27MVisits",
+        "26MVisits",
+        "25MVisits",
+        "24MVisits",
+        "23MVisits",
+        "22MVisits",
+        "21MVisits",
+        "20M5Visits",
+        "20MVisits",
+        "19M5Visits",
+        "19MVisits",
+        "18M5Visits",
+        "18MVisits",
+        "17M5Visits",
+        "17MVisits",
+        "16M5Visits",
+        "16MVisits",
+        "15M5Visits",
+        "15MVisits",
+        "14M5Visits",
+        "14MVisits",
+        "11MVisits",
+        "10M5Visits",
+        "10MVisits",
+        "9MVisits",
+        "8M5Visits",
+        "7MVisits",
+        "6M5Visits",
+        -- Các mã sự kiện, sửa lỗi & đền bù
         "BigUPD",
         "SorryForShutdown",
+        "InfnanLOL",
+        "367BUG",
         "UIBUG",
         "ThanksForNitroBoost",
         "Enzo",
@@ -3247,6 +3304,7 @@ createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập t�
         "FreeReroll",
         "FreeReroll2",
         "BuyAgain",
+        "BugAgain",
         "BUGBUGBUG",
         "Golden",
         "Hit5KActives",
@@ -3265,8 +3323,18 @@ createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập t�
                 Events.RedeemCode:FireServer(c)
                 task.wait(0.25)
             end
-            ShowNotification("Giftcode", string.format("Đã nạp toàn bộ %d mã code mới nhất vào game!", #codes), "SUCCESS")
+            ShowNotification("Giftcode", string.format("Đã nạp toàn bộ %d mã code vào game!", #codes), "SUCCESS")
         end)
+    end
+end)
+
+createInputRow(dailyCard, "Nhập Mã Code Thủ Công", "Gõ mã giftcode riêng hoặc mã mới ra để nạp ngay", "", function(codeTxt)
+    if codeTxt and codeTxt:gsub("%s+", "") ~= "" then
+        local cleanCode = codeTxt:gsub("%s+", "")
+        if Events and Events:FindFirstChild("RedeemCode") then
+            Events.RedeemCode:FireServer(cleanCode)
+            ShowNotification("Giftcode", "Đã gửi mã: " .. cleanCode, "SUCCESS")
+        end
     end
 end)
 
