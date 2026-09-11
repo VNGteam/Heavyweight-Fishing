@@ -928,74 +928,28 @@ killBtn.MouseButton1Click:Connect(function()
     UnloadScript()
 end)
 
-local pendingCategory = nil
+local pendingHeader = nil
 
 local function createCategoryHeader(parent, text, defaultExpanded)
-    pendingCategory = {
-        parent = parent,
-        text = text,
-        defaultExpanded = (defaultExpanded == nil and true or defaultExpanded)
-    }
-    return nil
-end
-
-local function createCardGroup(parent, customText, defaultExpanded)
-    local headerInfo = pendingCategory
-    pendingCategory = nil
-
-    local titleText = customText or (headerInfo and headerInfo.text)
-    local isExpanded = true
-    if defaultExpanded ~= nil then
-        isExpanded = defaultExpanded
-    elseif headerInfo and headerInfo.defaultExpanded ~= nil then
-        isExpanded = headerInfo.defaultExpanded
-    end
-
-    if not titleText or #titleText == 0 then
-        local group = Instance.new("Frame")
-        group.Size = UDim2.new(1, 0, 0, 0)
-        group.AutomaticSize = Enum.AutomaticSize.Y
-        group.BackgroundColor3 = Colors.RowNormal
-        group.BorderSizePixel = 0
-        group.Parent = parent
-        local s = Instance.new("UIStroke"); s.Color = Colors.BorderSubtle; s.Thickness = 1; s.Parent = group
-        Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
-        local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
-        return group
-    end
-
-    local sectionContainer = Instance.new("Frame")
-    sectionContainer.Name = "Section_" .. tostring(titleText)
-    sectionContainer.Size = UDim2.new(1, 0, 0, 0)
-    sectionContainer.AutomaticSize = Enum.AutomaticSize.Y
-    sectionContainer.BackgroundTransparency = 1
-    sectionContainer.BorderSizePixel = 0
-    sectionContainer.Parent = parent
-
-    local scLayout = Instance.new("UIListLayout")
-    scLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    scLayout.Padding = UDim.new(0, 4)
-    scLayout.Parent = sectionContainer
-
+    local isExpanded = (defaultExpanded == nil and true or defaultExpanded)
     local headerBtn = Instance.new("TextButton")
-    headerBtn.Name = "HeaderBtn"
+    headerBtn.Name = "HeaderBtn_" .. tostring(text)
     headerBtn.Size = UDim2.new(1, 0, 0, 32)
-    headerBtn.BackgroundColor3 = Colors.ControlBg
+    headerBtn.BackgroundColor3 = isExpanded and Colors.ControlBg or Colors.SidebarBg
     headerBtn.BorderSizePixel = 0
     headerBtn.AutoButtonColor = false
     headerBtn.Text = ""
-    headerBtn.LayoutOrder = 1
-    headerBtn.Parent = sectionContainer
+    headerBtn.Parent = parent
 
     local hCorner = Instance.new("UICorner", headerBtn); hCorner.CornerRadius = UDim.new(0, 6)
     local hStroke = Instance.new("UIStroke", headerBtn); hStroke.Color = Colors.BorderSubtle; hStroke.Thickness = 1
     local hPad = Instance.new("UIPadding", headerBtn); hPad.PaddingLeft = UDim.new(0, 10); hPad.PaddingRight = UDim.new(0, 10)
 
     local titleLbl = Instance.new("TextLabel")
-    titleLbl.Size = UDim2.new(1, -75, 1, 0)
+    titleLbl.Size = UDim2.new(1, -85, 1, 0)
     titleLbl.BackgroundTransparency = 1
     titleLbl.Font = Enum.Font.GothamBold
-    titleLbl.Text = string.upper(titleText)
+    titleLbl.Text = string.upper(text)
     titleLbl.TextColor3 = Colors.PurplePrimary
     titleLbl.TextSize = 11
     titleLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -1003,8 +957,8 @@ local function createCardGroup(parent, customText, defaultExpanded)
     titleLbl.Parent = headerBtn
 
     local toggleBadge = Instance.new("TextLabel")
-    toggleBadge.Size = UDim2.new(0, 70, 0, 20)
-    toggleBadge.Position = UDim2.new(1, -70, 0.5, -10)
+    toggleBadge.Size = UDim2.new(0, 76, 0, 22)
+    toggleBadge.Position = UDim2.new(1, -76, 0.5, -11)
     toggleBadge.BackgroundColor3 = isExpanded and Colors.PurpleDark or Colors.RowNormal
     toggleBadge.Font = Enum.Font.GothamBold
     toggleBadge.Text = isExpanded and "▼ Thu gọn" or "▶ Mở rộng"
@@ -1015,6 +969,36 @@ local function createCardGroup(parent, customText, defaultExpanded)
     toggleBadge.Parent = headerBtn
     Instance.new("UICorner", toggleBadge).CornerRadius = UDim.new(0, 4)
 
+    pendingHeader = {
+        btn = headerBtn,
+        title = titleLbl,
+        badge = toggleBadge,
+        stroke = hStroke,
+        defaultTitle = string.upper(text),
+        isExpanded = isExpanded,
+        parent = parent
+    }
+
+    return headerBtn
+end
+
+local function createCardGroup(parent, customText, defaultExpanded)
+    local headerInfo = pendingHeader
+    pendingHeader = nil
+
+    if customText and not headerInfo then
+        createCategoryHeader(parent, customText, defaultExpanded)
+        headerInfo = pendingHeader
+        pendingHeader = nil
+    end
+
+    local isExpanded = true
+    if defaultExpanded ~= nil then
+        isExpanded = defaultExpanded
+    elseif headerInfo and headerInfo.isExpanded ~= nil then
+        isExpanded = headerInfo.isExpanded
+    end
+
     local group = Instance.new("Frame")
     group.Name = "CardBody"
     group.Size = UDim2.new(1, 0, 0, 0)
@@ -1022,56 +1006,61 @@ local function createCardGroup(parent, customText, defaultExpanded)
     group.BackgroundColor3 = Colors.RowNormal
     group.BorderSizePixel = 0
     group.Visible = isExpanded
-    group.LayoutOrder = 2
-    group.Parent = sectionContainer
+    group.Parent = parent
 
-    local gStroke = Instance.new("UIStroke", group); gStroke.Color = Colors.BorderSubtle; gStroke.Thickness = 1
+    local s = Instance.new("UIStroke", group); s.Color = Colors.BorderSubtle; s.Thickness = 1
     Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
-    local gLayout = Instance.new("UIListLayout", group); gLayout.SortOrder = Enum.SortOrder.LayoutOrder; gLayout.Padding = UDim.new(0, 0)
+    local l = Instance.new("UIListLayout", group); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0)
 
-    group._header = {
-        btn = headerBtn,
-        title = titleLbl,
-        badge = toggleBadge,
-        stroke = hStroke,
-        defaultTitle = string.upper(titleText),
-        getExpanded = function() return isExpanded end
-    }
+    if headerInfo then
+        local headerBtn = headerInfo.btn
+        local titleLbl = headerInfo.title
+        local toggleBadge = headerInfo.badge
 
-    local function ToggleExpand()
-        isExpanded = not isExpanded
-        group.Visible = isExpanded
-        if not group._isHighlighted then
-            toggleBadge.Text = isExpanded and "▼ Thu gọn" or "▶ Mở rộng"
-            toggleBadge.TextColor3 = isExpanded and Colors.PurpleAccent or Colors.TextMuted
-            toggleBadge.BackgroundColor3 = isExpanded and Colors.PurpleDark or Colors.RowNormal
-            TweenService:Create(headerBtn, TweenInfo.new(0.15), {
-                BackgroundColor3 = isExpanded and Colors.ControlBg or Colors.SidebarBg
-            }):Play()
-        else
-            toggleBadge.Text = isExpanded and "🟢 Thu gọn (Boss)" or "🟢 Mở (Boss)"
+        group._header = {
+            btn = headerBtn,
+            title = titleLbl,
+            badge = toggleBadge,
+            stroke = headerInfo.stroke,
+            defaultTitle = headerInfo.defaultTitle,
+            getExpanded = function() return group.Visible end
+        }
+
+        local function ToggleExpand()
+            local nowVis = not group.Visible
+            group.Visible = nowVis
+            if not group._isHighlighted then
+                toggleBadge.Text = nowVis and "▼ Thu gọn" or "▶ Mở rộng"
+                toggleBadge.TextColor3 = nowVis and Colors.PurpleAccent or Colors.TextMuted
+                toggleBadge.BackgroundColor3 = nowVis and Colors.PurpleDark or Colors.RowNormal
+                TweenService:Create(headerBtn, TweenInfo.new(0.15), {
+                    BackgroundColor3 = nowVis and Colors.ControlBg or Colors.SidebarBg
+                }):Play()
+            else
+                toggleBadge.Text = nowVis and "🟢 Thu gọn (Boss)" or "🟢 Mở (Boss)"
+            end
         end
+
+        headerBtn.MouseButton1Click:Connect(ToggleExpand)
+        headerBtn.MouseEnter:Connect(function()
+            if not group._isHighlighted then
+                TweenService:Create(headerBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play()
+            else
+                TweenService:Create(headerBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(22, 65, 35)}):Play()
+            end
+        end)
+        headerBtn.MouseLeave:Connect(function()
+            if not group._isHighlighted then
+                TweenService:Create(headerBtn, TweenInfo.new(0.15), {
+                    BackgroundColor3 = group.Visible and Colors.ControlBg or Colors.SidebarBg
+                }):Play()
+            else
+                TweenService:Create(headerBtn, TweenInfo.new(0.15), {
+                    BackgroundColor3 = Color3.fromRGB(15, 48, 25)
+                }):Play()
+            end
+        end)
     end
-
-    headerBtn.MouseButton1Click:Connect(ToggleExpand)
-    headerBtn.MouseEnter:Connect(function()
-        if not group._isHighlighted then
-            TweenService:Create(headerBtn, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play()
-        else
-            TweenService:Create(headerBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(22, 65, 35)}):Play()
-        end
-    end)
-    headerBtn.MouseLeave:Connect(function()
-        if not group._isHighlighted then
-            TweenService:Create(headerBtn, TweenInfo.new(0.15), {
-                BackgroundColor3 = isExpanded and Colors.ControlBg or Colors.SidebarBg
-            }):Play()
-        else
-            TweenService:Create(headerBtn, TweenInfo.new(0.15), {
-                BackgroundColor3 = Color3.fromRGB(15, 48, 25)
-            }):Play()
-        end
-    end)
 
     return group
 end
