@@ -3592,9 +3592,14 @@ local function CheckSkillReady(sk, fUI, minCooldown)
 
     local now = tick()
     local lastUsed = lastSkillUsedTimes[cleanKey] or 0
-    local minCd = minCooldown or Config.TrainSkillCooldown or 1.0
+    local minCd = minCooldown or 0.8
     if (now - lastUsed < minCd) then
         return false
+    end
+
+    -- Nếu đã trôi qua hơn 10 giây kể từ lần cuối cast chiêu này, đảm bảo 100% chiêu đã hồi xong
+    if (now - lastUsed >= 10.0) then
+        return true
     end
 
     if fUI then
@@ -3606,8 +3611,15 @@ local function CheckSkillReady(sk, fUI, minCooldown)
                 end
                 for _, child in ipairs(desc:GetDescendants()) do
                     if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
-                        if tonumber(child.Text:match("^%s*(%d+)")) then
-                            return false
+                        local cName = child.Name:lower()
+                        -- Bỏ qua label hiển thị Damage / Power / Level / Name
+                        if not cName:find("dmg") and not cName:find("damage") and not cName:find("power") and not cName:find("level") and not cName:find("title") and not cName:find("name") then
+                            local numStr = child.Text:match("^%s*(%d+%.?%d*)%s*s?%s*$")
+                            local num = tonumber(numStr)
+                            -- Cooldown chiêu thực tế từ 0.5s đến 30s. Nếu là số lớn như 80, 103, 132 thì đó là Damage!
+                            if num and num > 0 and num <= 30 then
+                                return false
+                            end
                         end
                     end
                 end
@@ -3646,12 +3658,23 @@ local function GetFishHealth(fUI)
     end
 
     if fUI then
-        for _, lblName in ipairs({"FishHP", "HPFish", "Health", "HP", "BossHP", "TargetHP"}) do
+        for _, lblName in ipairs({"FishHP", "HPFish", "Health", "HP", "BossHP", "TargetHP", "Value"}) do
             local d = fUI:FindFirstChild(lblName, true)
             if d and d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
-                local num = d.Text:match("(%d+[,%d*]*)%s*/") or d.Text:match("(%d+[,%d*]*)")
-                if num then
-                    local cleanNum = num:gsub(",", "")
+                local txt = d.Text
+                -- Xử lý viết tắt dạng 3k / 3.5k HP
+                local kMatch = txt:match("([%d%.]+)%s*[kK]")
+                if kMatch and tonumber(kMatch) then
+                    return tonumber(kMatch) * 1000
+                end
+                local mMatch = txt:match("([%d%.]+)%s*[mM]")
+                if mMatch and tonumber(mMatch) then
+                    return tonumber(mMatch) * 1000000
+                end
+                -- Xử lý chuỗi số có dấu cách ngăn cách (3 000 / 3 000) hoặc dấu phẩy
+                local rawNum = txt:match("([%d%s,%._]+)%s*/") or txt:match("([%d%s,%._]+)")
+                if rawNum then
+                    local cleanNum = rawNum:gsub("[%s,]", "")
                     if tonumber(cleanNum) then return tonumber(cleanNum) end
                 end
             end
@@ -3688,6 +3711,12 @@ local function GetPlayerHealth(fUI)
 end
 
 local function IsCharacterCastingSkill()
+    local now = tick()
+    -- Chỉ coi là animation skill trong tối đa 1.4s kể từ khi tung chiêu, tránh bị kẹt vĩnh viễn
+    if (now - lastComboSkillCastTime > 1.4) then
+        return false
+    end
+
     local char = LocalPlayer.Character
     if not char then return false end
 
@@ -3705,8 +3734,11 @@ local function IsCharacterCastingSkill()
             for _, tr in ipairs(tracks) do
                 if tr.IsPlaying and (tr.Priority == Enum.AnimationPriority.Action or tr.Priority == Enum.AnimationPriority.Action2 or tr.Priority == Enum.AnimationPriority.Action3 or tr.Priority == Enum.AnimationPriority.Action4) then
                     local animName = tr.Name:lower()
-                    if animName:find("skill") or animName:find("attack") or animName:find("cast") or animName:find("strike") or animName:find("special") then
-                        return true
+                    -- Loại bỏ các animation câu cá / quăng cần / cuộn dây (tránh nhận nhầm làm kẹt combo)
+                    if not animName:find("fish") and not animName:find("rod") and not animName:find("reel") and not animName:find("cast") and not animName:find("idle") and not animName:find("hold") then
+                        if animName:find("skill") or animName:find("attack") or animName:find("special") or animName:find("slash") then
+                            return true
+                        end
                     end
                 end
             end
@@ -3878,7 +3910,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             
             -- XỬ LÝ FAST SKIP KHI SĂN SECRET BOSS (NẾU KHÔNG PHẢI BOSS MỤC TIÊU THÌ GIẬT CẦN THẢ LẠI)
             local skipTriggered = false
-            if Config.AutoChatSecretBoss and secretBossState.active and Config.FastSkipNonBoss then
+            -- Tuyệt đối KHÔNG tự động giật cần nếu người dùng đang bật Smart Combo hoặc khi con cá là cá to (> threshold)
+            local curFishHp = GetFishHealth(fUI)
+            local isBigFish = (curFishHp > (Config.FishHpThreshold or 500)) and (curFishHp < 999990)
+
+            if Config.AutoChatSecretBoss and secretBossState.active and Config.FastSkipNonBoss and not Config.SmartComboEnabled and not isBigFish then
                 if secretBossState.minigameStartTime == 0 then
                     secretBossState.minigameStartTime = now
                 end
@@ -3931,7 +3967,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
 
             if not skipTriggered then
-                if Config.AutoTrainSkill then
+                if Config.AutoTrainSkill and not Config.SmartComboEnabled then
                     if not isTrainingBusy then
                         isTrainingBusy = true
                         task.spawn(function()
@@ -4073,7 +4109,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         if Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" then
                             local playerHp = GetPlayerHealth(fUI)
                             if playerHp <= (Config.EmergencyHealHp or 40) then
-                                if CheckSkillReady(Config.EmergencyHealSkill, fUI, 1.0) then
+                                if CheckSkillReady(Config.EmergencyHealSkill, fUI, 0.8) then
                                     CastSkill(Config.EmergencyHealSkill)
                                     healTriggered = true
                                 end
@@ -4086,17 +4122,34 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             local threshold = Config.FishHpThreshold or 500
 
                             if fishHp <= threshold then
-                                -- Máu cá <= 500 HP: Cá nhỏ/thường/yếu -> Tung ngay chiêu dứt điểm nhanh (Quick Catch)
+                                -- Máu cá <= threshold (ví dụ <= 900 HP): Ưu tiên tung chiêu kết liễu
+                                local finisherCasted = false
                                 if Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" then
-                                    if CheckSkillReady(Config.QuickCatchSkill, fUI, 1.0) then
+                                    if CheckSkillReady(Config.QuickCatchSkill, fUI, 0.8) then
                                         CastSkill(Config.QuickCatchSkill)
+                                        finisherCasted = true
+                                    end
+                                end
+                                -- Nếu chiêu kết liễu đang hồi, tiếp tục tung chuỗi chiêu Loop (X, V) để dứt điểm cá, không đứng im!
+                                if not finisherCasted then
+                                    local loopKeys = {}
+                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
+                                        table.insert(loopKeys, k:upper())
+                                    end
+                                    if #loopKeys == 0 then loopKeys = {"X", "V"} end
+
+                                    for _, sk in ipairs(loopKeys) do
+                                        if CheckSkillReady(sk, fUI, 0.8) then
+                                            CastSkill(sk)
+                                            break
+                                        end
                                     end
                                 end
                             else
-                                -- Máu cá > 500 HP: Cá to/Boss -> Bật chuỗi Combo chiến thuật
+                                -- Máu cá > threshold (Cá to / Boss 3k HP): Bật chuỗi Combo chiến thuật
                                 local openerTriggered = false
                                 if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and (openerUsedCount < (Config.OpenerMaxCount or 1)) then
-                                    if CheckSkillReady(Config.OpenerSkill, fUI, 1.0) then
+                                    if CheckSkillReady(Config.OpenerSkill, fUI, 0.8) then
                                         CastSkill(Config.OpenerSkill)
                                         openerUsedCount = openerUsedCount + 1
                                         openerTriggered = true
@@ -4104,15 +4157,15 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
 
                                 if not openerTriggered then
-                                    -- Chuỗi đảo chiêu luân phiên (Core Loop)
+                                    -- Chuỗi đảo chiêu luân phiên (Core Loop: X, V)
                                     local loopKeys = {}
-                                    for k in string.gmatch(Config.LoopSkills or "X, C", "([ZXCVzxcv])") do
+                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
                                         table.insert(loopKeys, k:upper())
                                     end
-                                    if #loopKeys == 0 then loopKeys = {"X", "C"} end
+                                    if #loopKeys == 0 then loopKeys = {"X", "V"} end
 
                                     for _, sk in ipairs(loopKeys) do
-                                        if CheckSkillReady(sk, fUI, 1.0) then
+                                        if CheckSkillReady(sk, fUI, 0.8) then
                                             CastSkill(sk)
                                             break
                                         end
