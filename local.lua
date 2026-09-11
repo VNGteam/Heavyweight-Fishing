@@ -146,6 +146,7 @@ local Config = {
     -- TỰ ĐỘNG SĂN SECRET BOSS THEO CHAT & TẠI ĐẢO
     AutoHuntBoss = false,
     AutoChatSecretBoss = false,
+    AutoLockSecretBoss = true,
     AutoServerHopOnDespawn = false,
     FastSkipNonBoss = true,
     SecretBossCheckPower = true,
@@ -285,6 +286,8 @@ local ConfigLabelMap = {
     ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
     ["Bật Săn Secret Boss (Chat Sniper)"] = "AutoChatSecretBoss",
     ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
+    ["Tự Động Khóa Secret Boss"] = "AutoLockSecretBoss",
+    ["Khóa Secret Boss"] = "AutoLockSecretBoss",
     ["Giật Cần Thả Lại (Fast Skip Cá Thường)"] = "FastSkipNonBoss",
     ["Bỏ Qua Cá Thường (Fast Skip)"] = "FastSkipNonBoss",
     ["Kiểm Tra Lực Cần (Power Check)"] = "SecretBossCheckPower",
@@ -2815,6 +2818,7 @@ end)
 local fishList = {"Colossal Tigerfish", "Heavenpiercer Turtle", "Golden Guardian Fish", "Crimson Electric Eel", "Frost Kingfish", "Ascended Perch", "Primordial Kunfish Overlord", "Warbringer Shark", "Mountain Fish", "Tiger Mirefish", "Mirage Lanternfish", "Octoparasitic Fish", "Elder Scarlet Fish", "Verdant Bonefang", "Draconic Koi", "Sanguine Fish", "Flying Fish Emperor", "Reborn Puffer Beast"}
 createToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá quý hiếm đã chọn, không bao giờ bị bán nhầm", Config.AutoFavouriteFish, function(v) Config.AutoFavouriteFish = v end)
 createDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName, function(v) Config.FavouriteFishName = v end)
+createToggleRow(sellCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) mọi cá Secret Boss trong balo không để bị bán nhầm", Config.AutoLockSecretBoss, function(v) Config.AutoLockSecretBoss = v end)
 createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
 createToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
 
@@ -2908,6 +2912,10 @@ createToggleRow(chatBossCard, "Tự Động Bay Theo Chat (Chat Sniper)", "Tự 
             end
         end
     end
+end)
+
+createToggleRow(chatBossCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) các loài Secret Boss khi câu được, chống bị bán mất", Config.AutoLockSecretBoss, function(v)
+    Config.AutoLockSecretBoss = v
 end)
 
 createToggleRow(chatBossCard, "Bỏ Qua Cá Thường (Fast Skip)", "Nếu cắn câu không phải Secret Boss đã chọn thì lập tức giật cần thả lại", Config.FastSkipNonBoss, function(v)
@@ -4135,6 +4143,106 @@ local craftMaterialFish = {
     ["Flying Fish Emperor"] = true,
 }
 
+local function IsItemFavorited(item)
+    if not item then return false end
+    local favVal = item:FindFirstChild("Favorite")
+    if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
+    if item:GetAttribute("Favorite") == true then return true end
+    local lockVal = item:FindFirstChild("Locked")
+    if lockVal and (lockVal.Value == true or lockVal.Value == 1) then return true end
+    if item:GetAttribute("Locked") == true then return true end
+    return false
+end
+
+local function IsSecretBossFish(item)
+    if not item then return false end
+    local rawName = tostring(item.Name or "")
+    local lowerName = rawName:lower()
+
+    for bLower, _ in pairs(secretBossLookup) do
+        if lowerName:find(bLower, 1, true) then
+            return true
+        end
+    end
+
+    if item:GetAttribute("Boss") == true or item:GetAttribute("Secret") == true or item:GetAttribute("IsBoss") == true then
+        return true
+    end
+
+    return false
+end
+
+local function IsMutatedFish(item)
+    if not item then return false end
+    local name = tostring(item.Name or "")
+    for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
+        if name:find(kw) then return true end
+    end
+    local mutVal = item:FindFirstChild("Mutation")
+    if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
+        return true
+    end
+    for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
+        local v = item:GetAttribute(attr)
+        if v and tostring(v) ~= "" and tostring(v) ~= "None" then
+            return true
+        end
+    end
+    return false
+end
+
+local function ProtectInventoryItem(item, showNotify)
+    if not item or IsItemFavorited(item) then return false end
+    local itemName = item.Name
+    local shouldProtect = false
+    local reason = ""
+
+    if Config.AutoLockSecretBoss and IsSecretBossFish(item) then
+        shouldProtect = true
+        reason = "Secret Boss"
+    elseif Config.AutoProtectMutations and IsMutatedFish(item) then
+        shouldProtect = true
+        reason = "Cá Đột Biến"
+    elseif Config.MaterialFarming and craftMaterialFish[itemName] then
+        shouldProtect = true
+        reason = "Nguyên Liệu"
+    elseif Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then
+        shouldProtect = true
+        reason = "Cá Quý Chỉ Định"
+    end
+
+    if shouldProtect and Events and Events:FindFirstChild("FavoriteItem") then
+        Events.FavoriteItem:FireServer(item)
+        if showNotify and reason == "Secret Boss" then
+            ShowNotification("Khóa Secret Boss", "Đã tự động KHÓA bảo vệ [" .. itemName .. "] không bị bán!", "SUCCESS", 6)
+        end
+        return true
+    end
+    return false
+end
+
+local function ProtectAllInventoryItems(showNotify)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if pData and pData:FindFirstChild("Inventory") then
+        for _, item in ipairs(pData.Inventory:GetChildren()) do
+            ProtectInventoryItem(item, showNotify)
+        end
+    end
+end
+
+-- Lắng nghe khi nhận được cá mới vào balo -> Khóa ngay lập tức nếu là Secret Boss
+task.spawn(function()
+    local pDataInit = ReplicatedStorage:WaitForChild("Data", 10)
+    local userFolder = pDataInit and pDataInit:WaitForChild(tostring(LocalPlayer.UserId), 10)
+    local invFolder = userFolder and userFolder:WaitForChild("Inventory", 10)
+    if invFolder then
+        table.insert(activeConnections, invFolder.ChildAdded:Connect(function(child)
+            task.wait(0.3)
+            ProtectInventoryItem(child, true)
+        end))
+    end
+end)
+
 local waterPlatform = Instance.new("Part")
 waterPlatform.Name = "IdenticalWaterPlatform"
 waterPlatform.Size = Vector3.new(60, 2, 60)
@@ -4216,6 +4324,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             openerUsedCount = 0
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
+            if wasMinigame and secretBossState.isCatchingTarget then
+                task.delay(0.5, function()
+                    ProtectAllInventoryItems(true)
+                end)
+            end
             minigameDurationTracker = 0
             secretBossState.webhookSentForCurrent = false
             secretBossState.isCatchingTarget = false
@@ -4533,99 +4646,23 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                     if invCount >= pData.InventoryLimit.Value then
                         canCast = false
-                        local function IsMutatedFish(item)
-                            local name = item.Name
-                            for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
-                                if name:find(kw) then return true end
-                            end
-                            local mutVal = item:FindFirstChild("Mutation")
-                            if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
-                                return true
-                            end
-                            for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
-                                local v = item:GetAttribute(attr)
-                                if v and tostring(v) ~= "" and tostring(v) ~= "None" then
-                                    return true
-                                end
-                            end
-                            return false
-                        end
-
                         if Config.AutoSell and (now - lastSellTime >= 5.0) and Events:FindFirstChild("SellFish") then
-                            if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and pData:FindFirstChild("Inventory") then
-                                for _, item in ipairs(pData.Inventory:GetChildren()) do
-                                    local itemName = item.Name
-                                    local isFav = item:FindFirstChild("Favorite") and item.Favorite.Value == true
-                                    if not isFav then
-                                        local shouldFav = false
-                                        if Config.AutoProtectMutations and IsMutatedFish(item) then shouldFav = true end
-                                        if Config.MaterialFarming and craftMaterialFish[itemName] then shouldFav = true end
-                                        if Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then shouldFav = true end
-                                        if shouldFav and Events:FindFirstChild("FavoriteItem") then
-                                            Events.FavoriteItem:FireServer(item)
-                                        end
-                                    end
-                                end
-                            end
+                            ProtectAllInventoryItems(false)
                             Events.SellFish:FireServer("All")
                             lastSellTime = now
                         end
                     end
                 end
 
-                local function IsMutatedFish(item)
-                    local name = item.Name
-                    for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
-                        if name:find(kw) then return true end
-                    end
-                    local mutVal = item:FindFirstChild("Mutation")
-                    if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
-                        return true
-                    end
-                    for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
-                        local v = item:GetAttribute(attr)
-                        if v and tostring(v) ~= "" and tostring(v) ~= "None" then
-                            return true
-                        end
-                    end
-                    return false
-                end
-
                 if Config.AutoSell and (now - lastSellTime >= Config.SellInterval) and Events:FindFirstChild("SellFish") then
-                    if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and pData and pData:FindFirstChild("Inventory") then
-                        for _, item in ipairs(pData.Inventory:GetChildren()) do
-                            local itemName = item.Name
-                            local isFav = item:FindFirstChild("Favorite") and item.Favorite.Value == true
-                            if not isFav then
-                                local shouldFav = false
-                                if Config.AutoProtectMutations and IsMutatedFish(item) then shouldFav = true end
-                                if Config.MaterialFarming and craftMaterialFish[itemName] then shouldFav = true end
-                                if Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then shouldFav = true end
-                                if shouldFav and Events:FindFirstChild("FavoriteItem") then
-                                    Events.FavoriteItem:FireServer(item)
-                                end
-                            end
-                        end
-                    end
+                    ProtectAllInventoryItems(false)
                     Events.SellFish:FireServer("All")
                     lastSellTime = now
                 end
 
-                if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and (now - lastProtectTime >= 1.5) and pData and pData:FindFirstChild("Inventory") then
+                if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations or Config.AutoLockSecretBoss) and (now - lastProtectTime >= 1.5) then
                     lastProtectTime = now
-                    for _, item in ipairs(pData.Inventory:GetChildren()) do
-                        local itemName = item.Name
-                        local isFav = item:FindFirstChild("Favorite") and item.Favorite.Value == true
-                        if not isFav then
-                            local shouldProtect = false
-                            if Config.AutoProtectMutations and IsMutatedFish(item) then shouldProtect = true end
-                            if Config.MaterialFarming and craftMaterialFish[itemName] then shouldProtect = true end
-                            if Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then shouldProtect = true end
-                            if shouldProtect and Events:FindFirstChild("FavoriteItem") then
-                                Events.FavoriteItem:FireServer(item)
-                            end
-                        end
-                    end
+                    ProtectAllInventoryItems(false)
                 end
 
                 if canCast and Events and Events:FindFirstChild("Fishing") then
