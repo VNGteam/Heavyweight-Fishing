@@ -2115,13 +2115,17 @@ local function ServerHop()
     end)
 end
 
-local function CancelAndRecastRod()
+local function CancelAndRecastRod(forceCast)
     local char = LocalPlayer.Character
     if not char then return end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
         hum:UnequipTools()
     end
+    local isBossActive = secretBossState and secretBossState.active
+    local shouldRecast = forceCast or Config.AutoCast or Config.AutoTrainSkill or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
+    if not shouldRecast then return end
+
     task.delay(0.2, function()
         if not isRunning then return end
         if Events and Events:FindFirstChild("ToggleHotbar") then
@@ -2471,10 +2475,12 @@ function secretBossState.ReturnToHome()
         secretBossState.currentMap = "Home Farm"
         secretBossState.standPos = homeCf.Position
 
-        -- Bắt đầu quăng cần sau 1.5s
+        -- Bắt đầu quăng cần sau 1.5s nếu có bật AutoCast hoặc AutoTrainSkill
         task.delay(1.5, function()
             if not isRunning then return end
-            CancelAndRecastRod()
+            if Config.AutoCast or Config.AutoTrainSkill then
+                CancelAndRecastRod()
+            end
         end)
         return true
     end
@@ -6345,7 +6351,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local isCD = char:GetAttribute("CDForTheNextThrow") == true
         local isSwimming = char:GetAttribute("Swimming") == true
 
-        local shouldAutoFish = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or Config.AutoChatSecretBoss
+        local isBossActive = secretBossState and secretBossState.active
+        local shouldAutoFish = Config.AutoCast or Config.AutoTrainSkill or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
 
         if shouldAutoFish and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
             lastEquipRodTime = now
@@ -6784,7 +6791,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             secretBossState.minigameStartTime = 0
             lastCastTime = now
         else
-            local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or Config.AutoHuntBoss or Config.AutoChatSecretBoss
+            local isBossActive = secretBossState and secretBossState.active
+            local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
             if shouldAutoCast and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
                 local canCast = true
                 if pData and pData:FindFirstChild("InventoryLimit") then
