@@ -3215,6 +3215,9 @@ createButtonRow(dailyCard, "Nhập Toàn Bộ Mã Code", "Tự động nhập to
         "39MVisits",
         "38MVisits",
         "37MVisits",
+        "9KActive",
+        "9KActives",
+        "SorryForShutdown",
         -- Mã đang hoạt động & hot
         "PVP",
         "19KActives",
