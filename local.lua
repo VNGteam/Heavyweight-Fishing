@@ -1258,8 +1258,14 @@ local secretBossDatabase = {
         patterns = {"bamboo", "đảo tre", "dao tre", "đảo 2", "dao 2"},
         weatherPatterns = {"thunderstorm", "bão sấm", "bao sam", "thunder", "sấm", "lightning"},
         bossPatterns = {"scarlet fish", "elder scarlet", "crimson electric eel", "electric eel"},
-        pos = Vector3.new(-1236.8, 8.5, -174.1),
-        lookAt = Vector3.new(-1250.0, 7.0, -220.0),
+        pos = Vector3.new(-1187.8, 7.5, -22.5),
+        lookAt = Vector3.new(-1137.9, 7.5, -24.9),
+        spots = {
+            [1] = {
+                pos = Vector3.new(-1187.8, 7.5, -22.5),
+                lookAt = Vector3.new(-1137.9, 7.5, -24.9),
+            },
+        },
         bosses = {
             {name = "Scarlet Fish", reward = "+3 Gems"},
             {name = "Elder Scarlet Fish", reward = "+5 Gems"},
@@ -1272,8 +1278,14 @@ local secretBossDatabase = {
         patterns = {"fallout", "phóng xạ", "phong xa", "đảo 3", "dao 3"},
         weatherPatterns = {"rainy", "trời mưa", "troi mua", "heavy rain", "mưa", "rain"},
         bossPatterns = {"alligator gar", "verdant alligator", "verdant grouper", "verdant bonefang", "bonefang"},
-        pos = Vector3.new(138.4, 9.5, 1179.7),
-        lookAt = Vector3.new(165.0, 7.5, 1220.0),
+        pos = Vector3.new(12.0, 19.0, 1413.0),
+        lookAt = Vector3.new(8.3, 19.0, 1363.2),
+        spots = {
+            [1] = {
+                pos = Vector3.new(12.0, 19.0, 1413.0),
+                lookAt = Vector3.new(8.3, 19.0, 1363.2),
+            },
+        },
         bosses = {
             {name = "Verdant Alligator Gar", reward = "+3 Gems | Skill 25%"},
             {name = "Verdant Grouper", reward = "+3 Gems | Skill 25%"},
@@ -1286,8 +1298,14 @@ local secretBossDatabase = {
         patterns = {"perch", "cá chép", "ca chep", "đảo 5", "dao 5"},
         weatherPatterns = {"windy", "trời gió", "troi gio", "gale", "gió", "wind"},
         bossPatterns = {"flying fish empress", "flying fish emperor", "flying fish"},
-        pos = Vector3.new(-9.5, 9.5, -1330.0),
-        lookAt = Vector3.new(15.0, 7.5, -1370.0),
+        pos = Vector3.new(-85.3, 9.3, -1340.8),
+        lookAt = Vector3.new(-114.0, 9.3, -1381.8),
+        spots = {
+            [1] = {
+                pos = Vector3.new(-85.3, 9.3, -1340.8),
+                lookAt = Vector3.new(-114.0, 9.3, -1381.8),
+            },
+        },
         bosses = {
             {name = "Flying Fish Empress", reward = "+10 Gems | Skill 10%"},
             {name = "Flying Fish Emperor", reward = "+10 Gems | Skill 10%"},
@@ -1299,8 +1317,14 @@ local secretBossDatabase = {
         patterns = {"frost", "băng giá", "bang gia", "đảo băng", "dao bang", "đảo 6", "dao 6"},
         weatherPatterns = {"snowy", "bão tuyết", "bao tuyet", "blizzard", "tuyết", "snow", "frosty"},
         bossPatterns = {"reborn puffer beast", "puffer beast", "frost kingfish"},
-        pos = Vector3.new(-1400.4, 9.5, -1490.6),
-        lookAt = Vector3.new(-1430.0, 7.5, -1530.0),
+        pos = Vector3.new(-1347.6, 8.9, -1454.2),
+        lookAt = Vector3.new(-1353.8, 8.9, -1404.6),
+        spots = {
+            [1] = {
+                pos = Vector3.new(-1347.6, 8.9, -1454.2),
+                lookAt = Vector3.new(-1353.8, 8.9, -1404.6),
+            },
+        },
         bosses = {
             {name = "Reborn Puffer Beast", reward = "+10 Gems"},
             {name = "Frost Kingfish", reward = "+10 Gems | Skill Drop"},
@@ -1312,8 +1336,14 @@ local secretBossDatabase = {
         patterns = {"coconut", "quả dừa", "qua dua", "đảo dừa", "dao dua", "đảo 7", "dao 7"},
         weatherPatterns = {"foggy", "sương mù", "suong mu", "dense fog", "mist", "sương", "fog"},
         bossPatterns = {"tigerfang whale", "tigerfang", "heaven piercer turtle", "piercer turtle"},
-        pos = Vector3.new(1446.0, 9.5, -1408.0),
-        lookAt = Vector3.new(1465.0, 7.5, -1445.0),
+        pos = Vector3.new(1412.0, 9.3, -1457.7),
+        lookAt = Vector3.new(1404.0, 9.3, -1408.4),
+        spots = {
+            [1] = {
+                pos = Vector3.new(1412.0, 9.3, -1457.7),
+                lookAt = Vector3.new(1404.0, 9.3, -1408.4),
+            },
+        },
         bosses = {
             {name = "Tigerfang Whale", reward = "+5 Gems | Skill Drop"},
             {name = "Heaven Piercer Turtle", reward = "+5 Gems"},
@@ -1325,8 +1355,14 @@ local secretBossDatabase = {
         patterns = {"amber", "hổ phách", "ho phach", "đảo 8", "dao 8"},
         weatherPatterns = {"blazing sun", "nắng gắt", "nang gat", "blazing", "heatwave", "nắng", "sun"},
         bossPatterns = {"draconic koi", "draconic", "sanguine fish", "sanguine"},
-        pos = Vector3.new(1292.7, 8.5, 1497.4),
-        lookAt = Vector3.new(1315.0, 7.0, 1535.0),
+        pos = Vector3.new(1146.0, 9.3, 1391.6),
+        lookAt = Vector3.new(1096.2, 9.3, 1395.8),
+        spots = {
+            [1] = {
+                pos = Vector3.new(1146.0, 9.3, 1391.6),
+                lookAt = Vector3.new(1096.2, 9.3, 1395.8),
+            },
+        },
         bosses = {
             {name = "Draconic Koi", reward = "+5 Gems"},
             {name = "Sanguine Fish", reward = "+20 Gems | Skill 10%"},
@@ -1338,8 +1374,14 @@ local secretBossDatabase = {
         patterns = {"battlefield", "chiến trường", "chien truong", "đảo 9", "dao 9"},
         weatherPatterns = {"boss realm", "realm"},
         bossPatterns = {"primordial kunfish", "kunfish overlord", "kunfish", "warbringer shark", "warbringer"},
-        pos = Vector3.new(1393.5, 11.5, 169.6),
-        lookAt = Vector3.new(1425.0, 8.0, 195.0),
+        pos = Vector3.new(1365.5, 8.9, 270.4),
+        lookAt = Vector3.new(1316.1, 8.9, 262.6),
+        spots = {
+            [1] = {
+                pos = Vector3.new(1365.5, 8.9, 270.4),
+                lookAt = Vector3.new(1316.1, 8.9, 262.6),
+            },
+        },
         bosses = {
             {name = "Primordial Kunfish Overlord", reward = "+30 Gems"},
             {name = "Warbringer Shark", reward = "+25 Gems"},
@@ -1351,8 +1393,14 @@ local secretBossDatabase = {
         patterns = {"mistpeak", "đỉnh sương mù", "dinh suong mu", "đảo 10", "dao 10"},
         weatherPatterns = {"mountain peak", "mistpeak", "đỉnh núi"},
         bossPatterns = {"mountain fish"},
-        pos = Vector3.new(2660.2, 9.0, -86.7),
-        lookAt = Vector3.new(2685.0, 7.0, -110.0),
+        pos = Vector3.new(2579.1, 9.3, 11.7),
+        lookAt = Vector3.new(2529.3, 9.3, 7.3),
+        spots = {
+            [1] = {
+                pos = Vector3.new(2579.1, 9.3, 11.7),
+                lookAt = Vector3.new(2529.3, 9.3, 7.3),
+            },
+        },
         bosses = {
             {name = "Mountain Fish", reward = "+20 Gems | Skill 5%"},
         }
@@ -1365,6 +1413,12 @@ local secretBossDatabase = {
         bossPatterns = {"octoparasitic fish", "octoparasitic", "octoparasite"},
         pos = Vector3.new(1608.2, 5.5, -218.3),
         lookAt = Vector3.new(1635.0, 5.0, -235.0),
+        spots = {
+            [1] = {
+                pos = Vector3.new(1608.2, 5.5, -218.3),
+                lookAt = Vector3.new(1635.0, 5.0, -235.0),
+            },
+        },
         bosses = {
             {name = "Octoparasitic Fish", reward = "+50 Gems | Secret"},
         }
@@ -1895,19 +1949,38 @@ end
 function secretBossState.GetIslandSpots(islandName)
     local spots = {}
     local custom = Config.CustomBossSpots and Config.CustomBossSpots[islandName]
-    if not custom then return spots end
 
-    if custom.spots and type(custom.spots) == "table" then
-        for i = 1, 3 do
-            local s = custom.spots[i] or custom.spots[tostring(i)]
-            if s and s.cframe then
-                table.insert(spots, { slot = i, cframe = s.cframe, savedAt = s.savedAt })
+    if custom then
+        if custom.spots and type(custom.spots) == "table" then
+            for i = 1, 3 do
+                local s = custom.spots[i] or custom.spots[tostring(i)]
+                if s and s.cframe then
+                    table.insert(spots, { slot = i, cframe = s.cframe, savedAt = s.savedAt })
+                end
             end
+        end
+
+        if #spots == 0 and custom.cframe then
+            table.insert(spots, { slot = 1, cframe = custom.cframe, savedAt = custom.savedAt })
         end
     end
 
-    if #spots == 0 and custom.cframe then
-        table.insert(spots, { slot = 1, cframe = custom.cframe, savedAt = custom.savedAt })
+    -- Nếu người chơi chưa tự lưu vị trí riêng, tự động dùng vị trí chuẩn đã nạp sẵn trong script gốc
+    if #spots == 0 then
+        for _, entry in ipairs(secretBossDatabase) do
+            if entry.islandName == islandName then
+                if entry.spots and #entry.spots > 0 then
+                    for idx, sp in ipairs(entry.spots) do
+                        local cf = CFrame.lookAt(sp.pos, sp.lookAt)
+                        table.insert(spots, { slot = idx, cframe = {cf:GetComponents()}, savedAt = "Mặc Định (Gốc)" })
+                    end
+                elseif entry.pos and entry.lookAt then
+                    local cf = CFrame.lookAt(entry.pos, entry.lookAt)
+                    table.insert(spots, { slot = 1, cframe = {cf:GetComponents()}, savedAt = "Mặc Định (Gốc)" })
+                end
+                break
+            end
+        end
     end
 
     return spots
@@ -1915,13 +1988,28 @@ end
 
 function secretBossState.GetIslandSlotSpot(islandName, slot)
     local custom = Config.CustomBossSpots and Config.CustomBossSpots[islandName]
-    if not custom then return nil end
-    if custom.spots and type(custom.spots) == "table" then
-        local s = custom.spots[slot] or custom.spots[tostring(slot)]
-        if s and s.cframe then return s end
+    if custom then
+        if custom.spots and type(custom.spots) == "table" then
+            local s = custom.spots[slot] or custom.spots[tostring(slot)]
+            if s and s.cframe then return s end
+        end
+        if slot == 1 and custom.cframe then
+            return { cframe = custom.cframe, savedAt = custom.savedAt }
+        end
     end
-    if slot == 1 and custom.cframe then
-        return { cframe = custom.cframe, savedAt = custom.savedAt }
+
+    -- Fallback vào vị trí chuẩn trong database
+    for _, entry in ipairs(secretBossDatabase) do
+        if entry.islandName == islandName then
+            if entry.spots and (entry.spots[slot] or entry.spots[tostring(slot)]) then
+                local sp = entry.spots[slot] or entry.spots[tostring(slot)]
+                local cf = CFrame.lookAt(sp.pos, sp.lookAt)
+                return { cframe = {cf:GetComponents()}, savedAt = "Mặc Định (Gốc)" }
+            elseif slot == 1 and entry.pos and entry.lookAt then
+                local cf = CFrame.lookAt(entry.pos, entry.lookAt)
+                return { cframe = {cf:GetComponents()}, savedAt = "Mặc Định (Gốc)" }
+            end
+        end
     end
     return nil
 end
@@ -3507,13 +3595,11 @@ do
     local function GetSpotStats()
         local islandCount = 0
         local spotCount = 0
-        if Config.CustomBossSpots then
-            for _, entry in ipairs(secretBossDatabase) do
-                local spots = secretBossState.GetIslandSpots(entry.islandName)
-                if #spots > 0 then
-                    islandCount = islandCount + 1
-                    spotCount = spotCount + #spots
-                end
+        for _, entry in ipairs(secretBossDatabase) do
+            local spots = secretBossState.GetIslandSpots(entry.islandName)
+            if #spots > 0 then
+                islandCount = islandCount + 1
+                spotCount = spotCount + #spots
             end
         end
         return islandCount, spotCount
