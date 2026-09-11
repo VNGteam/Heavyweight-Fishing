@@ -4147,6 +4147,8 @@ local isTrainingBusy = false
 local lastGlobalSkillCastTime = 0
 local comboState = {
     openerUsedCount = 0,
+    openerDone = false,
+    loopTargetIndex = 1,
     loopIndex = 1,
     lastCastTime = 0,
     minigameStartTime = 0,
@@ -4221,18 +4223,40 @@ local function CheckSkillReady(sk, fUI, minCooldown)
     return true
 end
 
-local function ExecuteComboLoop(loopKeys, fUI)
-    if not loopKeys or #loopKeys == 0 then return false end
-    local n = #loopKeys
-    if comboState.loopIndex > n then comboState.loopIndex = 1 end
+local function IsSkillOnCooldown(sk, fUI)
+    if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = sk:match("([ZXCVzxcv])") or sk
+    cleanKey = cleanKey:upper()
 
-    for offset = 0, n - 1 do
-        local idx = ((comboState.loopIndex - 1 + offset) % n) + 1
-        local candidateSkill = loopKeys[idx]
-        if candidateSkill and CheckSkillReady(candidateSkill, fUI, 0.8) then
-            if CastSkill(candidateSkill) then
-                comboState.loopIndex = (idx % n) + 1
-                return true
+    if fUI then
+        for _, desc in ipairs(fUI:GetDescendants()) do
+            local nameUpper = desc.Name:upper()
+            if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
+                if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
+                    return true
+                end
+                for _, child in ipairs(desc:GetDescendants()) do
+                    if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
+                        local cName = child.Name:lower()
+                        local isCdLabel = cName:find("cd") or cName:find("cooldown") or cName:find("timer") or cName:find("time")
+                        local txt = child.Text
+                        if not cName:find("dmg") and not cName:find("damage") and not cName:find("power") and not cName:find("level") and not cName:find("title") and not cName:find("name") then
+                            local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
+                            if cdWithS then
+                                local num = tonumber(cdWithS)
+                                if num and num > 0 and num <= 999 then
+                                    return true
+                                end
+                            elseif isCdLabel then
+                                local numStr = txt:match("^%s*(%d+%.?%d*)%s*$")
+                                local num = tonumber(numStr)
+                                if num and num > 0 and num <= 999 and not (num >= 1 and num <= 4 and not txt:find("%.%")) then
+                                    return true
+                                end
+                            end
+                        end
+                    end
+                end
             end
         end
     end
@@ -4596,6 +4620,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         if isMinigame and not wasMinigame then
             minigameDurationTracker = now
             comboState.openerUsedCount = 0
+            comboState.openerDone = false
+            comboState.loopTargetIndex = 1
             comboState.loopIndex = 1
             comboState.minigameStartTime = now
             secretBossState.webhookSentForCurrent = false
@@ -4878,22 +4904,43 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 -- Máu cá > Ngưỡng (Cá to / Boss):
                                 local minigameElapsed = now - (comboState.minigameStartTime or now)
 
-                                -- 1. Gửi lệnh kích hoạt chiêu mở màn trong 0.35s đầu trận để đảm bảo Server nhận 100%
-                                if Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and minigameElapsed <= 0.35 then
-                                    local opKey = Config.OpenerSkill:match("([ZXCVzxcv])")
-                                    if opKey then
-                                        opKey = opKey:upper()
-                                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(opKey) end
-                                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(opKey) end
+                                -- 1. GIAI ĐOẠN CHIÊU MỞ MÀN (Opener Skill):
+                                local opKey = Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])")
+                                if opKey then opKey = opKey:upper() end
+
+                                if opKey and not comboState.openerDone then
+                                    if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(opKey) end
+                                    if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(opKey) end
+
+                                    -- Khi icon chiêu mở màn đã vào Cooldown hoặc sau 0.4s đầu -> Hoàn tất Opener
+                                    if IsSkillOnCooldown(opKey, fUI) or minigameElapsed >= 0.4 then
+                                        comboState.openerDone = true
                                     end
                                 else
-                                    -- 2. Ngay sau đó, liên tục gửi chuỗi đảo chiêu (X, V).
-                                    -- Server của game sẽ tự động đón nhận chiêu X ngay khi chiêu Z kết thúc hoạt ảnh (dù Z dài 1s hay 10s),
-                                    -- rồi tự động đón nhận chiêu V ngay khi X kết thúc mà không cần phải phỏng đoán thời gian!
+                                    -- 2. GIAI ĐOẠN ĐẢO CHIÊU TUẦN TỰ (Loop Skills State Machine):
+                                    local loopKeys = {}
                                     for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
-                                        local lk = k:upper()
-                                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(lk) end
-                                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(lk) end
+                                        table.insert(loopKeys, k:upper())
+                                    end
+
+                                    if #loopKeys > 0 then
+                                        if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
+                                            comboState.loopTargetIndex = 1
+                                        end
+
+                                        -- Kiểm tra chiêu mục tiêu: Nếu Server đã nuốt và chiêu này đang Cooldown -> Dịch sang chiêu kế tiếp!
+                                        local checkCount = 0
+                                        while checkCount < #loopKeys and IsSkillOnCooldown(loopKeys[comboState.loopTargetIndex], fUI) do
+                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                            checkCount = checkCount + 1
+                                        end
+
+                                        -- Bắn xung nhịp chiêu mục tiêu đang sẵn sàng (Server sẽ nuốt ngay khi hoạt ảnh chiêu trước dứt)
+                                        local targetSkill = loopKeys[comboState.loopTargetIndex]
+                                        if targetSkill and not IsSkillOnCooldown(targetSkill, fUI) then
+                                            if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(targetSkill) end
+                                            if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(targetSkill) end
+                                        end
                                     end
                                 end
                             end
