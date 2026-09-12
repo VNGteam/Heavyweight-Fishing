@@ -588,7 +588,83 @@ function Inspector:Compare(nameBefore, nameAfter)
 end
 
 -- ============================================================================
--- 7. INTERACTIVE DEBUG UI v2 (Clean Modern Theme)
+-- 7. EXPLORER FILE EXPORTER (writefile + setclipboard)
+-- ============================================================================
+function Inspector:GenerateFullExport()
+    if not self.LastScanResults or #self.LastScanResults == 0 then
+        self:Scan("ALL")
+    end
+
+    local treeText = self:BuildTreeView()
+    local lines = {}
+    table.insert(lines, "================================================================================")
+    table.insert(lines, "           ROBLOX CLIENT EXPLORER & GAME DATA FULL EXPORT                       ")
+    table.insert(lines, "================================================================================")
+    table.insert(lines, "Game PlaceId:     " .. tostring(game.PlaceId))
+    table.insert(lines, "Game JobId:       " .. tostring(game.JobId))
+    table.insert(lines, "LocalPlayer:      " .. tostring(LocalPlayer.Name) .. " (UserId: " .. tostring(LocalPlayer.UserId) .. ")")
+    table.insert(lines, "Export Time:      " .. os.date("%Y-%m-%d %H:%M:%S"))
+    table.insert(lines, "Total Objects:    " .. tostring(#self.LastScanResults))
+    table.insert(lines, "Target Root:      " .. tostring(self.CurrentRoot or "ALL"))
+    table.insert(lines, "================================================================================\n")
+
+    table.insert(lines, "==================== [PHẦN 1: EXPLORER TREE HIERARCHY] ====================")
+    table.insert(lines, treeText)
+    table.insert(lines, "\n==================== [PHẦN 2: TOÀN BỘ DATA OBJECTS & VALUES] ====================")
+
+    for i, item in ipairs(self.LastScanResults) do
+        local valText = item.Value and (" | Value: " .. tostring(item.Value)) or ""
+        table.insert(lines, string.format("[%d] %s [%s]%s", i, item.Path, item.ClassName, valText))
+        if next(item.Attributes) ~= nil then
+            for aName, aData in pairs(item.Attributes) do
+                table.insert(lines, string.format("    - Attr '%s' (%s) = %s", aName, aData.Type, tostring(aData.Display)))
+            end
+        end
+        if #item.Tags > 0 then
+            table.insert(lines, "    - Tags: " .. table.concat(item.Tags, ", "))
+        end
+        if item.Extra and item.Extra.Text then
+            table.insert(lines, string.format("    - UI Text: \"%s\"", item.Extra.Text))
+        end
+    end
+
+    table.insert(lines, "\n==================== [PHẦN 3: TỔNG KẾT SCAN SUMMARY] ====================")
+    if self.LastSummary then
+        table.insert(lines, "Folders:          " .. tostring(self.LastSummary.Folders))
+        table.insert(lines, "Value Objects:    " .. tostring(self.LastSummary.ValueObjects))
+        table.insert(lines, "RemoteEvents:     " .. tostring(self.LastSummary.RemoteEvents))
+        table.insert(lines, "RemoteFunctions:  " .. tostring(self.LastSummary.RemoteFunctions))
+        table.insert(lines, "ModuleScripts:    " .. tostring(self.LastSummary.ModuleScripts))
+        table.insert(lines, "Attributes:       " .. tostring(self.LastSummary.Attributes))
+    end
+    table.insert(lines, "================================================================================")
+
+    return table.concat(lines, "\n")
+end
+
+function Inspector:SaveToFile(customFileName)
+    local fileName = customFileName or ("Explorer_Export_" .. os.date("%Y%m%d_%H%M%S") .. ".txt")
+    local fullContent = self:GenerateFullExport()
+    local saved = false
+
+    pcall(function()
+        if writefile then
+            writefile(fileName, fullContent)
+            saved = true
+        end
+    end)
+
+    pcall(function()
+        if setclipboard then
+            setclipboard(fullContent)
+        end
+    end)
+
+    return saved, fileName, fullContent
+end
+
+-- ============================================================================
+-- 8. INTERACTIVE DEBUG UI v2 (Clean Modern Theme)
 -- ============================================================================
 local function CreateInspectorUI()
     local existing = LocalPlayer:FindFirstChild("PlayerGui") and LocalPlayer.PlayerGui:FindFirstChild("PlayerInspectorGui")
@@ -764,7 +840,7 @@ local function CreateInspectorUI()
     local BtnSnapA = createActionBtn("Snap [A]", Color3.fromRGB(59, 130, 246), 68)
     local BtnSnapB = createActionBtn("Snap [B]", Color3.fromRGB(37, 99, 235), 68)
     local BtnCompare = createActionBtn("Diff", Color3.fromRGB(147, 51, 234), 58)
-    local BtnCopy = createActionBtn("Copy", Color3.fromRGB(31, 41, 55), 58)
+    local BtnExport = createActionBtn("💾 Export", Color3.fromRGB(16, 149, 114), 88)
 
     -- Search Bar
     local SearchBarFrame = Instance.new("Frame")
@@ -1019,12 +1095,46 @@ local function CreateInspectorUI()
         ContentText.Text = diffText or "Error comparing snapshots."
     end)
 
-    -- Copy / Export
-    BtnCopy.MouseButton1Click:Connect(function()
-        local txt = ContentText.Text
-        print(txt)
-        pcall(function()
-            if setclipboard then setclipboard(txt) end
+    -- Export File Action (writefile + setclipboard)
+    BtnExport.MouseButton1Click:Connect(function()
+        ContentText.Text = "Generating Explorer full export file... Please wait."
+        task.spawn(function()
+            task.wait(0.05)
+            local saved, fileName, fullContent = Inspector:SaveToFile()
+            local statusMsg = {}
+            table.insert(statusMsg, "==================================================")
+            table.insert(statusMsg, "           💾 EXPLORER EXPORT COMPLETED           ")
+            table.insert(statusMsg, "==================================================")
+            if saved then
+                table.insert(statusMsg, "✅ ĐÃ LƯU THÀNH TỆP: " .. fileName)
+                table.insert(statusMsg, "📁 Vị trí tệp: Thư mục 'workspace' của Executor bạn đang dùng!")
+            else
+                table.insert(statusMsg, "ℹ️ Môi trường không hỗ trợ writefile trực tiếp.")
+            end
+            table.insert(statusMsg, "📋 ĐÃ COPY TOÀN BỘ CẤU TRÚC VÀO BỘ NHỚ TẠM (CLIPBOARD)!")
+            table.insert(statusMsg, "👉 Bạn có thể mở Notepad / TextEdit / VS Code và nhấn [Ctrl+V] (hoặc [Cmd+V]) để dán toàn bộ cấu trúc game ra xem!")
+            table.insert(statusMsg, "==================================================\n")
+
+            -- Preview 80 dòng đầu
+            local previewLines = string.split(fullContent, "\n")
+            local previewLimit = math.min(#previewLines, 80)
+            for i = 1, previewLimit do
+                table.insert(statusMsg, previewLines[i])
+            end
+            if #previewLines > previewLimit then
+                table.insert(statusMsg, string.format("\n... (%d dòng tiếp theo đã được lưu đầy đủ vào tệp & clipboard!)", #previewLines - previewLimit))
+            end
+
+            ContentText.Text = table.concat(statusMsg, "\n")
+            Scroll.CanvasPosition = Vector2.zero
+
+            pcall(function()
+                game:GetService("StarterGui"):SetCore("SendNotification", {
+                    Title = "💾 Explorer Export",
+                    Text = saved and ("Đã lưu vào " .. fileName .. " và Clipboard!") or "Đã copy toàn bộ Explorer vào Clipboard!",
+                    Duration = 6
+                })
+            end)
         end)
     end)
 
