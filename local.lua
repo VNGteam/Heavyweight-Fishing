@@ -267,6 +267,61 @@ local Config = {
 
 local UIControllers = {}
 
+local comboState = {
+    openerUsedCount = 0,
+    openerDone = false,
+    loopTargetIndex = 1,
+    loopIndex = 1,
+    lastCastTime = 0,
+    lastActionTime = 0,
+    minigameStartTime = 0,
+    usedTimes = {
+        ["Z"] = 0,
+        ["X"] = 0,
+        ["C"] = 0,
+        ["V"] = 0
+    },
+    defaultCooldowns = {
+        ["Z"] = 2.5,
+        ["X"] = 3.0,
+        ["C"] = 5.0,
+        ["V"] = 4.0
+    },
+    loopWaitStartTime = 0
+}
+
+function comboState.SkillExists(sk, fUI)
+    if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = (sk:match("([ZXCVzxcv])") or sk):upper()
+    if not fUI then return true end
+    for _, desc in ipairs(fUI:GetDescendants()) do
+        local nameUpper = desc.Name:upper()
+        if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
+            return true
+        end
+    end
+    return false
+end
+
+function comboState.FormatCombo(str)
+    local keys = {}
+    for k in string.gmatch(str or "", "([ZXCVzxcv])") do
+        table.insert(keys, k:upper())
+    end
+    return table.concat(keys, ", ")
+end
+
+function comboState.GetComboPreview(str)
+    local keys = {}
+    for k in string.gmatch(str or "", "([ZXCVzxcv])") do
+        table.insert(keys, k:upper())
+    end
+    if #keys == 0 then
+        return "(Chưa có chiêu)"
+    end
+    return table.concat(keys, " ➔ ") .. string.format(" (%d chiêu)", #keys)
+end
+
 local ConfigLabelMap = {
     -- Câu cá cốt lõi
     ["Tự Động Quăng Cần (Auto Cast)"] = "AutoCast",
@@ -7916,60 +7971,6 @@ local lastCastTime = 0
 local lastSellTime = 0
 local lastSkillTime = 0
 local isTrainingBusy = false
-local comboState = {
-    openerUsedCount = 0,
-    openerDone = false,
-    loopTargetIndex = 1,
-    loopIndex = 1,
-    lastCastTime = 0,
-    lastActionTime = 0,
-    minigameStartTime = 0,
-    usedTimes = {
-        ["Z"] = 0,
-        ["X"] = 0,
-        ["C"] = 0,
-        ["V"] = 0
-    },
-    defaultCooldowns = {
-        ["Z"] = 2.5,
-        ["X"] = 3.0,
-        ["C"] = 5.0,
-        ["V"] = 4.0
-    },
-    loopWaitStartTime = 0
-}
-
-function comboState.SkillExists(sk, fUI)
-    if not sk or sk == "" or sk == "Tắt" then return false end
-    local cleanKey = (sk:match("([ZXCVzxcv])") or sk):upper()
-    if not fUI then return true end
-    for _, desc in ipairs(fUI:GetDescendants()) do
-        local nameUpper = desc.Name:upper()
-        if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
-            return true
-        end
-    end
-    return false
-end
-
-function comboState.FormatCombo(str)
-    local keys = {}
-    for k in string.gmatch(str or "", "([ZXCVzxcv])") do
-        table.insert(keys, k:upper())
-    end
-    return table.concat(keys, ", ")
-end
-
-function comboState.GetComboPreview(str)
-    local keys = {}
-    for k in string.gmatch(str or "", "([ZXCVzxcv])") do
-        table.insert(keys, k:upper())
-    end
-    if #keys == 0 then
-        return "(Chưa có chiêu)"
-    end
-    return table.concat(keys, " ➔ ") .. string.format(" (%d chiêu)", #keys)
-end
 
 function comboState.IsSkillReady(sk, fUI)
     if not sk or sk == "" or sk == "Tắt" then return false end
