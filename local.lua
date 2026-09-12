@@ -4622,7 +4622,7 @@ createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
 local fishCard = createCardGroup(tabFishing)
 
 createToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
-createSliderRow(fishCard, "Độ Trễ Quăng Cần", "Thời gian giãn cách giữa các lần quăng", 0.5, 5.0, Config.CastDelay, true, "s", function(v) Config.CastDelay = v end)
+createSliderRow(fishCard, "Độ Trễ Quăng Cần", "Thời gian giãn cách giữa các lần quăng", 0.0, 5.0, Config.CastDelay, true, "s", function(v) Config.CastDelay = v end)
 createToggleRow(fishCard, "Giữ Thanh Minigame (Anchor Bar)", "Tự động giữ thanh kéo ở giữa để bắt cá 100%", Config.AnchorBar, function(v) Config.AnchorBar = v end)
 createToggleRow(fishCard, "Tự Dùng Kỹ Năng Cần", "Tự kích hoạt kỹ năng cần câu để kéo cá siêu nhanh", Config.AutoSkills, function(v) Config.AutoSkills = v end)
 createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động nhấn Slam mức Perfect khi xuất hiện", Config.AutoSlam, function(v) Config.AutoSlam = v end)
@@ -9329,7 +9329,7 @@ fishRingAdornment.Parent = fishRingAnchor
 
 local fishRingBillboard = Instance.new("BillboardGui")
 fishRingBillboard.Name = "FishRingBillboard"
-fishRingBillboard.Size = UDim2.new(0, 220, 0, 30)
+fishRingBillboard.Size = UDim2.new(0, 280, 0, 32)
 fishRingBillboard.StudsOffset = Vector3.new(0, 2.5, 0)
 fishRingBillboard.AlwaysOnTop = true
 fishRingBillboard.Adornee = fishRingAnchor
@@ -9346,18 +9346,66 @@ fishRingText.TextSize = 13
 fishRingText.Text = ""
 fishRingText.Visible = false
 
-local function AddESP(instance, name, espCategory, color, icon)
+function secretBossState.GetNearestIslandName(pos)
+    if not pos then return "Đại Dương" end
+    local nearestDist = math.huge
+    local nearestName = "Đại Dương"
+
+    local spFolder = Workspace:FindFirstChild("Spawnpoint")
+    if spFolder then
+        for _, sp in ipairs(spFolder:GetChildren()) do
+            if sp:IsA("BasePart") then
+                local d = (pos - sp.Position).Magnitude
+                if d < nearestDist then
+                    nearestDist = d
+                    nearestName = sp.Name
+                end
+            end
+        end
+    end
+
+    if nearestDist > 1200 and secretBossDatabase then
+        for _, entry in ipairs(secretBossDatabase) do
+            if entry.pos then
+                local d = (pos - entry.pos).Magnitude
+                if d < nearestDist then
+                    nearestDist = d
+                    nearestName = entry.islandName:gsub("%s*%b()", "")
+                end
+            end
+        end
+    end
+    return nearestName
+end
+
+local function ResolveBestPart(instance)
+    if not instance then return nil end
+    if instance:IsA("BasePart") then return instance end
+    if instance:IsA("Model") then
+        return instance.PrimaryPart
+            or instance:FindFirstChild("HumanoidRootPart")
+            or instance:FindFirstChild("Torso")
+            or instance:FindFirstChild("UpperTorso")
+            or instance:FindFirstChild("Stick")
+            or instance:FindFirstChild("Handle")
+            or instance:FindFirstChild("Part")
+            or instance:FindFirstChildWhichIsA("BasePart", true)
+    end
+    return instance:FindFirstChildWhichIsA("BasePart", true)
+end
+
+local function AddESP(instance, name, espCategory, color, icon, explicitPart, customData)
     if not instance or activeESP[instance] then return end
     local isEnabled = Config["ESP_" .. espCategory]
     if not isEnabled then return end
 
-    local part = instance:IsA("BasePart") and instance or (instance.PrimaryPart or instance:FindFirstChild("HumanoidRootPart") or instance:FindFirstChild("Head") or instance:FindFirstChildWhichIsA("BasePart", true))
+    local part = explicitPart or ResolveBestPart(instance)
     if not part then return end
 
     local bb = Instance.new("BillboardGui")
     bb.Name = "ESP_" .. name
-    bb.Size = UDim2.new(0, 150, 0, 24)
-    bb.StudsOffset = Vector3.new(0, 2.5, 0)
+    bb.Size = UDim2.new(0, 195, 0, 36)
+    bb.StudsOffset = Vector3.new(0, 2.8, 0)
     bb.AlwaysOnTop = true
     bb.Adornee = part
     bb.Enabled = true
@@ -9365,22 +9413,47 @@ local function AddESP(instance, name, espCategory, color, icon)
 
     local f = Instance.new("Frame", bb)
     f.Size = UDim2.new(1, 0, 1, 0)
-    f.BackgroundColor3 = Colors.Background
-    f.BackgroundTransparency = 0.2
-    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 4)
+    f.BackgroundColor3 = Color3.fromRGB(15, 15, 24)
+    f.BackgroundTransparency = 0.15
+    Instance.new("UICorner", f).CornerRadius = UDim.new(0, 5)
+
     local s = Instance.new("UIStroke", f)
     s.Color = color or Colors.PurpleAccent
-    s.Thickness = 1
+    s.Thickness = 1.2
 
-    local lbl = Instance.new("TextLabel", f)
-    lbl.Size = UDim2.new(1, 0, 1, 0)
-    lbl.BackgroundTransparency = 1
-    lbl.Font = Enum.Font.GothamBold
-    lbl.Text = (icon or "") .. " " .. name
-    lbl.TextColor3 = color or Colors.TextWhite
-    lbl.TextSize = 10
+    local titleLbl = Instance.new("TextLabel", f)
+    titleLbl.Size = UDim2.new(1, -8, 0, 17)
+    titleLbl.Position = UDim2.new(0, 4, 0, 2)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Font = Enum.Font.GothamBold
+    titleLbl.Text = (icon or "") .. " " .. name
+    titleLbl.TextColor3 = color or Colors.TextWhite
+    titleLbl.TextSize = 10
+    titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
 
-    activeESP[instance] = {gui = bb, label = lbl, part = part, espCategory = espCategory, name = name, icon = icon or ""}
+    local subLbl = Instance.new("TextLabel", f)
+    subLbl.Size = UDim2.new(1, -8, 0, 14)
+    subLbl.Position = UDim2.new(0, 4, 0, 18)
+    subLbl.BackgroundTransparency = 1
+    subLbl.Font = Enum.Font.Gotham
+    subLbl.Text = "Đang tải dữ liệu..."
+    subLbl.TextColor3 = Color3.fromRGB(195, 205, 220)
+    subLbl.TextSize = 8.5
+    subLbl.TextTruncate = Enum.TextTruncate.AtEnd
+
+    activeESP[instance] = {
+        gui = bb,
+        frame = f,
+        stroke = s,
+        titleLbl = titleLbl,
+        subLbl = subLbl,
+        part = part,
+        instance = instance,
+        espCategory = espCategory,
+        name = name,
+        icon = icon or "",
+        customData = customData
+    }
 end
 
 local function RemoveESP(instance)
@@ -9421,9 +9494,9 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
     if Config.ESP_Players then
         for _, p in ipairs(Players:GetPlayers()) do
             if p ~= LocalPlayer and p.Character then
-                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Head")
                 if hrp then
-                    AddESP(p.Character, p.DisplayName, "Players", Colors.PurpleAccent, "👤")
+                    AddESP(p.Character, p.DisplayName, "Players", Colors.PurpleAccent, "👤", hrp, {player = p})
                 end
             end
         end
@@ -9448,9 +9521,46 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    if Config.ESP_Boss and Workspace:FindFirstChild("BossSetUp") then
-        for _, b in ipairs(Workspace.BossSetUp:GetChildren()) do
-            AddESP(b, b.Name, "Boss", Colors.AccentRed, "👹")
+    if Config.ESP_Boss then
+        if Workspace:FindFirstChild("BossSetUp") then
+            for _, b in ipairs(Workspace.BossSetUp:GetChildren()) do
+                AddESP(b, b.Name, "Boss", Colors.AccentRed, "👹")
+            end
+        end
+        if Workspace:FindFirstChild("Fishes") then
+            for _, f in ipairs(Workspace.Fishes:GetChildren()) do
+                local isBoss = f:GetAttribute("Boss") == true
+                local fName = f:GetAttribute("FishName") or ""
+                if not isBoss and fName ~= "" and (Config.SecretBossTargets[fName] or (secretBossLookup[fName:lower()] and Config.SecretBossTargets[secretBossLookup[fName:lower()]])) then
+                    isBoss = true
+                end
+                if isBoss then
+                    local targetPart = nil
+                    if f:FindFirstChild("Model") and f.Model:IsA("Model") then
+                        targetPart = f.Model.PrimaryPart or f.Model:FindFirstChildWhichIsA("BasePart", true)
+                    elseif f:FindFirstChild("Buoy") and f.Buoy:IsA("BasePart") then
+                        targetPart = f.Buoy
+                    end
+                    if not targetPart then
+                        for _, c in ipairs(f:GetChildren()) do
+                            if c.Name:find("_PlayerHealth") then
+                                local uid = c.Name:match("^(%d+)_PlayerHealth")
+                                if uid then
+                                    local pl = Players:GetPlayerByUserId(tonumber(uid))
+                                    local plChar = pl and pl.Character
+                                    if plChar then
+                                        targetPart = plChar:FindFirstChild("Buoy") or plChar:FindFirstChild("HumanoidRootPart")
+                                        break
+                                    end
+                                end
+                            end
+                        end
+                    end
+                    if targetPart then
+                        AddESP(f, fName ~= "" and fName or f.Name, "Boss", Colors.AccentRed, "👹", targetPart, {fish = f})
+                    end
+                end
+            end
         end
     end
 
@@ -9464,12 +9574,119 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
     local camPos = Camera.CFrame.Position
     for inst, data in pairs(activeESP) do
         local isEnabled = Config["ESP_" .. data.espCategory]
-        if not inst.Parent or not data.part.Parent or not isEnabled then
+        if not inst.Parent or not data.part or not data.part.Parent or not isEnabled then
             RemoveESP(inst)
         else
             data.gui.Enabled = true
             local dist = math.floor((camPos - data.part.Position).Magnitude)
-            data.label.Text = data.icon .. " " .. data.name .. " [" .. dist .. "m]"
+            local cat = data.espCategory
+
+            if cat == "Players" then
+                local p = data.customData and data.customData.player
+                if not p or not p.Parent or not p.Character or p.Character ~= inst then
+                    RemoveESP(inst)
+                else
+                    local hum = inst:FindFirstChildOfClass("Humanoid")
+                    local curHp = hum and math.floor(hum.Health) or 0
+                    local maxHp = hum and math.floor(hum.MaxHealth) or 100
+                    local isFishing = inst:GetAttribute("Fishing") == true
+                    local isMinigame = inst:GetAttribute("Minigame") == true
+                    local isSwimming = inst:GetAttribute("Swimming") == true
+
+                    local rodVal = "Không cầm"
+                    local pFolder = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(p.UserId))
+                    if pFolder and pFolder:FindFirstChild("FishingRod") and pFolder.FishingRod.Value ~= "" then
+                        rodVal = pFolder.FishingRod.Value
+                    end
+
+                    local act = "💤 Rảnh"
+                    if curHp <= 0 then act = "💀 Đã chết"
+                    elseif isMinigame then act = "⚡ Kéo cá"
+                    elseif isFishing then act = "🎣 Thả cần"
+                    elseif isSwimming then act = "🏊 Bơi"
+                    end
+
+                    data.titleLbl.Text = string.format("👤 %s  •  %dm", p.DisplayName, dist)
+                    data.subLbl.Text = string.format("❤️ %d/%d HP | 🎣 %s | %s", curHp, maxHp, rodVal, act)
+
+                    if isMinigame then
+                        data.stroke.Color = Color3.fromRGB(255, 170, 40)
+                    elseif isFishing then
+                        data.stroke.Color = Color3.fromRGB(60, 220, 255)
+                    else
+                        data.stroke.Color = Colors.PurpleAccent
+                    end
+                end
+            elseif cat == "Boss" then
+                local fish = data.customData and data.customData.fish
+                if fish and fish.Parent then
+                    local fName = fish:GetAttribute("FishName") or data.name or "Secret Boss"
+                    local maxHp = fish:GetAttribute("MaxHealth") or 0
+                    local curHp = typeof(fish.Value) == "number" and fish.Value or 0
+                    local hpPct = (maxHp > 0) and math.floor((curHp / maxHp) * 100) or 0
+
+                    local hooker = nil
+                    local contrib = fish:FindFirstChild("PlayerContribution")
+                    if contrib then
+                        local ch = contrib:GetChildren()
+                        if #ch > 0 then hooker = ch[1].Name end
+                    end
+                    if not hooker then
+                        for _, c in ipairs(fish:GetChildren()) do
+                            if c.Name:find("_PlayerHealth") then
+                                local uid = c.Name:match("^(%d+)_PlayerHealth")
+                                if uid then
+                                    local pl = Players:GetPlayerByUserId(tonumber(uid))
+                                    if pl then hooker = pl.DisplayName break end
+                                end
+                            end
+                        end
+                    end
+
+                    data.titleLbl.Text = string.format("👹 %s [TRÙM]  •  %dm", fName, dist)
+                    if hooker then
+                        data.subLbl.Text = string.format("❤️ HP: %d/%d (%d%%) | 🎯 %s", math.floor(curHp), maxHp, hpPct, hooker)
+                    else
+                        data.subLbl.Text = string.format("❤️ HP: %d/%d (%d%%)", math.floor(curHp), maxHp, hpPct)
+                    end
+                    data.stroke.Color = Color3.fromRGB(255, 50, 50)
+                else
+                    data.titleLbl.Text = string.format("👹 %s  •  %dm", data.name, dist)
+                    data.subLbl.Text = "⚔️ Khu vực triệu hồi & chiến đấu Enzo"
+                    data.stroke.Color = Color3.fromRGB(255, 60, 60)
+                end
+            elseif cat == "SecretRod" then
+                local isl = secretBossState.GetNearestIslandName(data.part.Position)
+                data.titleLbl.Text = string.format("🌟 %s  •  %dm", data.name, dist)
+                data.subLbl.Text = string.format("📍 Đảo: %s | ⭐ Cần Bí Mật", isl)
+                data.stroke.Color = Colors.AccentYellow
+            elseif cat == "GodSpirit" then
+                local isl = secretBossState.GetNearestIslandName(data.part.Position)
+                data.titleLbl.Text = string.format("⛩️ Thần Linh (God Spirit)  •  %dm", dist)
+                data.subLbl.Text = string.format("📍 Đảo: %s | 🙏 Cầu Nguyện", isl)
+                data.stroke.Color = Colors.AccentGreen
+            elseif cat == "Taoist" or cat == "Maoshan" then
+                local isl = secretBossState.GetNearestIslandName(data.part.Position)
+                local isMao = cat == "Maoshan"
+                data.titleLbl.Text = string.format("%s %s  •  %dm", isMao and "✨" or "📜", data.name, dist)
+                data.subLbl.Text = string.format("📍 Đảo: %s | 📜 Đạo Sĩ Bí Kíp", isl)
+            elseif cat == "Boats" then
+                local b = data.instance
+                local driverName = "Trống"
+                if b and b:IsA("Model") then
+                    local seat = b:FindFirstChildWhichIsA("VehicleSeat", true)
+                    if seat and seat.Occupant and seat.Occupant.Parent then
+                        local p = Players:GetPlayerFromCharacter(seat.Occupant.Parent)
+                        if p then driverName = p.DisplayName else driverName = seat.Occupant.Parent.Name end
+                    end
+                end
+                data.titleLbl.Text = string.format("⛵ %s  •  %dm", data.name, dist)
+                data.subLbl.Text = string.format("👤 Người lái: %s", driverName)
+                data.stroke.Color = Colors.AccentBlue
+            else
+                data.titleLbl.Text = string.format("%s %s  •  %dm", data.icon, data.name, dist)
+                data.subLbl.Text = ""
+            end
         end
     end
 
@@ -9549,6 +9766,16 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
                 local fName = GetCurrentHookedFishName()
                 local fWeight = char:GetAttribute("FishWeight") or char:GetAttribute("Weight")
                 local fMutation = char:GetAttribute("FishMutation") or char:GetAttribute("Mutation")
+                local curHp, maxHp = nil, nil
+
+                if fishID and Workspace:FindFirstChild("Fishes") then
+                    local f = Workspace.Fishes:FindFirstChild(fishID)
+                    if f then
+                        if not fName or fName == "" then fName = f:GetAttribute("FishName") end
+                        maxHp = f:GetAttribute("MaxHealth")
+                        if typeof(f.Value) == "number" then curHp = f.Value end
+                    end
+                end
 
                 if not fWeight and fUI then
                     local wLabel = fUI:FindFirstChild("Weight", true) or fUI:FindFirstChild("FishWeight", true)
@@ -9557,19 +9784,20 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
                     end
                 end
 
-                local displayStr = ""
-                if fName then displayStr = tostring(fName) end
-                if fMutation and tostring(fMutation) ~= "" then
-                    displayStr = displayStr .. " [" .. tostring(fMutation) .. "]"
-                end
+                local displayParts = {}
+                if fName and fName ~= "" then table.insert(displayParts, tostring(fName)) end
+                if fMutation and tostring(fMutation) ~= "" then table.insert(displayParts, "[" .. tostring(fMutation) .. "]") end
                 if fWeight then
                     local wStr = tostring(fWeight)
                     if tonumber(wStr) then wStr = string.format("%.1f kg", tonumber(wStr)) end
-                    displayStr = displayStr .. " (" .. wStr .. ")"
+                    table.insert(displayParts, "(" .. wStr .. ")")
+                end
+                if curHp and maxHp and maxHp > 0 then
+                    table.insert(displayParts, string.format("• ❤️ %d/%d", math.floor(curHp), maxHp))
                 end
 
-                if displayStr ~= "" then
-                    fishRingText.Text = displayStr
+                if #displayParts > 0 then
+                    fishRingText.Text = table.concat(displayParts, " ")
                     fishRingText.Visible = true
                 else
                     fishRingText.Text = "🎣 Đang Cắn Câu"
