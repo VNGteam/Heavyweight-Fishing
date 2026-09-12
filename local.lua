@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "2add94b"
+local SCRIPT_BUILD_COMMIT = "f28a6ea"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -587,6 +587,138 @@ local function DeleteAccountConfig(cfgName)
     end
     return false, "Không thể xóa file cấu hình!"
 end
+
+Config._essentialKeys = {
+    -- Kỹ năng & Combo
+    ["LoopSkills"] = true,
+    ["SmartComboEnabled"] = true,
+    ["ComboRotationMode"] = true,
+    ["LoopStrictOrder"] = true,
+    ["FastCastKey"] = true,
+    ["CastSkillOnCast"] = true,
+    ["CastSkillKey"] = true,
+    ["AutoTrainSkill"] = true,
+    ["AutoCastTrainSkill"] = true,
+    ["TicketSkillKey"] = true,
+    ["TicketQuickSkill"] = true,
+    ["AutoEquipBestOrb"] = true,
+
+    -- Mồi câu & Tùy chọn Farm
+    ["AutoEquipBestBait"] = true,
+    ["BaitChoiceNormal"] = true,
+    ["BaitChoiceBoss"] = true,
+    ["AutoEquipBossBait"] = true,
+
+    -- Nhiệm vụ vé
+    ["TicketDifficulty"] = true,
+    ["TicketQuestMode"] = true,
+    ["TicketBaitChoice"] = true,
+    ["TicketCooldownMinutes"] = true,
+    ["TicketAutoSellFull"] = true,
+    ["TicketReturnHomeWhenDone"] = true,
+    ["TicketAutoCastAtHome"] = true,
+    ["TicketRemoteClaim"] = true,
+
+    -- Nhân vật & Tiện ích
+    ["WalkSpeedEnabled"] = true,
+    ["WalkSpeedValue"] = true,
+    ["FlyEnabled"] = true,
+    ["FlySpeed"] = true,
+    ["InfiniteJump"] = true,
+    ["WalkOnWater"] = true,
+    ["AcidWaterShield"] = true,
+    ["AutoProtectMutations"] = true,
+    ["UIKeybind"] = true,
+
+    -- Thị giác & ESP
+    ["FishRedRing"] = true,
+    ["ShowFishWeightRing"] = true,
+    ["Fullbright"] = true,
+    ["NoFog"] = true,
+    ["HideOverheadNames"] = true,
+
+    -- Webhook
+    ["WebhookUrl"] = true,
+    ["WebhookEnabled"] = true,
+    ["WebhookNotifyBoss"] = true,
+    ["WebhookHourlyStats"] = true,
+
+    -- Thời tiết
+    ["TargetWeather"] = true,
+    ["WeatherHopAutoFish"] = true,
+    ["WeatherHopAlertWebhook"] = true,
+}
+
+Config._saveEssential = function()
+    EnsureAccountConfigDir()
+    local accDir = GetAccountConfigDir()
+    local filePath = accDir .. "/essential_config.json"
+
+    local data = {}
+    for k, _ in pairs(Config._essentialKeys) do
+        local v = Config[k]
+        if v ~= nil then
+            if typeof(v) == "EnumItem" then
+                data[k] = {__enum = tostring(v)}
+            else
+                data[k] = v
+            end
+        end
+    end
+
+    local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+    if ok and encoded and writefile then
+        pcall(function() writefile(filePath, encoded) end)
+    end
+end
+
+Config._loadEssential = function()
+    EnsureAccountConfigDir()
+    local accDir = GetAccountConfigDir()
+    local filePath = accDir .. "/essential_config.json"
+
+    if not isfile or not isfile(filePath) then return false end
+    local ok, content = pcall(function() return readfile(filePath) end)
+    if not ok or not content or #content == 0 then return false end
+    local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(decoded) ~= "table" then return false end
+
+    for k, v in pairs(decoded) do
+        if Config._essentialKeys[k] and Config[k] ~= nil then
+            if type(v) == "table" and v.__enum then
+                local enumType, enumName = v.__enum:match("Enum%.(%w+)%.(%w+)")
+                if enumType and enumName and Enum[enumType] and Enum[enumType][enumName] then
+                    Config[k] = Enum[enumType][enumName]
+                end
+            else
+                Config[k] = v
+            end
+        end
+    end
+    return true
+end
+
+Config._autoSaveTimer = nil
+Config._triggerAutoSave = function(delaySec)
+    delaySec = delaySec or 0.8
+    if Config._autoSaveTimer then
+        pcall(function() task.cancel(Config._autoSaveTimer) end)
+        Config._autoSaveTimer = nil
+    end
+    Config._autoSaveTimer = task.delay(delaySec, function()
+        Config._autoSaveTimer = nil
+        pcall(Config._saveEssential)
+    end)
+end
+
+pcall(function()
+    if Config._loadEssential() then
+        task.spawn(function()
+            task.wait(1.5)
+            ShowNotification("CẤU HÌNH TỰ ĐỘNG", "Đã nạp cài đặt thiết yếu (Skill, Combo, Tiện ích) từ máy!", "SUCCESS", 5)
+        end)
+    end
+end)
 
 local Colors = {
     Background       = Color3.fromRGB(15, 12, 22),
@@ -1140,6 +1272,10 @@ local function createToggleRow(parent, labelText, descText, initialVal, callback
         state = not state
         updateVisuals()
         if type(callback) == "function" then callback(state) end
+        local key = ConfigLabelMap[labelText]
+        if key and Config._essentialKeys and Config._essentialKeys[key] and Config._triggerAutoSave then
+            Config._triggerAutoSave()
+        end
     end)
     local ret = {frame = row, Set = function(val) state = val; updateVisuals(); if type(callback) == "function" then callback(state) end end, Get = function() return state end}
     local key = ConfigLabelMap[labelText]
@@ -1166,6 +1302,10 @@ local function createSliderRow(parent, labelText, descText, minVal, maxVal, init
         currentVal = val; fill.Size = UDim2.new(rel, 0, 1, 0)
         valLabel.Text = isFloat and string.format("%.2f", val)..suffix or tostring(val)..suffix
         if type(callback) == "function" then callback(val) end
+        local skey = ConfigLabelMap[labelText]
+        if skey and Config._essentialKeys and Config._essentialKeys[skey] and Config._triggerAutoSave then
+            Config._triggerAutoSave()
+        end
     end
     track.InputBegan:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = true; updateFromX(input.Position.X) end end)
     UserInputService.InputEnded:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseButton1 then sliding = false end end)
@@ -1219,6 +1359,10 @@ local function createDropdownRow(parent, labelText, descText, options, initialVa
                 selected = opt; ddBtn.Text = tostring(opt) .. "  v"; optC.Visible = false
                 for oN, b in pairs(optButtons) do b.BackgroundColor3 = (oN == opt) and Colors.DropdownSelected or Colors.InputBg; b.TextColor3 = (oN == opt) and Colors.PurplePrimary or Colors.TextWhite; b.Text = (oN == opt and "> " or "   ") .. tostring(oN) end
                 if type(callback) == "function" then callback(opt) end
+                local mKey = ConfigLabelMap[labelText]
+                if mKey and Config._essentialKeys and Config._essentialKeys[mKey] and Config._triggerAutoSave then
+                    Config._triggerAutoSave()
+                end
             end)
         end
     end
@@ -1307,6 +1451,10 @@ local function createInputRow(parent, labelText, descText, initialVal, callback,
     s.Thickness = 1
     tb.FocusLost:Connect(function(enterPressed)
         if type(callback) == "function" then callback(tb.Text) end
+        local inpKey = ConfigLabelMap[labelText]
+        if inpKey and Config._essentialKeys and Config._essentialKeys[inpKey] and Config._triggerAutoSave then
+            Config._triggerAutoSave()
+        end
     end)
     local ret = {
         frame = row,
@@ -5118,6 +5266,9 @@ do
 
         local cleanStr = comboState.FormatCombo(newVal)
         Config.LoopSkills = cleanStr
+        if Config._triggerAutoSave then
+            Config._triggerAutoSave()
+        end
 
         if source ~= "input" and customInput and customInput.Set then
             customInput.Set(cleanStr)
@@ -8158,7 +8309,25 @@ do
 
     local curAccName = (LocalPlayer and LocalPlayer.Name) or "DefaultUser"
     createInfoRow(profCard, "Tài Khoản Hiện Tại", curAccName)
-    createInfoRow(profCard, "Khởi Động Script", "Mặc Định (Luôn Default)")
+    createInfoRow(profCard, "Tự Động Lưu Thiết Yếu (Máy)", "Tự động lưu Skill, Combo, Tiện ích")
+
+    createButtonRow(profCard, "Lưu Thiết Yếu Vào Máy", "Lưu ngay toàn bộ Skill, Combo, Tiện ích hiện tại vào file máy", "💾 Lưu Ngay", function()
+        if Config._saveEssential then
+            Config._saveEssential()
+            ShowNotification("Lưu Thiết Yếu", "Đã lưu cài đặt thiết yếu vào máy thành công!", "SUCCESS")
+        end
+    end)
+
+    createButtonRow(profCard, "Nạp Lại Thiết Yếu Từ Máy", "Đọc và cập nhật lại cấu hình thiết yếu đã lưu từ file máy", "🔄 Nạp Lại", function()
+        if Config._loadEssential then
+            local ok = Config._loadEssential()
+            if ok then
+                ShowNotification("Nạp Thiết Yếu", "Đã nạp cài đặt thiết yếu từ máy thành công!", "SUCCESS")
+            else
+                ShowNotification("Nạp Thiết Yếu", "Chưa có file cấu hình thiết yếu nào trên máy!", "WARN")
+            end
+        end
+    end)
 
     local initialConfigs = GetSavedConfigList()
     local selectedConfigName = initialConfigs[1] or ""
