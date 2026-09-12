@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "5a2da3e"
+local SCRIPT_BUILD_COMMIT = "713e272"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
