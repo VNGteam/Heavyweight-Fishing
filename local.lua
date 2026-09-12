@@ -224,6 +224,7 @@ local Config = {
     Fullbright = false,
     PerformanceMode = false,
     HideGameUI = false,
+    HideOverheadNames = false,
     
     AntiAFK = true,
     AutoRejoin = false,
@@ -335,6 +336,7 @@ local ConfigLabelMap = {
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
     ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
+    ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",
 
     -- Nhân vật
     ["Tăng Tốc Độ Chạy (Speed)"] = "WalkSpeedEnabled",
@@ -5890,6 +5892,17 @@ createToggleRow(espCard, "ESP Maoshan", "Hiện vị trí NPC hoặc cần Maosh
 createToggleRow(espCard, "ESP Đạo Sĩ (Taoist)", "Hiện vị trí NPC hoặc cần Taoist", Config.ESP_Taoist, function(v) Config.ESP_Taoist = v end)
 createToggleRow(espCard, "ESP Trùm Boss", "Hiện vị trí các Boss đang xuất hiện", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
 createToggleRow(espCard, "ESP Người Chơi", "Hiện khung & khoảng cách đến người chơi khác", Config.ESP_Players, function(v) Config.ESP_Players = v end)
+createToggleRow(espCard, "Ẩn Tên Mặc Định Người Chơi", "Ẩn toàn bộ bảng tên và thanh máu mặc định của Roblox trên đầu người chơi khác", Config.HideOverheadNames, function(v)
+    Config.HideOverheadNames = v
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p.Character then
+            local hum = p.Character:FindFirstChildOfClass("Humanoid")
+            if hum then
+                hum.DisplayDistanceType = v and Enum.HumanoidDisplayDistanceType.None or Enum.HumanoidDisplayDistanceType.Viewer
+            end
+        end
+    end
+end)
 createToggleRow(espCard, "Vòng Tròn Định Vị Cá", "Hiện vòng tròn đỏ dưới nước chỉ đúng con cá cắn câu", Config.FishRedRing, function(v) Config.FishRedRing = v end)
 createToggleRow(espCard, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ", "Hiển thị tên cá, cân nặng (kg) và loại đột biến trực tiếp trên vòng định vị", Config.ShowFishWeightRing, function(v) Config.ShowFishWeightRing = v end)
 
@@ -7619,6 +7632,9 @@ fishRingText.Visible = false
 
 local function AddESP(instance, name, espCategory, color, icon)
     if not instance or activeESP[instance] then return end
+    local isEnabled = Config["ESP_" .. espCategory]
+    if not isEnabled then return end
+
     local part = instance:IsA("BasePart") and instance or (instance.PrimaryPart or instance:FindFirstChild("HumanoidRootPart") or instance:FindFirstChild("Head") or instance:FindFirstChildWhichIsA("BasePart", true))
     if not part then return end
 
@@ -7628,6 +7644,7 @@ local function AddESP(instance, name, espCategory, color, icon)
     bb.StudsOffset = Vector3.new(0, 2.5, 0)
     bb.AlwaysOnTop = true
     bb.Adornee = part
+    bb.Enabled = true
     bb.Parent = espFolder
 
     local f = Instance.new("Frame", bb)
@@ -7685,16 +7702,18 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    for _, p in ipairs(Players:GetPlayers()) do
-        if p ~= LocalPlayer and p.Character then
-            local hrp = p.Character:FindFirstChild("HumanoidRootPart")
-            if hrp then
-                AddESP(p.Character, p.DisplayName, "Players", Colors.PurpleAccent, "👤")
+    if Config.ESP_Players then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+                if hrp then
+                    AddESP(p.Character, p.DisplayName, "Players", Colors.PurpleAccent, "👤")
+                end
             end
         end
     end
 
-    if Workspace:FindFirstChild("SecretRod") then
+    if Config.ESP_SecretRod and Workspace:FindFirstChild("SecretRod") then
         for _, r in ipairs(Workspace.SecretRod:GetChildren()) do
             AddESP(r, r.Name, "SecretRod", Colors.AccentYellow, "🌟")
         end
@@ -7707,13 +7726,13 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
         end
     end
 
-    if Workspace:FindFirstChild("Boat") then
+    if Config.ESP_Boats and Workspace:FindFirstChild("Boat") then
         for _, b in ipairs(Workspace.Boat:GetChildren()) do
             AddESP(b, b.Name, "Boats", Colors.AccentBlue, "⛵")
         end
     end
 
-    if Workspace:FindFirstChild("BossSetUp") then
+    if Config.ESP_Boss and Workspace:FindFirstChild("BossSetUp") then
         for _, b in ipairs(Workspace.BossSetUp:GetChildren()) do
             AddESP(b, b.Name, "Boss", Colors.AccentRed, "👹")
         end
@@ -7728,14 +7747,23 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
 
     local camPos = Camera.CFrame.Position
     for inst, data in pairs(activeESP) do
-        if not inst.Parent or not data.part.Parent then
+        local isEnabled = Config["ESP_" .. data.espCategory]
+        if not inst.Parent or not data.part.Parent or not isEnabled then
             RemoveESP(inst)
         else
-            local isEnabled = Config["ESP_" .. data.espCategory]
-            data.gui.Enabled = isEnabled and true or false
-            if isEnabled then
-                local dist = math.floor((camPos - data.part.Position).Magnitude)
-                data.label.Text = data.icon .. " " .. data.name .. " [" .. dist .. "m]"
+            data.gui.Enabled = true
+            local dist = math.floor((camPos - data.part.Position).Magnitude)
+            data.label.Text = data.icon .. " " .. data.name .. " [" .. dist .. "m]"
+        end
+    end
+
+    if Config.HideOverheadNames then
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.DisplayDistanceType ~= Enum.HumanoidDisplayDistanceType.None then
+                    hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+                end
             end
         end
     end
