@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "76b550e"
+local SCRIPT_BUILD_COMMIT = "152762e"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3398,18 +3398,63 @@ ticketQuestState.cachedNPCPos = nil
 ticketQuestState.cachedNPCPrompt = nil
 ticketQuestState.lastNPCSearch = 0
 
+-- Hàm tiện ích lấy folder dữ liệu của LocalPlayer từ ReplicatedStorage.Data (Chính xác 100% từ cấu trúc game)
+function ticketQuestState.GetPlayerDataFolder()
+    local d = ReplicatedStorage:FindFirstChild("Data")
+    if not d then return nil end
+    local uid = tostring(LocalPlayer.UserId)
+    return d:FindFirstChild(uid) or d:FindFirstChild(LocalPlayer.UserId)
+end
+
 function ticketQuestState.FindTicketNPC()
     if ticketQuestState.cachedNPCModel and ticketQuestState.cachedNPCModel.Parent and ticketQuestState.cachedNPCPos then
         return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt
     end
 
     local now = tick()
-    if now - (ticketQuestState.lastNPCSearch or 0) < 15.0 and ticketQuestState.cachedNPCPos then
+    if now - (ticketQuestState.lastNPCSearch or 0) < 5.0 and ticketQuestState.cachedNPCPos then
         return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt
     end
     ticketQuestState.lastNPCSearch = now
 
-    -- 1. Tìm trong các folder NPC / Spawns / Entities (chỉ GetChildren, cực nhẹ)
+    -- 1. Ưu tiên tìm đúng cấu trúc từ Explorer export: Workspace.NPC.Function["Ticket Quest Giver"]
+    local directModel = nil
+    if Workspace:FindFirstChild("NPC") then
+        local funcFolder = Workspace.NPC:FindFirstChild("Function")
+        if funcFolder then
+            directModel = funcFolder:FindFirstChild("Ticket Quest Giver")
+        end
+        if not directModel then
+            for _, ch in ipairs(Workspace.NPC:GetChildren()) do
+                local n = ch.Name:lower()
+                if ch:IsA("Model") and (n:find("ticket") or n:find("giver")) then
+                    directModel = ch
+                    break
+                elseif ch:IsA("Folder") then
+                    for _, sub in ipairs(ch:GetChildren()) do
+                        local sn = sub.Name:lower()
+                        if sub:IsA("Model") and (sn:find("ticket") or sn:find("giver")) then
+                            directModel = sub
+                            break
+                        end
+                    end
+                end
+                if directModel then break end
+            end
+        end
+    end
+
+    if directModel then
+        local cf = directModel:IsA("Model") and directModel:GetPivot() or directModel.CFrame
+        local p = directModel:FindFirstChildWhichIsA("ProximityPrompt", true)
+        ticketQuestState.cachedNPCModel = directModel
+        ticketQuestState.cachedNPCPos = cf.Position
+        ticketQuestState.cachedNPCPrompt = p
+        ticketQuestState.spotNPC = cf.Position
+        return directModel, cf.Position, p
+    end
+
+    -- 2. Tìm trong các folder NPC / Spawns / Entities
     for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns"}) do
         local folder = Workspace:FindFirstChild(fName)
         if folder then
@@ -3428,7 +3473,7 @@ function ticketQuestState.FindTicketNPC()
         end
     end
 
-    -- 2. Tìm trong direct children của Workspace (chỉ duyệt con cấp 1, TUYỆT ĐỐI KHÔNG GetDescendants toàn bộ Workspace)
+    -- 3. Tìm trong direct children của Workspace
     for _, inst in ipairs(Workspace:GetChildren()) do
         if inst:IsA("Model") then
             local n = inst.Name:lower()
@@ -3448,11 +3493,24 @@ function ticketQuestState.FindTicketNPC()
 end
 
 function ticketQuestState.CheckNPCReady()
+    -- 1. Ưu tiên kiểm tra mốc hồi chiêu từ ReplicatedStorage.Data[UserId].TicketQuestCooldown (Chính xác 100% không độ trễ)
+    local pData = ticketQuestState.GetPlayerDataFolder()
+    if pData and pData:FindFirstChild("TicketQuestCooldown") then
+        local cd = tonumber(pData.TicketQuestCooldown.Value) or 0
+        if cd > 0 then
+            if cd <= os.time() then
+                return true -- Đã hết hồi chiêu, sẵn sàng nhận vé mới!
+            else
+                return false -- Vẫn đang hồi chiêu
+            end
+        end
+    end
+
+    -- 2. Kiểm tra nhãn "?" trên đầu NPC (Workspace.NPC.Function["Ticket Quest Giver"].Head.BillboardGui.Time)
     local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
     local targetInst = npcModel or (prompt and prompt.Parent)
     if not targetInst then return false end
 
-    -- Chỉ kiểm tra trong chính Model của NPC (chỉ vài Part con, cực nhẹ 0ms)
     pcall(function()
         if prompt then
             local act = tostring(prompt.ActionText or "")
@@ -3485,6 +3543,23 @@ function ticketQuestState.TeleportTo(pos)
         root.CFrame = CFrame.new(pos + Vector3.new(0, 3, 0))
         task.wait(0.3)
     end
+end
+
+-- Hàm tìm Frame hội thoại của game (PlayerGui.MainGui.Menu.Dialogue hoặc tương đương)
+function ticketQuestState.GetDialogueGui()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+    local mg = pg:FindFirstChild("MainGui")
+    if mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue") then
+        return mg.Menu.Dialogue
+    end
+    for _, g in ipairs(pg:GetChildren()) do
+        if g:IsA("ScreenGui") then
+            local d = g:FindFirstChild("Dialogue", true)
+            if d then return d end
+        end
+    end
+    return nil
 end
 
 -- Hàm tìm và click nút UI theo điều kiện hàm kiểm tra text
@@ -3544,20 +3619,57 @@ function ticketQuestState.FindAndClickButton(predicate)
     return false
 end
 
+-- Kích hoạt lựa chọn thoại bằng cả UI Click và RemoteEvent chuẩn từ game
+function ticketQuestState.SelectDialogueOption(optionIndex, optionTextPattern)
+    local clicked = false
+
+    -- 1. Click trực tiếp trên MainGui.Menu.Dialogue.ButtonFrame[optionIndex]
+    local dlg = ticketQuestState.GetDialogueGui()
+    if dlg and dlg:FindFirstChild("ButtonFrame") then
+        local btn = dlg.ButtonFrame:FindFirstChild(tostring(optionIndex)) or dlg.ButtonFrame:FindFirstChild(optionIndex)
+        if btn then
+            pcall(function()
+                if firesignal then
+                    if btn.Activated then firesignal(btn.Activated) end
+                    if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                end
+                if getconnections then
+                    if btn.Activated then for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end end
+                    if btn.MouseButton1Click then for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end end
+                end
+            end)
+            clicked = true
+        end
+    end
+
+    -- 2. Tìm theo text nếu chưa click được
+    if not clicked and optionTextPattern then
+        clicked = ticketQuestState.FindAndClickButton(function(t) return t:find(optionTextPattern) end)
+    end
+
+    -- 3. Gửi RemoteEvent ChooseDialogueOption (Tìm thấy từ Explorer export)
+    if Events and Events:FindFirstChild("ChooseDialogueOption") then
+        pcall(function() Events.ChooseDialogueOption:FireServer(optionIndex) end)
+        pcall(function() Events.ChooseDialogueOption:FireServer(tostring(optionIndex)) end)
+    end
+
+    return clicked
+end
+
 function ticketQuestState.InteractNPC(isClaiming)
     local isHard = (Config.TicketDifficulty or "Hard") == "Hard"
     local diffKeyword = isHard and "hard" or "easy"
 
     -- 1. Nếu bảng hội thoại NPC đã mở sẵn trước mặt (người dùng tự bấm E):
     if isClaiming then
-        -- Trả vé: Tìm nút "*Leave*" (ảnh trả nhiệm vụ)
-        if ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("claim") or t:find("xong") end) then
-            ShowNotification("Nhiệm Vụ Vé", "Đã bấm *Leave* nộp nhiệm vụ & nhận thưởng thành công!", "SUCCESS", 5)
+        -- Trả vé: Tìm nút "*Leave*" (ảnh trả nhiệm vụ hoàn thành)
+        if ticketQuestState.SelectDialogueOption(1, "leave") or ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("claim") or t:find("xong") end) then
+            ShowNotification("Nhiệm Vụ Vé", "Đã bấm *Leave* nộp nhiệm vụ & nhận vé thành công!", "SUCCESS", 5)
             return true
         end
     else
         -- Nhận vé:
-        -- Kiểm tra nếu đã ở Bước 2 (bảng đã có nút "Accept Hard Quest"):
+        -- Bước 2: Bấm nút nhận độ khó nếu đã ở trang 2
         local clickedDiff = ticketQuestState.FindAndClickButton(function(t)
             return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
         end)
@@ -3566,8 +3678,8 @@ function ticketQuestState.InteractNPC(isClaiming)
             return true
         end
 
-        -- Kiểm tra nếu đang ở Bước 1 (bảng có nút "Quest" và "Nevermind"):
-        local clickedQuest = ticketQuestState.FindAndClickButton(function(t)
+        -- Bước 1: Bấm nút "Quest" (ảnh 2)
+        local clickedQuest = ticketQuestState.SelectDialogueOption(1, "^quest") or ticketQuestState.FindAndClickButton(function(t)
             return (t == "quest" or t:find("^quest")) and not t:find("nevermind") and not t:find("huy")
         end)
         if clickedQuest then
@@ -3633,17 +3745,16 @@ function ticketQuestState.InteractNPC(isClaiming)
 
     if isClaiming then
         -- Quy trình TRẢ nhiệm vụ: Chờ nút "*Leave*" xuất hiện và click (ảnh 3)
-        while (tick() - t0) < 3.0 do
+        while (tick() - t0) < 3.5 do
             task.wait(0.2)
-            if ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("claim") or t:find("xong") end) then
+            if ticketQuestState.SelectDialogueOption(1, "leave") or ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("claim") or t:find("xong") end) then
                 success = true
                 break
             end
         end
     else
         -- Quy trình NHẬN nhiệm vụ (2 bước chuẩn 100% theo ảnh của bạn):
-        -- Bước 5A: Chờ bảng hiện ra và bấm nút "Quest" (ảnh 1)
-        while (tick() - t0) < 3.0 do
+        while (tick() - t0) < 3.5 do
             task.wait(0.2)
             -- Nếu bảng đã mở sẵn ở bước 2 thì bấm nút chọn độ khó ngay
             if ticketQuestState.FindAndClickButton(function(t)
@@ -3654,16 +3765,16 @@ function ticketQuestState.InteractNPC(isClaiming)
             end
 
             -- Nếu ở bước 1: Bấm nút "Quest"
-            if ticketQuestState.FindAndClickButton(function(t)
+            if ticketQuestState.SelectDialogueOption(1, "^quest") or ticketQuestState.FindAndClickButton(function(t)
                 return (t == "quest" or t:find("^quest")) and not t:find("nevermind") and not t:find("huy")
             end) then
-                -- Bước 5B: Chờ bảng hội thoại chuyển trang sang "Accept Hard Quest" (ảnh 2)
+                -- Chờ chuyển trang sang bước 2 "Accept Hard Quest"
                 local t1 = tick()
                 while (tick() - t1) < 2.5 do
                     task.wait(0.2)
                     if ticketQuestState.FindAndClickButton(function(t)
                         return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
-                    end) then
+                    end) or ticketQuestState.SelectDialogueOption(1, diffKeyword) then
                         success = true
                         break
                     end
@@ -3699,11 +3810,79 @@ function ticketQuestState.DetectActiveQuest()
     local isDone = false
     local detectedCooldownSec = nil
 
-    -- 0. Hàm tiện ích làm sạch text (xóa thẻ rich text HTML/XML)
-    local function cleanStr(s)
-        if not s then return "" end
-        local res = tostring(s):gsub("<[^>]->", "")
-        return res:gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
+    -- 0. ƯU TIÊN SỐ 1: Đọc trực tiếp từ ReplicatedStorage.Data[UserId] (Dữ liệu gốc của Server game, CHÍNH XÁC 100%, 0ms, 0 lag!)
+    local pData = ticketQuestState.GetPlayerDataFolder()
+    if pData then
+        -- 0A. Đọc thời gian hồi chiêu
+        local cdVal = pData:FindFirstChild("TicketQuestCooldown")
+        if cdVal and tonumber(cdVal.Value) then
+            local stamp = tonumber(cdVal.Value)
+            if stamp > os.time() then
+                detectedCooldownSec = stamp - os.time()
+            end
+        end
+
+        -- 0B. Đọc nhiệm vụ từ pData.Quest.Main
+        local questFolder = pData:FindFirstChild("Quest")
+        local mainFolder = questFolder and questFolder:FindFirstChild("Main")
+        if mainFolder then
+            local tq = mainFolder:FindFirstChild("Hard Ticket Quest") 
+                or mainFolder:FindFirstChild("Ticket Quest") 
+                or mainFolder:FindFirstChild("Easy Ticket Quest")
+            if not tq then
+                for _, ch in ipairs(mainFolder:GetChildren()) do
+                    local cn = ch.Name:lower()
+                    if cn:find("ticket") and cn:find("quest") then
+                        tq = ch
+                        break
+                    end
+                end
+            end
+
+            if tq then
+                -- Lấy tiến độ hiện tại (NumberValue tên là "1")
+                local curVal = tq:FindFirstChild("1")
+                if curVal and tonumber(curVal.Value) ~= nil then
+                    detectedCur = tonumber(curVal.Value)
+                end
+
+                -- Lấy mục tiêu và tên nhiệm vụ (StringValue trong tq.Objective["1"]: "Use any skill for 100 times,100,UseSkillForTimes")
+                local objFolder = tq:FindFirstChild("Objective")
+                local objVal = objFolder and objFolder:FindFirstChild("1")
+                local objStr = objVal and tostring(objVal.Value or "") or ""
+                local rawTitle, rawMax, rawCode = objStr:match("^([^,]+),([^,]+),?(.*)$")
+
+                detectedMax = tonumber(rawMax) or 100
+                detectedTitle = (rawTitle and #rawTitle > 0) and rawTitle or tq.Name
+                local codeLow = (rawCode or ""):lower()
+                local titleLow = (detectedTitle):lower()
+
+                if codeLow:find("skill") or titleLow:find("skill") or titleLow:find("chiêu") or titleLow:find("kỹ năng") then
+                    detectedType = "skill_100"
+                    if detectedMax == 0 then detectedMax = 100 end
+                elseif codeLow:find("bait") or titleLow:find("bait") or titleLow:find("mồi") then
+                    detectedType = "bait_100"
+                    if detectedMax == 0 then detectedMax = 100 end
+                elseif detectedMax == 10 or titleLow:find("1.5") or titleLow:find("1500") or titleLow:find("heavy") then
+                    detectedType = "fish_15m"
+                    if detectedMax == 0 then detectedMax = 10 end
+                else
+                    detectedType = "fish_100"
+                    if detectedMax == 0 then detectedMax = 100 end
+                end
+
+                if detectedMax > 0 and detectedCur >= detectedMax then
+                    isDone = true
+                end
+
+                return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
+            end
+        end
+
+        -- Nếu không có folder nhiệm vụ tq trong Quest.Main, nhưng đang có Cooldown:
+        if detectedCooldownSec and detectedCooldownSec > 0 then
+            return nil, nil, 0, 0, false, detectedCooldownSec
+        end
     end
 
     -- 1. Ưu tiên chế độ người dùng chọn thủ công nếu không chọn Auto Detect
@@ -3726,7 +3905,13 @@ function ticketQuestState.DetectActiveQuest()
         detectedMax = 100
     end
 
-    -- 2. Quét nhanh PlayerGui tìm đúng Thẻ Ticket Quest
+    -- 2. DỰ PHÒNG: Quét PlayerGui (Bỏ qua nhãn Stats "1/50" để không bị nhầm tiến độ)
+    local function cleanStr(s)
+        if not s then return "" end
+        local res = tostring(s):gsub("<[^>]->", "")
+        return res:gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
+    end
+
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
         for _, lbl in ipairs(pg:GetDescendants()) do
@@ -3734,30 +3919,20 @@ function ticketQuestState.DetectActiveQuest()
                 local txt = cleanStr(lbl.Text)
                 local lower = txt:lower()
 
-                -- Thẻ Ticket Quest trong game luôn có tiêu đề "Hard Ticket Quest" hoặc "Ticket Quest"
                 if lower:find("hard ticket quest") or lower:find("easy ticket quest") or (lower:find("ticket") and lower:find("quest")) then
                     local card = lbl.Parent
                     if card then
-                        -- Kiểm tra nếu ngay trên nhãn tiêu đề có chứa tiến độ (VD: "Hard Ticket Quest (41/100)")
-                        local c, m = txt:match("(%d+)%s*/%s*(%d+)")
-                        if c and m then
-                            detectedCur = tonumber(c) or 0
-                            detectedMax = tonumber(m) or 0
-                        end
-
-                        -- Quét các nhãn con trong Card Frame này để lấy TÊN và TIẾN ĐỘ CHÍNH XÁC
                         for _, sibling in ipairs(card:GetDescendants()) do
-                            if (sibling:IsA("TextLabel") or sibling:IsA("TextButton")) and sibling ~= lbl then
+                            -- Bỏ qua nhãn tên là "Stats" vì đây là số lượt làm trong ngày (1/50)
+                            if (sibling:IsA("TextLabel") or sibling:IsA("TextButton")) and sibling ~= lbl and sibling.Name ~= "Stats" then
                                 local subTxt = cleanStr(sibling.Text)
                                 local subLower = subTxt:lower()
 
-                                -- Bắt dòng tiến độ: ví dụ "Use any skill for 100 times (41/100)"
                                 local sc, sm = subTxt:match("(%d+)%s*/%s*(%d+)")
                                 if sc and sm then
                                     detectedCur = tonumber(sc) or 0
                                     detectedMax = tonumber(sm) or 0
 
-                                    -- Tách lấy đúng TÊN nhiệm vụ thực tế từ game (bỏ phần đuôi tiến độ "(41/100)")
                                     local nameOnly = subTxt:gsub("%s*%(%d+%s*/%s*%d+%)%s*", ""):match("^%s*(.-)%s*$")
                                     if nameOnly and #nameOnly > 0 and not nameOnly:lower():find("ticket quest") then
                                         detectedTitle = nameOnly
@@ -3774,7 +3949,6 @@ function ticketQuestState.DetectActiveQuest()
                             end
                         end
 
-                        -- Phân loại kiểu nhiệm vụ để bot biết vị trí câu/cách làm
                         local titleLow = (detectedTitle or txt):lower()
                         if titleLow:find("skill") or titleLow:find("chiêu") or titleLow:find("kỹ năng") then
                             detectedType = "skill_100"
@@ -3803,22 +3977,25 @@ function ticketQuestState.DetectActiveQuest()
                             isDone = true
                         end
 
-                        -- TRẢ VỀ NGAY LẬP TỨC khi tìm thấy thẻ Ticket Quest (Tuyệt đối không quét lan sang các UI khác gây lag & sai số)
-                        return detectedType, detectedTitle, detectedCur, detectedMax, isDone, nil
+                        return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
                     end
                 end
             end
         end
     end
 
-    -- Nếu không tìm thấy thẻ Ticket Quest nào trong PlayerGui -> Trả về nil
-    return nil, nil, 0, 0, false, nil
+    return nil, nil, 0, 0, false, detectedCooldownSec
 end
 
--- Hàm chủ động quét toàn diện trạng thái và tiến độ nhiệm vụ hiện tại từ PlayerGui
 function ticketQuestState.ScanAndUpdateStatus()
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
     local now = tick()
+
+    -- Cập nhật hồi chiêu từ Server nếu có
+    if detectedCd and detectedCd > 0 then
+        ticketQuestState.cooldownEnd = now + detectedCd
+        ticketQuestState.isCooldown = true
+    end
 
     -- 1. Nếu tìm thấy nhiệm vụ đang hoạt động
     if qType then
@@ -3835,7 +4012,7 @@ function ticketQuestState.ScanAndUpdateStatus()
             ticketQuestState.statusText = ticketQuestState.currentQuestTitle
         end
     else
-        -- 2. Không phát hiện thẻ nhiệm vụ nào trong PlayerGui -> Chưa nhận nhiệm vụ hoặc đang hồi chiêu
+        -- 2. Không có nhiệm vụ nào -> Chưa nhận nhiệm vụ hoặc đang hồi chiêu
         ticketQuestState.isCompleted = false
         ticketQuestState.currentQuestType = "none"
         ticketQuestState.currentQuestTitle = "Chưa nhận nhiệm vụ"
@@ -3848,6 +4025,7 @@ function ticketQuestState.ScanAndUpdateStatus()
             local secs = remain % 60
             ticketQuestState.statusText = string.format("Chờ hồi chiêu (%02d:%02d)", mins, secs)
         else
+            ticketQuestState.isCooldown = false
             ticketQuestState.statusText = "Chưa nhận nhiệm vụ nào"
         end
     end
@@ -3885,7 +4063,7 @@ function ticketQuestState.Tick()
             ticketQuestState.currentQuestType = "none"
             ticketQuestState.currentProgress = 0
             ticketQuestState.isCompleted = false
-            ticketQuestState.statusText = "NPC đã xuất hiện dấu (?)! Đang tiến đến nhận vé..."
+            ticketQuestState.statusText = "NPC đã sẵn sàng (?)! Đang tiến đến nhận vé..."
             ticketQuestState.UpdateUI()
         else
             local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
@@ -3950,17 +4128,25 @@ function ticketQuestState.Tick()
         end
     end
 
-    -- 2. Đã hoàn thành nhiệm vụ -> Trả vé tại NPC (từ xa hoặc chớp nhoáng)
+    -- 2. Đã hoàn thành nhiệm vụ -> Trả vé tại NPC (bấm *Leave* theo ảnh 3)
     if ticketQuestState.isCompleted or done then
         ticketQuestState.statusText = "Đã xong nhiệm vụ! Đang nộp vé Hard..."
         ticketQuestState.UpdateUI()
         ticketQuestState.InteractNPC(true)
         task.wait(0.5)
         if Events and Events:FindFirstChild("ClaimQuest") then
-            Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
+            pcall(function() Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard") end)
         end
 
         local setCooldown = detectedCd and detectedCd > 0 and detectedCd or ((Config.TicketCooldownMinutes or 20) * 60)
+        local pData = ticketQuestState.GetPlayerDataFolder()
+        if pData and pData:FindFirstChild("TicketQuestCooldown") then
+            local serverCd = tonumber(pData.TicketQuestCooldown.Value) or 0
+            if serverCd > os.time() then
+                setCooldown = serverCd - os.time()
+            end
+        end
+
         ticketQuestState.cooldownEnd = now + setCooldown
         ticketQuestState.isCooldown = true
         ticketQuestState.isCompleted = false
@@ -4067,7 +4253,7 @@ function ticketQuestState.Tick()
 
     -- Tự bán cá nếu đầy balo
     if Config.TicketAutoSellFull then
-        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local pData = ticketQuestState.GetPlayerDataFolder()
         if pData and pData:FindFirstChild("InventoryLimit") then
             local invCount = 0
             if pData:FindFirstChild("Inventory") then invCount = invCount + #pData.Inventory:GetChildren() end
@@ -4083,7 +4269,7 @@ function ticketQuestState.Tick()
     -- Nếu là quest 100 mồi: tự kiểm tra và mua mồi + trang bị mồi
     if ticketQuestState.currentQuestType == "bait_100" then
         local baitName = Config.TicketBaitChoice or "Basic Bait"
-        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local pData = ticketQuestState.GetPlayerDataFolder()
         if pData and pData:FindFirstChild("Bait") then
             local bVal = pData.Bait:FindFirstChild(baitName)
             local bCount = bVal and bVal.Value or 0
@@ -4102,7 +4288,7 @@ function ticketQuestState.Tick()
         end
     elseif ticketQuestState.currentQuestType == "fish_100" then
         -- Nhiệm vụ 100 con cá: Tuyệt đối không dùng mồi để tiết kiệm mồi (trang bị None nếu có)
-        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local pData = ticketQuestState.GetPlayerDataFolder()
         if pData and pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "None" and (now - ticketQuestState.lastBaitEquip >= 2.0) then
             ticketQuestState.lastBaitEquip = now
             if Events and Events:FindFirstChild("EquipBait") then
