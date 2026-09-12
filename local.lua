@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "551e0c7"
+local SCRIPT_BUILD_COMMIT = "fa1b730"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -985,6 +985,58 @@ local function createCardGroup(parent)
     Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
     local l = Instance.new("UIListLayout"); l.SortOrder = Enum.SortOrder.LayoutOrder; l.Padding = UDim.new(0, 0); l.Parent = group
     return group
+end
+
+local function createCollapsibleCardGroup(parent, text, defaultOpen)
+    local isOpen = (defaultOpen == true)
+    local hdr = Instance.new("Frame")
+    hdr.Size = UDim2.new(1, 0, 0, 26)
+    hdr.BackgroundTransparency = 1
+    hdr.Parent = parent
+
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = hdr
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -95, 1, 0)
+    lbl.Position = UDim2.new(0, 0, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Text = string.upper(text)
+    lbl.TextColor3 = Colors.PurplePrimary
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = hdr
+
+    local badge = Instance.new("TextButton")
+    badge.Size = UDim2.new(0, 85, 0, 20)
+    badge.Position = UDim2.new(1, -85, 0.5, -10)
+    badge.BackgroundColor3 = Colors.ControlBg
+    badge.BorderSizePixel = 0
+    badge.Font = Enum.Font.GothamBold
+    badge.Text = isOpen and "▼ Thu Gọn" or "▶ Mở Rộng"
+    badge.TextColor3 = isOpen and Colors.TextMuted or Colors.PurpleAccent
+    badge.TextSize = 10
+    badge.Parent = hdr
+    Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+
+    local group = createCardGroup(parent)
+    group.Visible = isOpen
+
+    local function toggle()
+        isOpen = not isOpen
+        group.Visible = isOpen
+        badge.Text = isOpen and "▼ Thu Gọn" or "▶ Mở Rộng"
+        badge.TextColor3 = isOpen and Colors.TextMuted or Colors.PurpleAccent
+    end
+
+    btn.MouseButton1Click:Connect(toggle)
+    badge.MouseButton1Click:Connect(toggle)
+
+    return group, toggle
 end
 
 local function createBaseRow(parent, labelText, descText, indexSearch)
@@ -6334,8 +6386,7 @@ ticketQuestState.uiStatus = createInfoRow(questCard, "Nhiệm Vụ Hiện Tại"
 ticketQuestState.uiProgress = createInfoRow(questCard, "Tiến Độ Nhiệm Vụ", "0 / 100 (0%)")
 ticketQuestState.uiCooldown = createInfoRow(questCard, "Hồi Chiêu 20 Phút", "Sẵn sàng nhận vé!")
 
-createCategoryHeader(tabQuests, "📍 Cài Đặt Vị Trí Câu & NPC Ticket Quest")
-local spotCard = createCardGroup(tabQuests)
+local spotCard = createCollapsibleCardGroup(tabQuests, "📍 Cài Đặt Vị Trí Câu & NPC Ticket Quest", false)
 
 ticketQuestState.ui100Spot = createInfoRow(spotCard, "Điểm Câu 100 Con (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot100Fish.X, ticketQuestState.spot100Fish.Y, ticketQuestState.spot100Fish.Z))
 createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Con", "Gán vị trí bạn đang đứng làm nơi câu 100 con cá nhẹ", "Lấy Vị Trí", function()
@@ -6435,11 +6486,8 @@ createToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự đ�
     Config.TicketAutoSellFull = v
 end)
 
-createToggleRow(optionCard, "Tự Về Home Spot Khi Xong Nhiệm Vụ", "Khi trả xong vé và vào thời gian chờ 20p, tự bay về Home Spot để câu farm", Config.TicketReturnHomeWhenDone, function(v)
+createToggleRow(optionCard, "Tự Về Home Spot Câu Farm (Chờ 20p)", "Khi trả xong vé và chờ hồi 20p, tự bay về Home Spot và tự động câu cá/combo", Config.TicketReturnHomeWhenDone, function(v)
     Config.TicketReturnHomeWhenDone = v
-end)
-
-createToggleRow(optionCard, "Tự Quăng Cần & Đánh Combo Tại Home Spot", "Tự quăng cần và dùng Combo đã cài khi đang chờ ở Home Spot (không cần bật Auto Cast chung)", Config.TicketAutoCastAtHome, function(v)
     Config.TicketAutoCastAtHome = v
 end)
 
