@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "f28a6ea"
+local SCRIPT_BUILD_COMMIT = "dc47f4a"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2419,22 +2419,96 @@ end
 
 local function ServerHop()
     ShowNotification("Đổi Server", "Đang tìm kiếm server phù hợp...", "WARN")
-    pcall(function()
+    secretBossState.isNormalHopping = true
+    task.spawn(function()
         local placeId = game.PlaceId
         local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
-        local res = game:HttpGet(url)
-        local body = HttpService:JSONDecode(res)
-        if body and body.data then
-            for _, s in ipairs(body.data) do
-                if s.playing < s.maxPlayers and s.id ~= game.JobId then
-                    TeleportService:TeleportToPlaceInstance(placeId, s.id, LocalPlayer)
+        local ok, res = pcall(function() return game:HttpGet(url) end)
+        if ok and res then
+            local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
+            if bOk and body and body.data then
+                local candidates = {}
+                for _, s in ipairs(body.data) do
+                    if s.playing and s.maxPlayers and s.id ~= game.JobId then
+                        local free = s.maxPlayers - s.playing
+                        if free >= 2 then
+                            table.insert(candidates, s.id)
+                        end
+                    end
+                end
+                local chosen = (#candidates > 0 and candidates[math.random(1, #candidates)]) or nil
+                if not chosen then
+                    for _, s in ipairs(body.data) do
+                        if s.playing and s.maxPlayers and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                            chosen = s.id
+                            break
+                        end
+                    end
+                end
+                if chosen then
+                    pcall(function() TeleportService:TeleportToPlaceInstance(placeId, chosen, LocalPlayer) end)
                     return
                 end
             end
         end
+        pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
     end)
 end
 secretBossState.ServerHop = ServerHop
+
+secretBossState.isHopping = false
+secretBossState.currentTargetWeather = nil
+secretBossState.currentVisited = {}
+secretBossState.lastAttemptedJob = nil
+secretBossState.hopWatchdog = 0
+secretBossState.isNormalHopping = false
+
+secretBossState.HandleTeleportError = function(reason)
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        if gs and gs.ClearError then gs:ClearError() end
+    end)
+
+    if secretBossState.isHopping then
+        local failJob = secretBossState.lastAttemptedJob
+        if failJob and secretBossState.currentVisited then
+            if not table.find(secretBossState.currentVisited, failJob) then
+                table.insert(secretBossState.currentVisited, failJob)
+            end
+        end
+        ShowNotification("Đổi Server", "Server đầy hoặc lỗi (" .. tostring(reason or "GameFull"):sub(1, 35) .. "). Tự động tìm server khác...", "WARN", 4)
+        secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
+        task.delay(1.5, function()
+            if secretBossState.isHopping then
+                secretBossState.HopToNextWeatherServer(secretBossState.currentTargetWeather, secretBossState.currentVisited)
+            end
+        end)
+    elseif secretBossState.isNormalHopping then
+        ShowNotification("Đổi Server", "Server đầy. Đang tự động thử server khác...", "WARN", 4)
+        task.delay(1.5, function()
+            if secretBossState.ServerHop then secretBossState.ServerHop() end
+        end)
+    end
+end
+
+if not secretBossState.hooksInitialized then
+    secretBossState.hooksInitialized = true
+
+    table.insert(activeConnections, TeleportService.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+        if player == LocalPlayer then
+            secretBossState.HandleTeleportError(errorMessage or teleportResult or "TeleportInitFailed")
+        end
+    end))
+
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        table.insert(activeConnections, gs.ErrorMessageChanged:Connect(function(msg)
+            if (secretBossState.isHopping or secretBossState.isNormalHopping) and msg and msg ~= "" then
+                secretBossState.HandleTeleportError(msg)
+            end
+        end))
+    end)
+end
 
 secretBossState.weatherHopChoices = {
     "Bất Kỳ Thời Tiết Nào (Trừ Clear)",
@@ -2468,8 +2542,13 @@ function secretBossState.IsWeatherMatch(currentWeatherName, targetWeather)
 end
 
 function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
+    secretBossState.isHopping = true
+    secretBossState.currentTargetWeather = targetWeather
     visitedServers = visitedServers or {}
-    table.insert(visitedServers, game.JobId)
+    secretBossState.currentVisited = visitedServers
+    if not table.find(visitedServers, game.JobId) then
+        table.insert(visitedServers, game.JobId)
+    end
 
     if writefile then
         pcall(function()
@@ -2491,28 +2570,37 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
         end)
     end
 
-    ShowNotification("Tìm Server", string.format("Đang tìm server có: %s...", targetWeather), "WARN", 5)
+    ShowNotification("Tìm Server", string.format("Đang quét server còn chỗ trống cho: %s...", targetWeather), "WARN", 5)
 
     task.spawn(function()
         local placeId = game.PlaceId
         local cursor = ""
-        local foundJob = nil
         local visitedMap = {}
         for _, jid in ipairs(visitedServers) do visitedMap[jid] = true end
 
-        for page = 1, 4 do
+        local tier1 = {} -- freeSlots >= 3, playing >= 3
+        local tier2 = {} -- freeSlots >= 2
+        local tier3 = {} -- freeSlots >= 1
+
+        for page = 1, 5 do
             local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", placeId, cursor ~= "" and ("&cursor=" .. cursor) or "")
             local ok, res = pcall(function() return game:HttpGet(url) end)
             if ok and res then
                 local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
                 if bOk and body and body.data then
                     for _, s in ipairs(body.data) do
-                        if s.playing and s.maxPlayers and s.playing < s.maxPlayers and not visitedMap[s.id] and s.id ~= game.JobId then
-                            foundJob = s.id
-                            break
+                        if s.id and s.id ~= game.JobId and not visitedMap[s.id] and s.playing and s.maxPlayers then
+                            local free = s.maxPlayers - s.playing
+                            if free >= 3 and s.playing >= 3 then
+                                table.insert(tier1, s.id)
+                            elseif free >= 2 then
+                                table.insert(tier2, s.id)
+                            elseif free >= 1 then
+                                table.insert(tier3, s.id)
+                            end
                         end
                     end
-                    if foundJob then break end
+                    if #tier1 >= 5 or #tier2 >= 8 then break end
                     cursor = body.nextPageCursor or ""
                     if not cursor or cursor == "" then break end
                 end
@@ -2520,14 +2608,54 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
             task.wait(0.2)
         end
 
+        if not secretBossState.isHopping then return end
+
+        local chosenPool = (#tier1 > 0 and tier1) or (#tier2 > 0 and tier2) or tier3
+        local foundJob = nil
+        if #chosenPool > 0 then
+            foundJob = chosenPool[math.random(1, #chosenPool)]
+        end
+
         if foundJob then
-            ShowNotification("Đổi Server", "Đã chọn server mới! Đang chuyển...", "SUCCESS", 4)
+            secretBossState.lastAttemptedJob = foundJob
+            ShowNotification("Đổi Server", "Đã chọn server còn chỗ trống! Đang chuyển...", "SUCCESS", 4)
             task.wait(0.5)
-            TeleportService:TeleportToPlaceInstance(placeId, foundJob, LocalPlayer)
+
+            secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
+            local myWatchdog = secretBossState.hopWatchdog
+            local myOrigJob = game.JobId
+            task.delay(10, function()
+                if secretBossState.isHopping and secretBossState.hopWatchdog == myWatchdog and game.JobId == myOrigJob then
+                    pcall(function()
+                        local gs = game:GetService("GuiService")
+                        if gs and gs.ClearError then gs:ClearError() end
+                    end)
+                    if not table.find(visitedServers, foundJob) then
+                        table.insert(visitedServers, foundJob)
+                    end
+                    ShowNotification("Đổi Server", "Không thể vào server (Server đầy / hết hạn). Tự động tìm server khác...", "WARN", 4)
+                    task.wait(1)
+                    if secretBossState.isHopping then
+                        secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
+                    end
+                end
+            end)
+
+            local teleOk, teleErr = pcall(function()
+                TeleportService:TeleportToPlaceInstance(placeId, foundJob, LocalPlayer)
+            end)
+            if not teleOk then
+                table.insert(visitedServers, foundJob)
+                ShowNotification("Đổi Server", "Lỗi kết nối (" .. tostring(teleErr):sub(1, 40) .. "). Đang thử server khác...", "WARN", 4)
+                task.wait(1.5)
+                if secretBossState.isHopping then
+                    secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
+                end
+            end
         else
-            ShowNotification("Tìm Server", "Đang chuyển sang server ngẫu nhiên...", "INFO", 4)
+            ShowNotification("Tìm Server", "Không tìm thấy server còn chỗ. Đang chuyển sang server ngẫu nhiên...", "INFO", 4)
             task.wait(1.5)
-            TeleportService:Teleport(placeId, LocalPlayer)
+            pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
         end
     end)
 end
@@ -2554,6 +2682,8 @@ function secretBossState.CheckWeatherHopOnJoin()
         local isMatch = secretBossState.IsWeatherMatch(weatherName, targetWeather)
 
         if isMatch then
+            secretBossState.isHopping = false
+            secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
             if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
                 pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
             end
@@ -6330,6 +6460,12 @@ end
                 secretBossState.HopToNextWeatherServer(Config.TargetWeather, {})
             end
         else
+            secretBossState.isHopping = false
+            secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
+            pcall(function()
+                local gs = game:GetService("GuiService")
+                if gs and gs.ClearError then gs:ClearError() end
+            end)
             if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
                 pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
             end
@@ -6350,6 +6486,12 @@ end
     end)
 
     createButtonRow(weatherHopCard, "Dừng Tìm Kiếm Ngay Lập Tức", "Hủy bỏ quá trình nhảy server và xóa dữ liệu ghi nhớ", "Dừng Tìm", function()
+        secretBossState.isHopping = false
+        secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
+        pcall(function()
+            local gs = game:GetService("GuiService")
+            if gs and gs.ClearError then gs:ClearError() end
+        end)
         if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
             pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
         end
