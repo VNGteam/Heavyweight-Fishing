@@ -929,6 +929,9 @@ local function SwitchTab(tabName)
             local pill = btn:FindFirstChild("ActivePill"); if pill then pill.Visible = false end
         end
     end
+    if tabName == "Wiki" and Wiki and Wiki.RefreshBagUI then
+        task.spawn(Wiki.RefreshBagUI)
+    end
 end
 
 local function CreateTab(name)
@@ -1693,14 +1696,27 @@ function Wiki.GetPlayerFishCount(fishName)
     local count = 0
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if not pData then return 0 end
-    local fishLower = tostring(fishName or ""):lower()
+    local fishLower = tostring(fishName or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if #fishLower == 0 then return 0 end
+
+    local function cleanFishName(str)
+        local s = tostring(str or ""):lower()
+        for _, kw in ipairs({"shiny", "giant", "golden", "albino", "corrupted", "colossal", "heavyweight", "dark", "radiant", "spectral", "sparkling"}) do
+            s = s:gsub("%f[%a]" .. kw .. "%f[%A]", "")
+        end
+        return s:match("^%s*(.-)%s*$") or s
+    end
 
     local function checkFolder(folder)
         if not folder then return end
         for _, item in ipairs(folder:GetChildren()) do
-            local rawName = Wiki.GetItemRawName(item):lower()
-            local instName = tostring(item.Name or ""):lower()
-            if rawName == fishLower or instName == fishLower or rawName:find(fishLower, 1, true) or instName:find(fishLower, 1, true) then
+            local rawName = Wiki.GetItemRawName(item):lower():gsub("^%s+", ""):gsub("%s+$", "")
+            local instName = tostring(item.Name or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+            local cleanRaw = cleanFishName(rawName)
+            local cleanInst = cleanFishName(instName)
+
+            local isMatch = (rawName == fishLower) or (instName == fishLower) or (cleanRaw == fishLower) or (cleanInst == fishLower)
+            if isMatch then
                 local qtyVal = item:FindFirstChild("Quantity") or item:FindFirstChild("Count") or item:FindFirstChild("Amount") or item:FindFirstChild("Stack")
                 local qty = (qtyVal and tonumber(qtyVal.Value)) or 1
                 count = count + qty
@@ -6240,36 +6256,53 @@ do
             end
         end
 
-        if infoBagSummary and infoBagSummary.Set then
-            infoBagSummary.Set(string.format("%d / %d ô (%d cá cần giữ | %d cá nên bán)", totalItems, invLimit, totalKeepInBag, totalSellInBag))
-        end
-
         local typesInBagCount = 0
         for _, entry in ipairs(cardEntries) do
             local f = entry.fishData
             local cnt = Wiki.GetPlayerFishCount(f.name)
             entry.currentCount = cnt
-            if cnt > 0 then typesInBagCount = typesInBagCount + 1 end
-            if entry.countLabel then
-                if cnt > 0 then
-                    entry.countLabel.Text = string.format("Đang có: %d con", cnt)
+
+            if cnt > 0 then
+                typesInBagCount = typesInBagCount + 1
+                -- Cá đã có: xếp lên đầu bảng theo thứ tự phẩm chất
+                entry.cardFrame.LayoutOrder = entry.defaultOrder
+                entry.cardFrame.BackgroundTransparency = 0
+                if entry.cardStroke then
+                    entry.cardStroke.Color = f.keep and Colors.BorderPurple or Colors.AccentGreen
+                    entry.cardStroke.Thickness = 1.2
+                end
+                if entry.countLabel then
+                    entry.countLabel.Text = string.format("✔ Đang có: %d con", cnt)
                     entry.countLabel.TextColor3 = f.keep and Colors.AccentYellow or Colors.AccentGreen
-                    if entry.countBox then
-                        entry.countBox.BackgroundColor3 = Colors.ControlBg
-                    end
-                else
-                    entry.countLabel.Text = "Đang có: 0 con"
+                end
+                if entry.countBox then
+                    entry.countBox.BackgroundColor3 = Colors.ControlBg
+                end
+            else
+                -- Cá chưa có: xếp xuống dưới bảng
+                entry.cardFrame.LayoutOrder = 10000 + entry.defaultOrder
+                entry.cardFrame.BackgroundTransparency = 0.35
+                if entry.cardStroke then
+                    entry.cardStroke.Color = Colors.BorderSubtle
+                    entry.cardStroke.Thickness = 0.8
+                end
+                if entry.countLabel then
+                    entry.countLabel.Text = "Chưa có (0 con)"
                     entry.countLabel.TextColor3 = Colors.TextMuted
-                    if entry.countBox then
-                        entry.countBox.BackgroundColor3 = Colors.InputBg
-                    end
+                end
+                if entry.countBox then
+                    entry.countBox.BackgroundColor3 = Colors.InputBg
                 end
             end
         end
 
         btnFInBag.Text = string.format("🎒 Trong Túi (%d)", typesInBagCount)
+        if infoBagSummary and infoBagSummary.Set then
+            infoBagSummary.Set(string.format("%d / %d ô (%d cá cần giữ | %d cá nên bán | %d loài đang có)", totalItems, invLimit, totalKeepInBag, totalSellInBag, typesInBagCount))
+        end
         UpdateCardFilter()
     end
+    Wiki.RefreshBagUI = RefreshWikiBagCounts
 
     -- Tạo từng Thẻ Cá (Card) trong Bách Khoa Toàn Thư
     for idx, f in ipairs(Wiki.wikiFishData) do
@@ -6455,12 +6488,14 @@ do
 
         table.insert(cardEntries, {
             cardFrame = card,
+            cardStroke = cardStroke,
             fishData = f,
             countBox = countBox,
             countLabel = countLbl,
             countStroke = countStroke,
             singleBtn = singleBtn,
-            currentCount = 0
+            currentCount = 0,
+            defaultOrder = idx
         })
     end
 
@@ -6471,21 +6506,27 @@ do
         end)
     end
 
-    -- Tự động làm mới khi có cá mới thêm vào hoặc bán bớt trong balo
+    -- Tự động làm mới khi có cá mới thêm vào hoặc bán bớt trong balo & hotbar
     task.spawn(function()
         local pDataInit = ReplicatedStorage:WaitForChild("Data", 10)
         local userFolder = pDataInit and pDataInit:WaitForChild(tostring(LocalPlayer.UserId), 10)
         local invFolder = userFolder and userFolder:WaitForChild("Inventory", 10)
-        if invFolder then
-            table.insert(activeConnections, invFolder.ChildAdded:Connect(function()
+        local hotbarFolder = userFolder and userFolder:WaitForChild("Hotbar", 10)
+
+        local function attachFolder(folder)
+            if not folder then return end
+            table.insert(activeConnections, folder.ChildAdded:Connect(function()
                 task.wait(0.4)
                 pcall(RefreshWikiBagCounts)
             end))
-            table.insert(activeConnections, invFolder.ChildRemoved:Connect(function()
+            table.insert(activeConnections, folder.ChildRemoved:Connect(function()
                 task.wait(0.4)
                 pcall(RefreshWikiBagCounts)
             end))
         end
+
+        attachFolder(invFolder)
+        attachFolder(hotbarFolder)
     end)
 
     -- Khởi tạo lần đầu
