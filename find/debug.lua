@@ -670,11 +670,12 @@ local function CreateInspectorUI()
 
     local function createTabBtn(text, parent)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 120, 1, 0)
+        btn.Size = UDim2.new(0, 120, 0, 28)
         btn.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
-        btn.ClipsDescendants = true
+        btn.ClipsDescendants = false
+        btn.ZIndex = 5
         btn.Font = Enum.Font.GothamSemibold
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(200, 205, 220)
@@ -685,15 +686,17 @@ local function CreateInspectorUI()
         cr.CornerRadius = UDim.new(0, 5)
         cr.Parent = btn
 
-        local baseColor = btn.BackgroundColor3
+        local baseColor = Color3.fromRGB(35, 38, 52)
+        local hoverColor = Color3.fromRGB(50, 55, 75)
+
         btn.MouseEnter:Connect(function()
             if Inspector.CurrentRoot and not text:find(Inspector.CurrentRoot) then
-                btn.BackgroundColor3 = Color3.fromRGB(48, 52, 70)
+                game:GetService("TweenService"):Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = hoverColor}):Play()
             end
         end)
         btn.MouseLeave:Connect(function()
             if Inspector.CurrentRoot and not text:find(Inspector.CurrentRoot) then
-                btn.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+                game:GetService("TweenService"):Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = baseColor}):Play()
             end
         end)
 
@@ -711,6 +714,7 @@ local function CreateInspectorUI()
     ControlBar.Size = UDim2.new(1, -20, 0, 32)
     ControlBar.Position = UDim2.new(0, 10, 0, 84)
     ControlBar.BackgroundTransparency = 1
+    ControlBar.ZIndex = 4
     ControlBar.Parent = MainFrame
 
     local ControlLayout = Instance.new("UIListLayout")
@@ -720,11 +724,12 @@ local function CreateInspectorUI()
 
     local function createActionBtn(text, color, width)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, width or 80, 1, 0)
+        btn.Size = UDim2.new(0, width or 80, 0, 30)
         btn.BackgroundColor3 = color or Color3.fromRGB(45, 50, 70)
         btn.BorderSizePixel = 0
         btn.AutoButtonColor = false
-        btn.ClipsDescendants = true
+        btn.ClipsDescendants = false
+        btn.ZIndex = 5
         btn.Font = Enum.Font.GothamSemibold
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(240, 245, 255)
@@ -735,18 +740,18 @@ local function CreateInspectorUI()
         cr.CornerRadius = UDim.new(0, 5)
         cr.Parent = btn
 
-        -- Custom smooth hover without AutoButtonColor glitch
         local normalColor = color or Color3.fromRGB(45, 50, 70)
         local hoverColor = Color3.fromRGB(
-            math.min(255, math.floor(normalColor.R * 255 + 25)),
-            math.min(255, math.floor(normalColor.G * 255 + 25)),
-            math.min(255, math.floor(normalColor.B * 255 + 25))
+            math.min(255, math.floor(normalColor.R * 255 + 28)),
+            math.min(255, math.floor(normalColor.G * 255 + 28)),
+            math.min(255, math.floor(normalColor.B * 255 + 28))
         )
+
         btn.MouseEnter:Connect(function()
-            btn.BackgroundColor3 = hoverColor
+            game:GetService("TweenService"):Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = hoverColor}):Play()
         end)
         btn.MouseLeave:Connect(function()
-            btn.BackgroundColor3 = normalColor
+            game:GetService("TweenService"):Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = normalColor}):Play()
         end)
 
         return btn
