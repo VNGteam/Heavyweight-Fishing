@@ -931,6 +931,8 @@ local function SwitchTab(tabName)
     end
     if tabName == "Wiki" and Wiki and Wiki.RefreshBagUI then
         task.spawn(Wiki.RefreshBagUI)
+    elseif tabName == "Nhiệm Vụ" and ticketQuestState and ticketQuestState.ScanAndUpdateStatus then
+        task.spawn(ticketQuestState.ScanAndUpdateStatus)
     end
 end
 
@@ -4173,7 +4175,7 @@ function ticketQuestState.DetectActiveQuest()
         detectedMax = 100
     end
 
-    -- 2. DỰ PHÒNG: Quét PlayerGui (Bỏ qua nhãn Stats "1/50" để không bị nhầm tiến độ)
+    -- 2. DỰ PHÒNG: Quét GUI cụ thể (Có bộ nhớ đệm cachedCard, không quét toàn bộ 30k elements của PlayerGui)
     local function cleanStr(s)
         if not s then return "" end
         local res = tostring(s):gsub("<[^>]->", "")
@@ -4182,14 +4184,24 @@ function ticketQuestState.DetectActiveQuest()
 
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
-        for _, lbl in ipairs(pg:GetDescendants()) do
-            if lbl:IsA("TextLabel") or lbl:IsA("TextButton") then
-                local txt = cleanStr(lbl.Text)
-                local lower = txt:lower()
+        local searchRoots = {}
+        if ticketQuestState.cachedCard and ticketQuestState.cachedCard.Parent then
+            table.insert(searchRoots, ticketQuestState.cachedCard)
+        else
+            if pg:FindFirstChild("MainGui") then table.insert(searchRoots, pg.MainGui) end
+            if pg:FindFirstChild("Fisher_GUI") then table.insert(searchRoots, pg.Fisher_GUI) end
+        end
 
-                if lower:find("hard ticket quest") or lower:find("easy ticket quest") or (lower:find("ticket") and lower:find("quest")) then
-                    local card = lbl.Parent
-                    if card then
+        for _, root in ipairs(searchRoots) do
+            for _, lbl in ipairs(root:GetDescendants()) do
+                if lbl:IsA("TextLabel") or lbl:IsA("TextButton") then
+                    local txt = cleanStr(lbl.Text)
+                    local lower = txt:lower()
+
+                    if lower:find("hard ticket quest") or lower:find("easy ticket quest") or (lower:find("ticket") and lower:find("quest")) then
+                        local card = lbl.Parent
+                        if card then
+                            ticketQuestState.cachedCard = card
                         for _, sibling in ipairs(card:GetDescendants()) do
                             -- Bỏ qua nhãn tên là "Stats" vì đây là số lượt làm trong ngày (1/50)
                             if (sibling:IsA("TextLabel") or sibling:IsA("TextButton")) and sibling ~= lbl and sibling.Name ~= "Stats" then
@@ -4250,6 +4262,7 @@ function ticketQuestState.DetectActiveQuest()
                 end
             end
         end
+    end
     end
 
     return nil, nil, 0, 0, false, detectedCooldownSec
@@ -4602,21 +4615,11 @@ end
 
 task.spawn(function()
     pcall(function() ticketQuestState.LoadSpots() end)
-    -- Quét tức thì ngay khi vừa bật script
-    task.spawn(function()
-        task.wait(0.5)
-        pcall(function() ticketQuestState.ScanAndUpdateStatus() end)
-    end)
     while isRunning do
         task.wait(2.5)
         if Config.AutoTicketQuest then
             pcall(function()
                 ticketQuestState.Tick()
-            end)
-        else
-            -- Luôn quét tiến độ nhiệm vụ ngầm theo thời gian thực kể cả khi chưa bật Auto Ticket Quest
-            pcall(function()
-                ticketQuestState.ScanAndUpdateStatus()
             end)
         end
     end
@@ -6516,12 +6519,18 @@ do
         local function attachFolder(folder)
             if not folder then return end
             table.insert(activeConnections, folder.ChildAdded:Connect(function()
-                task.wait(0.4)
-                pcall(RefreshWikiBagCounts)
+                local page = tabFrames and tabFrames["Wiki"]
+                if page and page.Visible then
+                    task.wait(0.4)
+                    pcall(RefreshWikiBagCounts)
+                end
             end))
             table.insert(activeConnections, folder.ChildRemoved:Connect(function()
-                task.wait(0.4)
-                pcall(RefreshWikiBagCounts)
+                local page = tabFrames and tabFrames["Wiki"]
+                if page and page.Visible then
+                    task.wait(0.4)
+                    pcall(RefreshWikiBagCounts)
+                end
             end))
         end
 
@@ -8751,10 +8760,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     lastSellTime = now
                 end
 
-                if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and (now - lastProtectTime >= 1.5) then
-                    lastProtectTime = now
-                    ProtectAllInventoryItems(false)
-                end
 
                 if canCast and Events and Events:FindFirstChild("Fishing") then
                     Events.Fishing:FireServer(root.CFrame)
@@ -9519,112 +9524,106 @@ local function RemoveESP(instance)
     end
 end
 
-table.insert(activeConnections, RunService.RenderStepped:Connect(function()
-    if not isRunning then return end
-
-    if Config.Fullbright then
-        Lighting.Brightness = 2.5
-        Lighting.ClockTime = 14
-        Lighting.FogEnd = 1000000
-        Lighting.GlobalShadows = false
-        Lighting.Ambient = Color3.fromRGB(180, 180, 180)
-        Lighting.OutdoorAmbient = Color3.fromRGB(180, 180, 180)
-    end
-    if Config.NoFog then
-        Lighting.FogEnd = 1000000
-        Lighting.FogStart = 1000000
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo and (atmo.Density > 0 or atmo.Haze > 0) then
-            atmo.Density = 0
-            atmo.Haze = 0
-            atmo.Glare = 0
-        end
-        for _, d in ipairs(Camera:GetDescendants()) do
-            if d:IsA("ParticleEmitter") and d.Enabled then
-                d.Enabled = false
-            end
-        end
-    end
-
-    if Config.ESP_Players then
-        for _, p in ipairs(Players:GetPlayers()) do
-            if p ~= LocalPlayer and p.Character then
-                local hrp = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Head")
-                if hrp then
-                    AddESP(p.Character, p.DisplayName, "Players", Colors.PurpleAccent, "👤", hrp, {player = p})
-                end
-            end
-        end
-    end
-
-    if Config.ESP_SecretRod and Workspace:FindFirstChild("SecretRod") then
-        for _, r in ipairs(Workspace.SecretRod:GetChildren()) do
-            AddESP(r, r.Name, "SecretRod", Colors.AccentYellow, "🌟")
-        end
-    end
-
-    if Config.ESP_GodSpirit then
-        local sp = secretBossState.GetGodSpirit()
-        if sp then
-            AddESP(sp, "God Spirit", "GodSpirit", Colors.AccentGreen, "⛩️")
-        end
-    end
-
-    if Config.ESP_Boats and Workspace:FindFirstChild("Boat") then
-        for _, b in ipairs(Workspace.Boat:GetChildren()) do
-            AddESP(b, b.Name, "Boats", Colors.AccentBlue, "⛵")
-        end
-    end
-
-    if Config.ESP_Boss then
-        if Workspace:FindFirstChild("BossSetUp") then
-            for _, b in ipairs(Workspace.BossSetUp:GetChildren()) do
-                AddESP(b, b.Name, "Boss", Colors.AccentRed, "👹")
-            end
-        end
-        if Workspace:FindFirstChild("Fishes") then
-            for _, f in ipairs(Workspace.Fishes:GetChildren()) do
-                local isBoss = f:GetAttribute("Boss") == true
-                local fName = f:GetAttribute("FishName") or ""
-                if not isBoss and fName ~= "" and (Config.SecretBossTargets[fName] or (secretBossLookup[fName:lower()] and Config.SecretBossTargets[secretBossLookup[fName:lower()]])) then
-                    isBoss = true
-                end
-                if isBoss then
-                    local targetPart = nil
-                    if f:FindFirstChild("Model") and f.Model:IsA("Model") then
-                        targetPart = f.Model.PrimaryPart or f.Model:FindFirstChildWhichIsA("BasePart", true)
-                    elseif f:FindFirstChild("Buoy") and f.Buoy:IsA("BasePart") then
-                        targetPart = f.Buoy
+-- VÒNG LẶP KHÁM PHÁ ĐỐI TƯỢNG ESP (CHỈ QUÉT KHI CÓ ÍT NHẤT 1 TÙY CHỌN ESP ĐƯỢC BẬT)
+task.spawn(function()
+    while isRunning do
+        task.wait(1.2)
+        local anyESP = Config.ESP_Players or Config.ESP_SecretRod or Config.ESP_GodSpirit or Config.ESP_Boats or Config.ESP_Boss or Config.ESP_Taoist or Config.ESP_Maoshan
+        if anyESP then
+            pcall(function()
+                if Config.ESP_Players then
+                    for _, p in ipairs(Players:GetPlayers()) do
+                        if p ~= LocalPlayer and p.Character then
+                            local hrp = p.Character:FindFirstChild("HumanoidRootPart") or p.Character:FindFirstChild("Head")
+                            if hrp then
+                                AddESP(p.Character, p.DisplayName, "Players", Colors.PurpleAccent, "👤", hrp, {player = p})
+                            end
+                        end
                     end
-                    if not targetPart then
-                        for _, c in ipairs(f:GetChildren()) do
-                            if c.Name:find("_PlayerHealth") then
-                                local uid = c.Name:match("^(%d+)_PlayerHealth")
-                                if uid then
-                                    local pl = Players:GetPlayerByUserId(tonumber(uid))
-                                    local plChar = pl and pl.Character
-                                    if plChar then
-                                        targetPart = plChar:FindFirstChild("Buoy") or plChar:FindFirstChild("HumanoidRootPart")
-                                        break
+                end
+
+                if Config.ESP_SecretRod and Workspace:FindFirstChild("SecretRod") then
+                    for _, r in ipairs(Workspace.SecretRod:GetChildren()) do
+                        AddESP(r, r.Name, "SecretRod", Colors.AccentYellow, "🌟")
+                    end
+                end
+
+                if Config.ESP_GodSpirit then
+                    local sp = secretBossState.GetGodSpirit()
+                    if sp then
+                        AddESP(sp, "God Spirit", "GodSpirit", Colors.AccentGreen, "⛩️")
+                    end
+                end
+
+                if Config.ESP_Boats and Workspace:FindFirstChild("Boat") then
+                    for _, b in ipairs(Workspace.Boat:GetChildren()) do
+                        AddESP(b, b.Name, "Boats", Colors.AccentBlue, "⛵")
+                    end
+                end
+
+                if Config.ESP_Boss then
+                    if Workspace:FindFirstChild("BossSetUp") then
+                        for _, b in ipairs(Workspace.BossSetUp:GetChildren()) do
+                            AddESP(b, b.Name, "Boss", Colors.AccentRed, "👹")
+                        end
+                    end
+                    if Workspace:FindFirstChild("Fishes") then
+                        for _, f in ipairs(Workspace.Fishes:GetChildren()) do
+                            local isBoss = f:GetAttribute("Boss") == true
+                            local fName = f:GetAttribute("FishName") or ""
+                            if not isBoss and fName ~= "" and (Config.SecretBossTargets[fName] or (secretBossLookup[fName:lower()] and Config.SecretBossTargets[secretBossLookup[fName:lower()]])) then
+                                isBoss = true
+                            end
+                            if isBoss then
+                                local targetPart = nil
+                                if f:FindFirstChild("Model") and f.Model:IsA("Model") then
+                                    targetPart = f.Model.PrimaryPart or f.Model:FindFirstChildWhichIsA("BasePart", true)
+                                elseif f:FindFirstChild("Buoy") and f.Buoy:IsA("BasePart") then
+                                    targetPart = f.Buoy
+                                end
+                                if not targetPart then
+                                    for _, c in ipairs(f:GetChildren()) do
+                                        if c.Name:find("_PlayerHealth") then
+                                            local uid = c.Name:match("^(%d+)_PlayerHealth")
+                                            if uid then
+                                                local pl = Players:GetPlayerByUserId(tonumber(uid))
+                                                local plChar = pl and pl.Character
+                                                if plChar then
+                                                    targetPart = plChar:FindFirstChild("Buoy") or plChar:FindFirstChild("HumanoidRootPart")
+                                                    break
+                                                end
+                                            end
+                                        end
                                     end
+                                end
+                                if targetPart then
+                                    AddESP(f, fName ~= "" and fName or f.Name, "Boss", Colors.AccentRed, "👹", targetPart, {fish = f})
                                 end
                             end
                         end
                     end
-                    if targetPart then
-                        AddESP(f, fName ~= "" and fName or f.Name, "Boss", Colors.AccentRed, "👹", targetPart, {fish = f})
+                end
+
+                if Config.ESP_Taoist or Config.ESP_Maoshan then
+                    local tInst, tName, tCat, tCol, tIcon = secretBossState.GetTaoist()
+                    if tInst then
+                        AddESP(tInst, tName, tCat or "Taoist", tCol or Colors.AccentOrange, tIcon or "📜")
                     end
+                end
+            end)
+        else
+            -- Nếu tắt hết tất cả ESP -> Xóa toàn bộ GUI tồn đọng và không quét bất kỳ thứ gì
+            if next(activeESP) then
+                for inst in pairs(activeESP) do
+                    RemoveESP(inst)
                 end
             end
         end
     end
+end)
 
-    if Config.ESP_Taoist or Config.ESP_Maoshan then
-        local tInst, tName, tCat, tCol, tIcon = secretBossState.GetTaoist()
-        if tInst then
-            AddESP(tInst, tName, tCat or "Taoist", tCol or Colors.AccentOrange, tIcon or "📜")
-        end
-    end
+table.insert(activeConnections, RunService.RenderStepped:Connect(function()
+    if not isRunning or not next(activeESP) then return end
 
     local camPos = Camera.CFrame.Position
     for inst, data in pairs(activeESP) do
