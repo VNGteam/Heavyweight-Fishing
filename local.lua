@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "0389eed"
+local SCRIPT_BUILD_COMMIT = "c0c7ffb"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -8690,13 +8690,22 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         if not ticketQuestState.isBusyRoutine then
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
-                                local chosenSkill = Config.TicketSkillKey or "Z"
+                                local chosenSkill = Config.TicketSkillKey or Config.TrainSkill or "Z"
                                 local cleanKey = chosenSkill:match("([ZXCVzxcv])") or chosenSkill
                                 cleanKey = cleanKey:upper()
+                                if comboState.IsSkillOnCooldown(cleanKey, fUI) then
+                                    for _, fallbackKey in ipairs({"Z", "X", "C", "V"}) do
+                                        if not comboState.IsSkillOnCooldown(fallbackKey, fUI) then
+                                            cleanKey = fallbackKey
+                                            break
+                                        end
+                                    end
+                                end
 
                                 local initialFishHp = GetFishHealth(fUI)
                                 local startTime = tick()
 
+                                -- 1. GIỮ THĂNG BẰNG THANH BAR VÀ CHỜ QUA 3 GIÂY KHÓA CHIÊU CỦA GAME (BẮN SKILL LIÊN TỤC ĐỂ BẮT ĐÚNG NHỊP MỞ)
                                 while isRunning and (fUI and fUI.Visible) do
                                     local barFrame = fUI:FindFirstChild("BarFrame")
                                     if barFrame and barFrame:FindFirstChild("Bar") then
@@ -8717,6 +8726,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     end
                                 end
 
+                                -- 2. Đợi 0.35s cho nhân vật tung chiêu xong để server ghi nhận
                                 local waitFinish = tick()
                                 while isRunning and (tick() - waitFinish) < 0.35 do
                                     if fUI and fUI.Visible then
@@ -8728,37 +8738,40 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     task.wait(0.05)
                                 end
 
+                                -- 3. Cập nhật tiến độ nhiệm vụ vé
                                 ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                 ticketQuestState.UpdateUI()
-                                if ticketQuestState.currentProgress >= 100 then
+                                if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
+                                    ticketQuestState.isCompleted = true
+                                elseif ticketQuestState.currentProgress >= 100 then
                                     ticketQuestState.isCompleted = true
                                 end
 
-                                local rodSlot = "1"
-                                local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-                                if pData and pData:FindFirstChild("Hotbar") then
-                                    for _, item in ipairs(pData.Hotbar:GetChildren()) do
-                                        local vName = item:FindFirstChild("ValueName")
-                                        if vName and tostring(vName.Value):lower():find("rod") and not tostring(vName.Value):lower():find("inventory") then
-                                            rodSlot = item.Name
-                                            break
+                                -- 4. THAY VÌ CẤT CẦN -> CHỜ KÉO CÁ LÊN LUÔN (GIỮ NGUYÊN CẦN TRÊN TAY)
+                                local pullStartTime = tick()
+                                while isRunning and (fUI and fUI.Visible) and (tick() - pullStartTime < 25.0) do
+                                    local barFrame = fUI:FindFirstChild("BarFrame")
+                                    if barFrame and barFrame:FindFirstChild("Bar") then
+                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                    end
+                                    if Events and Events:FindFirstChild("Slam") then
+                                        Events.Slam:FireServer("Perfect")
+                                    end
+                                    if Events and Events:FindFirstChild("Charge") then
+                                        Events.Charge:FireServer(100)
+                                    end
+                                    if Events and Events:FindFirstChild("UpdateFishProgression") then
+                                        Events.UpdateFishProgression:FireServer()
+                                    end
+                                    for _, sk in ipairs({"Z", "X", "C", "V"}) do
+                                        if not comboState.IsSkillOnCooldown(sk, fUI) then
+                                            comboState.CastSkill(sk)
                                         end
                                     end
+                                    task.wait(0.08)
                                 end
-                                pcall(function()
-                                    local c = LocalPlayer.Character
-                                    local h = c and c:FindFirstChildOfClass("Humanoid")
-                                    if h then h:UnequipTools() end
-                                end)
 
-                                task.wait(0.25)
-                                pcall(function()
-                                    if Events and Events:FindFirstChild("ToggleHotbar") then
-                                        Events.ToggleHotbar:InvokeServer(rodSlot)
-                                    end
-                                end)
-
-                                task.wait(0.35)
+                                task.wait(0.3)
                                 lastCastTime = tick()
                                 ticketQuestState.isBusyRoutine = false
                             end)
