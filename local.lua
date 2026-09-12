@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "09ec274"
+local SCRIPT_BUILD_COMMIT = "76c7323"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3419,6 +3419,52 @@ function ticketQuestState.FindTicketNPC()
     return nil, ticketQuestState.spotNPC
 end
 
+function ticketQuestState.CheckNPCReady()
+    local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
+    if not npcModel and not prompt then return false end
+
+    -- 1. Kiểm tra trong prompt của NPC
+    if prompt then
+        local act = tostring(prompt.ActionText or "")
+        local obj = tostring(prompt.ObjectText or "")
+        if act:find("%?") or obj:find("%?") then
+            return true
+        end
+    end
+
+    -- 2. Kiểm tra các BillboardGui, TextLabel, Decal, SurfaceGui gắn trên đầu NPC
+    local targetInst = npcModel or (prompt and prompt.Parent)
+    if targetInst then
+        for _, d in ipairs(targetInst:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Visible then
+                local txt = tostring(d.Text or "")
+                if txt:find("%?") then
+                    return true
+                end
+            elseif d:IsA("BillboardGui") and d.Enabled then
+                for _, sub in ipairs(d:GetDescendants()) do
+                    if sub:IsA("TextLabel") and sub.Visible and tostring(sub.Text or ""):find("%?") then
+                        return true
+                    end
+                end
+            elseif d:IsA("Decal") or d:IsA("Texture") then
+                local n = d.Name:lower()
+                local tex = tostring(d.Texture or ""):lower()
+                if n:find("question") or n:find("quest") or tex:find("question") or tex:find("%?") then
+                    return true
+                end
+            elseif d:IsA("MeshPart") or d:IsA("Part") then
+                local n = d.Name:lower()
+                if n:find("question") or n == "?" or n:find("questmark") or n:find("exclamation") then
+                    return true
+                end
+            end
+        end
+    end
+
+    return false
+end
+
 function ticketQuestState.TeleportTo(pos)
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -3681,9 +3727,18 @@ function ticketQuestState.Tick()
     if not Config.AutoTicketQuest then return end
     local now = tick()
 
-    -- 0. Đồng bộ thời gian hồi chiêu thực tế của game nếu phát hiện nhãn thời gian từ server
+    -- 0. Kiểm tra xem NPC Ticket Quest đã hồi (hiện dấu ? trên đầu hoặc trong prompt)
+    local isNPCReady = ticketQuestState.CheckNPCReady()
+    if isNPCReady and ticketQuestState.isCooldown and ticketQuestState.currentQuestType == "none" then
+        ticketQuestState.isCooldown = false
+        ticketQuestState.isAtHomeSpot = false
+        ticketQuestState.statusText = "NPC đã xuất hiện dấu (?)! Sẵn sàng nhận vé Hard mới..."
+        ticketQuestState.UpdateUI()
+    end
+
+    -- 0.1 Đồng bộ thời gian hồi chiêu thực tế của game nếu phát hiện nhãn thời gian từ server
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
-    if detectedCd and detectedCd > 0 then
+    if detectedCd and detectedCd > 0 and not isNPCReady then
         if not ticketQuestState.isCooldown or math.abs((now + detectedCd) - ticketQuestState.cooldownEnd) > 5 then
             ticketQuestState.isCooldown = true
             ticketQuestState.cooldownEnd = now + detectedCd
@@ -3692,64 +3747,71 @@ function ticketQuestState.Tick()
 
     -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới)
     if ticketQuestState.isCooldown then
-        local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
-        if remain > 0 then
-            local mins = math.floor(remain / 60)
-            local secs = remain % 60
-            ticketQuestState.statusText = string.format("Đang chờ hồi chiêu vé (còn %02d:%02d)", mins, secs)
+        -- Nếu NPC đã xuất hiện dấu ? thì lập tức thoát cooldown để nhận quest
+        if isNPCReady then
+            ticketQuestState.isCooldown = false
+            ticketQuestState.isAtHomeSpot = false
+            ticketQuestState.statusText = "NPC đã xuất hiện dấu (?)! Đang tiến đến nhận vé..."
+            ticketQuestState.UpdateUI()
+            local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
+            if remain > 0 then
+                local mins = math.floor(remain / 60)
+                local secs = remain % 60
+                ticketQuestState.statusText = string.format("Đang chờ hồi chiêu vé (còn %02d:%02d)", mins, secs)
 
-            -- Về Home Spot câu cá trong thời gian chờ hồi chiêu
-            if Config.TicketReturnHomeWhenDone and Config.HomeFarmSpot and not ticketQuestState.isAtHomeSpot then
-                local char = LocalPlayer.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root then
-                    local homeCf = nil
-                    if Config.HomeFarmSpot.cframe and #Config.HomeFarmSpot.cframe == 12 then
-                        homeCf = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
-                    elseif Config.HomeFarmSpot.x and Config.HomeFarmSpot.y and Config.HomeFarmSpot.z then
-                        homeCf = CFrame.new(Config.HomeFarmSpot.x, Config.HomeFarmSpot.y, Config.HomeFarmSpot.z)
-                    end
-                    if homeCf then
-                        local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
-                        if not wp then
-                            wp = Instance.new("Part")
-                            wp.Name = "IdenticalWaterPlatform"
-                            wp.Size = Vector3.new(30, 2, 30)
-                            wp.Transparency = 1
-                            wp.Anchored = true
-                            wp.CanCollide = true
-                            wp.Parent = Workspace
+                -- Về Home Spot câu cá trong thời gian chờ hồi chiêu
+                if Config.TicketReturnHomeWhenDone and Config.HomeFarmSpot and not ticketQuestState.isAtHomeSpot then
+                    local char = LocalPlayer.Character
+                    local root = char and char:FindFirstChild("HumanoidRootPart")
+                    if root then
+                        local homeCf = nil
+                        if Config.HomeFarmSpot.cframe and #Config.HomeFarmSpot.cframe == 12 then
+                            homeCf = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+                        elseif Config.HomeFarmSpot.x and Config.HomeFarmSpot.y and Config.HomeFarmSpot.z then
+                            homeCf = CFrame.new(Config.HomeFarmSpot.x, Config.HomeFarmSpot.y, Config.HomeFarmSpot.z)
                         end
-                        wp.CFrame = CFrame.new(homeCf.Position.X, homeCf.Position.Y - 2.8, homeCf.Position.Z)
-                        wp.CanCollide = true
-                        root.CFrame = homeCf + Vector3.new(0, 1.5, 0)
-                        task.wait(0.2)
-                        root.CFrame = homeCf
-                        ticketQuestState.isAtHomeSpot = true
-                        ticketQuestState.statusText = string.format("Đang chờ hồi: đã về Home Spot farm combo (còn %02d:%02d)", mins, secs)
-                        ShowNotification("Home Spot", "Đã về vị trí Home Spot để câu farm trong lúc chờ vé!", "SUCCESS", 5)
+                        if homeCf then
+                            local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
+                            if not wp then
+                                wp = Instance.new("Part")
+                                wp.Name = "IdenticalWaterPlatform"
+                                wp.Size = Vector3.new(30, 2, 30)
+                                wp.Transparency = 1
+                                wp.Anchored = true
+                                wp.CanCollide = true
+                                wp.Parent = Workspace
+                            end
+                            wp.CFrame = CFrame.new(homeCf.Position.X, homeCf.Position.Y - 2.8, homeCf.Position.Z)
+                            wp.CanCollide = true
+                            root.CFrame = homeCf + Vector3.new(0, 1.5, 0)
+                            task.wait(0.2)
+                            root.CFrame = homeCf
+                            ticketQuestState.isAtHomeSpot = true
+                            ticketQuestState.statusText = string.format("Đang chờ hồi: đã về Home Spot farm combo (còn %02d:%02d)", mins, secs)
+                            ShowNotification("Home Spot", "Đã về vị trí Home Spot để câu farm trong lúc chờ vé!", "SUCCESS", 5)
 
-                        if Config.TicketAutoCastAtHome then
-                            task.delay(1.0, function()
-                                if isRunning and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot then
-                                    CancelAndRecastRod()
-                                end
-                            end)
+                            if Config.TicketAutoCastAtHome then
+                                task.delay(1.0, function()
+                                    if isRunning and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot then
+                                        CancelAndRecastRod()
+                                    end
+                                end)
+                            end
                         end
                     end
                 end
-            end
 
-            ticketQuestState.UpdateUI()
-            return
-        else
-            ticketQuestState.isCooldown = false
-            ticketQuestState.isAtHomeSpot = false
-            ticketQuestState.statusText = "Hồi chiêu đã xong! Đang nhận vé Hard mới..."
-            ticketQuestState.currentQuestType = "none"
-            ticketQuestState.currentProgress = 0
-            ticketQuestState.isCompleted = false
-            ticketQuestState.UpdateUI()
+                ticketQuestState.UpdateUI()
+                return
+            else
+                ticketQuestState.isCooldown = false
+                ticketQuestState.isAtHomeSpot = false
+                ticketQuestState.statusText = "Hồi chiêu đã xong! Đang nhận vé Hard mới..."
+                ticketQuestState.currentQuestType = "none"
+                ticketQuestState.currentProgress = 0
+                ticketQuestState.isCompleted = false
+                ticketQuestState.UpdateUI()
+            end
         end
     end
 
