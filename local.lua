@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "2409572"
+local SCRIPT_BUILD_COMMIT = "2409573"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3711,34 +3711,112 @@ function ticketQuestState.SelectDialogueOption(optionIndex, optionTextPattern)
     return true
 end
 
-function ticketQuestState.InteractNPC(isClaiming)
+-- Xử lý toàn bộ logic tương tác các trang hội thoại của NPC Vé (Ticket Quest Giver)
+function ticketQuestState.HandleDialogue(isClaiming)
+    if not ticketQuestState.IsDialogueOpen() then return false end
+
     local isHard = (Config.TicketDifficulty or "Hard") == "Hard"
     local diffKeyword = isHard and "hard" or "easy"
 
-    -- 1. Nếu bảng hội thoại NPC đã mở sẵn trước mặt và hợp lệ:
-    if ticketQuestState.IsDialogueOpen() then
-        if isClaiming then
-            if ticketQuestState.SelectDialogueOption(1, "leave") or ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("xong") end) then
-                task.wait(0.5)
-                return true
-            end
-        else
-            if ticketQuestState.FindAndClickButton(function(t)
-                return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
-            end) then
-                task.wait(0.5)
-                return true
-            end
-            if ticketQuestState.SelectDialogueOption(1, "^quest") or ticketQuestState.FindAndClickButton(function(t)
+    if isClaiming then
+        -- 1. Nếu đã ở trang kết quả nộp vé (có nút Leave / *Leave* / Xong)
+        local clickedLeave = ticketQuestState.SelectDialogueOption(1, "leave") or ticketQuestState.FindAndClickButton(function(t)
+            return t == "leave" or t:find("leave") or t:find("xong")
+        end)
+        if clickedLeave then
+            task.wait(0.5)
+            return true
+        end
+
+        -- 2. Nếu đang ở trang đầu (có nút Quest & Nevermind - như ảnh thực tế khi vừa mở NPC)
+        local clickedQuest = ticketQuestState.SelectDialogueOption(1, "^quest")
+            or ticketQuestState.FindAndClickButton(function(t)
                 return (t == "quest" or t:find("^quest")) and not t:find("nevermind")
-            end) then
-                task.wait(0.35)
-                ticketQuestState.FindAndClickButton(function(t)
-                    return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+            end)
+            or ticketQuestState.SelectDialogueOption(1)
+
+        if clickedQuest then
+            -- Chờ trang thoại chuyển sang trang kết quả nộp vé (chứa nút *Leave*)
+            local t0 = tick()
+            while (tick() - t0) < 2.8 do
+                task.wait(0.2)
+                local clickedDone = ticketQuestState.SelectDialogueOption(1, "leave") or ticketQuestState.FindAndClickButton(function(t)
+                    return t == "leave" or t:find("leave") or t:find("xong") or t:find("yuppie")
                 end)
+                if clickedDone then
+                    task.wait(0.5)
+                    return true
+                end
+                if not ticketQuestState.IsDialogueOpen() then
+                    return true
+                end
+            end
+            if not ticketQuestState.IsDialogueOpen() then
                 return true
             end
         end
+    else
+        -- 1. Nhận vé mới: Nếu đã có nút độ khó (Accept Hard / Easy)
+        local clickedDiff = ticketQuestState.FindAndClickButton(function(t)
+            return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+        end) or ticketQuestState.SelectDialogueOption(1, diffKeyword)
+
+        if clickedDiff then
+            task.wait(0.5)
+            return true
+        end
+
+        -- 2. Nếu đang ở trang đầu, bấm "Quest" để mở danh sách độ khó
+        local clickedQuest = ticketQuestState.SelectDialogueOption(1, "^quest")
+            or ticketQuestState.FindAndClickButton(function(t)
+                return (t == "quest" or t:find("^quest")) and not t:find("nevermind")
+            end)
+            or ticketQuestState.SelectDialogueOption(1)
+
+        if clickedQuest then
+            local t0 = tick()
+            while (tick() - t0) < 2.8 do
+                task.wait(0.2)
+                local clickedNext = ticketQuestState.FindAndClickButton(function(t)
+                    return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+                end) or ticketQuestState.SelectDialogueOption(1, diffKeyword)
+                if clickedNext then
+                    task.wait(0.5)
+                    return true
+                end
+                if not ticketQuestState.IsDialogueOpen() then
+                    return true
+                end
+            end
+            if not ticketQuestState.IsDialogueOpen() then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
+function ticketQuestState.InteractNPC(isClaiming)
+    local isHard = (Config.TicketDifficulty or "Hard") == "Hard"
+
+    -- 1. Nếu bảng hội thoại NPC đã mở sẵn trước mặt:
+    -- Xử lý trực tiếp hội thoại, TUYỆT ĐỐI KHÔNG spam phím E hay TriggerPrompt để tránh gây giật lag game!
+    if ticketQuestState.IsDialogueOpen() then
+        if ticketQuestState.HandleDialogue(isClaiming) then
+            if isClaiming then
+                ShowNotification("Nhiệm Vụ Vé", "Đã nộp nhiệm vụ & nhận thưởng vé thành công!", "SUCCESS", 5)
+            else
+                ShowNotification("Nhiệm Vụ Vé", "Đã nhận thành công nhiệm vụ " .. (isHard and "Hard" or "Easy") .. " Ticket!", "SUCCESS", 5)
+            end
+            return true
+        end
+        -- Nếu mở thoại nhưng UI chưa kịp render xong hiệu ứng, chờ 0.4s thử lại 1 lần
+        task.wait(0.4)
+        if ticketQuestState.IsDialogueOpen() and ticketQuestState.HandleDialogue(isClaiming) then
+            return true
+        end
+        return false
     end
 
     -- 2. Di chuyển trực tiếp đến NPC nếu đang ở xa
@@ -3772,88 +3850,62 @@ function ticketQuestState.InteractNPC(isClaiming)
         end
     end
 
-    -- 3. Tìm và kích hoạt ProximityPrompt hoặc bấm E
-    local promptFound = prompt
-    if not promptFound then
-        local _, _, freshPrompt = ticketQuestState.FindTicketNPC()
-        promptFound = freshPrompt
-    end
-    if not promptFound and targetPos then
-        for _, p in ipairs(Workspace:GetDescendants()) do
-            if p:IsA("ProximityPrompt") then
-                local pPos = (p.Parent:IsA("BasePart") and p.Parent.Position) or (p.Parent:IsA("Model") and p.Parent:GetPivot().Position)
-                if pPos and (pPos - targetPos).Magnitude <= 18 then
-                    promptFound = p
-                    break
+    -- 3. Chỉ kích hoạt Prompt hoặc bấm E khi bảng thoại CHƯA MỞ
+    if not ticketQuestState.IsDialogueOpen() then
+        local promptFound = prompt
+        if not promptFound then
+            local _, _, freshPrompt = ticketQuestState.FindTicketNPC()
+            promptFound = freshPrompt
+        end
+        if not promptFound and targetPos then
+            for _, p in ipairs(Workspace:GetDescendants()) do
+                if p:IsA("ProximityPrompt") then
+                    local pPos = (p.Parent:IsA("BasePart") and p.Parent.Position) or (p.Parent:IsA("Model") and p.Parent:GetPivot().Position)
+                    if pPos and (pPos - targetPos).Magnitude <= 18 then
+                        promptFound = p
+                        break
+                    end
                 end
             end
         end
-    end
 
-    if promptFound then
-        TriggerPrompt(promptFound)
-    end
-
-    -- Gửi phím E mở thoại
-    pcall(function()
-        local vim = game:GetService("VirtualInputManager")
-        if vim then
-            vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
-            task.wait(0.1)
-            vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+        if promptFound then
+            TriggerPrompt(promptFound)
         end
-    end)
 
-    -- Click TextButton trên GUI ProximityPrompts nếu có
-    pcall(function()
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        local pPrompts = pg and pg:FindFirstChild("ProximityPrompts")
-        if pPrompts then
-            local btn = pPrompts:FindFirstChild("TextButton", true)
-            if btn and btn:IsA("GuiButton") and btn.Visible then
-                if firesignal then firesignal(btn.Activated) end
-                if getconnections then for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end end
+        -- Gửi phím E mở thoại 1 lần
+        pcall(function()
+            local vim = game:GetService("VirtualInputManager")
+            if vim then
+                vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                task.wait(0.08)
+                vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
             end
-        end
-    end)
+        end)
 
-    -- 4. Chờ bảng hội thoại xuất hiện (tối đa 3.5s)
+        -- Click TextButton trên GUI ProximityPrompts nếu có
+        pcall(function()
+            local pg = LocalPlayer:FindFirstChild("PlayerGui")
+            local pPrompts = pg and pg:FindFirstChild("ProximityPrompts")
+            if pPrompts then
+                local btn = pPrompts:FindFirstChild("TextButton", true)
+                if btn and btn:IsA("GuiButton") and btn.Visible then
+                    if firesignal then firesignal(btn.Activated) end
+                    if getconnections then for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end end
+                end
+            end
+        end)
+    end
+
+    -- 4. Chờ bảng hội thoại xuất hiện và xử lý
     local success = false
     local t0 = tick()
     while (tick() - t0) < 3.5 do
         task.wait(0.2)
         if ticketQuestState.IsDialogueOpen() then
-            if isClaiming then
-                if ticketQuestState.SelectDialogueOption(1, "leave") or ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("xong") end) then
-                    success = true
-                    task.wait(0.5)
-                    break
-                end
-            else
-                if ticketQuestState.FindAndClickButton(function(t)
-                    return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
-                end) then
-                    success = true
-                    task.wait(0.5)
-                    break
-                end
-
-                if ticketQuestState.SelectDialogueOption(1, "^quest") or ticketQuestState.FindAndClickButton(function(t)
-                    return (t == "quest" or t:find("^quest")) and not t:find("nevermind")
-                end) then
-                    local t1 = tick()
-                    while (tick() - t1) < 2.5 do
-                        task.wait(0.2)
-                        if ticketQuestState.FindAndClickButton(function(t)
-                            return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
-                        end) or ticketQuestState.SelectDialogueOption(1, diffKeyword) then
-                            success = true
-                            task.wait(0.5)
-                            break
-                        end
-                    end
-                    break
-                end
+            if ticketQuestState.HandleDialogue(isClaiming) then
+                success = true
+                break
             end
         end
     end
