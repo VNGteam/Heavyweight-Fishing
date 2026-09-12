@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "c1051e2"
+local SCRIPT_BUILD_COMMIT = "d22a8fa"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -206,6 +206,8 @@ local Config = {
     TicketQuickSkill = "Chiêu V",
     TicketCooldownMinutes = 20,
     TicketAutoSellFull = true,
+    TicketReturnHomeWhenDone = true,
+    TicketAutoCastAtHome = true,
     AutoClaimDaily = false,
     DailyClaimDelay = 0.5,
     
@@ -339,6 +341,8 @@ local ConfigLabelMap = {
     ["Chiêu Giật Nhanh Cho 100 Con Cá"] = "TicketQuickSkill",
     ["Thời Gian Hồi Chiêu (Phút)"] = "TicketCooldownMinutes",
     ["Tự Bán Cá Khi Đầy Balo (Vé NV)"] = "TicketAutoSellFull",
+    ["Tự Về Home Spot Khi Xong Nhiệm Vụ"] = "TicketReturnHomeWhenDone",
+    ["Tự Động Quăng Cần Tại Home Spot"] = "TicketAutoCastAtHome",
     ["Tự Động Nhận Thưởng Hàng Ngày (Daily)"] = "AutoClaimDaily",
     ["Vòng Quay May Mắn (Auto Gacha)"] = "AutoGacha",
     ["Chọn Vòng Quay Gacha"] = "GachaBanner",
@@ -2154,6 +2158,15 @@ end
 secretBossState.ServerHop = ServerHop
 local ticketQuestState = nil
 
+local function IsTicketQuestFishingActive()
+    if not Config.AutoTicketQuest or not ticketQuestState then return false end
+    if ticketQuestState.isCooldown then
+        return Config.TicketReturnHomeWhenDone and Config.TicketAutoCastAtHome and (ticketQuestState.isAtHomeSpot == true)
+    else
+        return ticketQuestState.active and (ticketQuestState.currentQuestType ~= "none")
+    end
+end
+
 local function CancelAndRecastRod(forceCast)
     local char = LocalPlayer.Character
     if not char then return end
@@ -2162,7 +2175,7 @@ local function CancelAndRecastRod(forceCast)
         hum:UnequipTools()
     end
     local isBossActive = secretBossState and secretBossState.active
-    local isTicketActive = Config.AutoTicketQuest and (ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown)
+    local isTicketActive = IsTicketQuestFishingActive()
     local shouldRecast = forceCast or Config.AutoCast or Config.AutoTrainSkill or isTicketActive or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
     if not shouldRecast then return end
 
@@ -3276,18 +3289,21 @@ ticketQuestState = {
     lastBaitBuy = 0,
     lastBaitEquip = 0,
     isBusyRoutine = false,
+    isAtHomeSpot = false,
     statusText = "Đang chờ bật tự động làm vé...",
     
     -- Vị trí mặc định
-    spot100Fish = Vector3.new(-200.7, 11.1, 35.9), -- Map 1
-    spot15MFish = Vector3.new(1393.5, 11.3, 169.6), -- Map 9
-    spotNPC = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 NPC
+    spot100Fish = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 (100 con cá)
+    spot100Bait = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 (100 mồi)
+    spot15MFish = Vector3.new(1393.5, 11.3, 169.6), -- Map 9 (1.5M cá)
+    spotNPC = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 NPC Ticket Quest
     
     -- UI rows
     uiStatus = nil,
     uiProgress = nil,
     uiCooldown = nil,
     ui100Spot = nil,
+    ui100BaitSpot = nil,
     ui15MSpot = nil,
     uiNPCSpot = nil,
 }
@@ -3297,6 +3313,7 @@ function ticketQuestState.SaveSpots()
     pcall(function()
         local data = {
             spot100Fish = {x = ticketQuestState.spot100Fish.X, y = ticketQuestState.spot100Fish.Y, z = ticketQuestState.spot100Fish.Z},
+            spot100Bait = {x = ticketQuestState.spot100Bait.X, y = ticketQuestState.spot100Bait.Y, z = ticketQuestState.spot100Bait.Z},
             spot15MFish = {x = ticketQuestState.spot15MFish.X, y = ticketQuestState.spot15MFish.Y, z = ticketQuestState.spot15MFish.Z},
             spotNPC = {x = ticketQuestState.spotNPC.X, y = ticketQuestState.spotNPC.Y, z = ticketQuestState.spotNPC.Z},
             cooldownEnd = ticketQuestState.cooldownEnd,
@@ -3314,6 +3331,9 @@ function ticketQuestState.LoadSpots()
             if type(dec) == "table" then
                 if dec.spot100Fish and dec.spot100Fish.x then
                     ticketQuestState.spot100Fish = Vector3.new(dec.spot100Fish.x, dec.spot100Fish.y, dec.spot100Fish.z)
+                end
+                if dec.spot100Bait and dec.spot100Bait.x then
+                    ticketQuestState.spot100Bait = Vector3.new(dec.spot100Bait.x, dec.spot100Bait.y, dec.spot100Bait.z)
                 end
                 if dec.spot15MFish and dec.spot15MFish.x then
                     ticketQuestState.spot15MFish = Vector3.new(dec.spot15MFish.x, dec.spot15MFish.y, dec.spot15MFish.z)
@@ -3344,7 +3364,11 @@ function ticketQuestState.UpdateUI()
             local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - tick()))
             local mins = math.floor(remain / 60)
             local secs = remain % 60
-            ticketQuestState.uiCooldown.Set(string.format("Chờ 20p: %02d:%02d", mins, secs))
+            local homeStr = ""
+            if ticketQuestState.isAtHomeSpot then
+                homeStr = " (Đang farm Home Spot)"
+            end
+            ticketQuestState.uiCooldown.Set(string.format("Chờ 20p: %02d:%02d%s", mins, secs, homeStr))
         else
             ticketQuestState.uiCooldown.Set("Sẵn sàng nhận vé!")
         end
@@ -3352,6 +3376,10 @@ function ticketQuestState.UpdateUI()
     if ticketQuestState.ui100Spot and ticketQuestState.ui100Spot.Set then
         local p = ticketQuestState.spot100Fish
         ticketQuestState.ui100Spot.Set(string.format("(%.0f, %.0f, %.0f)", p.X, p.Y, p.Z))
+    end
+    if ticketQuestState.ui100BaitSpot and ticketQuestState.ui100BaitSpot.Set then
+        local p = ticketQuestState.spot100Bait
+        ticketQuestState.ui100BaitSpot.Set(string.format("(%.0f, %.0f, %.0f)", p.X, p.Y, p.Z))
     end
     if ticketQuestState.ui15MSpot and ticketQuestState.ui15MSpot.Set then
         local p = ticketQuestState.spot15MFish
@@ -3467,25 +3495,7 @@ function ticketQuestState.DetectActiveQuest()
         detectedMax = 100
     end
 
-    -- 2. Quét pData
-    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-    if pData then
-        local qFolder = pData:FindFirstChild("TicketQuest") or pData:FindFirstChild("Quest") or pData:FindFirstChild("Quests") or pData:FindFirstChild("Ticket")
-        if qFolder then
-            for _, item in ipairs(qFolder:GetChildren()) do
-                local name = item.Name:lower()
-                if item:IsA("IntValue") or item:IsA("NumberValue") then
-                    if name:find("progress") or name:find("current") or name:find("count") then
-                        detectedCur = item.Value
-                    elseif name:find("target") or name:find("max") or name:find("total") then
-                        detectedMax = item.Value
-                    end
-                end
-            end
-        end
-    end
-
-    -- 3. Quét PlayerGui (HUD nhiệm vụ trên màn hình)
+    -- 2. Quét PlayerGui (HUD nhiệm vụ trên màn hình: Hard Ticket Quest)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
         for _, d in ipairs(pg:GetDescendants()) do
@@ -3493,29 +3503,34 @@ function ticketQuestState.DetectActiveQuest()
                 local txt = tostring(d.Text or "")
                 if #txt > 0 then
                     local lower = txt:lower()
-                    if lower:find("1.5m") or lower:find("1,500,000") or lower:find("1500000") or (lower:find("1.5") and (lower:find("weight") or lower:find("kg") or lower:find("size"))) then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "fish_15m"
-                            detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                            detectedMax = 10
-                        end
-                    elseif (lower:find("bait") or lower:find("mồi")) and (lower:find("100") or lower:find("use") or lower:find("consume") or lower:find("tiêu")) then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "bait_100"
-                            detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                            detectedMax = 100
-                        end
-                    elseif (lower:find("skill") or lower:find("chiêu") or lower:find("kỹ năng")) and (lower:find("100") or lower:find("use") or lower:find("cast")) then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "skill_100"
-                            detectedTitle = "Dùng kỹ năng 100 lần"
-                            detectedMax = 100
-                        end
-                    elseif (lower:find("fish") or lower:find("cá") or lower:find("catch")) and lower:find("100") and not lower:find("bait") and not lower:find("skill") then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "fish_100"
-                            detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                            detectedMax = 100
+                    local isTicketRelated = lower:find("hard ticket quest") or lower:find("ticket quest")
+                        or d:FindFirstAncestor("Quest") or d:FindFirstAncestor("Ticket") or d.Name:lower():find("quest")
+
+                    if isTicketRelated or mode == "Tự Động (Auto Detect)" then
+                        if lower:find("1.5m") or lower:find("1,500,000") or lower:find("1500000") or (lower:find("1.5") and (lower:find("weight") or lower:find("kg") or lower:find("size"))) then
+                            if not detectedType or mode == "Tự Động (Auto Detect)" then
+                                detectedType = "fish_15m"
+                                detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
+                                detectedMax = 10
+                            end
+                        elseif (lower:find("bait") or lower:find("mồi")) and (lower:find("100") or lower:find("use") or lower:find("consume") or lower:find("tiêu")) then
+                            if not detectedType or mode == "Tự Động (Auto Detect)" then
+                                detectedType = "bait_100"
+                                detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
+                                detectedMax = 100
+                            end
+                        elseif (lower:find("skill") or lower:find("chiêu") or lower:find("kỹ năng")) and (lower:find("100") or lower:find("use") or lower:find("cast")) then
+                            if not detectedType or mode == "Tự Động (Auto Detect)" then
+                                detectedType = "skill_100"
+                                detectedTitle = "Dùng kỹ năng 100 lần"
+                                detectedMax = 100
+                            end
+                        elseif (lower:find("fish") or lower:find("cá") or lower:find("catch")) and lower:find("100") and not lower:find("bait") and not lower:find("skill") then
+                            if not detectedType or mode == "Tự Động (Auto Detect)" then
+                                detectedType = "fish_100"
+                                detectedTitle = "Câu nhanh 100 con cá (Map 1)"
+                                detectedMax = 100
+                            end
                         end
                     end
 
@@ -3533,9 +3548,27 @@ function ticketQuestState.DetectActiveQuest()
                     end
 
                     if lower:find("claim") or lower:find("completed") or lower:find("hoàn thành") then
-                        if d:FindFirstAncestor("Quest") or d:FindFirstAncestor("Ticket") or d.Name:lower():find("quest") then
+                        if d:FindFirstAncestor("Quest") or d:FindFirstAncestor("Ticket") or d.Name:lower():find("quest") or lower:find("ticket") then
                             isDone = true
                         end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 3. Quét pData làm fallback bổ trợ
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if pData and (not detectedCur or detectedCur == 0) then
+        local qFolder = pData:FindFirstChild("TicketQuest") or pData:FindFirstChild("Quest") or pData:FindFirstChild("Quests") or pData:FindFirstChild("Ticket")
+        if qFolder then
+            for _, item in ipairs(qFolder:GetChildren()) do
+                local name = item.Name:lower()
+                if item:IsA("IntValue") or item:IsA("NumberValue") then
+                    if name:find("progress") or name:find("current") or name:find("count") then
+                        if item.Value > detectedCur then detectedCur = item.Value end
+                    elseif name:find("target") or name:find("max") or name:find("total") then
+                        if detectedMax == 0 then detectedMax = item.Value end
                     end
                 end
             end
@@ -3549,6 +3582,7 @@ function ticketQuestState.ResetCooldown()
     ticketQuestState.isCooldown = false
     ticketQuestState.cooldownEnd = 0
     ticketQuestState.isCompleted = false
+    ticketQuestState.isAtHomeSpot = false
     ticketQuestState.currentProgress = 0
     ticketQuestState.currentQuestType = "none"
     ticketQuestState.statusText = "Đã đặt lại! Sẵn sàng nhận vé mới."
@@ -3568,10 +3602,54 @@ function ticketQuestState.Tick()
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             ticketQuestState.statusText = string.format("Đang chờ hồi chiêu 20p (còn %02d:%02d)", mins, secs)
+
+            -- Về Home Spot câu cá trong thời gian chờ hồi chiêu
+            if Config.TicketReturnHomeWhenDone and Config.HomeFarmSpot and not ticketQuestState.isAtHomeSpot then
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local homeCf = nil
+                    if Config.HomeFarmSpot.cframe and #Config.HomeFarmSpot.cframe == 12 then
+                        homeCf = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+                    elseif Config.HomeFarmSpot.x and Config.HomeFarmSpot.y and Config.HomeFarmSpot.z then
+                        homeCf = CFrame.new(Config.HomeFarmSpot.x, Config.HomeFarmSpot.y, Config.HomeFarmSpot.z)
+                    end
+                    if homeCf then
+                        local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
+                        if not wp then
+                            wp = Instance.new("Part")
+                            wp.Name = "IdenticalWaterPlatform"
+                            wp.Size = Vector3.new(30, 2, 30)
+                            wp.Transparency = 1
+                            wp.Anchored = true
+                            wp.CanCollide = true
+                            wp.Parent = Workspace
+                        end
+                        wp.CFrame = CFrame.new(homeCf.Position.X, homeCf.Position.Y - 2.8, homeCf.Position.Z)
+                        wp.CanCollide = true
+                        root.CFrame = homeCf + Vector3.new(0, 1.5, 0)
+                        task.wait(0.2)
+                        root.CFrame = homeCf
+                        ticketQuestState.isAtHomeSpot = true
+                        ticketQuestState.statusText = string.format("Đang chờ 20p: đã về Home Spot farm combo (còn %02d:%02d)", mins, secs)
+                        ShowNotification("Home Spot", "Đã về vị trí Home Spot để câu farm trong lúc chờ vé 20p!", "SUCCESS", 5)
+
+                        if Config.TicketAutoCastAtHome then
+                            task.delay(1.0, function()
+                                if isRunning and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot then
+                                    CancelAndRecastRod()
+                                end
+                            end)
+                        end
+                    end
+                end
+            end
+
             ticketQuestState.UpdateUI()
             return
         else
             ticketQuestState.isCooldown = false
+            ticketQuestState.isAtHomeSpot = false
             ticketQuestState.statusText = "Hồi chiêu 20p đã xong! Đang nhận vé Hard mới..."
             ticketQuestState.currentQuestType = "none"
             ticketQuestState.currentProgress = 0
@@ -3594,6 +3672,7 @@ function ticketQuestState.Tick()
         ticketQuestState.cooldownEnd = now + ((Config.TicketCooldownMinutes or 20) * 60)
         ticketQuestState.isCooldown = true
         ticketQuestState.isCompleted = false
+        ticketQuestState.isAtHomeSpot = false
         ticketQuestState.currentQuestType = "none"
         ticketQuestState.currentProgress = 0
         ticketQuestState.active = false
@@ -3611,11 +3690,14 @@ function ticketQuestState.Tick()
             ticketQuestState.targetProgress = max > 0 and max or (qType == "fish_15m" and 10 or 100)
             if cur > ticketQuestState.currentProgress then ticketQuestState.currentProgress = cur end
             ticketQuestState.active = true
+            ticketQuestState.isAtHomeSpot = false
             ticketQuestState.statusText = "Đang làm: " .. qTitle
             ticketQuestState.UpdateUI()
 
             if qType == "fish_15m" then
                 ticketQuestState.TeleportTo(ticketQuestState.spot15MFish)
+            elseif qType == "bait_100" then
+                ticketQuestState.TeleportTo(ticketQuestState.spot100Bait or ticketQuestState.spot100Fish)
             else
                 ticketQuestState.TeleportTo(ticketQuestState.spot100Fish)
             end
@@ -3680,6 +3762,15 @@ function ticketQuestState.Tick()
                 if Events and Events:FindFirstChild("EquipBait") then
                     Events.EquipBait:InvokeServer(baitName)
                 end
+            end
+        end
+    elseif ticketQuestState.currentQuestType == "fish_100" then
+        -- Nhiệm vụ 100 con cá: Tuyệt đối không dùng mồi để tiết kiệm mồi (trang bị None nếu có)
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        if pData and pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "None" and (now - ticketQuestState.lastBaitEquip >= 2.0) then
+            ticketQuestState.lastBaitEquip = now
+            if Events and Events:FindFirstChild("EquipBait") then
+                Events.EquipBait:InvokeServer("None")
             end
         end
     end
@@ -3753,6 +3844,14 @@ local infoHomeSpot = createInfoRow(returnSpotCard, "Vị Trí Trở Về Hiện 
 
 createToggleRow(returnSpotCard, "Tự Về Vị Trí Này Khi Hết Boss / Clear", "Khi hết Boss hoặc thời tiết Clear, tự bay về vị trí này câu cá farm tiền", Config.ReturnToHomeWhenClear, function(v)
     Config.ReturnToHomeWhenClear = v
+end)
+
+createToggleRow(returnSpotCard, "Tự Về Vị Trí Này Khi Xong Vé NV", "Khi xong vé nhiệm vụ và vào 20p chờ, tự bay về vị trí này", Config.TicketReturnHomeWhenDone, function(v)
+    Config.TicketReturnHomeWhenDone = v
+end)
+
+createToggleRow(returnSpotCard, "Tự Quăng Cần & Đánh Combo Khi Về Điểm Này", "Tự quăng cần và dùng Combo đã cài khi đang chờ ở Home Spot (không cần bật Tự Quăng Cần tổng)", Config.TicketAutoCastAtHome, function(v)
+    Config.TicketAutoCastAtHome = v
 end)
 
 createButtonRow(returnSpotCard, "Lưu Vị Trí Đang Đứng Làm Điểm Trở Về", "Lưu tọa độ & hướng quay hiện tại làm nơi Farm cá mặc định (lưu riêng theo tài khoản)", "Lưu Vị Trí", function()
@@ -5732,6 +5831,28 @@ createButtonRow(spotCard, "Đặt Lại Mặc Định (Map 1 - Spawn)", "Khôi p
     ShowNotification("Vị Trí Nhiệm Vụ", "Đã đặt lại điểm câu 100 con về Map 1!", "SUCCESS")
 end)
 
+ticketQuestState.ui100BaitSpot = createInfoRow(spotCard, "Điểm Tiêu Thụ 100 Mồi (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot100Bait.X, ticketQuestState.spot100Bait.Y, ticketQuestState.spot100Bait.Z))
+createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Mồi", "Gán vị trí bạn đang đứng làm nơi câu tiêu thụ 100 mồi", "Lấy Vị Trí", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root then
+        ticketQuestState.spot100Bait = root.Position
+        ticketQuestState.SaveSpots()
+        ticketQuestState.UpdateUI()
+        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu điểm 100 mồi: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
+    end
+end)
+createButtonRow(spotCard, "Bay Đến Điểm 100 Mồi", "Dịch chuyển tức thì đến điểm câu 100 mồi đã cài", "Bay Đến", function()
+    ticketQuestState.TeleportTo(ticketQuestState.spot100Bait)
+    ShowNotification("Dịch Chuyển", "Đã bay đến điểm 100 mồi!", "SUCCESS")
+end)
+createButtonRow(spotCard, "Đặt Lại Mặc Định Điểm 100 Mồi", "Khôi phục tọa độ điểm 100 mồi về Đảo Khởi Đầu", "Đặt Lại", function()
+    ticketQuestState.spot100Bait = Vector3.new(-200.7, 11.1, 35.9)
+    ticketQuestState.SaveSpots()
+    ticketQuestState.UpdateUI()
+    ShowNotification("Vị Trí Nhiệm Vụ", "Đã đặt lại điểm 100 mồi về Map 1!", "SUCCESS")
+end)
+
 ticketQuestState.ui15MSpot = createInfoRow(spotCard, "Điểm Câu 1.5M (Map 9)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot15MFish.X, ticketQuestState.spot15MFish.Y, ticketQuestState.spot15MFish.Z))
 createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 1.5M", "Gán vị trí bạn đang đứng làm nơi câu cá 1.5M+", "Lấy Vị Trí", function()
     local char = LocalPlayer.Character
@@ -5802,6 +5923,14 @@ end)
 
 createToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự động bán sạch cá khi balo đạt giới hạn để câu tiếp", Config.TicketAutoSellFull, function(v)
     Config.TicketAutoSellFull = v
+end)
+
+createToggleRow(optionCard, "Tự Về Home Spot Khi Xong Nhiệm Vụ", "Khi trả xong vé và vào thời gian chờ 20p, tự bay về Home Spot để câu farm", Config.TicketReturnHomeWhenDone, function(v)
+    Config.TicketReturnHomeWhenDone = v
+end)
+
+createToggleRow(optionCard, "Tự Quăng Cần & Đánh Combo Tại Home Spot", "Tự quăng cần và dùng Combo đã cài khi đang chờ ở Home Spot (không cần bật Auto Cast chung)", Config.TicketAutoCastAtHome, function(v)
+    Config.TicketAutoCastAtHome = v
 end)
 
 createCategoryHeader(tabQuests, "⚡ Thao Tác Nhanh Bằng Tay")
@@ -7193,28 +7322,6 @@ task.spawn(function()
         table.insert(activeConnections, invFolder.ChildAdded:Connect(function(child)
             task.wait(0.3)
             ProtectInventoryItem(child, true)
-
-            -- Cập nhật tiến độ nhiệm vụ vé
-            if Config.AutoTicketQuest and ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown then
-                if ticketQuestState.currentQuestType == "fish_100" then
-                    ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
-                    ticketQuestState.UpdateUI()
-                    if ticketQuestState.currentProgress >= 100 then
-                        ticketQuestState.isCompleted = true
-                    end
-                elseif ticketQuestState.currentQuestType == "fish_15m" then
-                    local w = child:GetAttribute("Weight") or child:GetAttribute("FishWeight") or (child:FindFirstChild("Weight") and child.Weight.Value)
-                    local wNum = ParseFishWeightNumber(w)
-                    if wNum >= 1500000 then
-                        ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
-                        ticketQuestState.UpdateUI()
-                        ShowNotification("Nhiệm Vụ Vé", string.format("Đã câu cá >= 1.5M! Tiến độ: %d/10", ticketQuestState.currentProgress), "SUCCESS", 4)
-                        if ticketQuestState.currentProgress >= 10 then
-                            ticketQuestState.isCompleted = true
-                        end
-                    end
-                end
-            end
         end))
     end
 end)
@@ -7270,7 +7377,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local isSwimming = char:GetAttribute("Swimming") == true
 
         local isBossActive = secretBossState and secretBossState.active
-        local isTicketActive = Config.AutoTicketQuest and (ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown)
+        local isTicketActive = IsTicketQuestFishingActive()
         local shouldAutoFish = Config.AutoCast or Config.AutoTrainSkill or isTicketActive or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
 
         if shouldAutoFish and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
@@ -7669,10 +7776,12 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                         if Events and Events:FindFirstChild("Slam") then Events.Slam:FireServer("Perfect") end
                         if Events and Events:FindFirstChild("Charge") then Events.Charge:FireServer(100) end
+                        if Events and Events:FindFirstChild("UpdateFishProgression") then Events.UpdateFishProgression:FireServer() end
                     end
                 elseif fUI and fUI.Visible then
                     -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
-                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss) then
+                    local isHomeFishing = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot and Config.TicketAutoCastAtHome
+                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss or isHomeFishing) then
                         local barFrame = fUI:FindFirstChild("BarFrame")
                         if barFrame and barFrame:FindFirstChild("Bar") then
                             barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
@@ -7794,7 +7903,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             lastCastTime = now
         else
             local isBossActive = secretBossState and secretBossState.active
-            local isTicketActive = Config.AutoTicketQuest and (ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown)
+            local isTicketActive = IsTicketQuestFishingActive()
             local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or isTicketActive or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
             if shouldAutoCast and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
                 local canCast = true
@@ -7838,12 +7947,15 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             lastEquipTime = now
             if pData:FindFirstChild("Bait") and pData:FindFirstChild("EquippedBait") and Events:FindFirstChild("EquipBait") then
                 local isHuntingBoss = (Config.AutoHuntBoss or Config.AutoChatSecretBoss) and secretBossState.active
+                local isTicketFish100 = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown and ticketQuestState.currentQuestType == "fish_100"
                 local targetBaitChoice = nil
 
-                if isHuntingBoss and Config.AutoEquipBossBait then
-                    targetBaitChoice = Config.BaitChoiceBoss or "Mồi Tốt Nhất (Cao Nhất)"
-                elseif Config.AutoEquipBestBait then
-                    targetBaitChoice = Config.BaitChoiceNormal or "Mồi Tốt Nhất (Cao Nhất)"
+                if not isTicketFish100 then
+                    if isHuntingBoss and Config.AutoEquipBossBait then
+                        targetBaitChoice = Config.BaitChoiceBoss or "Mồi Tốt Nhất (Cao Nhất)"
+                    elseif Config.AutoEquipBestBait then
+                        targetBaitChoice = Config.BaitChoiceNormal or "Mồi Tốt Nhất (Cao Nhất)"
+                    end
                 end
 
                 if targetBaitChoice then
