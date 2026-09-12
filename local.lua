@@ -2321,8 +2321,19 @@ local function CancelAndRecastRod(forceCast)
 
     task.delay(0.2, function()
         if not isRunning then return end
+        local rodSlot = "1"
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        if pData and pData:FindFirstChild("Hotbar") then
+            for _, item in ipairs(pData.Hotbar:GetChildren()) do
+                local vName = item:FindFirstChild("ValueName")
+                if vName and tostring(vName.Value):lower():find("rod") and not tostring(vName.Value):lower():find("inventory") then
+                    rodSlot = item.Name
+                    break
+                end
+            end
+        end
         if Events and Events:FindFirstChild("ToggleHotbar") then
-            Events.ToggleHotbar:InvokeServer("1")
+            Events.ToggleHotbar:InvokeServer(rodSlot)
         end
         task.delay(0.25, function()
             if not isRunning then return end
@@ -2330,6 +2341,7 @@ local function CancelAndRecastRod(forceCast)
             local r = c and c:FindFirstChild("HumanoidRootPart")
             if r and Events and Events:FindFirstChild("Fishing") then
                 Events.Fishing:FireServer(r.CFrame)
+                lastCastTime = tick()
             end
         end)
     end)
@@ -3750,27 +3762,55 @@ function ticketQuestState.GetDialogueGui()
 end
 
 function ticketQuestState.IsDialogueOpen()
-    local dlg = ticketQuestState.GetDialogueGui()
-    if dlg and dlg.Visible == true then
-        return true
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local targetPos = ticketQuestState.spotNPC
+    if root and targetPos then
+        local dist = (root.Position - targetPos).Magnitude
+        if dist > 25 then
+            return false
+        end
     end
 
-    -- Kiểm tra trực tiếp ButtonFrame của Dialogue hoặc các nút lựa chọn đang hiển thị
+    local dlg = ticketQuestState.GetDialogueGui()
+    if dlg and dlg.Visible == true then
+        local mg = dlg:FindFirstAncestor("MainGui")
+        local menu = dlg.Parent
+        if (not menu or menu.Name ~= "Menu" or menu.Visible == true) and (not mg or mg.Enabled == true) then
+            return true
+        end
+    end
+
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
         local mg = pg:FindFirstChild("MainGui")
         local d = mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue")
-        if d and d.Visible == true then return true end
-        if d and d:FindFirstChild("ButtonFrame") and d.ButtonFrame.Visible == true then return true end
-        if d and d:FindFirstChild("ButtonFrame") and d.ButtonFrame:FindFirstChild("1") and d.ButtonFrame["1"].Visible == true then return true end
-        for _, g in ipairs(pg:GetChildren()) do
-            if g:IsA("ScreenGui") and g.Enabled then
-                local foundD = g:FindFirstChild("Dialogue", true)
-                if foundD and foundD.Visible == true then return true end
-            end
-        end
+        if d and d.Visible == true and mg.Menu.Visible == true then return true end
     end
     return false
+end
+
+function ticketQuestState.CloseDialogue()
+    pcall(function()
+        ticketQuestState.SelectDialogueOption(1, "leave")
+        ticketQuestState.FindAndClickButton(function(t)
+            return t == "leave" or t:find("leave") or t:find("xong") or t == "nevermind" or t:find("nevermind")
+        end)
+    end)
+    if Events and Events:FindFirstChild("ChooseDialogueOption") then
+        pcall(function() Events.ChooseDialogueOption:FireServer("Leave") end)
+        pcall(function() Events.ChooseDialogueOption:FireServer("*Leave*") end)
+        pcall(function() Events.ChooseDialogueOption:FireServer(1) end)
+    end
+    pcall(function()
+        local dlg = ticketQuestState.GetDialogueGui()
+        if dlg then dlg.Visible = false end
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local mg = pg and pg:FindFirstChild("MainGui")
+        if mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue") then
+            mg.Menu.Dialogue.Visible = false
+        end
+    end)
 end
 
 -- Hàm tìm và click nút UI theo điều kiện hàm kiểm tra text
@@ -3960,7 +4000,8 @@ function ticketQuestState.HandleDialogue(isClaiming)
         end) or ticketQuestState.SelectDialogueOption(1, diffKeyword)
 
         if clickedDiff then
-            task.wait(0.5)
+            task.wait(0.3)
+            ticketQuestState.CloseDialogue()
             return true
         end
 
@@ -3979,7 +4020,8 @@ function ticketQuestState.HandleDialogue(isClaiming)
                     return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
                 end) or ticketQuestState.SelectDialogueOption(1, diffKeyword)
                 if clickedNext then
-                    task.wait(0.5)
+                    task.wait(0.3)
+                    ticketQuestState.CloseDialogue()
                     return true
                 end
                 if not ticketQuestState.IsDialogueOpen() then
@@ -4339,6 +4381,7 @@ function ticketQuestState.ScanAndUpdateStatus()
 
     -- 1. Nếu tìm thấy nhiệm vụ đang hoạt động
     if qType then
+        ticketQuestState.active = true
         ticketQuestState.currentQuestType = qType
         ticketQuestState.currentQuestTitle = qTitle or "Nhiệm Vụ Vé"
         ticketQuestState.currentProgress = cur or 0
@@ -4583,6 +4626,9 @@ function ticketQuestState.Tick()
                 local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
                 if root and spotPos and (root.Position - spotPos).Magnitude > 35 then
                     ticketQuestState.TeleportTo(targetSpot)
+                    ticketQuestState.CloseDialogue()
+                    task.wait(0.3)
+                    CancelAndRecastRod(true)
                 end
             else
                 ticketQuestState.statusText = "Đã gửi lệnh nhận vé, đang chờ hệ thống cập nhật nhiệm vụ..."
@@ -4612,6 +4658,9 @@ function ticketQuestState.Tick()
         local dist = (root.Position - spotPos).Magnitude
         if dist > 35 then
             ticketQuestState.TeleportTo(targetSpot)
+            ticketQuestState.CloseDialogue()
+            task.wait(0.3)
+            CancelAndRecastRod(true)
         end
     end
 
