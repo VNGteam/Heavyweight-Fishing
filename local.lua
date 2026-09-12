@@ -809,14 +809,39 @@ do
 end
 
 local brandTitle = Instance.new("TextLabel")
-brandTitle.Size = UDim2.new(0, 150, 1, 0); brandTitle.Position = UDim2.new(0, 36, 0, 0)
+brandTitle.Size = UDim2.new(0, 92, 1, 0); brandTitle.Position = UDim2.new(0, 36, 0, 0)
 brandTitle.BackgroundTransparency = 1; brandTitle.Font = Enum.Font.GothamBold
 brandTitle.Text = "CÂU CÁ PRO"; brandTitle.TextColor3 = Colors.PurplePrimary
 brandTitle.TextSize = 14; brandTitle.TextXAlignment = Enum.TextXAlignment.Left
 brandTitle.Parent = titleBar
 
+local commitBadge = Instance.new("TextLabel")
+commitBadge.Size = UDim2.new(0, 68, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
+commitBadge.BackgroundColor3 = Color3.fromRGB(30, 22, 48)
+commitBadge.Font = Enum.Font.Code
+commitBadge.Text = "#latest"
+commitBadge.TextColor3 = Color3.fromRGB(190, 150, 255)
+commitBadge.TextSize = 10
+commitBadge.Parent = titleBar
+Instance.new("UICorner", commitBadge).CornerRadius = UDim.new(0, 4)
+local cStroke = Instance.new("UIStroke", commitBadge)
+cStroke.Color = Colors.PurpleAccent
+cStroke.Thickness = 1
+
+task.spawn(function()
+    pcall(function()
+        local res = (game.HttpGet and game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/commits/main?t=" .. tostring(tick())))
+        if res and #res > 0 then
+            local data = HttpService:JSONDecode(res)
+            if data and data.sha then
+                commitBadge.Text = "#" .. tostring(data.sha):sub(1, 7)
+            end
+        end
+    end)
+end)
+
 local gameSubtitle = Instance.new("TextLabel")
-gameSubtitle.Size = UDim2.new(0, 200, 1, 0); gameSubtitle.Position = UDim2.new(0, 118, 0, 0)
+gameSubtitle.Size = UDim2.new(0, 220, 1, 0); gameSubtitle.Position = UDim2.new(0, 208, 0, 0)
 gameSubtitle.BackgroundTransparency = 1; gameSubtitle.Font = Enum.Font.Gotham
 gameSubtitle.Text = "HEAVYWEIGHT FISHING | BẢN VIỆT HOÁ"; gameSubtitle.TextColor3 = Colors.PurpleMuted
 gameSubtitle.TextSize = 10; gameSubtitle.TextXAlignment = Enum.TextXAlignment.Left
