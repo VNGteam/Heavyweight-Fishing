@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "6dbbbf7"
+local SCRIPT_BUILD_COMMIT = "551e0c7"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3295,9 +3295,9 @@ ticketQuestState = {
     statusText = "Đang quét nhiệm vụ...",
     
     -- Vị trí mặc định
-    spot100Fish = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 (100 con cá)
-    spot100Bait = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 (100 mồi)
-    spot15MFish = Vector3.new(1393.5, 11.3, 169.6), -- Map 9 (1.5M cá)
+    spot100Fish = Vector3.new(-96, 9, 234), -- Map 1 (100 con cá)
+    spot100Bait = Vector3.new(-96, 9, 231), -- Map 1 (100 mồi)
+    spot15MFish = Vector3.new(1619, 13, 334), -- Map 9 (1.5M cá)
     spotNPC = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 NPC Ticket Quest
     
     -- UI rows
@@ -8127,16 +8127,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
                             end)
 
-                            -- 6. CÂU TIẾP (Quăng cần câu lại ngay)
-                            task.wait(0.25)
-                            local c2 = LocalPlayer.Character
-                            local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
-                            if r2 and Events and Events:FindFirstChild("Fishing") then
-                                Events.Fishing:FireServer(r2.CFrame)
-                                lastCastTime = tick()
-                            end
-
-                            task.wait(0.3)
+                            -- 6. Hoàn tất chu trình, chuyển quyền quăng cần mượt mà cho AutoCast
+                            task.wait(0.35)
+                            lastCastTime = tick()
                             isTrainingBusy = false
                         end)
                     end
@@ -8175,15 +8168,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     end
                                 end)
 
-                                task.wait(0.25)
-                                local c2 = LocalPlayer.Character
-                                local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
-                                if r2 and Events and Events:FindFirstChild("Fishing") then
-                                    Events.Fishing:FireServer(r2.CFrame)
-                                    lastCastTime = tick()
-                                end
-
-                                task.wait(0.3)
+                                task.wait(0.35)
+                                lastCastTime = tick()
                                 ticketQuestState.isBusyRoutine = false
                             end)
                         end
@@ -8259,15 +8245,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     end
                                 end)
 
-                                task.wait(0.25)
-                                local c2 = LocalPlayer.Character
-                                local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
-                                if r2 and Events and Events:FindFirstChild("Fishing") then
-                                    Events.Fishing:FireServer(r2.CFrame)
-                                    lastCastTime = tick()
-                                end
-
-                                task.wait(0.3)
+                                task.wait(0.35)
+                                lastCastTime = tick()
                                 ticketQuestState.isBusyRoutine = false
                             end)
                         end
@@ -8419,8 +8398,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         else
             local isBossActive = secretBossState and secretBossState.active
             local isTicketActive = IsTicketQuestFishingActive()
+            local isTicketBusy = ticketQuestState and ticketQuestState.isBusyRoutine
             local shouldAutoCast = Config.AutoCast or Config.AutoTrainSkill or isTicketActive or ((Config.AutoHuntBoss or Config.AutoChatSecretBoss) and isBossActive)
-            if shouldAutoCast and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy then
+            if shouldAutoCast and not isCD and not isSwimming and (char:GetAttribute("Type") == "Fishing Rod") and (now - lastCastTime >= Config.CastDelay) and not isTrainingBusy and not isTicketBusy then
                 local canCast = true
                 if pData and pData:FindFirstChild("InventoryLimit") then
                     local invCount = 0
