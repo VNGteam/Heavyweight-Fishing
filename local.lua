@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "713e272"
+local SCRIPT_BUILD_COMMIT = "7347277"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3399,31 +3399,71 @@ function ticketQuestState.FindTicketNPC()
         local folder = (fName == "Workspace") and Workspace or Workspace:FindFirstChild(fName)
         if folder then table.insert(candidates, folder) end
     end
+
+    -- 1. Quét tìm qua BillboardGui "Ticket Quest" hoặc Model có tên Ticket/Giver
     for _, folder in ipairs(candidates) do
         for _, inst in ipairs(folder:GetDescendants()) do
-            if inst:IsA("Model") or inst:IsA("BasePart") then
+            if inst:IsA("BillboardGui") then
+                local bName = inst.Name:lower()
+                local isTicket = bName:find("ticket")
+                if not isTicket then
+                    for _, l in ipairs(inst:GetDescendants()) do
+                        if l:IsA("TextLabel") and l.Text:lower():find("ticket") then
+                            isTicket = true
+                            break
+                        end
+                    end
+                end
+                if isTicket then
+                    local model = inst:FindFirstAncestorOfClass("Model") or inst.Parent
+                    local pos = (model:IsA("Model") and model:GetPivot().Position) or (model:IsA("BasePart") and model.Position)
+                    local p = model and model:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    if model and pos then
+                        ticketQuestState.spotNPC = pos
+                        return model, pos, p
+                    end
+                end
+            elseif inst:IsA("Model") then
                 local n = inst.Name:lower()
-                if n:find("ticket") and (n:find("quest") or n:find("npc") or n:find("ve")) then
-                    local cf = inst:IsA("Model") and inst:GetPivot() or inst.CFrame
-                    return inst, cf.Position
+                if n:find("ticket") and (n:find("quest") or n:find("npc") or n:find("ve") or n:find("giver")) then
+                    local cf = inst:GetPivot()
+                    local p = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    ticketQuestState.spotNPC = cf.Position
+                    return inst, cf.Position, p
                 end
             elseif inst:IsA("ProximityPrompt") then
                 local act = tostring(inst.ActionText or ""):lower()
                 local obj = tostring(inst.ObjectText or ""):lower()
                 local pName = inst.Parent and inst.Parent.Name:lower() or ""
-                if act:find("ticket") or obj:find("ticket") or pName:find("ticket") then
+                if (act:find("ticket") or obj:find("ticket") or pName:find("ticket")) or (act:find("talk") and (obj:find("ticket") or pName:find("ticket") or pName:find("giver"))) then
                     local pPos = inst.Parent:IsA("BasePart") and inst.Parent.Position or inst.Parent:GetPivot().Position
-                    return inst:FindFirstAncestorOfClass("Model") or inst.Parent, pPos, inst
+                    local model = inst:FindFirstAncestorOfClass("Model") or inst.Parent
+                    ticketQuestState.spotNPC = pPos
+                    return model, pPos, inst
                 end
             end
         end
     end
-    return nil, ticketQuestState.spotNPC
+
+    -- 2. Quét tìm ProximityPrompt trong bán kính 30 studs quanh spotNPC
+    if ticketQuestState.spotNPC then
+        for _, p in ipairs(Workspace:GetDescendants()) do
+            if p:IsA("ProximityPrompt") then
+                local pPos = (p.Parent:IsA("BasePart") and p.Parent.Position) or (p.Parent:IsA("Model") and p.Parent:GetPivot().Position)
+                if pPos and (pPos - ticketQuestState.spotNPC).Magnitude <= 30 then
+                    local model = p:FindFirstAncestorOfClass("Model") or p.Parent
+                    return model, pPos, p
+                end
+            end
+        end
+    end
+
+    return nil, ticketQuestState.spotNPC, nil
 end
 
 function ticketQuestState.CheckNPCReady()
     local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
-    if not npcModel and not prompt then return false end
+    if not npcModel and not prompt and not ticketQuestState.spotNPC then return false end
 
     -- 1. Kiểm tra trong prompt của NPC
     if prompt then
@@ -3436,6 +3476,18 @@ function ticketQuestState.CheckNPCReady()
 
     -- 2. Kiểm tra các BillboardGui, TextLabel, Decal, SurfaceGui gắn trên đầu NPC
     local targetInst = npcModel or (prompt and prompt.Parent)
+    if not targetInst and ticketQuestState.spotNPC then
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            if obj:IsA("BillboardGui") and obj.Enabled then
+                local parentPos = (obj.Parent:IsA("BasePart") and obj.Parent.Position) or (obj.Parent:IsA("Model") and obj.Parent:GetPivot().Position)
+                if parentPos and (parentPos - ticketQuestState.spotNPC).Magnitude <= 15 then
+                    targetInst = obj.Parent
+                    break
+                end
+            end
+        end
+    end
+
     if targetInst then
         for _, d in ipairs(targetInst:GetDescendants()) do
             if d:IsA("TextLabel") and d.Visible then
@@ -3476,43 +3528,208 @@ function ticketQuestState.TeleportTo(pos)
     end
 end
 
-function ticketQuestState.InteractNPC(isClaiming)
-    -- Giống cơ chế bán cá 100%: Bắn thẳng RemoteEvent ClaimQuest lên server từ bất cứ đâu, 100% không di chuyển!
-    if Events and Events:FindFirstChild("ClaimQuest") then
-        Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
-    end
+-- Hàm tìm và click nút UI theo điều kiện hàm kiểm tra text
+function ticketQuestState.FindAndClickButton(predicate)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return false end
 
-    -- Bổ trợ kích hoạt Prompt từ xa nếu có (mở rộng phạm vi vô tận)
-    pcall(function()
-        local _, _, prompt = ticketQuestState.FindTicketNPC()
-        if prompt then
-            prompt.MaxActivationDistance = math.huge
-            prompt.RequiresLineOfSight = false
-            TriggerPrompt(prompt)
-        end
-    end)
-
-    -- Tự động nhấn nút trên Dialogue/UI nếu có
-    pcall(function()
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        if pg then
-            for _, btn in ipairs(pg:GetDescendants()) do
-                if btn:IsA("TextButton") then
-                    local t = tostring(btn.Text or ""):lower()
-                    if t:find("accept") or t:find("nhận") or t:find("take") or t == "hard" or t:find("yes") or t:find("đồng ý") then
-                        if firesignal then
-                            firesignal(btn.Activated)
-                            firesignal(btn.MouseButton1Click)
-                        elseif getconnections then
-                            for _, c in ipairs(getconnections(btn.Activated or btn.MouseButton1Click)) do
-                                c:Fire()
+    for _, inst in ipairs(pg:GetDescendants()) do
+        if inst:IsA("GuiButton") or inst:IsA("TextLabel") then
+            local isVis = true
+            pcall(function()
+                if inst:IsA("GuiObject") and not inst.Visible then isVis = false end
+            end)
+            if isVis then
+                local txt = ""
+                if inst:IsA("TextButton") or inst:IsA("TextLabel") then
+                    txt = tostring(inst.Text or "")
+                end
+                -- Làm sạch chuỗi: bỏ dấu hoa thị, ký tự đặc biệt, chuẩn hóa khoảng trắng
+                local cleanTxt = txt:lower():gsub("%*", ""):gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
+                if predicate(cleanTxt) then
+                    local targetBtn = inst:IsA("GuiButton") and inst or inst:FindFirstAncestorWhichIsA("GuiButton") or inst.Parent
+                    if targetBtn and (targetBtn:IsA("GuiButton") or targetBtn:IsA("TextButton") or targetBtn:IsA("ImageButton")) then
+                        pcall(function()
+                            if firesignal then
+                                if targetBtn.Activated then firesignal(targetBtn.Activated) end
+                                if targetBtn.MouseButton1Click then firesignal(targetBtn.MouseButton1Click) end
+                                if targetBtn.MouseButton1Down then firesignal(targetBtn.MouseButton1Down) end
+                                if targetBtn.MouseButton1Up then firesignal(targetBtn.MouseButton1Up) end
                             end
-                        end
+                        end)
+                        pcall(function()
+                            if getconnections then
+                                if targetBtn.Activated then
+                                    for _, c in ipairs(getconnections(targetBtn.Activated)) do c:Fire() end
+                                end
+                                if targetBtn.MouseButton1Click then
+                                    for _, c in ipairs(getconnections(targetBtn.MouseButton1Click)) do c:Fire() end
+                                end
+                            end
+                        end)
+                        pcall(function()
+                            local vim = game:GetService("VirtualInputManager")
+                            if vim and targetBtn.AbsolutePosition and targetBtn.AbsoluteSize then
+                                local pos = targetBtn.AbsolutePosition + targetBtn.AbsoluteSize / 2
+                                vim:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
+                                task.wait(0.05)
+                                vim:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
+                            end
+                        end)
+                        return true
                     end
                 end
             end
         end
-    end)
+    end
+    return false
+end
+
+function ticketQuestState.InteractNPC(isClaiming)
+    local isHard = (Config.TicketDifficulty or "Hard") == "Hard"
+    local diffKeyword = isHard and "hard" or "easy"
+
+    -- 1. Nếu bảng hội thoại NPC đã mở sẵn trước mặt (người dùng tự bấm E):
+    if isClaiming then
+        -- Trả vé: Tìm nút "*Leave*" (ảnh trả nhiệm vụ)
+        if ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("claim") or t:find("xong") end) then
+            ShowNotification("Nhiệm Vụ Vé", "Đã bấm *Leave* nộp nhiệm vụ & nhận thưởng thành công!", "SUCCESS", 5)
+            return true
+        end
+    else
+        -- Nhận vé:
+        -- Kiểm tra nếu đã ở Bước 2 (bảng đã có nút "Accept Hard Quest"):
+        local clickedDiff = ticketQuestState.FindAndClickButton(function(t)
+            return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+        end)
+        if clickedDiff then
+            ShowNotification("Nhiệm Vụ Vé", "Đã nhận thành công nhiệm vụ " .. (isHard and "Hard" or "Easy") .. " Ticket!", "SUCCESS", 5)
+            return true
+        end
+
+        -- Kiểm tra nếu đang ở Bước 1 (bảng có nút "Quest" và "Nevermind"):
+        local clickedQuest = ticketQuestState.FindAndClickButton(function(t)
+            return (t == "quest" or t:find("^quest")) and not t:find("nevermind") and not t:find("huy")
+        end)
+        if clickedQuest then
+            task.wait(0.35)
+            local clickedStep2 = ticketQuestState.FindAndClickButton(function(t)
+                return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+            end)
+            if clickedStep2 then
+                ShowNotification("Nhiệm Vụ Vé", "Đã nhận thành công nhiệm vụ " .. (isHard and "Hard" or "Easy") .. " Ticket!", "SUCCESS", 5)
+                return true
+            end
+        end
+    end
+
+    -- 2. Nếu hội thoại chưa mở -> Di chuyển lại gần NPC nếu đang ở xa (> 12 studs)
+    local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
+    local targetPos = npcPos or ticketQuestState.spotNPC
+
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if root and targetPos then
+        local dist = (root.Position - targetPos).Magnitude
+        if dist > 12 then
+            ticketQuestState.TeleportTo(targetPos)
+            task.wait(0.35)
+        end
+    end
+
+    -- 3. Cập nhật lại prompt sau khi tới gần NPC
+    if not prompt then
+        local _, _, freshPrompt = ticketQuestState.FindTicketNPC()
+        prompt = freshPrompt
+    end
+    if not prompt and targetPos then
+        for _, p in ipairs(Workspace:GetDescendants()) do
+            if p:IsA("ProximityPrompt") then
+                local pPos = (p.Parent:IsA("BasePart") and p.Parent.Position) or (p.Parent:IsA("Model") and p.Parent:GetPivot().Position)
+                if pPos and (pPos - targetPos).Magnitude <= 20 then
+                    prompt = p
+                    break
+                end
+            end
+        end
+    end
+
+    -- 4. Kích hoạt ProximityPrompt [E] Talk
+    if prompt then
+        TriggerPrompt(prompt)
+    else
+        pcall(function()
+            local vim = game:GetService("VirtualInputManager")
+            if vim then
+                vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                task.wait(0.1)
+                vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+            end
+        end)
+    end
+
+    -- 5. Đợi bảng hội thoại xuất hiện và tự động thực hiện đúng quy trình theo ảnh
+    local success = false
+    local t0 = tick()
+
+    if isClaiming then
+        -- Quy trình TRẢ nhiệm vụ: Chờ nút "*Leave*" xuất hiện và click (ảnh 3)
+        while (tick() - t0) < 3.0 do
+            task.wait(0.2)
+            if ticketQuestState.FindAndClickButton(function(t) return t:find("leave") or t:find("claim") or t:find("xong") end) then
+                success = true
+                break
+            end
+        end
+    else
+        -- Quy trình NHẬN nhiệm vụ (2 bước chuẩn 100% theo ảnh của bạn):
+        -- Bước 5A: Chờ bảng hiện ra và bấm nút "Quest" (ảnh 1)
+        while (tick() - t0) < 3.0 do
+            task.wait(0.2)
+            -- Nếu bảng đã mở sẵn ở bước 2 thì bấm nút chọn độ khó ngay
+            if ticketQuestState.FindAndClickButton(function(t)
+                return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+            end) then
+                success = true
+                break
+            end
+
+            -- Nếu ở bước 1: Bấm nút "Quest"
+            if ticketQuestState.FindAndClickButton(function(t)
+                return (t == "quest" or t:find("^quest")) and not t:find("nevermind") and not t:find("huy")
+            end) then
+                -- Bước 5B: Chờ bảng hội thoại chuyển trang sang "Accept Hard Quest" (ảnh 2)
+                local t1 = tick()
+                while (tick() - t1) < 2.5 do
+                    task.wait(0.2)
+                    if ticketQuestState.FindAndClickButton(function(t)
+                        return (t:find(diffKeyword) and (t:find("quest") or t:find("accept"))) or t == ("accept " .. diffKeyword .. " quest")
+                    end) then
+                        success = true
+                        break
+                    end
+                end
+                break
+            end
+        end
+    end
+
+    -- Fallback RemoteEvent nếu game có hỗ trợ ngầm
+    if Events and Events:FindFirstChild("ClaimQuest") then
+        pcall(function() Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard") end)
+    end
+
+    if success then
+        if isClaiming then
+            ShowNotification("Nhiệm Vụ Vé", "Đã bấm *Leave* nộp nhiệm vụ & nhận thưởng thành công!", "SUCCESS", 5)
+        else
+            ShowNotification("Nhiệm Vụ Vé", "Đã nhận thành công nhiệm vụ " .. (isHard and "Hard" or "Easy") .. " Ticket!", "SUCCESS", 5)
+        end
+    else
+        ShowNotification("Nhiệm Vụ Vé", "Đã tương tác với NPC " .. (isClaiming and "để nộp vé" or "để nhận vé") .. "!", "INFO", 4)
+    end
+
+    return success
 end
 
 function ticketQuestState.DetectActiveQuest()
@@ -4009,12 +4226,12 @@ function ticketQuestState.Tick()
     if ticketQuestState.currentQuestType == "none" then
         if now - ticketQuestState.lastNpcInteract >= 10.0 then
             ticketQuestState.lastNpcInteract = now
-            ticketQuestState.statusText = "Đang nhận vé Hard (từ xa)..."
+            ticketQuestState.statusText = "Đang tương tác NPC nhận vé Hard mới..."
             ticketQuestState.UpdateUI()
             ticketQuestState.InteractNPC(false)
 
-            -- Thử quét lại ngay lập tức sau khi tương tác NPC
-            task.wait(0.8)
+            -- Quét lại sau khi nhận quest
+            task.wait(1.0)
             local freshType, freshTitle, freshCur, freshMax, freshDone = ticketQuestState.DetectActiveQuest()
             if freshType then
                 ticketQuestState.currentQuestType = freshType
@@ -6285,14 +6502,18 @@ end)
 createCategoryHeader(tabQuests, "⚡ Thao Tác Nhanh Bằng Tay")
 local manualCard = createCardGroup(tabQuests)
 
-createButtonRow(manualCard, "Nhận Vé Hard Ngay", "Nhận nhiệm vụ Hard từ xa hoặc tương tác NPC", "Nhận Hard", function()
-    ticketQuestState.InteractNPC(false)
-    ShowNotification("Nhiệm Vụ Vé", "Đang gửi lệnh nhận vé Hard...", "SUCCESS")
+createButtonRow(manualCard, "Nhận Vé Hard Ngay", "Tương tác NPC, mở hội thoại và bấm nút Quest để nhận vé mới", "Nhận Hard", function()
+    task.spawn(function()
+        ShowNotification("Nhiệm Vụ Vé", "Đang tương tác NPC nhận vé Hard...", "INFO", 3)
+        ticketQuestState.InteractNPC(false)
+    end)
 end)
 
-createButtonRow(manualCard, "Nộp / Trả Vé Hard Ngay", "Nộp nhiệm vụ Hard từ xa hoặc tương tác NPC", "Nộp Hard", function()
-    ticketQuestState.InteractNPC(true)
-    ShowNotification("Nhiệm Vụ Vé", "Đã gửi lệnh nộp vé Hard!", "SUCCESS")
+createButtonRow(manualCard, "Nộp / Trả Vé Hard Ngay", "Tương tác NPC, mở hội thoại và bấm nút *Leave* để trả vé & nhận quà", "Nộp Hard", function()
+    task.spawn(function()
+        ShowNotification("Nhiệm Vụ Vé", "Đang tương tác NPC nộp vé Hard...", "INFO", 3)
+        ticketQuestState.InteractNPC(true)
+    end)
 end)
 
 createButtonRow(manualCard, "Đặt Lại Bộ Đếm & Bỏ Hồi Chiêu", "Reset bộ đếm tiến độ và hủy thời gian chờ 20 phút", "Đặt Lại", function()
