@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "efa4a57"
+local SCRIPT_BUILD_COMMIT = "21d7b2f"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3746,6 +3746,19 @@ function ticketQuestState.TeleportTo(target)
     end
 
     if targetCf then
+        local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
+        if not wp then
+            wp = Instance.new("Part")
+            wp.Name = "IdenticalWaterPlatform"
+            wp.Size = Vector3.new(30, 2, 30)
+            wp.Transparency = 1
+            wp.Anchored = true
+            wp.CanCollide = true
+            wp.Parent = Workspace
+        end
+        wp.CFrame = CFrame.new(targetCf.Position.X, targetCf.Position.Y - 2.8, targetCf.Position.Z)
+        wp.CanCollide = true
+
         root.AssemblyLinearVelocity = Vector3.zero
         root.CFrame = targetCf + Vector3.new(0, 1.5, 0)
         task.wait(0.12)
@@ -4641,17 +4654,10 @@ function ticketQuestState.Tick()
                 local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
                 if root and spotPos then
                     local dist = (root.Position - spotPos).Magnitude
-                    if dist > 8 then
+                    if dist > 25 then
                         ticketQuestState.TeleportTo(targetSpot)
-                        ticketQuestState.CloseDialogue()
-                        task.wait(0.3)
-                        CancelAndRecastRod(true)
-                    else
-                        ticketQuestState.CloseDialogue()
-                        if char:GetAttribute("Type") ~= "Fishing Rod" and not isFishing and not isMinigame then
-                            CancelAndRecastRod(true)
-                        end
                     end
+                    ticketQuestState.CloseDialogue()
                 end
             else
                 ticketQuestState.statusText = "Đã gửi lệnh nhận vé, đang chờ hệ thống cập nhật nhiệm vụ..."
@@ -4665,6 +4671,15 @@ function ticketQuestState.Tick()
     ticketQuestState.active = true
     ticketQuestState.isAtHomeSpot = false
 
+    local char = LocalPlayer.Character
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    local isFishing = char and char:GetAttribute("Fishing") == true
+    local isMinigame = char and (char:GetAttribute("Minigame") == true or (pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing") and pg.MainGui.Fishing.Visible))
+    if isFishing or isMinigame then
+        -- Đang câu (chờ cá cắn) hoặc đang kéo minigame: tuyệt đối không can thiệp, để yên cho cá cắn câu và kéo cá lên!
+        return
+    end
+
     -- Xác định vị trí câu tương ứng với loại nhiệm vụ hiện tại
     local targetSpot = ticketQuestState.spot100Fish
     if ticketQuestState.currentQuestType == "fish_15m" then
@@ -4676,22 +4691,14 @@ function ticketQuestState.Tick()
     end
 
     -- Nếu bị trôi xa khỏi vị trí câu quest (ví dụ đang ở NPC hoặc chỗ khác), bay về vị trí câu
-    local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
     if root and spotPos then
         local dist = (root.Position - spotPos).Magnitude
-        if dist > 8 then
+        if dist > 25 then
             ticketQuestState.TeleportTo(targetSpot)
-            ticketQuestState.CloseDialogue()
-            task.wait(0.3)
-            CancelAndRecastRod(true)
-        else
-            ticketQuestState.CloseDialogue()
-            if char:GetAttribute("Type") ~= "Fishing Rod" and not isFishing and not isMinigame then
-                CancelAndRecastRod(true)
-            end
         end
+        ticketQuestState.CloseDialogue()
     end
 
     -- Cập nhật giao diện định kỳ
@@ -8515,7 +8522,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local skipTriggered = false
             local isHunting = (Config.AutoHuntBoss or Config.AutoChatSecretBoss) and secretBossState.active
 
-            if isHunting and Config.FastSkipNonBoss and not Config.AutoTrainSkill then
+            if isHunting and Config.FastSkipNonBoss and not Config.AutoTrainSkill and not isTicketActive then
                 if secretBossState.minigameStartTime == 0 then
                     secretBossState.minigameStartTime = now
                 end
