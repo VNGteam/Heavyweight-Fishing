@@ -629,6 +629,8 @@ local function CreateInspectorUI()
     CloseBtn.Size = UDim2.new(0, 28, 0, 28)
     CloseBtn.Position = UDim2.new(1, -34, 0.5, -14)
     CloseBtn.BackgroundColor3 = Color3.fromRGB(239, 68, 68)
+    CloseBtn.BorderSizePixel = 0
+    CloseBtn.AutoButtonColor = false
     CloseBtn.Font = Enum.Font.GothamBold
     CloseBtn.Text = "X"
     CloseBtn.TextColor3 = Color3.new(1, 1, 1)
@@ -656,14 +658,31 @@ local function CreateInspectorUI()
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, 120, 1, 0)
         btn.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.ClipsDescendants = true
         btn.Font = Enum.Font.GothamSemibold
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(200, 205, 220)
         btn.TextSize = 11
         btn.Parent = parent
+
         local cr = Instance.new("UICorner")
         cr.CornerRadius = UDim.new(0, 5)
         cr.Parent = btn
+
+        local baseColor = btn.BackgroundColor3
+        btn.MouseEnter:Connect(function()
+            if Inspector.CurrentRoot and not text:find(Inspector.CurrentRoot) then
+                btn.BackgroundColor3 = Color3.fromRGB(48, 52, 70)
+            end
+        end)
+        btn.MouseLeave:Connect(function()
+            if Inspector.CurrentRoot and not text:find(Inspector.CurrentRoot) then
+                btn.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
+            end
+        end)
+
         return btn
     end
 
@@ -689,14 +708,33 @@ local function CreateInspectorUI()
         local btn = Instance.new("TextButton")
         btn.Size = UDim2.new(0, width or 80, 1, 0)
         btn.BackgroundColor3 = color or Color3.fromRGB(45, 50, 70)
+        btn.BorderSizePixel = 0
+        btn.AutoButtonColor = false
+        btn.ClipsDescendants = true
         btn.Font = Enum.Font.GothamSemibold
         btn.Text = text
         btn.TextColor3 = Color3.fromRGB(240, 245, 255)
         btn.TextSize = 11
         btn.Parent = ControlBar
+
         local cr = Instance.new("UICorner")
         cr.CornerRadius = UDim.new(0, 5)
         cr.Parent = btn
+
+        -- Custom smooth hover without AutoButtonColor glitch
+        local normalColor = color or Color3.fromRGB(45, 50, 70)
+        local hoverColor = Color3.fromRGB(
+            math.min(255, math.floor(normalColor.R * 255 + 25)),
+            math.min(255, math.floor(normalColor.G * 255 + 25)),
+            math.min(255, math.floor(normalColor.B * 255 + 25))
+        )
+        btn.MouseEnter:Connect(function()
+            btn.BackgroundColor3 = hoverColor
+        end)
+        btn.MouseLeave:Connect(function()
+            btn.BackgroundColor3 = normalColor
+        end)
+
         return btn
     end
 
@@ -766,28 +804,31 @@ local function CreateInspectorUI()
     ContentText.TextWrapped = false
     ContentText.Parent = Scroll
 
-    -- Rock-solid Window Dragging (No stuck drag, no shaking, no jumping)
+    -- Rock-solid Window Dragging with Hardware Mouse Check
     local dragging = false
-    local dragInput = nil
     local dragStart = nil
     local startPos = nil
 
     Header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
         end
     end)
 
-    Header.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
-            dragInput = input
-        end
-    end)
-
     UserInputService.InputChanged:Connect(function(input)
-        if dragging and input == dragInput then
+        if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
+            -- BẮT BUỘC: Kiểm tra nút chuột có đang THỰC SỰ bị bấm đè hay không
+            local isPressed = false
+            pcall(function()
+                isPressed = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            end)
+            if not isPressed then
+                dragging = false
+                return
+            end
+
             local delta = input.Position - dragStart
             MainFrame.Position = UDim2.new(
                 startPos.X.Scale,
@@ -799,9 +840,8 @@ local function CreateInspectorUI()
     end)
 
     UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
             dragging = false
-            dragInput = nil
         end
     end)
 
