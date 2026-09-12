@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "e78a113"
+local SCRIPT_BUILD_COMMIT = "32bc73d"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3292,7 +3292,7 @@ ticketQuestState = {
     lastBaitEquip = 0,
     isBusyRoutine = false,
     isAtHomeSpot = false,
-    statusText = "Đang chờ bật tự động làm vé...",
+    statusText = "Đang quét nhiệm vụ...",
     
     -- Vị trí mặc định
     spot100Fish = Vector3.new(-200.7, 11.1, 35.9), -- Map 1 (100 con cá)
@@ -4072,6 +4072,62 @@ function ticketQuestState.DetectActiveQuest()
     return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
 end
 
+-- Hàm chủ động quét toàn diện trạng thái và tiến độ nhiệm vụ hiện tại từ PlayerGui
+function ticketQuestState.ScanAndUpdateStatus()
+    local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
+    local isNPCReady = ticketQuestState.CheckNPCReady()
+    local now = tick()
+
+    -- 1. Đồng bộ Cooldown nếu phát hiện nhãn thời gian từ game
+    if detectedCd and detectedCd > 0 and not isNPCReady then
+        if not ticketQuestState.isCooldown or math.abs((now + detectedCd) - ticketQuestState.cooldownEnd) > 5 then
+            ticketQuestState.isCooldown = true
+            ticketQuestState.cooldownEnd = now + detectedCd
+        end
+    end
+
+    -- 2. Nếu tìm thấy nhiệm vụ đang hoạt động
+    if qType then
+        ticketQuestState.currentQuestType = qType
+        ticketQuestState.currentQuestTitle = qTitle or ticketQuestState.currentQuestTitle
+        if max and max > 0 then
+            ticketQuestState.targetProgress = max
+        end
+        if cur and cur >= 0 then
+            ticketQuestState.currentProgress = cur
+        end
+
+        local isFinished = (done == true) or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
+        ticketQuestState.isCompleted = isFinished
+
+        if isFinished then
+            ticketQuestState.statusText = string.format("Đã xong (%d/%d)! Sẵn sàng nộp vé tại NPC.", ticketQuestState.currentProgress, ticketQuestState.targetProgress)
+        else
+            ticketQuestState.statusText = string.format("Đang làm: %s (%d/%d)", ticketQuestState.currentQuestTitle, ticketQuestState.currentProgress, ticketQuestState.targetProgress)
+        end
+    else
+        -- 3. Không phát hiện thẻ nhiệm vụ nào trong PlayerGui -> Chưa nhận nhiệm vụ hoặc đang hồi chiêu
+        ticketQuestState.isCompleted = false
+        ticketQuestState.currentQuestType = "none"
+        ticketQuestState.currentProgress = 0
+        ticketQuestState.targetProgress = 100
+
+        if ticketQuestState.isCooldown and ticketQuestState.cooldownEnd > now then
+            local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
+            local mins = math.floor(remain / 60)
+            local secs = remain % 60
+            ticketQuestState.statusText = string.format("Chưa có nhiệm vụ (Đang chờ hồi chiêu %02d:%02d)", mins, secs)
+        elseif isNPCReady then
+            ticketQuestState.statusText = "Chưa nhận nhiệm vụ nào (NPC sẵn sàng dấu ?)"
+        else
+            ticketQuestState.statusText = "Chưa nhận nhiệm vụ nào"
+        end
+    end
+
+    ticketQuestState.UpdateUI()
+    return qType, qTitle, cur, max, done, detectedCd
+end
+
 function ticketQuestState.ResetCooldown()
     ticketQuestState.isCooldown = false
     ticketQuestState.cooldownEnd = 0
@@ -4089,19 +4145,9 @@ function ticketQuestState.Tick()
     if not Config.AutoTicketQuest then return end
     local now = tick()
 
-    -- 0. Kiểm tra xem NPC Ticket Quest đã hồi (hiện dấu ? trên đầu hoặc trong prompt)
+    -- 0. Quét đồng bộ trạng thái và tiến độ nhiệm vụ trước khi thực thi
+    local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.ScanAndUpdateStatus()
     local isNPCReady = ticketQuestState.CheckNPCReady()
-
-    -- 0.1 Quét trạng thái nhiệm vụ và Cooldown hiện tại từ game
-    local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
-
-    -- Đồng bộ thời gian hồi chiêu thực tế của game nếu phát hiện nhãn thời gian từ server
-    if detectedCd and detectedCd > 0 and not isNPCReady then
-        if not ticketQuestState.isCooldown or math.abs((now + detectedCd) - ticketQuestState.cooldownEnd) > 5 then
-            ticketQuestState.isCooldown = true
-            ticketQuestState.cooldownEnd = now + detectedCd
-        end
-    end
 
     -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới)
     if ticketQuestState.isCooldown then
@@ -4340,15 +4386,21 @@ end
 
 task.spawn(function()
     pcall(function() ticketQuestState.LoadSpots() end)
+    -- Quét tức thì ngay khi vừa bật script
+    task.spawn(function()
+        task.wait(0.5)
+        pcall(function() ticketQuestState.ScanAndUpdateStatus() end)
+    end)
     while isRunning do
-        task.wait(1.0)
+        task.wait(1.5)
         if Config.AutoTicketQuest then
             pcall(function()
                 ticketQuestState.Tick()
             end)
-        elseif ticketQuestState.uiCooldown and ticketQuestState.isCooldown then
+        else
+            -- Luôn quét tiến độ nhiệm vụ ngầm theo thời gian thực kể cả khi chưa bật Auto Ticket Quest
             pcall(function()
-                ticketQuestState.UpdateUI()
+                ticketQuestState.ScanAndUpdateStatus()
             end)
         end
     end
@@ -6514,6 +6566,11 @@ createButtonRow(manualCard, "Nộp / Trả Vé Hard Ngay", "Tương tác NPC, m�
         ShowNotification("Nhiệm Vụ Vé", "Đang tương tác NPC nộp vé Hard...", "INFO", 3)
         ticketQuestState.InteractNPC(true)
     end)
+end)
+
+createButtonRow(manualCard, "Quét Lại Tiến Độ Nhiệm Vụ", "Quét ngay lập tức PlayerGui để kiểm tra nhiệm vụ và tiến độ hiện tại", "Quét Ngay", function()
+    ticketQuestState.ScanAndUpdateStatus()
+    ShowNotification("Nhiệm Vụ Vé", tostring(ticketQuestState.statusText), "INFO", 5)
 end)
 
 createButtonRow(manualCard, "Đặt Lại Bộ Đếm & Bỏ Hồi Chiêu", "Reset bộ đếm tiến độ và hủy thời gian chờ 20 phút", "Đặt Lại", function()
