@@ -6310,17 +6310,18 @@ local function IsSkillOnCooldown(sk, fUI)
 end
 
 local function GetFishHealth(fUI)
+    -- 1. Kiểm tra Workspace.Fishes
     local fishID = LocalPlayer:GetAttribute("FishID")
     if fishID and Workspace:FindFirstChild("Fishes") then
         local f = Workspace.Fishes:FindFirstChild(fishID)
         if f then
-            local hpVal = f:FindFirstChild("Health") or f:FindFirstChild("HP") or f:FindFirstChild("FishHealth")
-            if hpVal and (hpVal:IsA("NumberValue") or hpVal:IsA("IntValue")) then
+            local hpVal = f:FindFirstChild("FishHealth") or f:FindFirstChild("Health")
+            if hpVal and (hpVal:IsA("NumberValue") or hpVal:IsA("IntValue")) and hpVal.Value > 0 then
                 return hpVal.Value
             end
             for _, child in ipairs(f:GetChildren()) do
-                if child.Name:find("Health") or child.Name:find("HP") then
-                    if child:IsA("NumberValue") or child:IsA("IntValue") then
+                if (child.Name:find("FishHealth") or child.Name:find("Health")) and not child.Name:find("Player") then
+                    if (child:IsA("NumberValue") or child:IsA("IntValue")) and child.Value > 0 then
                         return child.Value
                     end
                 end
@@ -6328,39 +6329,105 @@ local function GetFishHealth(fUI)
         end
     end
 
+    -- 2. Kiểm tra Attribute trên Character (TUYỆT ĐỐI KHÔNG KIỂM TRA "HP" VÌ ĐÓ LÀ MÁU NGƯỜI CHƠI)
     local char = LocalPlayer.Character
     if char then
-        for _, att in ipairs({"FishHealth", "FishHP", "TargetHealth", "BossHP", "TargetHP", "HP"}) do
+        for _, att in ipairs({"FishHealth", "FishHP", "TargetHealth", "BossHP", "TargetHP"}) do
             local val = char:GetAttribute(att)
-            if val and tonumber(val) then return tonumber(val) end
-        end
-    end
-
-    if fUI then
-        for _, lblName in ipairs({"FishHP", "HPFish", "Health", "HP", "BossHP", "TargetHP", "Value"}) do
-            local d = fUI:FindFirstChild(lblName, true)
-            if d and d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
-                local txt = d.Text
-                -- Xử lý viết tắt dạng 3k / 3.5k HP
-                local kMatch = txt:match("([%d%.]+)%s*[kK]")
-                if kMatch and tonumber(kMatch) then
-                    return tonumber(kMatch) * 1000
-                end
-                local mMatch = txt:match("([%d%.]+)%s*[mM]")
-                if mMatch and tonumber(mMatch) then
-                    return tonumber(mMatch) * 1000000
-                end
-                -- Xử lý chuỗi số có dấu cách ngăn cách (3 000 / 3 000) hoặc dấu phẩy
-                local rawNum = txt:match("([%d%s,%._]+)%s*/") or txt:match("([%d%s,%._]+)")
-                if rawNum then
-                    local cleanNum = rawNum:gsub("[%s,]", "")
-                    if tonumber(cleanNum) then return tonumber(cleanNum) end
-                end
+            if val and tonumber(val) and tonumber(val) > 0 then
+                return tonumber(val)
             end
         end
     end
 
-    return 999999
+    -- 3. Quét trong fUI (PlayerGui.MainGui.Fishing)
+    if fUI then
+        -- ƯU TIÊN 1: Kiểm tra xem có BossFightBar (Thanh chiến đấu của Boss) đang hiện không
+        local isBossFight = false
+        for _, bName in ipairs({"BossFightBar", "BossBar", "BossUI", "BossFrame", "BossProgress", "BossHealth"}) do
+            local bBar = fUI:FindFirstChild(bName, true)
+            if bBar and bBar.Visible then
+                isBossFight = true
+                for _, d in ipairs(bBar:GetDescendants()) do
+                    if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
+                        local txt = d.Text
+                        local kMatch = txt:match("([%d%.]+)%s*[kK]")
+                        if kMatch and tonumber(kMatch) then return tonumber(kMatch) * 1000 end
+                        local mMatch = txt:match("([%d%.]+)%s*[mM]")
+                        if mMatch and tonumber(mMatch) then return tonumber(mMatch) * 1000000 end
+
+                        local slashMatch = txt:match("([%d,%.]+)%s*/")
+                        if slashMatch then
+                            local n = tonumber(slashMatch:gsub("[,]", ""))
+                            if n and n > 0 then return n end
+                        end
+
+                        local numOnly = txt:match("^%s*([%d,%.]+)%s*$")
+                        if numOnly then
+                            local n = tonumber(numOnly:gsub("[,]", ""))
+                            if n and n > 0 and n ~= 100 then return n end
+                        end
+                    end
+                end
+                -- Nếu là Boss nhưng chưa kịp đọc số -> Coi như máu to (> threshold)
+                return 999999
+            end
+        end
+
+        -- ƯU TIÊN 2: Quét nhãn máu cá (LOẠI BỎ TRIỆT ĐỂ HPPlayer và mọi khung thuộc người chơi)
+        for _, d in ipairs(fUI:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
+                local isPlayer = false
+                local p = d
+                while p and p ~= fUI do
+                    local pName = p.Name:lower()
+                    if pName:find("player") or pName == "hpplayer" then
+                        isPlayer = true
+                        break
+                    end
+                    p = p.Parent
+                end
+
+                if not isPlayer then
+                    local dName = d.Name:lower()
+                    local txt = d.Text
+                    local isFishContext = dName:find("fish") or dName:find("target") or dName:find("boss") or dName:find("hp") or dName:find("health") or txt:lower():find("hp")
+
+                    if isFishContext then
+                        local kMatch = txt:match("([%d%.]+)%s*[kK]")
+                        if kMatch and tonumber(kMatch) then return tonumber(kMatch) * 1000 end
+                        local mMatch = txt:match("([%d%.]+)%s*[mM]")
+                        if mMatch and tonumber(mMatch) then return tonumber(mMatch) * 1000000 end
+
+                        local slashMatch = txt:match("([%d,%.]+)%s*/")
+                        if slashMatch then
+                            local n = tonumber(slashMatch:gsub("[,]", ""))
+                            if n and n > 0 then return n end
+                        end
+
+                        local hpSuffixMatch = txt:match("([%d,%.]+)%s*[hH][pP]") or txt:match("[hH][pP]%s*:?%s*([%d,%.]+)")
+                        if hpSuffixMatch then
+                            local n = tonumber(hpSuffixMatch:gsub("[,]", ""))
+                            if n and n > 0 then return n end
+                        end
+
+                        local numOnly = txt:match("^%s*([%d,%.]+)%s*$")
+                        if numOnly then
+                            local n = tonumber(numOnly:gsub("[,]", ""))
+                            if n and n > 0 and n ~= 100 then return n end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Nếu KHÔNG CÓ BossBar và KHÔNG PHẢI Boss -> Đây 100% là Cá Thường (máu chỉ ~10 HP)
+        if not isBossFight then
+            return 10
+        end
+    end
+
+    return 10
 end
 
 local function GetPlayerHealth(fUI)
@@ -6446,6 +6513,23 @@ local function CastSkill(sk)
             vim:SendKeyEvent(true, kCode, false, game)
             task.wait(0.02)
             vim:SendKeyEvent(false, kCode, false, game)
+        end
+    end)
+    pcall(function()
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local fUI = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing")
+        if not fUI then return end
+        for _, d in ipairs(fUI:GetDescendants()) do
+            local dUpper = d.Name:upper()
+            if (dUpper == cleanKey or dUpper:find("SKILL" .. cleanKey) or dUpper:find("SLOT" .. cleanKey) or dUpper:find("BUTTON" .. cleanKey)) then
+                local btn = d:IsA("GuiButton") and d or d:FindFirstChildOfClass("TextButton") or d:FindFirstChildOfClass("ImageButton")
+                if btn and btn.Visible then
+                    if firesignal then
+                        pcall(function() firesignal(btn.MouseButton1Click) end)
+                        pcall(function() firesignal(btn.Activated) end)
+                    end
+                end
+            end
         end
     end)
     comboState.usedTimes[cleanKey] = tick()
@@ -6915,9 +6999,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         if Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" and playerHp <= (Config.EmergencyHealHp or 31) then
                             local hKey = Config.EmergencyHealSkill:match("([ZXCVzxcv])")
                             if hKey then
-                                hKey = hKey:upper()
-                                if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(hKey) end
-                                if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(hKey) end
+                                CastSkill(hKey)
                                 isHealing = true
                             end
                         end
@@ -6925,22 +7007,20 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         if not isHealing then
                             -- BƯỚC 2: PHÂN LOẠI THEO MÁU CÁ
                             local fishHp = GetFishHealth(fUI)
-                            local threshold = Config.FishHpThreshold or 1304
+                            local threshold = Config.FishHpThreshold or 500
 
                             if fishHp <= threshold then
-                                -- Máu cá <= Ngưỡng: Tung chiêu kết liễu và các chiêu dứt điểm nhanh
+                                -- Máu cá <= Ngưỡng (Cá thường / Cá yếu): Tung DUY NHẤT chiêu Bắt Nhanh (V)
                                 if Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" then
                                     local qKey = Config.QuickCatchSkill:match("([ZXCVzxcv])")
                                     if qKey then
-                                        qKey = qKey:upper()
-                                        if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(qKey) end
-                                        if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(qKey) end
+                                        CastSkill(qKey)
                                     end
-                                end
-                                for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
-                                    local lk = k:upper()
-                                    if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(lk) end
-                                    if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(lk) end
+                                else
+                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
+                                        local lk = k:upper()
+                                        CastSkill(lk)
+                                    end
                                 end
                             else
                                 -- Máu cá > Ngưỡng (Cá to / Boss):
@@ -6951,8 +7031,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 if opKey then opKey = opKey:upper() end
 
                                 if opKey and not comboState.openerDone then
-                                    if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(opKey) end
-                                    if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(opKey) end
+                                    CastSkill(opKey)
 
                                     -- Khi icon chiêu mở màn đã vào Cooldown hoặc sau 0.4s đầu -> Hoàn tất Opener
                                     if IsSkillOnCooldown(opKey, fUI) or minigameElapsed >= 0.4 then
@@ -6977,11 +7056,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             checkCount = checkCount + 1
                                         end
 
-                                        -- Bắn xung nhịp chiêu mục tiêu đang sẵn sàng (Server sẽ nuốt ngay khi hoạt ảnh chiêu trước dứt)
+                                        -- Bắn xung nhịp chiêu mục tiêu đang sẵn sàng
                                         local targetSkill = loopKeys[comboState.loopTargetIndex]
                                         if targetSkill and not IsSkillOnCooldown(targetSkill, fUI) then
-                                            if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(targetSkill) end
-                                            if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(targetSkill) end
+                                            CastSkill(targetSkill)
                                         end
                                     end
                                 end
