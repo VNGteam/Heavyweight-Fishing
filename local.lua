@@ -3362,9 +3362,6 @@ createDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy
 createSliderRow(trainCard, "Nhịp Chờ Xuất Chiêu (Cancel Delay)", "Thời gian chờ nhân vật bắt đầu xuất chiêu trước khi cất cần (0.2s - 1.2s)", 0.2, 1.2, Config.TrainCancelDelay or 0.45, true, "s", function(v)
     Config.TrainCancelDelay = v
 end)
-createSliderRow(trainCard, "Thời Gian Hồi Chiêu (Skill CD)", "Giữ cá chờ chiêu hồi xong rồi mới tung (chống xịt chiêu / nhịp có nhịp không)", 1.0, 15.0, Config.TrainSkillCooldown or 5.0, true, "s", function(v)
-    Config.TrainSkillCooldown = v
-end)
 createSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa (mặc định 100 lần)", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
     Config.TrainTargetCount = v
     if infoTrainProgress and infoTrainProgress.Set then
@@ -6763,10 +6760,38 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             local cleanKey = chosenSkill:match("([ZXCVzxcv])") or chosenSkill
                             cleanKey = cleanKey:upper()
 
-                            -- Nhịp 1: Chờ minigame thực sự ổn định (0.9s)
-                            -- Trong lúc chờ, CHỈ tự động giữ cân bằng thanh Bar để cá không tuột (KHÔNG tăng tiến độ câu để tránh bắt cá sớm)
-                            local waitStart = tick()
-                            while isRunning and (tick() - waitStart) < 0.9 do
+                            local initialFishHp = GetFishHealth(fUI)
+                            local castStart = tick()
+
+                            -- 1. BẮN LIÊN TỤC SKILL NHƯ COMBO (Mỗi 0.1s) CHO ĐẾN KHI SKILL ĐƯỢC KÍCH HOẠT
+                            while isRunning and (fUI and fUI.Visible) do
+                                CastSkill(cleanKey)
+
+                                -- Giữ thăng bằng thanh bar ở giữa để cá không tuột
+                                local barFrame = fUI:FindFirstChild("BarFrame")
+                                if barFrame and barFrame:FindFirstChild("Bar") then
+                                    barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                end
+
+                                task.wait(0.1)
+
+                                -- Nhận diện phát hiện chiêu đã xuất ra:
+                                -- A. Icon chiêu chuyển sang Cooldown
+                                -- B. Máu cá bị tụt do dính đòn
+                                -- C. Hoặc đã bắn nhịp liên tục >= 0.8s
+                                local curHp = GetFishHealth(fUI)
+                                local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
+                                local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
+                                local elapsed = tick() - castStart
+
+                                if nowOnCd or hpDropped or (elapsed >= 0.8) then
+                                    break
+                                end
+                            end
+
+                            -- 2. Đợi 0.35s cho nhân vật chém đòn / tung chiêu xong để server ghi nhận
+                            local waitFinish = tick()
+                            while isRunning and (tick() - waitFinish) < 0.35 do
                                 if fUI and fUI.Visible then
                                     local barFrame = fUI:FindFirstChild("BarFrame")
                                     if barFrame and barFrame:FindFirstChild("Bar") then
@@ -6776,67 +6801,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 task.wait(0.05)
                             end
 
-                            -- Nhịp 2: Đảm bảo chiêu đã hồi xong hoàn toàn (chống tình trạng cá cắn nhanh hơn thời gian hồi chiêu gây xịt chiêu)
-                            local defaultCds = { ["Z"] = 4.5, ["X"] = 5.5, ["C"] = 7.5, ["V"] = 8.0 }
-                            local skillCd = tonumber(Config.TrainSkillCooldown) or defaultCds[cleanKey] or 5.0
-                            local lastCast = comboState.usedTimes[cleanKey] or 0
-                            local timeSinceCast = tick() - lastCast
-
-                            -- Nếu lượt trước vừa dùng và chưa đủ thời gian hồi chiêu -> Giữ cá trên cần chờ đúng lúc hồi xong
-                            if timeSinceCast < skillCd then
-                                local cdRemaining = skillCd - timeSinceCast
-                                local cdWaitStart = tick()
-                                while isRunning and (tick() - cdWaitStart) < cdRemaining do
-                                    if fUI and fUI.Visible then
-                                        local barFrame = fUI:FindFirstChild("BarFrame")
-                                        if barFrame and barFrame:FindFirstChild("Bar") then
-                                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                        end
-                                    end
-                                    task.wait(0.1)
-                                end
-                            end
-
-                            -- Nếu giao diện vẫn đang báo Cooldown, tiếp tục giữ cá chờ dứt điểm CD
-                            local uiCdWaitStart = tick()
-                            while isRunning and IsSkillOnCooldown(cleanKey, fUI) and (tick() - uiCdWaitStart) < 8.0 do
-                                if fUI and fUI.Visible then
-                                    local barFrame = fUI:FindFirstChild("BarFrame")
-                                    if barFrame and barFrame:FindFirstChild("Bar") then
-                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                    end
-                                end
-                                task.wait(0.1)
-                            end
-
-                            -- Nhịp 3: Tung chiêu luyện liên tục qua CastSkill cho đến khi chiêu thực sự được thi triển
-                            local initialFishHp = GetFishHealth(fUI)
-                            local pulseStart = tick()
-
-                            while isRunning and (tick() - pulseStart) < 2.0 do
-                                CastSkill(cleanKey)
-
-                                if fUI and fUI.Visible then
-                                    local barFrame = fUI:FindFirstChild("BarFrame")
-                                    if barFrame and barFrame:FindFirstChild("Bar") then
-                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                    end
-                                end
-
-                                task.wait(0.1)
-
-                                -- Kiểm tra xem chiêu đã bắt đầu xuất ra chưa:
-                                local curHp = GetFishHealth(fUI)
-                                local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
-
-                                if nowOnCd or hpDropped or (tick() - pulseStart >= 0.8) then
-                                    break
-                                end
-                            end
-
-                            comboState.usedTimes[cleanKey] = tick()
-
+                            -- 3. Cập nhật số lần đã luyện
                             Config.TrainCurrentCount = Config.TrainCurrentCount + 1
                             if infoTrainProgress and infoTrainProgress.Set then
                                 infoTrainProgress.Set(string.format("%d / %d lần (Vừa cast: %s)", Config.TrainCurrentCount, Config.TrainTargetCount, cleanKey))
@@ -6854,20 +6819,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 return
                             end
 
-                            -- Nhịp 4: Đợi nhân vật thực hiện hoạt ảnh đòn đánh và server ghi nhận điểm (0.6s)
-                            local cancelDelay = tonumber(Config.TrainCancelDelay) or 0.6
-                            local animStart = tick()
-                            while isRunning and (tick() - animStart) < cancelDelay do
-                                if fUI and fUI.Visible then
-                                    local barFrame = fUI:FindFirstChild("BarFrame")
-                                    if barFrame and barFrame:FindFirstChild("Bar") then
-                                        barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                    end
-                                end
-                                task.wait(0.05)
-                            end
-
-                            -- Nhịp 5: Cất cần vào túi (UnequipTools) để hủy cá & đóng minigame ngay lập tức
+                            -- 4. BẤM THÁO CẦN (UnequipTools) ĐỂ HỦY CÁ
                             local rodSlot = "1"
                             local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
                             if pData and pData:FindFirstChild("Hotbar") then
@@ -6886,8 +6838,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 if h then h:UnequipTools() end
                             end)
 
-                            -- Nhịp 6: Đợi 0.3s để server dọn dẹp minigame, sau đó lấy cần ra lại
-                            task.wait(0.3)
+                            -- 5. LẤY CẦN RA LẠI
+                            task.wait(0.25)
                             pcall(function()
                                 if Events and Events:FindFirstChild("ToggleHotbar") then
                                     Events.ToggleHotbar:InvokeServer(rodSlot)
@@ -6901,8 +6853,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
                             end)
 
-                            -- Nhịp 7: Đợi cần cầm lên tay hoàn tất (0.3s) rồi quăng cần xuống nước câu lại ngay
-                            task.wait(0.3)
+                            -- 6. CÂU TIẾP (Quăng cần câu lại ngay)
+                            task.wait(0.25)
                             local c2 = LocalPlayer.Character
                             local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
                             if r2 and Events and Events:FindFirstChild("Fishing") then
@@ -6910,8 +6862,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 lastCastTime = tick()
                             end
 
-                            -- Nhịp 8: Cho phép vòng lặp tiếp theo sau khi đã quăng cần xong
-                            task.wait(0.35)
+                            task.wait(0.3)
                             isTrainingBusy = false
                         end)
                     end
