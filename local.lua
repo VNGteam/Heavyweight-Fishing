@@ -6761,31 +6761,33 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             cleanKey = cleanKey:upper()
 
                             local initialFishHp = GetFishHealth(fUI)
-                            local castStart = tick()
+                            local startTime = tick()
 
-                            -- 1. BẮN LIÊN TỤC SKILL NHƯ COMBO (Mỗi 0.1s) CHO ĐẾN KHI SKILL ĐƯỢC KÍCH HOẠT
+                            -- 1. GIỮ THĂNG BẰNG THANH BAR VÀ CHỜ QUA 3 GIÂY KHÓA CHIÊU CỦA GAME (BẮN SKILL LIÊN TỤC ĐỂ BẮT ĐÚNG NHỊP MỞ)
                             while isRunning and (fUI and fUI.Visible) do
-                                CastSkill(cleanKey)
-
-                                -- Giữ thăng bằng thanh bar ở giữa để cá không tuột
+                                -- Giữ thăng bằng thanh bar ở giữa để cá không bao giờ bị tuột
                                 local barFrame = fUI:FindFirstChild("BarFrame")
                                 if barFrame and barFrame:FindFirstChild("Bar") then
                                     barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                 end
 
-                                task.wait(0.1)
+                                -- Bắn skill liên tục để kích hoạt ngay khoảnh khắc game mở khóa
+                                CastSkill(cleanKey)
 
-                                -- Nhận diện phát hiện chiêu đã xuất ra:
-                                -- A. Icon chiêu chuyển sang Cooldown
-                                -- B. Máu cá bị tụt do dính đòn
-                                -- C. Hoặc đã bắn nhịp liên tục >= 0.8s
-                                local curHp = GetFishHealth(fUI)
-                                local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
-                                local elapsed = tick() - castStart
+                                task.wait(0.08)
 
-                                if nowOnCd or hpDropped or (elapsed >= 0.8) then
-                                    break
+                                local elapsed = tick() - startTime
+
+                                -- TUYỆT ĐỐI KHÔNG ĐƯỢC THOÁT TRƯỚC 3 GIÂY VÌ GAME ĐANG KHÓA CHIÊU
+                                if elapsed >= 3.05 then
+                                    local curHp = GetFishHealth(fUI)
+                                    local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
+                                    local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
+
+                                    -- Sau khi qua 3s: nếu đã tung chiêu thành công hoặc sau thêm 0.8s nữa thì ngắt để cất cần
+                                    if nowOnCd or hpDropped or (elapsed >= 3.8) then
+                                        break
+                                    end
                                 end
                             end
 
