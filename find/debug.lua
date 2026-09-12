@@ -588,10 +588,11 @@ local function CreateInspectorUI()
     -- Window
     local MainFrame = Instance.new("Frame")
     MainFrame.Name = "MainFrame"
-    MainFrame.Size = UDim2.new(0, 780, 0, 520)
-    MainFrame.Position = UDim2.new(0.5, -390, 0.5, -260)
+    MainFrame.Size = UDim2.new(0, 800, 0, 530)
+    MainFrame.Position = UDim2.new(0.5, -400, 0.5, -265)
     MainFrame.BackgroundColor3 = Color3.fromRGB(20, 22, 28)
     MainFrame.BorderSizePixel = 0
+    MainFrame.Active = true
     MainFrame.ClipsDescendants = true
     MainFrame.Parent = ScreenGui
 
@@ -610,6 +611,7 @@ local function CreateInspectorUI()
     Header.Size = UDim2.new(1, 0, 0, 42)
     Header.BackgroundColor3 = Color3.fromRGB(28, 30, 40)
     Header.BorderSizePixel = 0
+    Header.Active = true
     Header.Parent = MainFrame
 
     local Title = Instance.new("TextLabel")
@@ -652,7 +654,7 @@ local function CreateInspectorUI()
 
     local function createTabBtn(text, parent)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 115, 1, 0)
+        btn.Size = UDim2.new(0, 120, 1, 0)
         btn.BackgroundColor3 = Color3.fromRGB(35, 38, 52)
         btn.Font = Enum.Font.GothamSemibold
         btn.Text = text
@@ -683,9 +685,9 @@ local function CreateInspectorUI()
     ControlLayout.Padding = UDim.new(0, 6)
     ControlLayout.Parent = ControlBar
 
-    local function createActionBtn(text, color)
+    local function createActionBtn(text, color, width)
         local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 90, 1, 0)
+        btn.Size = UDim2.new(0, width or 80, 1, 0)
         btn.BackgroundColor3 = color or Color3.fromRGB(45, 50, 70)
         btn.Font = Enum.Font.GothamSemibold
         btn.Text = text
@@ -698,14 +700,14 @@ local function CreateInspectorUI()
         return btn
     end
 
-    local BtnScan = createActionBtn("Scan", Color3.fromRGB(37, 99, 235))
-    local BtnQuestFocus = createActionBtn("⭐ Quest Focus", Color3.fromRGB(234, 88, 12))
-    local BtnTree = createActionBtn("Tree View", Color3.fromRGB(16, 149, 114))
-    local BtnRemoteSpy = createActionBtn("Remote Spy: OFF", Color3.fromRGB(75, 85, 99))
-    local BtnSnapA = createActionBtn("Snap [A]", Color3.fromRGB(59, 130, 246))
-    local BtnSnapB = createActionBtn("Snap [B]", Color3.fromRGB(37, 99, 235))
-    local BtnCompare = createActionBtn("Diff", Color3.fromRGB(147, 51, 234))
-    local BtnCopy = createActionBtn("Copy", Color3.fromRGB(31, 41, 55))
+    local BtnScan = createActionBtn("Scan", Color3.fromRGB(37, 99, 235), 68)
+    local BtnQuestFocus = createActionBtn("⭐ Quest Focus", Color3.fromRGB(234, 88, 12), 118)
+    local BtnTree = createActionBtn("Tree View", Color3.fromRGB(16, 149, 114), 78)
+    local BtnRemoteSpy = createActionBtn("Remote Spy: OFF", Color3.fromRGB(75, 85, 99), 125)
+    local BtnSnapA = createActionBtn("Snap [A]", Color3.fromRGB(59, 130, 246), 68)
+    local BtnSnapB = createActionBtn("Snap [B]", Color3.fromRGB(37, 99, 235), 68)
+    local BtnCompare = createActionBtn("Diff", Color3.fromRGB(147, 51, 234), 58)
+    local BtnCopy = createActionBtn("Copy", Color3.fromRGB(31, 41, 55), 58)
 
     -- Search Bar
     local SearchBarFrame = Instance.new("Frame")
@@ -743,6 +745,7 @@ local function CreateInspectorUI()
     Scroll.ScrollBarThickness = 6
     Scroll.ScrollBarImageColor3 = Color3.fromRGB(60, 65, 85)
     Scroll.AutomaticCanvasSize = Enum.AutomaticSize.XY
+    Scroll.CanvasSize = UDim2.new(0, 0, 0, 0)
     Scroll.Parent = MainFrame
 
     local ScrollCorner = Instance.new("UICorner")
@@ -750,7 +753,7 @@ local function CreateInspectorUI()
     ScrollCorner.Parent = Scroll
 
     local ContentText = Instance.new("TextLabel")
-    ContentText.Size = UDim2.new(1, -16, 0, 0)
+    ContentText.Size = UDim2.new(0, 0, 0, 0)
     ContentText.Position = UDim2.new(0, 8, 0, 8)
     ContentText.BackgroundTransparency = 1
     ContentText.Font = Enum.Font.Code
@@ -760,27 +763,45 @@ local function CreateInspectorUI()
     ContentText.TextXAlignment = Enum.TextXAlignment.Left
     ContentText.TextYAlignment = Enum.TextYAlignment.Top
     ContentText.AutomaticSize = Enum.AutomaticSize.XY
+    ContentText.TextWrapped = false
     ContentText.Parent = Scroll
 
-    -- Window Dragging
-    local dragging, dragInput, dragStart, startPos
+    -- Rock-solid Window Dragging (No stuck drag, no shaking, no jumping)
+    local dragging = false
+    local dragInput = nil
+    local dragStart = nil
+    local startPos = nil
+
     Header.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
             dragging = true
             dragStart = input.Position
             startPos = MainFrame.Position
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then dragging = false end
-            end)
         end
     end)
+
     Header.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end
+        if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+            dragInput = input
+        end
     end)
+
     UserInputService.InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
+        if dragging and input == dragInput then
             local delta = input.Position - dragStart
-            MainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            MainFrame.Position = UDim2.new(
+                startPos.X.Scale,
+                startPos.X.Offset + delta.X,
+                startPos.Y.Scale,
+                startPos.Y.Offset + delta.Y
+            )
+        end
+    end)
+
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            dragInput = nil
         end
     end)
 
