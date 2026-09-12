@@ -208,6 +208,7 @@ local Config = {
     TicketAutoSellFull = true,
     TicketReturnHomeWhenDone = true,
     TicketAutoCastAtHome = true,
+    TicketRemoteClaim = true,
     AutoClaimDaily = false,
     DailyClaimDelay = 0.5,
     
@@ -343,6 +344,7 @@ local ConfigLabelMap = {
     ["Tự Bán Cá Khi Đầy Balo (Vé NV)"] = "TicketAutoSellFull",
     ["Tự Về Home Spot Khi Xong Nhiệm Vụ"] = "TicketReturnHomeWhenDone",
     ["Tự Động Quăng Cần Tại Home Spot"] = "TicketAutoCastAtHome",
+    ["Nhận & Nộp Vé Từ Xa (Remote)"] = "TicketRemoteClaim",
     ["Tự Động Nhận Thưởng Hàng Ngày (Daily)"] = "AutoClaimDaily",
     ["Vòng Quay May Mắn (Auto Gacha)"] = "AutoGacha",
     ["Chọn Vòng Quay Gacha"] = "GachaBanner",
@@ -3474,66 +3476,112 @@ function ticketQuestState.TeleportTo(pos)
     end
 end
 
-function ticketQuestState.InteractNPC()
+function ticketQuestState.InteractNPC(isClaiming)
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
 
+    local prevCFrame = root.CFrame
     local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
     local targetPos = npcPos or ticketQuestState.spotNPC
-    root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-    task.wait(0.35)
 
-    if prompt then
-        TriggerPrompt(prompt)
-    elseif npcModel then
-        for _, d in ipairs(npcModel:GetDescendants()) do
-            if d:IsA("ProximityPrompt") then
-                TriggerPrompt(d)
-                break
+    local function executeInteraction()
+        if prompt then
+            pcall(function()
+                prompt.MaxActivationDistance = math.huge
+                prompt.RequiresLineOfSight = false
+            end)
+            TriggerPrompt(prompt)
+        elseif npcModel then
+            for _, d in ipairs(npcModel:GetDescendants()) do
+                if d:IsA("ProximityPrompt") then
+                    pcall(function()
+                        d.MaxActivationDistance = math.huge
+                        d.RequiresLineOfSight = false
+                    end)
+                    TriggerPrompt(d)
+                    break
+                end
             end
-        end
-    else
-        for _, d in ipairs(Workspace:GetDescendants()) do
-            if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
-                local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
-                if (pPos - root.Position).Magnitude <= 35 then
+        else
+            for _, d in ipairs(Workspace:GetDescendants()) do
+                if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
                     local act = tostring(d.ActionText or ""):lower()
                     local obj = tostring(d.ObjectText or ""):lower()
                     if act:find("ticket") or obj:find("ticket") or act:find("quest") or obj:find("quest") then
+                        pcall(function()
+                            d.MaxActivationDistance = math.huge
+                            d.RequiresLineOfSight = false
+                        end)
                         TriggerPrompt(d)
                         break
                     end
                 end
             end
         end
-    end
 
-    task.wait(0.3)
-    -- Tự động nhấn các nút trong Dialogue/UI nếu có (Accept, Nhận, Take, Hard...)
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if pg then
-        for _, btn in ipairs(pg:GetDescendants()) do
-            if btn:IsA("TextButton") and btn.Visible then
-                local t = tostring(btn.Text or ""):lower()
-                if t:find("accept") or t:find("nhận") or t:find("take") or t == "hard" or t:find("yes") or t:find("đồng ý") then
-                    pcall(function()
-                        if firesignal then
-                            firesignal(btn.Activated)
-                            firesignal(btn.MouseButton1Click)
-                        elseif getconnections then
-                            for _, c in ipairs(getconnections(btn.Activated or btn.MouseButton1Click)) do
-                                c:Fire()
+        task.wait(0.25)
+        -- Tự động nhấn các nút trong Dialogue/UI nếu có (Accept, Nhận, Take, Hard...)
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        if pg then
+            for _, btn in ipairs(pg:GetDescendants()) do
+                if btn:IsA("TextButton") and btn.Visible then
+                    local t = tostring(btn.Text or ""):lower()
+                    if t:find("accept") or t:find("nhận") or t:find("take") or t == "hard" or t:find("yes") or t:find("đồng ý") then
+                        pcall(function()
+                            if firesignal then
+                                firesignal(btn.Activated)
+                                firesignal(btn.MouseButton1Click)
+                            elseif getconnections then
+                                for _, c in ipairs(getconnections(btn.Activated or btn.MouseButton1Click)) do
+                                    c:Fire()
+                                end
                             end
-                        end
-                    end)
+                        end)
+                    end
                 end
             end
         end
+
+        if Events and Events:FindFirstChild("ClaimQuest") then
+            Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
+        end
     end
 
-    if Events and Events:FindFirstChild("ClaimQuest") then
-        Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
+    if Config.TicketRemoteClaim then
+        -- 1. Thử nhận/nộp từ xa mà KHÔNG dịch chuyển người chơi (Zero-Movement Remote)
+        executeInteraction()
+        task.wait(0.5)
+
+        -- Kiểm tra xem đã nhận hoặc nộp thành công chưa
+        local qType, _, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
+        local success = false
+        if isClaiming then
+            if detectedCd or qType == nil or qType == "none" then
+                success = true
+            end
+        else
+            if qType and qType ~= "none" then
+                success = true
+            end
+        end
+
+        if success then
+            -- Thành công từ xa 100%! Nhân vật đứng yên tại bãi câu không xê dịch!
+            return
+        end
+
+        -- 2. Nếu server Roblox bắt buộc khoảng cách vật lý: Thực hiện Chớp Nhoáng (Blink)
+        -- Bay tới NPC trong 0.15s để server ghi nhận vị trí -> kích hoạt -> trả về vị trí cũ ngay lập tức!
+        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+        task.wait(0.15)
+        executeInteraction()
+        task.wait(0.15)
+        root.CFrame = prevCFrame
+    else
+        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
+        task.wait(0.35)
+        executeInteraction()
     end
 end
 
@@ -3961,12 +4009,12 @@ function ticketQuestState.Tick()
         end
     end
 
-    -- 2. Đã hoàn thành nhiệm vụ -> Trả vé tại NPC
+    -- 2. Đã hoàn thành nhiệm vụ -> Trả vé tại NPC (từ xa hoặc chớp nhoáng)
     if ticketQuestState.isCompleted or done then
-        ticketQuestState.statusText = "Đã xong nhiệm vụ! Đang trả vé Hard..."
+        ticketQuestState.statusText = "Đã xong nhiệm vụ! Đang nộp vé Hard..."
         ticketQuestState.UpdateUI()
-        ticketQuestState.InteractNPC()
-        task.wait(0.8)
+        ticketQuestState.InteractNPC(true)
+        task.wait(0.5)
         if Events and Events:FindFirstChild("ClaimQuest") then
             Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
         end
@@ -4007,16 +4055,16 @@ function ticketQuestState.Tick()
         ticketQuestState.UpdateUI()
     end
 
-    -- 4. Chưa có quest nào (currentQuestType == "none") -> Đến NPC nhận vé (Giãn cách 12s tránh spam teleport)
+    -- 4. Chưa có quest nào (currentQuestType == "none") -> Đến NPC nhận vé (Giãn cách 10s tránh spam teleport)
     if ticketQuestState.currentQuestType == "none" then
-        if now - ticketQuestState.lastNpcInteract >= 12.0 then
+        if now - ticketQuestState.lastNpcInteract >= 10.0 then
             ticketQuestState.lastNpcInteract = now
-            ticketQuestState.statusText = "Đang đến NPC Ticket Quest nhận vé Hard..."
+            ticketQuestState.statusText = "Đang nhận vé Hard (từ xa)..."
             ticketQuestState.UpdateUI()
-            ticketQuestState.InteractNPC()
+            ticketQuestState.InteractNPC(false)
 
             -- Thử quét lại ngay lập tức sau khi tương tác NPC
-            task.wait(1.0)
+            task.wait(0.8)
             local freshType, freshTitle, freshCur, freshMax, freshDone = ticketQuestState.DetectActiveQuest()
             if freshType then
                 ticketQuestState.currentQuestType = freshType
@@ -4028,16 +4076,20 @@ function ticketQuestState.Tick()
                 ticketQuestState.statusText = "Đang làm: " .. ticketQuestState.currentQuestTitle
                 ticketQuestState.UpdateUI()
 
-                -- Dịch chuyển ngay tới điểm câu tương ứng
+                -- Dịch chuyển tới điểm câu nếu chưa đứng ở đó
+                local targetSpot = ticketQuestState.spot100Fish
                 if freshType == "fish_15m" then
-                    ticketQuestState.TeleportTo(ticketQuestState.spot15MFish)
+                    targetSpot = ticketQuestState.spot15MFish
                 elseif freshType == "bait_100" then
-                    ticketQuestState.TeleportTo(ticketQuestState.spot100Bait or ticketQuestState.spot100Fish)
-                else
-                    ticketQuestState.TeleportTo(ticketQuestState.spot100Fish)
+                    targetSpot = ticketQuestState.spot100Bait or ticketQuestState.spot100Fish
+                end
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root and targetSpot and (root.Position - targetSpot).Magnitude > 35 then
+                    ticketQuestState.TeleportTo(targetSpot)
                 end
             else
-                ticketQuestState.statusText = "Đã nhận vé từ NPC, đang chờ hệ thống cập nhật nhiệm vụ..."
+                ticketQuestState.statusText = "Đã gửi lệnh nhận vé, đang chờ hệ thống cập nhật nhiệm vụ..."
                 ticketQuestState.UpdateUI()
             end
         end
@@ -6276,20 +6328,20 @@ createToggleRow(optionCard, "Tự Quăng Cần & Đánh Combo Tại Home Spot", 
     Config.TicketAutoCastAtHome = v
 end)
 
+createToggleRow(optionCard, "Nhận & Nộp Vé Từ Xa (Remote)", "Đứng yên tại chỗ câu để nhận và nộp vé Hard từ xa (không cần bay về NPC)", Config.TicketRemoteClaim, function(v)
+    Config.TicketRemoteClaim = v
+end)
+
 createCategoryHeader(tabQuests, "⚡ Thao Tác Nhanh Bằng Tay")
 local manualCard = createCardGroup(tabQuests)
 
-createButtonRow(manualCard, "Nhận Vé Hard Ngay", "Bay đến NPC và nhận nhiệm vụ Hard lập tức", "Nhận Hard", function()
-    ticketQuestState.InteractNPC()
-    ShowNotification("Nhiệm Vụ Vé", "Đang tương tác NPC nhận vé Hard...", "SUCCESS")
+createButtonRow(manualCard, "Nhận Vé Hard Ngay", "Nhận nhiệm vụ Hard từ xa hoặc tương tác NPC", "Nhận Hard", function()
+    ticketQuestState.InteractNPC(false)
+    ShowNotification("Nhiệm Vụ Vé", "Đang gửi lệnh nhận vé Hard...", "SUCCESS")
 end)
 
-createButtonRow(manualCard, "Nộp / Trả Vé Hard Ngay", "Bay đến NPC và nộp nhiệm vụ Hard lập tức", "Nộp Hard", function()
-    ticketQuestState.InteractNPC()
-    task.wait(0.5)
-    if Events and Events:FindFirstChild("ClaimQuest") then
-        Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
-    end
+createButtonRow(manualCard, "Nộp / Trả Vé Hard Ngay", "Nộp nhiệm vụ Hard từ xa hoặc tương tác NPC", "Nộp Hard", function()
+    ticketQuestState.InteractNPC(true)
     ShowNotification("Nhiệm Vụ Vé", "Đã gửi lệnh nộp vé Hard!", "SUCCESS")
 end)
 
