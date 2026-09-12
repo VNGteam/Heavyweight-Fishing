@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "152762e"
+local SCRIPT_BUILD_COMMIT = "6dbbbf7"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -6352,12 +6352,6 @@ createButtonRow(spotCard, "Bay Đến Điểm Câu 100 Con", "Dịch chuyển t�
     ticketQuestState.TeleportTo(ticketQuestState.spot100Fish)
     ShowNotification("Dịch Chuyển", "Đã bay đến điểm câu 100 con!", "SUCCESS")
 end)
-createButtonRow(spotCard, "Đặt Lại Mặc Định (Map 1 - Spawn)", "Khôi phục tọa độ gốc của Đảo Khởi Đầu", "Đặt Lại", function()
-    ticketQuestState.spot100Fish = Vector3.new(-200.7, 11.1, 35.9)
-    ticketQuestState.SaveSpots()
-    ticketQuestState.UpdateUI()
-    ShowNotification("Vị Trí Nhiệm Vụ", "Đã đặt lại điểm câu 100 con về Map 1!", "SUCCESS")
-end)
 
 ticketQuestState.ui100BaitSpot = createInfoRow(spotCard, "Điểm Tiêu Thụ 100 Mồi (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot100Bait.X, ticketQuestState.spot100Bait.Y, ticketQuestState.spot100Bait.Z))
 createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Mồi", "Gán vị trí bạn đang đứng làm nơi câu tiêu thụ 100 mồi", "Lấy Vị Trí", function()
@@ -6374,12 +6368,6 @@ createButtonRow(spotCard, "Bay Đến Điểm 100 Mồi", "Dịch chuyển tức
     ticketQuestState.TeleportTo(ticketQuestState.spot100Bait)
     ShowNotification("Dịch Chuyển", "Đã bay đến điểm 100 mồi!", "SUCCESS")
 end)
-createButtonRow(spotCard, "Đặt Lại Mặc Định Điểm 100 Mồi", "Khôi phục tọa độ điểm 100 mồi về Đảo Khởi Đầu", "Đặt Lại", function()
-    ticketQuestState.spot100Bait = Vector3.new(-200.7, 11.1, 35.9)
-    ticketQuestState.SaveSpots()
-    ticketQuestState.UpdateUI()
-    ShowNotification("Vị Trí Nhiệm Vụ", "Đã đặt lại điểm 100 mồi về Map 1!", "SUCCESS")
-end)
 
 ticketQuestState.ui15MSpot = createInfoRow(spotCard, "Điểm Câu 1.5M (Map 9)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot15MFish.X, ticketQuestState.spot15MFish.Y, ticketQuestState.spot15MFish.Z))
 createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 1.5M", "Gán vị trí bạn đang đứng làm nơi câu cá 1.5M+", "Lấy Vị Trí", function()
@@ -6395,12 +6383,6 @@ end)
 createButtonRow(spotCard, "Bay Đến Điểm Câu 1.5M", "Dịch chuyển tức thì đến điểm câu cá 1.5M+ đã cài", "Bay Đến", function()
     ticketQuestState.TeleportTo(ticketQuestState.spot15MFish)
     ShowNotification("Dịch Chuyển", "Đã bay đến điểm câu 1.5M!", "SUCCESS")
-end)
-createButtonRow(spotCard, "Đặt Lại Mặc Định (Map 9 - Battlefield)", "Khôi phục tọa độ gốc của Đảo Chiến Trường", "Đặt Lại", function()
-    ticketQuestState.spot15MFish = Vector3.new(1393.5, 11.3, 169.6)
-    ticketQuestState.SaveSpots()
-    ticketQuestState.UpdateUI()
-    ShowNotification("Vị Trí Nhiệm Vụ", "Đã đặt lại điểm câu 1.5M về Map 9!", "SUCCESS")
 end)
 
 ticketQuestState.uiNPCSpot = createInfoRow(spotCard, "Vị Trí NPC Ticket Quest (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spotNPC.X, ticketQuestState.spotNPC.Y, ticketQuestState.spotNPC.Z))
@@ -6485,10 +6467,6 @@ end)
 createButtonRow(manualCard, "Quét Lại Tiến Độ Nhiệm Vụ", "Quét ngay lập tức PlayerGui để kiểm tra nhiệm vụ và tiến độ hiện tại", "Quét Ngay", function()
     ticketQuestState.ScanAndUpdateStatus()
     ShowNotification("Nhiệm Vụ Vé", tostring(ticketQuestState.statusText), "INFO", 5)
-end)
-
-createButtonRow(manualCard, "Đặt Lại Bộ Đếm & Bỏ Hồi Chiêu", "Reset bộ đếm tiến độ và hủy thời gian chờ 20 phút", "Đặt Lại", function()
-    ticketQuestState.ResetCooldown()
 end)
 
 createCategoryHeader(tabQuests, "Điểm Danh & Nhiệm Vụ Hàng Ngày")
