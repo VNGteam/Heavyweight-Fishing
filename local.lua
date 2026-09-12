@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "c9a8283"
+local SCRIPT_BUILD_COMMIT = "a40c045"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3393,67 +3393,53 @@ function ticketQuestState.UpdateUI()
     end
 end
 
+ticketQuestState.cachedNPCModel = nil
+ticketQuestState.cachedNPCPos = nil
+ticketQuestState.cachedNPCPrompt = nil
+ticketQuestState.lastNPCSearch = 0
+
 function ticketQuestState.FindTicketNPC()
-    local candidates = {}
-    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns", "Map", "Islands", "Workspace"}) do
-        local folder = (fName == "Workspace") and Workspace or Workspace:FindFirstChild(fName)
-        if folder then table.insert(candidates, folder) end
+    if ticketQuestState.cachedNPCModel and ticketQuestState.cachedNPCModel.Parent and ticketQuestState.cachedNPCPos then
+        return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt
     end
 
-    -- 1. Quét tìm qua BillboardGui "Ticket Quest" hoặc Model có tên Ticket/Giver
-    for _, folder in ipairs(candidates) do
-        for _, inst in ipairs(folder:GetDescendants()) do
-            if inst:IsA("BillboardGui") then
-                local bName = inst.Name:lower()
-                local isTicket = bName:find("ticket")
-                if not isTicket then
-                    for _, l in ipairs(inst:GetDescendants()) do
-                        if l:IsA("TextLabel") and l.Text:lower():find("ticket") then
-                            isTicket = true
-                            break
-                        end
-                    end
-                end
-                if isTicket then
-                    local model = inst:FindFirstAncestorOfClass("Model") or inst.Parent
-                    local pos = (model:IsA("Model") and model:GetPivot().Position) or (model:IsA("BasePart") and model.Position)
-                    local p = model and model:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    if model and pos then
-                        ticketQuestState.spotNPC = pos
-                        return model, pos, p
-                    end
-                end
-            elseif inst:IsA("Model") then
+    local now = tick()
+    if now - (ticketQuestState.lastNPCSearch or 0) < 15.0 and ticketQuestState.cachedNPCPos then
+        return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt
+    end
+    ticketQuestState.lastNPCSearch = now
+
+    -- 1. Tìm trong các folder NPC / Spawns / Entities (chỉ GetChildren, cực nhẹ)
+    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns"}) do
+        local folder = Workspace:FindFirstChild(fName)
+        if folder then
+            for _, inst in ipairs(folder:GetChildren()) do
                 local n = inst.Name:lower()
-                if n:find("ticket") and (n:find("quest") or n:find("npc") or n:find("ve") or n:find("giver")) then
-                    local cf = inst:GetPivot()
+                if n:find("ticket") or n:find("giver") then
+                    local cf = inst:IsA("Model") and inst:GetPivot() or inst.CFrame
                     local p = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
+                    ticketQuestState.cachedNPCModel = inst
+                    ticketQuestState.cachedNPCPos = cf.Position
+                    ticketQuestState.cachedNPCPrompt = p
                     ticketQuestState.spotNPC = cf.Position
                     return inst, cf.Position, p
-                end
-            elseif inst:IsA("ProximityPrompt") then
-                local act = tostring(inst.ActionText or ""):lower()
-                local obj = tostring(inst.ObjectText or ""):lower()
-                local pName = inst.Parent and inst.Parent.Name:lower() or ""
-                if (act:find("ticket") or obj:find("ticket") or pName:find("ticket")) or (act:find("talk") and (obj:find("ticket") or pName:find("ticket") or pName:find("giver"))) then
-                    local pPos = inst.Parent:IsA("BasePart") and inst.Parent.Position or inst.Parent:GetPivot().Position
-                    local model = inst:FindFirstAncestorOfClass("Model") or inst.Parent
-                    ticketQuestState.spotNPC = pPos
-                    return model, pPos, inst
                 end
             end
         end
     end
 
-    -- 2. Quét tìm ProximityPrompt trong bán kính 30 studs quanh spotNPC
-    if ticketQuestState.spotNPC then
-        for _, p in ipairs(Workspace:GetDescendants()) do
-            if p:IsA("ProximityPrompt") then
-                local pPos = (p.Parent:IsA("BasePart") and p.Parent.Position) or (p.Parent:IsA("Model") and p.Parent:GetPivot().Position)
-                if pPos and (pPos - ticketQuestState.spotNPC).Magnitude <= 30 then
-                    local model = p:FindFirstAncestorOfClass("Model") or p.Parent
-                    return model, pPos, p
-                end
+    -- 2. Tìm trong direct children của Workspace (chỉ duyệt con cấp 1, TUYỆT ĐỐI KHÔNG GetDescendants toàn bộ Workspace)
+    for _, inst in ipairs(Workspace:GetChildren()) do
+        if inst:IsA("Model") then
+            local n = inst.Name:lower()
+            if n:find("ticket") and (n:find("quest") or n:find("giver") or n:find("npc")) then
+                local cf = inst:GetPivot()
+                local p = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
+                ticketQuestState.cachedNPCModel = inst
+                ticketQuestState.cachedNPCPos = cf.Position
+                ticketQuestState.cachedNPCPrompt = p
+                ticketQuestState.spotNPC = cf.Position
+                return inst, cf.Position, p
             end
         end
     end
@@ -3463,53 +3449,26 @@ end
 
 function ticketQuestState.CheckNPCReady()
     local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
-    if not npcModel and not prompt and not ticketQuestState.spotNPC then return false end
-
-    -- 1. Kiểm tra trong prompt của NPC
-    if prompt then
-        local act = tostring(prompt.ActionText or "")
-        local obj = tostring(prompt.ObjectText or "")
-        if act:find("%?") or obj:find("%?") then
-            return true
-        end
-    end
-
-    -- 2. Kiểm tra các BillboardGui, TextLabel, Decal, SurfaceGui gắn trên đầu NPC
     local targetInst = npcModel or (prompt and prompt.Parent)
-    if not targetInst and ticketQuestState.spotNPC then
-        for _, obj in ipairs(Workspace:GetDescendants()) do
-            if obj:IsA("BillboardGui") and obj.Enabled then
-                local parentPos = (obj.Parent:IsA("BasePart") and obj.Parent.Position) or (obj.Parent:IsA("Model") and obj.Parent:GetPivot().Position)
-                if parentPos and (parentPos - ticketQuestState.spotNPC).Magnitude <= 15 then
-                    targetInst = obj.Parent
-                    break
-                end
+    if not targetInst then return false end
+
+    -- Chỉ kiểm tra trong chính Model của NPC (chỉ vài Part con, cực nhẹ 0ms)
+    pcall(function()
+        if prompt then
+            local act = tostring(prompt.ActionText or "")
+            local obj = tostring(prompt.ObjectText or "")
+            if act:find("%?") or obj:find("%?") then
+                return true
             end
         end
-    end
+    end)
 
-    if targetInst then
-        for _, d in ipairs(targetInst:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Visible then
-                local txt = tostring(d.Text or "")
-                if txt:find("%?") then
-                    return true
-                end
-            elseif d:IsA("BillboardGui") and d.Enabled then
-                for _, sub in ipairs(d:GetDescendants()) do
-                    if sub:IsA("TextLabel") and sub.Visible and tostring(sub.Text or ""):find("%?") then
-                        return true
-                    end
-                end
-            elseif d:IsA("Decal") or d:IsA("Texture") then
-                local n = d.Name:lower()
-                local tex = tostring(d.Texture or ""):lower()
-                if n:find("question") or tex:find("question") or tex:find("%?") then
-                    return true
-                end
-            elseif d:IsA("MeshPart") or d:IsA("Part") then
-                local n = d.Name:lower()
-                if n == "?" or n:find("question") then
+    for _, d in ipairs(targetInst:GetDescendants()) do
+        if d:IsA("TextLabel") and d.Visible and tostring(d.Text or ""):find("%?") then
+            return true
+        elseif d:IsA("BillboardGui") and d.Enabled then
+            for _, sub in ipairs(d:GetDescendants()) do
+                if sub:IsA("TextLabel") and sub.Visible and tostring(sub.Text or ""):find("%?") then
                     return true
                 end
             end
@@ -3767,348 +3726,119 @@ function ticketQuestState.DetectActiveQuest()
         detectedMax = 100
     end
 
-    -- 2. Quét PlayerGui (Kể cả khi khung Quest đang đóng/ẩn)
+    -- 2. Quét nhanh PlayerGui tìm đúng Thẻ Ticket Quest
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
-        -- 2A. Quét chính xác cấu trúc Thẻ "Hard Ticket Quest" như trong ảnh người dùng gửi
         for _, lbl in ipairs(pg:GetDescendants()) do
             if lbl:IsA("TextLabel") or lbl:IsA("TextButton") then
                 local txt = cleanStr(lbl.Text)
                 local lower = txt:lower()
 
-                if lower:find("hard ticket quest") or (lower:find("ticket") and lower:find("quest")) then
-                    -- Quét mô tả ngay trong chính nhãn này nếu có
-                    local c, m = txt:match("(%d+)%s*/%s*(%d+)")
-                    if c and m then
-                        detectedCur = tonumber(c) or 0
-                        detectedMax = tonumber(m) or 0
-                        if detectedCur >= detectedMax and detectedMax > 0 then isDone = true end
-                        detectedTitle = txt
-                    end
-
-                    -- Quét các nhãn con/anh em trong cùng khung thẻ (Card Frame)
+                -- Thẻ Ticket Quest trong game luôn có tiêu đề "Hard Ticket Quest" hoặc "Ticket Quest"
+                if lower:find("hard ticket quest") or lower:find("easy ticket quest") or (lower:find("ticket") and lower:find("quest")) then
                     local card = lbl.Parent
                     if card then
+                        -- Kiểm tra nếu ngay trên nhãn tiêu đề có chứa tiến độ (VD: "Hard Ticket Quest (41/100)")
+                        local c, m = txt:match("(%d+)%s*/%s*(%d+)")
+                        if c and m then
+                            detectedCur = tonumber(c) or 0
+                            detectedMax = tonumber(m) or 0
+                        end
+
+                        -- Quét các nhãn con trong Card Frame này để lấy TÊN và TIẾN ĐỘ CHÍNH XÁC
                         for _, sibling in ipairs(card:GetDescendants()) do
                             if (sibling:IsA("TextLabel") or sibling:IsA("TextButton")) and sibling ~= lbl then
                                 local subTxt = cleanStr(sibling.Text)
                                 local subLower = subTxt:lower()
 
+                                -- Bắt dòng tiến độ: ví dụ "Use any skill for 100 times (41/100)"
                                 local sc, sm = subTxt:match("(%d+)%s*/%s*(%d+)")
                                 if sc and sm then
                                     detectedCur = tonumber(sc) or 0
                                     detectedMax = tonumber(sm) or 0
-                                    if detectedCur >= detectedMax and detectedMax > 0 then isDone = true end
-                                    detectedTitle = subTxt
 
-                                    -- Phân loại quest theo nội dung text trong ảnh
-                                    if subLower:find("skill") or subLower:find("chiêu") or subLower:find("kỹ năng") then
-                                        detectedType = "skill_100"
-                                    elseif subLower:find("bait") or subLower:find("mồi") then
-                                        detectedType = "bait_100"
-                                    elseif subLower:find("1.5") or subLower:find("1,500") or subLower:find("1500") or subLower:find("heavy") then
-                                        detectedType = "fish_15m"
-                                    elseif subLower:find("fish") or subLower:find("cá") or subLower:find("catch") or subLower:find("bắt") then
-                                        detectedType = "fish_100"
-                                    else
-                                        if detectedMax == 10 then
-                                            detectedType = "fish_15m"
-                                        else
-                                            detectedType = "fish_100"
-                                        end
+                                    -- Tách lấy đúng TÊN nhiệm vụ thực tế từ game (bỏ phần đuôi tiến độ "(41/100)")
+                                    local nameOnly = subTxt:gsub("%s*%(%d+%s*/%s*%d+%)%s*", ""):match("^%s*(.-)%s*$")
+                                    if nameOnly and #nameOnly > 0 and not nameOnly:lower():find("ticket quest") then
+                                        detectedTitle = nameOnly
                                     end
-                                    break
+                                elseif not subLower:find("ticket") and not subLower:find("quest") and #subTxt > 0 then
+                                    if not detectedTitle or detectedTitle == "" then
+                                        detectedTitle = subTxt
+                                    end
+                                end
+
+                                if subLower:find("completed") or subLower:find("hoàn thành") or subLower:find("yuppie") then
+                                    isDone = true
                                 end
                             end
                         end
-                    end
 
-                    if detectedType then break end
-                end
-            end
-        end
-
-        -- 2B. Quét theo cụm Container (Frames/Billboard/ScreenGui) chứa từ khóa Quest/Ticket (Kể cả khi đóng)
-        if not detectedType then
-            local questContainers = {}
-            for _, obj in ipairs(pg:GetDescendants()) do
-                if obj:IsA("GuiObject") or obj:IsA("ScreenGui") or obj:IsA("BillboardGui") then
-                    local oName = obj.Name:lower()
-                    if oName:find("ticket") or oName:find("quest") or oName:find("task") or oName:find("mission") then
-                        table.insert(questContainers, obj)
-                    end
-                end
-            end
-
-            for _, container in ipairs(questContainers) do
-                local combinedText = ""
-                local containerCur = 0
-                local containerMax = 0
-                local containerDone = false
-
-                for _, d in ipairs(container:GetDescendants()) do
-                    if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
-                        local raw = cleanStr(d.Text)
-                        if #raw > 0 then
-                            combinedText = combinedText .. " " .. raw
-
-                            local c, m = raw:match("(%d+)%s*/%s*(%d+)")
-                            if c and m then
-                                local cN = tonumber(c) or 0
-                                local mN = tonumber(m) or 0
-                                if mN > 0 and (containerMax == 0 or mN >= containerMax) then
-                                    containerCur = cN
-                                    containerMax = mN
-                                    if cN >= mN then containerDone = true end
-                                end
-                            end
-
-                            local lowD = raw:lower()
-                            if lowD:find("claim") or lowD:find("completed") or lowD:find("hoàn thành") then
-                                containerDone = true
-                            end
-                        end
-                    end
-                end
-
-                local lowComb = combinedText:lower()
-                if #lowComb > 0 and (lowComb:find("ticket") or lowComb:find("hard") or containerMax == 10 or containerMax == 100) then
-                    -- Kiểm tra thời gian hồi chiêu
-                    if lowComb:find("cooldown") or lowComb:find("wait") or lowComb:find("chờ") or lowComb:find("next") then
-                        local m, s = combinedText:match("(%d+)%s*:%s*(%d+)")
-                        if m and s then
-                            local total = (tonumber(m) or 0) * 60 + (tonumber(s) or 0)
-                            if total > 0 and total <= 1800 then detectedCooldownSec = total end
-                        end
-                    end
-
-                    if not detectedType or mode == "Tự Động (Auto Detect)" then
-                        if lowComb:find("1.5") or lowComb:find("1,500,000") or lowComb:find("1500000") or lowComb:find("heavy") or containerMax == 10 then
-                            detectedType = "fish_15m"
-                            detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                            if containerMax == 0 then containerMax = 10 end
-                        elseif lowComb:find("bait") or lowComb:find("mồi") then
-                            detectedType = "bait_100"
-                            detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                            if containerMax == 0 then containerMax = 100 end
-                        elseif lowComb:find("skill") or lowComb:find("chiêu") or lowComb:find("kỹ năng") then
+                        -- Phân loại kiểu nhiệm vụ để bot biết vị trí câu/cách làm
+                        local titleLow = (detectedTitle or txt):lower()
+                        if titleLow:find("skill") or titleLow:find("chiêu") or titleLow:find("kỹ năng") then
                             detectedType = "skill_100"
-                            detectedTitle = "Dùng kỹ năng 100 lần"
-                            if containerMax == 0 then containerMax = 100 end
-                        elseif (lowComb:find("fish") or lowComb:find("cá") or lowComb:find("catch") or lowComb:find("bắt")) or containerMax == 100 then
+                            if detectedMax == 0 then detectedMax = 100 end
+                        elseif titleLow:find("bait") or titleLow:find("mồi") then
+                            detectedType = "bait_100"
+                            if detectedMax == 0 then detectedMax = 100 end
+                        elseif titleLow:find("1.5") or titleLow:find("1,500") or titleLow:find("1500") or titleLow:find("heavy") or detectedMax == 10 then
+                            detectedType = "fish_15m"
+                            if detectedMax == 0 then detectedMax = 10 end
+                        elseif titleLow:find("fish") or titleLow:find("cá") or titleLow:find("catch") or titleLow:find("bắt") or detectedMax == 100 then
                             detectedType = "fish_100"
-                            detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                            if containerMax == 0 then containerMax = 100 end
-                        elseif containerMax > 0 then
-                            detectedType = "fish_100"
-                            detectedTitle = "Nhiệm Vụ Vé (" .. containerMax .. ")"
-                        end
-                    end
-
-                    if containerCur > detectedCur then detectedCur = containerCur end
-                    if containerMax > detectedMax then detectedMax = containerMax end
-                    if containerDone then isDone = true end
-                    if detectedType then break end
-                end
-            end
-        end
-
-        -- 2C. Quét toàn bộ TextLabel đơn lẻ (Không phân biệt ẩn/hiện)
-        if not detectedType then
-            for _, d in ipairs(pg:GetDescendants()) do
-                if d:IsA("TextLabel") or d:IsA("TextButton") then
-                    local txt = cleanStr(d.Text)
-                    if #txt > 0 then
-                        local lower = txt:lower()
-
-                        -- Quét Cooldown từ text
-                        if (lower:find("ticket") or lower:find("quest")) and (lower:find("cooldown") or lower:find("wait") or lower:find("chờ")) then
-                            local m, s = txt:match("(%d+)%s*:%s*(%d+)")
-                            if m and s then
-                                local total = (tonumber(m) or 0) * 60 + (tonumber(s) or 0)
-                                if total > 0 and total <= 1800 then detectedCooldownSec = total end
-                            end
+                            if detectedMax == 0 then detectedMax = 100 end
+                        else
+                            if detectedMax == 10 then detectedType = "fish_15m" else detectedType = "fish_100" end
                         end
 
-                        local cur, max = txt:match("(%d+)%s*/%s*(%d+)")
-                        if cur and max then
-                            local cNum = tonumber(cur) or 0
-                            local mNum = tonumber(max) or 0
-                            if mNum == 10 or mNum == 100 then
-                                if mNum == 10 then
-                                    detectedType = "fish_15m"
-                                    detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                                    detectedMax = 10
-                                elseif mNum == 100 then
-                                    if lower:find("skill") or lower:find("chiêu") or lower:find("kỹ năng") then
-                                        detectedType = "skill_100"
-                                        detectedTitle = "Dùng kỹ năng 100 lần"
-                                    elseif lower:find("bait") or lower:find("mồi") then
-                                        detectedType = "bait_100"
-                                        detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                                    else
-                                        detectedType = "fish_100"
-                                        detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                                    end
-                                    detectedMax = 100
-                                end
-
-                                if cNum > detectedCur then detectedCur = cNum end
-                                if mNum > detectedMax then detectedMax = mNum end
-                                if cNum >= mNum and mNum > 0 then isDone = true end
-                                break
-                            end
+                        if not detectedTitle or detectedTitle == "" then
+                            detectedTitle = (detectedType == "skill_100" and "Use any skill for 100 times")
+                                or (detectedType == "bait_100" and "Consume 100 bait")
+                                or (detectedType == "fish_15m" and "Catch 10 fish over 1.5M")
+                                or "Catch 100 fish"
                         end
+
+                        if detectedMax > 0 and detectedCur >= detectedMax then
+                            isDone = true
+                        end
+
+                        -- TRẢ VỀ NGAY LẬP TỨC khi tìm thấy thẻ Ticket Quest (Tuyệt đối không quét lan sang các UI khác gây lag & sai số)
+                        return detectedType, detectedTitle, detectedCur, detectedMax, isDone, nil
                     end
                 end
             end
         end
     end
 
-    -- 3. Quét pData & LocalPlayer Attributes làm fallback
-    for attrName, attrVal in pairs(LocalPlayer:GetAttributes()) do
-        local n = tostring(attrName):lower()
-        local v = tostring(attrVal):lower()
-        if n:find("ticket") or n:find("quest") or v:find("ticket") or v:find("quest") then
-            if not detectedType then
-                if v:find("skill") or n:find("skill") then
-                    detectedType = "skill_100"
-                    detectedTitle = "Dùng kỹ năng 100 lần"
-                    detectedMax = 100
-                elseif v:find("1.5") or n:find("1.5") then
-                    detectedType = "fish_15m"
-                    detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                    detectedMax = 10
-                elseif v:find("bait") or n:find("bait") then
-                    detectedType = "bait_100"
-                    detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                    detectedMax = 100
-                elseif v:find("fish") or n:find("fish") then
-                    detectedType = "fish_100"
-                    detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                    detectedMax = 100
-                end
-            end
-        end
-        if n:find("progress") or n:find("ticketcur") then
-            local num = tonumber(attrVal)
-            if num and num > detectedCur then detectedCur = num end
-        end
-        if n:find("ticketmax") or n:find("target") then
-            local num = tonumber(attrVal)
-            if num and num > detectedMax then detectedMax = num end
-        end
-    end
-
-    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-    if pData then
-        local cdVal = pData:FindFirstChild("TicketCooldown") or pData:FindFirstChild("QuestCooldown")
-            or (pData:FindFirstChild("Cooldowns") and pData.Cooldowns:FindFirstChild("Ticket"))
-        if cdVal and (cdVal:IsA("IntValue") or cdVal:IsA("NumberValue")) then
-            local v = cdVal.Value
-            if v > tick() then
-                detectedCooldownSec = math.floor(v - tick())
-            elseif v > 0 and v <= 1800 then
-                detectedCooldownSec = math.floor(v)
-            end
-        end
-
-        if not detectedType then
-            local qFolder = pData:FindFirstChild("TicketQuest") or pData:FindFirstChild("Quest") or pData:FindFirstChild("Quests") or pData:FindFirstChild("Ticket")
-            if qFolder then
-                for _, item in ipairs(qFolder:GetChildren()) do
-                    local n = item.Name:lower()
-                    local valStr = item:IsA("StringValue") and item.Value:lower() or ""
-                    if n:find("skill") or valStr:find("skill") or n:find("100skill") then
-                        detectedType = "skill_100"
-                        detectedTitle = "Dùng kỹ năng 100 lần"
-                        detectedMax = 100
-                        break
-                    elseif n:find("1.5") or valStr:find("1.5") or n:find("fish_15") then
-                        detectedType = "fish_15m"
-                        detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                        detectedMax = 10
-                        break
-                    elseif n:find("bait") or valStr:find("bait") or n:find("100bait") then
-                        detectedType = "bait_100"
-                        detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                        detectedMax = 100
-                        break
-                    elseif n:find("catch") or n:find("fish") or valStr:find("fish") then
-                        detectedType = "fish_100"
-                        detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                        detectedMax = 100
-                        break
-                    end
-                end
-            end
-        end
-
-        if not detectedCur or detectedCur == 0 then
-            local qFolder = pData:FindFirstChild("TicketQuest") or pData:FindFirstChild("Quest") or pData:FindFirstChild("Quests") or pData:FindFirstChild("Ticket")
-            if qFolder then
-                for _, item in ipairs(qFolder:GetChildren()) do
-                    local name = item.Name:lower()
-                    if item:IsA("IntValue") or item:IsA("NumberValue") then
-                        if name:find("progress") or name:find("current") or name:find("count") then
-                            if item.Value > detectedCur then detectedCur = item.Value end
-                        elseif name:find("target") or name:find("max") or name:find("total") then
-                            if detectedMax == 0 then detectedMax = item.Value end
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    -- 4. Chốt Target Max mặc định nếu nhận diện được type nhưng chưa rõ max
-    if detectedType and detectedMax == 0 then
-        detectedMax = (detectedType == "fish_15m") and 10 or 100
-    end
-    if detectedMax > 0 and detectedCur >= detectedMax then
-        isDone = true
-    end
-
-    return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
+    -- Nếu không tìm thấy thẻ Ticket Quest nào trong PlayerGui -> Trả về nil
+    return nil, nil, 0, 0, false, nil
 end
 
 -- Hàm chủ động quét toàn diện trạng thái và tiến độ nhiệm vụ hiện tại từ PlayerGui
 function ticketQuestState.ScanAndUpdateStatus()
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
-    local isNPCReady = ticketQuestState.CheckNPCReady()
     local now = tick()
 
-    -- 1. Đồng bộ Cooldown nếu phát hiện nhãn thời gian từ game
-    if detectedCd and detectedCd > 0 and not isNPCReady then
-        if not ticketQuestState.isCooldown or math.abs((now + detectedCd) - ticketQuestState.cooldownEnd) > 5 then
-            ticketQuestState.isCooldown = true
-            ticketQuestState.cooldownEnd = now + detectedCd
-        end
-    end
-
-    -- 2. Nếu tìm thấy nhiệm vụ đang hoạt động
+    -- 1. Nếu tìm thấy nhiệm vụ đang hoạt động
     if qType then
         ticketQuestState.currentQuestType = qType
-        ticketQuestState.currentQuestTitle = qTitle or ticketQuestState.currentQuestTitle
-        if max and max > 0 then
-            ticketQuestState.targetProgress = max
-        end
-        if cur and cur >= 0 then
-            ticketQuestState.currentProgress = cur
-        end
+        ticketQuestState.currentQuestTitle = qTitle or "Nhiệm Vụ Vé"
+        ticketQuestState.currentProgress = cur or 0
+        ticketQuestState.targetProgress = (max and max > 0) and max or 100
+        ticketQuestState.isCompleted = (done == true) or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
+        ticketQuestState.isCooldown = false
 
-        local isFinished = (done == true) or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
-        ticketQuestState.isCompleted = isFinished
-
-        if isFinished then
-            ticketQuestState.statusText = string.format("Đã xong (%d/%d)! Sẵn sàng nộp vé tại NPC.", ticketQuestState.currentProgress, ticketQuestState.targetProgress)
+        if ticketQuestState.isCompleted then
+            ticketQuestState.statusText = ticketQuestState.currentQuestTitle .. " (Đã Hoàn Thành)"
         else
-            ticketQuestState.statusText = string.format("Đang làm: %s (%d/%d)", ticketQuestState.currentQuestTitle, ticketQuestState.currentProgress, ticketQuestState.targetProgress)
+            ticketQuestState.statusText = ticketQuestState.currentQuestTitle
         end
     else
-        -- 3. Không phát hiện thẻ nhiệm vụ nào trong PlayerGui -> Chưa nhận nhiệm vụ hoặc đang hồi chiêu
+        -- 2. Không phát hiện thẻ nhiệm vụ nào trong PlayerGui -> Chưa nhận nhiệm vụ hoặc đang hồi chiêu
         ticketQuestState.isCompleted = false
         ticketQuestState.currentQuestType = "none"
+        ticketQuestState.currentQuestTitle = "Chưa nhận nhiệm vụ"
         ticketQuestState.currentProgress = 0
         ticketQuestState.targetProgress = 100
 
@@ -4116,9 +3846,7 @@ function ticketQuestState.ScanAndUpdateStatus()
             local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
             local mins = math.floor(remain / 60)
             local secs = remain % 60
-            ticketQuestState.statusText = string.format("Chưa có nhiệm vụ (Đang chờ hồi chiêu %02d:%02d)", mins, secs)
-        elseif isNPCReady then
-            ticketQuestState.statusText = "Chưa nhận nhiệm vụ nào (NPC sẵn sàng dấu ?)"
+            ticketQuestState.statusText = string.format("Chờ hồi chiêu (%02d:%02d)", mins, secs)
         else
             ticketQuestState.statusText = "Chưa nhận nhiệm vụ nào"
         end
@@ -4392,7 +4120,7 @@ task.spawn(function()
         pcall(function() ticketQuestState.ScanAndUpdateStatus() end)
     end)
     while isRunning do
-        task.wait(1.5)
+        task.wait(2.5)
         if Config.AutoTicketQuest then
             pcall(function()
                 ticketQuestState.Tick()
