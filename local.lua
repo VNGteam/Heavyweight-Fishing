@@ -157,7 +157,6 @@ local Config = {
     -- TỰ ĐỘNG SĂN SECRET BOSS THEO CHAT & TẠI ĐẢO
     AutoHuntBoss = false,
     AutoChatSecretBoss = false,
-    AutoLockSecretBoss = true,
     AutoServerHopOnDespawn = false,
     FastSkipNonBoss = true,
     SecretBossCheckPower = true,
@@ -307,8 +306,6 @@ local ConfigLabelMap = {
     ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
     ["Bật Săn Secret Boss (Chat Sniper)"] = "AutoChatSecretBoss",
     ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
-    ["Tự Động Khóa Secret Boss"] = "AutoLockSecretBoss",
-    ["Khóa Secret Boss"] = "AutoLockSecretBoss",
     ["Giật Cần Thả Lại (Fast Skip Cá Thường)"] = "FastSkipNonBoss",
     ["Bỏ Qua Cá Thường (Fast Skip)"] = "FastSkipNonBoss",
     ["Kiểm Tra Lực Cần (Power Check)"] = "SecretBossCheckPower",
@@ -4265,7 +4262,6 @@ end)
 local fishList = {"Colossal Tigerfish", "Heavenpiercer Turtle", "Golden Guardian Fish", "Crimson Electric Eel", "Frost Kingfish", "Ascended Perch", "Primordial Kunfish Overlord", "Warbringer Shark", "Mountain Fish", "Tiger Mirefish", "Mirage Lanternfish", "Octoparasitic Fish", "Elder Scarlet Fish", "Verdant Bonefang", "Draconic Koi", "Sanguine Fish", "Flying Fish Emperor", "Reborn Puffer Beast"}
 createToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá quý hiếm đã chọn, không bao giờ bị bán nhầm", Config.AutoFavouriteFish, function(v) Config.AutoFavouriteFish = v end)
 createDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName, function(v) Config.FavouriteFishName = v end)
-createToggleRow(sellCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) mọi cá Secret Boss trong balo không để bị bán nhầm", Config.AutoLockSecretBoss, function(v) Config.AutoLockSecretBoss = v end)
 createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
 createToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
 
@@ -4359,10 +4355,6 @@ createToggleRow(chatBossCard, "Tự Động Bay Theo Chat (Chat Sniper)", "Tự 
             end
         end
     end
-end)
-
-createToggleRow(chatBossCard, "Tự Động Khóa Secret Boss", "Tự động khóa bảo vệ (Favorite) các loài Secret Boss khi câu được, chống bị bán mất", Config.AutoLockSecretBoss, function(v)
-    Config.AutoLockSecretBoss = v
 end)
 
 createToggleRow(chatBossCard, "Bỏ Qua Cá Thường (Fast Skip)", "Nếu cắn câu không phải Secret Boss đã chọn thì lập tức giật cần thả lại", Config.FastSkipNonBoss, function(v)
@@ -6481,10 +6473,7 @@ local function ProtectInventoryItem(item, showNotify)
     local shouldProtect = false
     local reason = ""
 
-    if Config.AutoLockSecretBoss and Wiki.IsSecretBossFish(item) then
-        shouldProtect = true
-        reason = "Secret Boss"
-    elseif Config.AutoProtectMutations and Wiki.IsMutatedFish(item) then
+    if Config.AutoProtectMutations and Wiki.IsMutatedFish(item) then
         shouldProtect = true
         reason = "Cá Đột Biến"
     elseif Config.MaterialFarming and Wiki.craftMaterialFish[itemName] then
@@ -6497,8 +6486,8 @@ local function ProtectInventoryItem(item, showNotify)
 
     if shouldProtect and Events and Events:FindFirstChild("FavoriteItem") then
         Events.FavoriteItem:FireServer(item)
-        if showNotify and reason == "Secret Boss" then
-            ShowNotification("Khóa Secret Boss", "Đã tự động KHÓA bảo vệ [" .. itemName .. "] không bị bán!", "SUCCESS", 6)
+        if showNotify and reason == "Cá Quý Chỉ Định" then
+            ShowNotification("Khóa Cá", "Đã tự động KHÓA bảo vệ [" .. itemName .. "]!", "SUCCESS", 6)
         end
         return true
     end
@@ -6613,11 +6602,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             comboState.minigameStartTime = now
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
-            if wasMinigame and secretBossState.isCatchingTarget then
-                task.delay(0.5, function()
-                    ProtectAllInventoryItems(true)
-                end)
-            end
             minigameDurationTracker = 0
             secretBossState.webhookSentForCurrent = false
             secretBossState.isCatchingTarget = false
@@ -7045,7 +7029,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     lastSellTime = now
                 end
 
-                if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations or Config.AutoLockSecretBoss) and (now - lastProtectTime >= 1.5) then
+                if (Config.MaterialFarming or Config.AutoFavouriteFish or Config.AutoProtectMutations) and (now - lastProtectTime >= 1.5) then
                     lastProtectTime = now
                     ProtectAllInventoryItems(false)
                 end
@@ -7530,16 +7514,71 @@ table.insert(activeConnections, UserInputService.JumpRequest:Connect(function()
     end
 end))
 
+-- ===============================================================
+-- 🛡️ HỆ THỐNG CHỐNG VĂNG GAME ĐA TẦNG (ANTI-AFK & AUTO-REJOIN)
+-- ===============================================================
+
+-- Tầng 1: Vô hiệu hóa bộ đếm Idled 20 phút mặc định của Roblox bằng getconnections
 pcall(function()
-    LocalPlayer.Idled:Connect(function()
-        if Config.AntiAFK and isRunning then
-            local vu = game:GetService("VirtualUser")
-            if vu then
-                vu:CaptureController()
-                vu:ClickButton2(Vector2.new(0, 0))
+    if getconnections then
+        for _, conn in ipairs(getconnections(LocalPlayer.Idled)) do
+            if conn.Disable then
+                conn:Disable()
+            elseif conn.Disconnect then
+                conn:Disconnect()
             end
         end
-    end)
+    end
+end)
+
+-- Tầng 2: Bắt sự kiện Idled dự phòng và giả lập thao tác chuột ảo
+pcall(function()
+    table.insert(activeConnections, LocalPlayer.Idled:Connect(function()
+        if Config.AntiAFK and isRunning then
+            pcall(function()
+                local vu = game:GetService("VirtualUser")
+                if vu then
+                    vu:CaptureController()
+                    vu:ClickButton2(Vector2.new(0, 0))
+                    vu:Button2Down(Vector2.new(0, 0))
+                    task.wait(0.05)
+                    vu:Button2Up(Vector2.new(0, 0))
+                end
+            end)
+            pcall(function()
+                local vim = game:GetService("VirtualInputManager")
+                if vim then
+                    vim:SendMouseButtonEvent(15, 15, 0, true, game, 1)
+                    task.wait(0.02)
+                    vim:SendMouseButtonEvent(15, 15, 0, false, game, 1)
+                end
+            end)
+        end
+    end))
+end)
+
+-- Tầng 3: Nhịp tim chủ động (Active Keep-Alive Pulse) cứ mỗi 5 phút gửi micro-action để reset thời gian idle của Roblox
+task.spawn(function()
+    while isRunning do
+        task.wait(300)
+        if isRunning and Config.AntiAFK then
+            pcall(function()
+                local vu = game:GetService("VirtualUser")
+                if vu then
+                    vu:CaptureController()
+                    vu:ClickButton2(Vector2.new(50, 50))
+                end
+            end)
+            pcall(function()
+                local vim = game:GetService("VirtualInputManager")
+                if vim then
+                    vim:SendMouseButtonEvent(20, 20, 0, true, game, 1)
+                    task.wait(0.02)
+                    vim:SendMouseButtonEvent(20, 20, 0, false, game, 1)
+                end
+            end)
+        end
+    end
 end)
 
 -- TỰ ĐỘNG ĐỔI SERVER TÌM TAOIST / GOD SPIRIT / MAOSHAN
