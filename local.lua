@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "21d7b2f"
+local SCRIPT_BUILD_COMMIT = "d07f24f"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -292,15 +292,7 @@ local comboState = {
 
 function comboState.SkillExists(sk, fUI)
     if not sk or sk == "" or sk == "Tắt" then return false end
-    local cleanKey = (sk:match("([ZXCVzxcv])") or sk):upper()
-    if not fUI then return true end
-    for _, desc in ipairs(fUI:GetDescendants()) do
-        local nameUpper = desc.Name:upper()
-        if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
-            return true
-        end
-    end
-    return false
+    return true
 end
 
 function comboState.FormatCombo(str)
@@ -8326,6 +8318,14 @@ function comboState.CastSkill(sk)
             end
         end
     end)
+    pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        if vim and Enum.KeyCode[cleanKey] then
+            vim:SendKeyEvent(true, Enum.KeyCode[cleanKey], false, game)
+            task.wait(0.02)
+            vim:SendKeyEvent(false, Enum.KeyCode[cleanKey], false, game)
+        end
+    end)
     comboState.usedTimes[cleanKey] = tick()
     comboState.lastCastTime = tick()
     return true
@@ -8744,64 +8744,66 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
                                 pcall(function()
-                                    local chosenSkill = Config.TicketSkillKey or Config.TrainSkill or "Z"
-                                    local cleanKey = chosenSkill:match("([ZXCVzxcv])") or chosenSkill
-                                    cleanKey = cleanKey:upper()
-                                    if comboState.IsSkillOnCooldown(cleanKey, fUI) then
-                                        for _, fallbackKey in ipairs({"Z", "X", "C", "V"}) do
-                                            if not comboState.IsSkillOnCooldown(fallbackKey, fUI) then
-                                                cleanKey = fallbackKey
-                                                break
-                                            end
+                                    -- 1. Lấy danh sách chuỗi combo mà người chơi đã cài (VD: "Z, X, V")
+                                    local comboList = {}
+                                    if Config.LoopSkills and Config.LoopSkills ~= "" then
+                                        for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
+                                            table.insert(comboList, k:upper())
                                         end
                                     end
+                                    if #comboList == 0 then
+                                        local fallback = Config.TicketSkillKey or Config.TrainSkill or "Z"
+                                        for k in string.gmatch(fallback, "([ZXCVzxcv])") do
+                                            table.insert(comboList, k:upper())
+                                        end
+                                    end
+                                    if #comboList == 0 then
+                                        comboList = {"Z", "X", "V"}
+                                    end
 
-                                    local initialFishHp = GetFishHealth(fUI)
+                                    -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
                                     local startTime = tick()
-
-                                    -- 1. GIỮ THĂNG BẰNG THANH BAR VÀ CHỜ QUA 3 GIÂY KHÓA CHIÊU CỦA GAME (BẮN SKILL LIÊN TỤC ĐỂ BẮT ĐÚNG NHỊP MỞ)
                                     while isRunning and (fUI and fUI.Visible) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
                                         if barFrame and barFrame:FindFirstChild("Bar") then
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
-
-                                        comboState.CastSkill(cleanKey)
-                                        task.wait(0.08)
-
-                                        local elapsed = tick() - startTime
-                                        if elapsed >= 3.05 then
-                                            local curHp = GetFishHealth(fUI)
-                                            local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                            local nowOnCd = comboState.IsSkillOnCooldown(cleanKey, fUI)
-                                            if nowOnCd or hpDropped or (elapsed >= 3.8) then
-                                                break
-                                            end
-                                        end
-                                    end
-
-                                    -- 2. Đợi 0.35s cho nhân vật tung chiêu xong để server ghi nhận
-                                    local waitFinish = tick()
-                                    while isRunning and (tick() - waitFinish) < 0.35 do
-                                        if fUI and fUI.Visible then
-                                            local barFrame = fUI:FindFirstChild("BarFrame")
-                                            if barFrame and barFrame:FindFirstChild("Bar") then
-                                                barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                            end
+                                        if (tick() - startTime) >= 3.05 then
+                                            break
                                         end
                                         task.wait(0.05)
                                     end
 
-                                    -- 3. Cập nhật tiến độ nhiệm vụ vé
-                                    ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
-                                    ticketQuestState.UpdateUI()
-                                    if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
-                                        ticketQuestState.isCompleted = true
-                                    elseif ticketQuestState.currentProgress >= 100 then
-                                        ticketQuestState.isCompleted = true
+                                    -- 3. Lần lượt tung TOÀN BỘ chuỗi combo đã cài (Z -> X -> V...)
+                                    for _, sk in ipairs(comboList) do
+                                        if not isRunning or not (fUI and fUI.Visible) then break end
+
+                                        local barFrame = fUI:FindFirstChild("BarFrame")
+                                        if barFrame and barFrame:FindFirstChild("Bar") then
+                                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                        end
+
+                                        comboState.CastSkill(sk)
+                                        ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
+                                        ticketQuestState.UpdateUI()
+                                        if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
+                                            ticketQuestState.isCompleted = true
+                                        elseif ticketQuestState.currentProgress >= 100 then
+                                            ticketQuestState.isCompleted = true
+                                        end
+
+                                        -- Đợi nhịp giữa các chiêu để server nhận diện và animation nhân vật chạy (0.35s)
+                                        local waitFinish = tick()
+                                        while isRunning and (fUI and fUI.Visible) and (tick() - waitFinish < 0.35) do
+                                            local bf = fUI:FindFirstChild("BarFrame")
+                                            if bf and bf:FindFirstChild("Bar") then
+                                                bf.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                            end
+                                            task.wait(0.05)
+                                        end
                                     end
 
-                                    -- 4. THAY VÌ CẤT CẦN -> CHỜ KÉO CÁ LÊN LUÔN (GIỮ NGUYÊN CẦN TRÊN TAY)
+                                    -- 4. Kéo cá lên (Charge 100 + Slam Perfect + UpdateFishProgression)
                                     local pullStartTime = tick()
                                     while isRunning and (fUI and fUI.Visible) and (tick() - pullStartTime < 25.0) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
@@ -8816,11 +8818,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         end
                                         if Events and Events:FindFirstChild("UpdateFishProgression") then
                                             Events.UpdateFishProgression:FireServer()
-                                        end
-                                        for _, sk in ipairs({"Z", "X", "C", "V"}) do
-                                            if not comboState.IsSkillOnCooldown(sk, fUI) then
-                                                comboState.CastSkill(sk)
-                                            end
                                         end
                                         task.wait(0.08)
                                     end
@@ -8835,55 +8832,58 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
                                 pcall(function()
-                                    local chosenSkill = Config.TicketQuickSkill or Config.TicketSkillKey or Config.TrainSkill or "V"
-                                    local cleanKey = chosenSkill:match("([ZXCVzxcv])") or chosenSkill
-                                    cleanKey = cleanKey:upper()
-                                    if comboState.IsSkillOnCooldown(cleanKey, fUI) then
-                                        for _, fallbackKey in ipairs({"V", "C", "X", "Z"}) do
-                                            if not comboState.IsSkillOnCooldown(fallbackKey, fUI) then
-                                                cleanKey = fallbackKey
-                                                break
-                                            end
+                                    -- 1. Lấy danh sách chuỗi combo mà người chơi đã cài (VD: "Z, X, V")
+                                    local comboList = {}
+                                    if Config.LoopSkills and Config.LoopSkills ~= "" then
+                                        for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
+                                            table.insert(comboList, k:upper())
                                         end
                                     end
+                                    if #comboList == 0 then
+                                        local fallback = Config.TicketQuickSkill or Config.TicketSkillKey or Config.TrainSkill or "V"
+                                        for k in string.gmatch(fallback, "([ZXCVzxcv])") do
+                                            table.insert(comboList, k:upper())
+                                        end
+                                    end
+                                    if #comboList == 0 then
+                                        comboList = {"Z", "X", "V"}
+                                    end
 
-                                    local initialFishHp = GetFishHealth(fUI)
+                                    -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
                                     local startTime = tick()
-
-                                    -- 1. GIỮ THĂNG BẰNG THANH BAR VÀ CHỜ QUA 3 GIÂY KHÓA CHIÊU CỦA GAME (BẮN SKILL LIÊN TỤC ĐỂ BẮT ĐÚNG NHỊP MỞ)
                                     while isRunning and (fUI and fUI.Visible) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
                                         if barFrame and barFrame:FindFirstChild("Bar") then
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
-
-                                        comboState.CastSkill(cleanKey)
-                                        task.wait(0.08)
-
-                                        local elapsed = tick() - startTime
-                                        if elapsed >= 3.05 then
-                                            local curHp = GetFishHealth(fUI)
-                                            local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                            local nowOnCd = comboState.IsSkillOnCooldown(cleanKey, fUI)
-                                            if nowOnCd or hpDropped or (elapsed >= 3.8) then
-                                                break
-                                            end
-                                        end
-                                    end
-
-                                    -- 2. Đợi 0.35s cho nhân vật tung chiêu xong để server ghi nhận
-                                    local waitFinish = tick()
-                                    while isRunning and (tick() - waitFinish) < 0.35 do
-                                        if fUI and fUI.Visible then
-                                            local barFrame = fUI:FindFirstChild("BarFrame")
-                                            if barFrame and barFrame:FindFirstChild("Bar") then
-                                                barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                            end
+                                        if (tick() - startTime) >= 3.05 then
+                                            break
                                         end
                                         task.wait(0.05)
                                     end
 
-                                    -- 3. THAY VÌ CẤT CẦN -> CHỜ KÉO CÁ LÊN LUÔN (GIỮ NGUYÊN CẦN TRÊN TAY)
+                                    -- 3. Lần lượt tung chuỗi combo (Z -> X -> V...)
+                                    for _, sk in ipairs(comboList) do
+                                        if not isRunning or not (fUI and fUI.Visible) then break end
+
+                                        local barFrame = fUI:FindFirstChild("BarFrame")
+                                        if barFrame and barFrame:FindFirstChild("Bar") then
+                                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                        end
+
+                                        comboState.CastSkill(sk)
+
+                                        local waitFinish = tick()
+                                        while isRunning and (fUI and fUI.Visible) and (tick() - waitFinish < 0.35) do
+                                            local bf = fUI:FindFirstChild("BarFrame")
+                                            if bf and bf:FindFirstChild("Bar") then
+                                                bf.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                            end
+                                            task.wait(0.05)
+                                        end
+                                    end
+
+                                    -- 4. Kéo cá lên
                                     local pullStartTime = tick()
                                     while isRunning and (fUI and fUI.Visible) and (tick() - pullStartTime < 25.0) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
@@ -8899,15 +8899,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         if Events and Events:FindFirstChild("UpdateFishProgression") then
                                             Events.UpdateFishProgression:FireServer()
                                         end
-                                        for _, sk in ipairs({"Z", "X", "C", "V"}) do
-                                            if not comboState.IsSkillOnCooldown(sk, fUI) then
-                                                comboState.CastSkill(sk)
-                                            end
-                                        end
                                         task.wait(0.08)
                                     end
 
-                                    -- 4. Cập nhật tiến độ bắt cá khi cá đã kéo lên thành công
+                                    -- 5. Cập nhật tiến độ bắt cá khi cá đã kéo lên thành công
                                     ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                     ticketQuestState.UpdateUI()
                                     if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
@@ -8988,113 +8983,54 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             end
 
                             if not didHeal then
-                                -- BƯỚC 2: PHÂN LOẠI THEO MÁU CÁ
-                                local fishHp = GetFishHealth(fUI)
-                                local threshold = Config.FishHpThreshold or 500
+                                -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU COMBO (VD: Z -> X -> V...)
+                                local loopKeys = {}
+                                for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
+                                    table.insert(loopKeys, k:upper())
+                                end
 
-                                if fishHp <= threshold then
-                                    -- Máu cá <= Ngưỡng (Cá thường / Cá yếu): Ưu tiên chiêu Bắt Nhanh (QuickCatchSkill)
-                                    local qKey = Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" and Config.QuickCatchSkill:match("([ZXCVzxcv])")
-                                    if qKey then qKey = qKey:upper() end
+                                if #loopKeys > 0 then
+                                    if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
+                                        comboState.loopTargetIndex = 1
+                                    end
 
-                                    if qKey and comboState.IsSkillReady(qKey, fUI) then
-                                        comboState.CastSkill(qKey)
-                                        comboState.lastActionTime = now
-                                    else
-                                        -- Nếu chiêu bắt nhanh đang hồi, dùng chiêu Loop sẵn sàng đầu tiên để hạ cá nhanh
-                                        local loopKeys = {}
-                                        for k in string.gmatch(Config.LoopSkills or "X, C", "([ZXCVzxcv])") do
-                                            table.insert(loopKeys, k:upper())
+                                    local chosenIndex = nil
+                                    if Config.LoopStrictOrder then
+                                        local targetKey = loopKeys[comboState.loopTargetIndex]
+                                        if comboState.IsSkillReady(targetKey, fUI) then
+                                            chosenIndex = comboState.loopTargetIndex
+                                        elseif comboState.loopWaitStartTime == 0 then
+                                            comboState.loopWaitStartTime = now
+                                        elseif (now - comboState.loopWaitStartTime >= 3.0) then
+                                            comboState.loopWaitStartTime = 0
+                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
                                         end
-                                        for _, lk in ipairs(loopKeys) do
-                                            if comboState.IsSkillReady(lk, fUI) then
-                                                comboState.CastSkill(lk)
-                                                comboState.lastActionTime = now
+                                    else
+                                        for offset = 0, #loopKeys - 1 do
+                                            local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                            local sk = loopKeys[idx]
+                                            if comboState.IsSkillReady(sk, fUI) then
+                                                chosenIndex = idx
                                                 break
                                             end
                                         end
                                     end
+
+                                    if chosenIndex then
+                                        local skillToCast = loopKeys[chosenIndex]
+                                        comboState.CastSkill(skillToCast)
+                                        comboState.lastActionTime = now
+                                        comboState.loopWaitStartTime = 0
+                                        comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
+                                    end
                                 else
-                                    -- Máu cá > Ngưỡng (Cá to / Boss):
-                                    -- GIAI ĐOẠN 1: CHIÊU MỞ MÀN (Opener Skill)
-                                    local opKey = Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])")
-                                    if opKey then opKey = opKey:upper() end
-
-                                    local openerMax = math.max(1, tonumber(Config.OpenerMaxCount) or 1)
-                                    local needsOpener = opKey and (not comboState.openerDone) and (comboState.openerUsedCount < openerMax)
-
-                                    if needsOpener then
-                                        if comboState.IsSkillReady(opKey, fUI) then
-                                            comboState.CastSkill(opKey)
-                                            comboState.openerUsedCount = comboState.openerUsedCount + 1
-                                            comboState.lastActionTime = now
-                                            if comboState.openerUsedCount >= openerMax then
-                                                comboState.openerDone = true
-                                            end
-                                        elseif comboState.openerUsedCount > 0 then
-                                            -- Đã tung được ít nhất 1 lần mở màn và giờ đang hồi chiêu -> Chuyển sang giai đoạn Đảo Chiêu luôn
-                                            comboState.openerDone = true
-                                        end
-                                    else
-                                        -- GIAI ĐOẠN 2: CHUỖI ĐẢO CHIÊU LUÂN PHIÊN (Loop Skills Rotation)
-                                        local loopKeys = {}
-                                        for k in string.gmatch(Config.LoopSkills or "X, C", "([ZXCVzxcv])") do
-                                            table.insert(loopKeys, k:upper())
-                                        end
-
-                                        if #loopKeys > 0 then
-                                            if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
-                                                comboState.loopTargetIndex = 1
-                                            end
-
-                                            local targetKey = loopKeys[comboState.loopTargetIndex]
-                                            local isStrict = Config.LoopStrictOrder == true
-
-                                            if isStrict then
-                                                -- Chế độ Tuần Tự Nghiêm Ngặt: Chờ đúng chiêu theo nhịp combo đã cài
-                                                local skillExists = comboState.SkillExists(targetKey, fUI)
-                                                local isReady = skillExists and comboState.IsSkillReady(targetKey, fUI)
-
-                                                if isReady then
-                                                    comboState.CastSkill(targetKey)
-                                                    comboState.lastActionTime = now
-                                                    comboState.loopWaitStartTime = 0
-                                                    comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                                elseif not skillExists then
-                                                    -- Chiêu không có trên cần -> Bỏ qua sang chiêu kế tiếp
-                                                    comboState.loopWaitStartTime = 0
-                                                    comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                                else
-                                                    -- Chiêu đang trong thời gian hồi chiêu (CD)
-                                                    if comboState.loopWaitStartTime == 0 then
-                                                        comboState.loopWaitStartTime = now
-                                                    elseif (now - comboState.loopWaitStartTime >= 5.0) then
-                                                        -- Chờ quá 5s chưa hồi -> Bỏ qua tránh kẹt combo
-                                                        comboState.loopWaitStartTime = 0
-                                                        comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                                    end
-                                                end
-                                            else
-                                                -- Chế độ Bỏ Qua Cooldown (Spam): Quét tìm chiêu sẵn sàng trong chuỗi bắt đầu từ loopTargetIndex
-                                                local chosenIndex = nil
-                                                for offset = 0, #loopKeys - 1 do
-                                                    local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
-                                                    local sk = loopKeys[idx]
-                                                    if comboState.IsSkillReady(sk, fUI) then
-                                                        chosenIndex = idx
-                                                        break
-                                                    end
-                                                end
-
-                                                if chosenIndex then
-                                                    local skillToCast = loopKeys[chosenIndex]
-                                                    comboState.CastSkill(skillToCast)
-                                                    comboState.lastActionTime = now
-                                                    comboState.loopWaitStartTime = 0
-                                                    comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
-                                                end
-                                            end
-                                        end
+                                    local fallbackKey = (Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" and Config.QuickCatchSkill:match("([ZXCVzxcv])"))
+                                        or (Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])"))
+                                        or "Z"
+                                    fallbackKey = fallbackKey:upper()
+                                    if comboState.IsSkillReady(fallbackKey, fUI) then
+                                        comboState.CastSkill(fallbackKey)
+                                        comboState.lastActionTime = now
                                     end
                                 end
                             end
