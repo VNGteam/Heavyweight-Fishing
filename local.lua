@@ -6760,20 +6760,23 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             local cleanKey = chosenSkill:match("([ZXCVzxcv])") or chosenSkill
                             cleanKey = cleanKey:upper()
 
-                            -- Nhịp 1: Chờ minigame thực sự sẵn sàng nhận đòn (0.35s)
-                            -- Trong lúc chờ, tự giữ cân bằng bar để cá không tuột
+                            -- Nhịp 1: Chờ minigame thực sự ổn định và server sẵn sàng nhận lệnh skill (1.1s)
+                            -- Trong lúc chờ, tự động giữ cân bằng thanh Bar và cập nhật Progression để cá không tuột
                             local waitStart = tick()
-                            while (tick() - waitStart) < 0.35 do
+                            while isRunning and (tick() - waitStart) < 1.1 do
                                 if fUI and fUI.Visible then
                                     local barFrame = fUI:FindFirstChild("BarFrame")
                                     if barFrame and barFrame:FindFirstChild("Bar") then
                                         barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                     end
+                                    if Events and Events:FindFirstChild("UpdateFishProgression") then
+                                        Events.UpdateFishProgression:FireServer()
+                                    end
                                 end
                                 task.wait(0.05)
                             end
 
-                            -- Nếu chiêu đang bị Cooldown từ lần trước: giữ cá chờ hết Cooldown rồi mới tung!
+                            -- Nhịp 2: Nếu chiêu đang bị Cooldown từ lần trước: giữ cá chờ hết Cooldown rồi mới tung!
                             local cdWaitStart = tick()
                             while isRunning and IsSkillOnCooldown(cleanKey, fUI) and (tick() - cdWaitStart) < 12.0 do
                                 if fUI and fUI.Visible then
@@ -6781,75 +6784,38 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     if barFrame and barFrame:FindFirstChild("Bar") then
                                         barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                     end
+                                    if Events and Events:FindFirstChild("UpdateFishProgression") then
+                                        Events.UpdateFishProgression:FireServer()
+                                    end
                                 end
                                 task.wait(0.1)
                             end
 
-                            -- Nhịp 2: Tung chiêu luyện (Bắn nhịp liên tục kết hợp Remote + Phím + Click GUI cho đến khi skill thực sự xuất ra)
+                            -- Nhịp 3: Tung chiêu luyện liên tục qua CastSkill cho đến khi chiêu thực sự được thi triển
                             local initialFishHp = GetFishHealth(fUI)
                             local pulseStart = tick()
 
-                            while isRunning and (tick() - pulseStart) < 1.2 do
-                                -- Remote Events
-                                if Events and Events:FindFirstChild("UseSkill") then
-                                    Events.UseSkill:FireServer(cleanKey)
-                                end
-                                if Events and Events:FindFirstChild("TriggerMinigameSkill") then
-                                    Events.TriggerMinigameSkill:FireServer(cleanKey)
-                                end
-
-                                -- VirtualInputManager Phím bấm
-                                pcall(function()
-                                    local vim = game:GetService("VirtualInputManager")
-                                    local kCode = Enum.KeyCode[cleanKey]
-                                    if vim and kCode then
-                                        vim:SendKeyEvent(true, kCode, false, game)
-                                        task.wait(0.02)
-                                        vim:SendKeyEvent(false, kCode, false, game)
-                                    end
-                                end)
-
-                                -- Click trực tiếp nút GUI trên màn hình
-                                pcall(function()
-                                    if not fUI then return end
-                                    for _, d in ipairs(fUI:GetDescendants()) do
-                                        local dUpper = d.Name:upper()
-                                        if (dUpper == cleanKey or dUpper:find("SKILL" .. cleanKey) or dUpper:find("SLOT" .. cleanKey) or dUpper:find("BUTTON" .. cleanKey)) then
-                                            local btn = d:IsA("GuiButton") and d or d:FindFirstChildOfClass("TextButton") or d:FindFirstChildOfClass("ImageButton")
-                                            if btn and btn.Visible then
-                                                if firesignal then
-                                                    pcall(function() firesignal(btn.MouseButton1Click) end)
-                                                    pcall(function() firesignal(btn.Activated) end)
-                                                    pcall(function() firesignal(btn.MouseButton1Down) end)
-                                                end
-                                                local vim = game:GetService("VirtualInputManager")
-                                                if vim and btn.AbsoluteSize.X > 0 then
-                                                    local cx = btn.AbsolutePosition.X + btn.AbsoluteSize.X / 2
-                                                    local cy = btn.AbsolutePosition.Y + btn.AbsoluteSize.Y / 2
-                                                    vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-                                                    task.wait(0.01)
-                                                    vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
-                                                end
-                                            end
-                                        end
-                                    end
-                                end)
+                            while isRunning and (tick() - pulseStart) < 2.5 do
+                                CastSkill(cleanKey)
 
                                 if fUI and fUI.Visible then
                                     local barFrame = fUI:FindFirstChild("BarFrame")
                                     if barFrame and barFrame:FindFirstChild("Bar") then
                                         barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                     end
+                                    if Events and Events:FindFirstChild("UpdateFishProgression") then
+                                        Events.UpdateFishProgression:FireServer()
+                                    end
                                 end
 
-                                task.wait(0.06)
+                                task.wait(0.1)
 
                                 -- Kiểm tra xem chiêu đã bắt đầu xuất ra chưa:
                                 local curHp = GetFishHealth(fUI)
                                 local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
                                 local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
 
-                                if nowOnCd or hpDropped or (tick() - pulseStart >= 0.45) then
+                                if nowOnCd or hpDropped or (tick() - pulseStart >= 1.5) then
                                     break
                                 end
                             end
@@ -6871,10 +6837,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 return
                             end
 
-                            -- Nhịp 3: Đợi nhân vật thực hiện hoạt ảnh đòn đánh (0.x giây theo cấu hình, mặc định 0.45s)
-                            local cancelDelay = tonumber(Config.TrainCancelDelay) or 0.45
+                            -- Nhịp 4: Đợi nhân vật thực hiện hoạt ảnh đòn đánh và server ghi nhận điểm (0.6s)
+                            local cancelDelay = tonumber(Config.TrainCancelDelay) or 0.6
                             local animStart = tick()
-                            while (tick() - animStart) < cancelDelay do
+                            while isRunning and (tick() - animStart) < cancelDelay do
                                 if fUI and fUI.Visible then
                                     local barFrame = fUI:FindFirstChild("BarFrame")
                                     if barFrame and barFrame:FindFirstChild("Bar") then
@@ -6884,7 +6850,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 task.wait(0.05)
                             end
 
-                            -- Nhịp 4: Cất cần vào túi (UnequipTools) để hủy cá & đóng minigame ngay lập tức
+                            -- Nhịp 5: Cất cần vào túi (UnequipTools) để hủy cá & đóng minigame ngay lập tức
                             local rodSlot = "1"
                             local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
                             if pData and pData:FindFirstChild("Hotbar") then
@@ -6903,8 +6869,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 if h then h:UnequipTools() end
                             end)
 
-                            -- Nhịp 5: Đợi 0.25s để server dọn dẹp minigame, sau đó lấy cần ra lại
-                            task.wait(0.25)
+                            -- Nhịp 6: Đợi 0.3s để server dọn dẹp minigame, sau đó lấy cần ra lại
+                            task.wait(0.3)
                             pcall(function()
                                 if Events and Events:FindFirstChild("ToggleHotbar") then
                                     Events.ToggleHotbar:InvokeServer(rodSlot)
@@ -6918,8 +6884,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
                             end)
 
-                            -- Nhịp 6: Đợi cần cầm lên tay hoàn tất (0.25s) rồi quăng cần xuống nước câu lại ngay
-                            task.wait(0.25)
+                            -- Nhịp 7: Đợi cần cầm lên tay hoàn tất (0.3s) rồi quăng cần xuống nước câu lại ngay
+                            task.wait(0.3)
                             local c2 = LocalPlayer.Character
                             local r2 = c2 and c2:FindFirstChild("HumanoidRootPart")
                             if r2 and Events and Events:FindFirstChild("Fishing") then
@@ -6927,7 +6893,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 lastCastTime = tick()
                             end
 
-                            -- Nhịp 7: Cho phép vòng lặp tiếp theo sau khi đã quăng cần xong
+                            -- Nhịp 8: Cho phép vòng lặp tiếp theo sau khi đã quăng cần xong
                             task.wait(0.35)
                             isTrainingBusy = false
                         end)
