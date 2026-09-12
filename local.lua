@@ -7784,15 +7784,14 @@ end)
 local lastCastTime = 0
 local lastSellTime = 0
 local lastSkillTime = 0
-local lastTrainSkillTime = 0
 local isTrainingBusy = false
-local lastGlobalSkillCastTime = 0
 local comboState = {
     openerUsedCount = 0,
     openerDone = false,
     loopTargetIndex = 1,
     loopIndex = 1,
     lastCastTime = 0,
+    lastActionTime = 0,
     minigameStartTime = 0,
     usedTimes = {
         ["Z"] = 0,
@@ -7808,22 +7807,16 @@ local comboState = {
     }
 }
 
-local function CheckSkillReady(sk, fUI, minCooldown)
+function comboState.IsSkillReady(sk, fUI)
     if not sk or sk == "" or sk == "Tắt" then return false end
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
 
     local now = tick()
     local lastUsed = comboState.usedTimes[cleanKey] or 0
-    local minCd = minCooldown or 0.8
-    if (now - lastUsed < minCd) then
+    -- Chống spam cùng 1 phím nhanh hơn 0.8s
+    if (now - lastUsed < 0.8) then
         return false
-    end
-
-    -- Nếu đã trôi qua hơn cooldown ước tính kể từ lần cuối cast chiêu này, đảm bảo chiêu đã hồi xong
-    local baseCd = comboState.defaultCooldowns[cleanKey] or 3.5
-    if (now - lastUsed >= baseCd) then
-        return true
     end
 
     if fUI then
@@ -7838,20 +7831,17 @@ local function CheckSkillReady(sk, fUI, minCooldown)
                         local cName = child.Name:lower()
                         local isCdLabel = cName:find("cd") or cName:find("cooldown") or cName:find("timer") or cName:find("time")
                         local txt = child.Text
-                        -- Bỏ qua label hiển thị Damage / Power / Level / Name
                         if not cName:find("dmg") and not cName:find("damage") and not cName:find("power") and not cName:find("level") and not cName:find("title") and not cName:find("name") then
-                            -- Chỉ nhận diện là cooldown nếu có chữ 's' (ví dụ 3.5s, 10s) hoặc nếu tên label là cooldown/timer
                             local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
                             if cdWithS then
                                 local num = tonumber(cdWithS)
-                                if num and num > 0 and num <= 30 then
+                                if num and num > 0 and num <= 999 then
                                     return false
                                 end
                             elseif isCdLabel then
                                 local numStr = txt:match("^%s*(%d+%.?%d*)%s*$")
                                 local num = tonumber(numStr)
-                                -- Bỏ qua các số nguyên 1, 2, 3, 4 nếu đó là phím tắt
-                                if num and num > 0 and num <= 30 and not (num >= 1 and num <= 4 and not txt:find("%.%")) then
+                                if num and num > 0 and num <= 999 and not (num >= 1 and num <= 4 and not txt:find("%.%")) then
                                     return false
                                 end
                             end
@@ -7865,44 +7855,15 @@ local function CheckSkillReady(sk, fUI, minCooldown)
     return true
 end
 
-local function IsSkillOnCooldown(sk, fUI)
-    if not sk or sk == "" or sk == "Tắt" then return false end
-    local cleanKey = sk:match("([ZXCVzxcv])") or sk
-    cleanKey = cleanKey:upper()
+function comboState.IsSkillOnCooldown(sk, fUI)
+    return not comboState.IsSkillReady(sk, fUI)
+end
 
-    if fUI then
-        for _, desc in ipairs(fUI:GetDescendants()) do
-            local nameUpper = desc.Name:upper()
-            if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
-                if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
-                    return true
-                end
-                for _, child in ipairs(desc:GetDescendants()) do
-                    if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
-                        local cName = child.Name:lower()
-                        local isCdLabel = cName:find("cd") or cName:find("cooldown") or cName:find("timer") or cName:find("time")
-                        local txt = child.Text
-                        if not cName:find("dmg") and not cName:find("damage") and not cName:find("power") and not cName:find("level") and not cName:find("title") and not cName:find("name") then
-                            local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
-                            if cdWithS then
-                                local num = tonumber(cdWithS)
-                                if num and num > 0 and num <= 999 then
-                                    return true
-                                end
-                            elseif isCdLabel then
-                                local numStr = txt:match("^%s*(%d+%.?%d*)%s*$")
-                                local num = tonumber(numStr)
-                                if num and num > 0 and num <= 999 and not (num >= 1 and num <= 4 and not txt:find("%.%")) then
-                                    return true
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
+function comboState.CheckSkillReady(sk, fUI, minCooldown)
+    if minCooldown and (tick() - (comboState.usedTimes[sk:upper()] or 0) < minCooldown) then
+        return false
     end
-    return false
+    return comboState.IsSkillReady(sk, fUI)
 end
 
 local function GetFishHealth(fUI)
@@ -8044,7 +8005,7 @@ local function GetPlayerHealth(fUI)
     return 100
 end
 
-local function IsCharacterCastingSkill()
+function comboState.IsCharacterCastingSkill()
     local now = tick()
     -- Chỉ coi là animation skill trong tối đa 0.7s kể từ khi tung chiêu, tránh bị kẹt vĩnh viễn
     if (now - comboState.lastCastTime > 0.7) then
@@ -8083,7 +8044,7 @@ local function IsCharacterCastingSkill()
     return false
 end
 
-local function CastSkill(sk)
+function comboState.CastSkill(sk)
     if not sk or sk == "" or sk == "Tắt" then return false end
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
@@ -8259,10 +8220,12 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             comboState.openerDone = false
             comboState.loopTargetIndex = 1
             comboState.loopIndex = 1
+            comboState.lastActionTime = 0
             comboState.minigameStartTime = now
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             minigameDurationTracker = 0
+            comboState.lastActionTime = 0
             secretBossState.webhookSentForCurrent = false
             secretBossState.isCatchingTarget = false
             secretBossState.minigameStartTime = 0
@@ -8378,7 +8341,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
 
                                 -- Bắn skill liên tục để kích hoạt ngay khoảnh khắc game mở khóa
-                                CastSkill(cleanKey)
+                                comboState.CastSkill(cleanKey)
 
                                 task.wait(0.08)
 
@@ -8388,7 +8351,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 if elapsed >= 3.05 then
                                     local curHp = GetFishHealth(fUI)
                                     local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                    local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
+                                    local nowOnCd = comboState.IsSkillOnCooldown(cleanKey, fUI)
 
                                     -- Sau khi qua 3s: nếu đã tung chiêu thành công hoặc sau thêm 0.8s nữa thì ngắt để cất cần
                                     if nowOnCd or hpDropped or (elapsed >= 3.8) then
@@ -8524,14 +8487,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                     end
 
-                                    CastSkill(cleanKey)
+                                    comboState.CastSkill(cleanKey)
                                     task.wait(0.08)
 
                                     local elapsed = tick() - startTime
                                     if elapsed >= 3.05 then
                                         local curHp = GetFishHealth(fUI)
                                         local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                        local nowOnCd = IsSkillOnCooldown(cleanKey, fUI)
+                                        local nowOnCd = comboState.IsSkillOnCooldown(cleanKey, fUI)
                                         if nowOnCd or hpDropped or (elapsed >= 3.8) then
                                             break
                                         end
@@ -8592,7 +8555,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         local quickSkill = Config.TicketQuickSkill or "V"
                         local cleanKey = quickSkill:match("([ZXCVzxcv])") or quickSkill
                         cleanKey = cleanKey:upper()
-                        CastSkill(cleanKey)
+                        comboState.CastSkill(cleanKey)
                         if Events and Events:FindFirstChild("Slam") then Events.Slam:FireServer("Perfect") end
                         if Events and Events:FindFirstChild("Charge") then Events.Charge:FireServer(100) end
                         if Events and Events:FindFirstChild("UpdateFishProgression") then Events.UpdateFishProgression:FireServer() end
@@ -8636,80 +8599,109 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         lastProgressionTime = now
                     end
 
-                    if Config.SmartComboEnabled and (now - lastSkillTime >= 0.15) then
-                        local playerHp = GetPlayerHealth(fUI)
+                    if Config.SmartComboEnabled and (now - lastSkillTime >= 0.1) then
+                        lastSkillTime = now
 
-                        -- BƯỚC 1: CỨU NGUY HỒI MÁU (Khi máu người chơi <= EmergencyHealHp, ví dụ <= 31%)
-                        local isHealing = false
-                        if Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" and playerHp <= (Config.EmergencyHealHp or 31) then
-                            local hKey = Config.EmergencyHealSkill:match("([ZXCVzxcv])")
-                            if hKey then
-                                CastSkill(hKey)
-                                isHealing = true
-                            end
+                        -- 1. KIỂM TRA NHỊP CHỜ RA CHIÊU & HOẠT ẢNH NHÂN VẬT (Chống nuốt chiêu & kẹt combo)
+                        local effectDelay = tonumber(Config.SkillEffectDelay) or 1.2
+                        local canActNow = (now - (comboState.lastActionTime or 0)) >= effectDelay
+                        if Config.SmartEffectAutoDetect and comboState.IsCharacterCastingSkill() then
+                            canActNow = false
                         end
 
-                        if not isHealing then
-                            -- BƯỚC 2: PHÂN LOẠI THEO MÁU CÁ
-                            local fishHp = GetFishHealth(fUI)
-                            local threshold = Config.FishHpThreshold or 500
+                        if canActNow then
+                            local playerHp = GetPlayerHealth(fUI)
 
-                            if fishHp <= threshold then
-                                -- Máu cá <= Ngưỡng (Cá thường / Cá yếu): Tung DUY NHẤT chiêu Bắt Nhanh (V)
-                                if Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" then
-                                    local qKey = Config.QuickCatchSkill:match("([ZXCVzxcv])")
-                                    if qKey then
-                                        CastSkill(qKey)
-                                    end
-                                else
-                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
-                                        local lk = k:upper()
-                                        CastSkill(lk)
-                                    end
+                            -- BƯỚC 1: CỨU NGUY HỒI MÁU (Khi máu người chơi <= EmergencyHealHp, ví dụ <= 40%)
+                            local didHeal = false
+                            local healKey = Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" and Config.EmergencyHealSkill:match("([ZXCVzxcv])")
+                            if healKey then healKey = healKey:upper() end
+
+                            if healKey and playerHp <= (Config.EmergencyHealHp or 40) then
+                                if comboState.IsSkillReady(healKey, fUI) then
+                                    comboState.CastSkill(healKey)
+                                    comboState.lastActionTime = now
+                                    didHeal = true
                                 end
-                            else
-                                -- Máu cá > Ngưỡng (Cá to / Boss):
-                                local minigameElapsed = now - (comboState.minigameStartTime or now)
+                            end
 
-                                -- 1. GIAI ĐOẠN CHIÊU MỞ MÀN (Opener Skill):
-                                local opKey = Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])")
-                                if opKey then opKey = opKey:upper() end
+                            if not didHeal then
+                                -- BƯỚC 2: PHÂN LOẠI THEO MÁU CÁ
+                                local fishHp = GetFishHealth(fUI)
+                                local threshold = Config.FishHpThreshold or 500
 
-                                if opKey and not comboState.openerDone then
-                                    CastSkill(opKey)
+                                if fishHp <= threshold then
+                                    -- Máu cá <= Ngưỡng (Cá thường / Cá yếu): Ưu tiên chiêu Bắt Nhanh (QuickCatchSkill)
+                                    local qKey = Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" and Config.QuickCatchSkill:match("([ZXCVzxcv])")
+                                    if qKey then qKey = qKey:upper() end
 
-                                    -- Khi icon chiêu mở màn đã vào Cooldown hoặc sau 0.4s đầu -> Hoàn tất Opener
-                                    if IsSkillOnCooldown(opKey, fUI) or minigameElapsed >= 0.4 then
-                                        comboState.openerDone = true
+                                    if qKey and comboState.IsSkillReady(qKey, fUI) then
+                                        comboState.CastSkill(qKey)
+                                        comboState.lastActionTime = now
+                                    else
+                                        -- Nếu chiêu bắt nhanh đang hồi, dùng chiêu Loop sẵn sàng đầu tiên để hạ cá nhanh
+                                        local loopKeys = {}
+                                        for k in string.gmatch(Config.LoopSkills or "X, C", "([ZXCVzxcv])") do
+                                            table.insert(loopKeys, k:upper())
+                                        end
+                                        for _, lk in ipairs(loopKeys) do
+                                            if comboState.IsSkillReady(lk, fUI) then
+                                                comboState.CastSkill(lk)
+                                                comboState.lastActionTime = now
+                                                break
+                                            end
+                                        end
                                     end
                                 else
-                                    -- 2. GIAI ĐOẠN ĐẢO CHIÊU TUẦN TỰ (Loop Skills State Machine):
-                                    local loopKeys = {}
-                                    for k in string.gmatch(Config.LoopSkills or "X, V", "([ZXCVzxcv])") do
-                                        table.insert(loopKeys, k:upper())
-                                    end
+                                    -- Máu cá > Ngưỡng (Cá to / Boss):
+                                    -- GIAI ĐOẠN 1: CHIÊU MỞ MÀN (Opener Skill)
+                                    local opKey = Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])")
+                                    if opKey then opKey = opKey:upper() end
 
-                                    if #loopKeys > 0 then
-                                        if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
-                                            comboState.loopTargetIndex = 1
+                                    local openerMax = math.max(1, tonumber(Config.OpenerMaxCount) or 1)
+                                    local needsOpener = opKey and (not comboState.openerDone) and (comboState.openerUsedCount < openerMax)
+
+                                    if needsOpener then
+                                        if comboState.IsSkillReady(opKey, fUI) then
+                                            comboState.CastSkill(opKey)
+                                            comboState.openerUsedCount = comboState.openerUsedCount + 1
+                                            comboState.lastActionTime = now
+                                            if comboState.openerUsedCount >= openerMax then
+                                                comboState.openerDone = true
+                                            end
+                                        elseif comboState.openerUsedCount > 0 then
+                                            -- Đã tung được ít nhất 1 lần mở màn và giờ đang hồi chiêu -> Chuyển sang giai đoạn Đảo Chiêu luôn
+                                            comboState.openerDone = true
+                                        end
+                                    else
+                                        -- GIAI ĐOẠN 2: CHUỖI ĐẢO CHIÊU LUÂN PHIÊN (Loop Skills Rotation)
+                                        local loopKeys = {}
+                                        for k in string.gmatch(Config.LoopSkills or "X, C", "([ZXCVzxcv])") do
+                                            table.insert(loopKeys, k:upper())
                                         end
 
-                                        -- Kiểm tra chiêu mục tiêu: Nếu Server đã nuốt và chiêu này đang Cooldown -> Dịch sang chiêu kế tiếp!
-                                        local checkCount = 0
-                                        while checkCount < #loopKeys and IsSkillOnCooldown(loopKeys[comboState.loopTargetIndex], fUI) do
-                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                            checkCount = checkCount + 1
-                                        end
+                                        if #loopKeys > 0 then
+                                            if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
+                                                comboState.loopTargetIndex = 1
+                                            end
 
-                                        -- Bắn xung nhịp chiêu mục tiêu đang sẵn sàng
-                                        local targetSkill = loopKeys[comboState.loopTargetIndex]
-                                        if targetSkill then
-                                            if not IsSkillOnCooldown(targetSkill, fUI) then
-                                                CastSkill(targetSkill)
-                                            elseif checkCount >= #loopKeys then
-                                                -- Nếu tất cả các chiêu đều báo cooldown, vẫn bắn để tránh bị đứng im do giao diện game nhận nhầm số
-                                                CastSkill(targetSkill)
-                                                comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                            -- Quét tìm chiêu sẵn sàng trong chuỗi bắt đầu từ vị trí loopTargetIndex
+                                            local chosenIndex = nil
+                                            for offset = 0, #loopKeys - 1 do
+                                                local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                                local sk = loopKeys[idx]
+                                                if comboState.IsSkillReady(sk, fUI) then
+                                                    chosenIndex = idx
+                                                    break
+                                                end
+                                            end
+
+                                            if chosenIndex then
+                                                local skillToCast = loopKeys[chosenIndex]
+                                                comboState.CastSkill(skillToCast)
+                                                comboState.lastActionTime = now
+                                                -- Dịch con trỏ sang chiêu tiếp theo trong chuỗi luân phiên
+                                                comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
                                             end
                                         end
                                     end
