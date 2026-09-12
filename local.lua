@@ -240,7 +240,7 @@ local Config = {
     ESP_Taoist = false,
     ESP_Boss = false,
     ESP_Players = false,
-    FishRedRing = false,
+    FishRedRing = true,
     NoFog = false,
     Fullbright = true,
     PerformanceMode = false,
@@ -3477,112 +3477,42 @@ function ticketQuestState.TeleportTo(pos)
 end
 
 function ticketQuestState.InteractNPC(isClaiming)
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
+    -- Giống cơ chế bán cá 100%: Bắn thẳng RemoteEvent ClaimQuest lên server từ bất cứ đâu, 100% không di chuyển!
+    if Events and Events:FindFirstChild("ClaimQuest") then
+        Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
+    end
 
-    local prevCFrame = root.CFrame
-    local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
-    local targetPos = npcPos or ticketQuestState.spotNPC
-
-    local function executeInteraction()
+    -- Bổ trợ kích hoạt Prompt từ xa nếu có (mở rộng phạm vi vô tận)
+    pcall(function()
+        local _, _, prompt = ticketQuestState.FindTicketNPC()
         if prompt then
-            pcall(function()
-                prompt.MaxActivationDistance = math.huge
-                prompt.RequiresLineOfSight = false
-            end)
+            prompt.MaxActivationDistance = math.huge
+            prompt.RequiresLineOfSight = false
             TriggerPrompt(prompt)
-        elseif npcModel then
-            for _, d in ipairs(npcModel:GetDescendants()) do
-                if d:IsA("ProximityPrompt") then
-                    pcall(function()
-                        d.MaxActivationDistance = math.huge
-                        d.RequiresLineOfSight = false
-                    end)
-                    TriggerPrompt(d)
-                    break
-                end
-            end
-        else
-            for _, d in ipairs(Workspace:GetDescendants()) do
-                if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
-                    local act = tostring(d.ActionText or ""):lower()
-                    local obj = tostring(d.ObjectText or ""):lower()
-                    if act:find("ticket") or obj:find("ticket") or act:find("quest") or obj:find("quest") then
-                        pcall(function()
-                            d.MaxActivationDistance = math.huge
-                            d.RequiresLineOfSight = false
-                        end)
-                        TriggerPrompt(d)
-                        break
-                    end
-                end
-            end
         end
+    end)
 
-        task.wait(0.25)
-        -- Tự động nhấn các nút trong Dialogue/UI nếu có (Accept, Nhận, Take, Hard...)
+    -- Tự động nhấn nút trên Dialogue/UI nếu có
+    pcall(function()
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         if pg then
             for _, btn in ipairs(pg:GetDescendants()) do
-                if btn:IsA("TextButton") and btn.Visible then
+                if btn:IsA("TextButton") then
                     local t = tostring(btn.Text or ""):lower()
                     if t:find("accept") or t:find("nhận") or t:find("take") or t == "hard" or t:find("yes") or t:find("đồng ý") then
-                        pcall(function()
-                            if firesignal then
-                                firesignal(btn.Activated)
-                                firesignal(btn.MouseButton1Click)
-                            elseif getconnections then
-                                for _, c in ipairs(getconnections(btn.Activated or btn.MouseButton1Click)) do
-                                    c:Fire()
-                                end
+                        if firesignal then
+                            firesignal(btn.Activated)
+                            firesignal(btn.MouseButton1Click)
+                        elseif getconnections then
+                            for _, c in ipairs(getconnections(btn.Activated or btn.MouseButton1Click)) do
+                                c:Fire()
                             end
-                        end)
+                        end
                     end
                 end
             end
         end
-
-        if Events and Events:FindFirstChild("ClaimQuest") then
-            Events.ClaimQuest:FireServer("Ticket", Config.TicketDifficulty or "Hard")
-        end
-    end
-
-    if Config.TicketRemoteClaim then
-        -- 1. Thử nhận/nộp từ xa mà KHÔNG dịch chuyển người chơi (Zero-Movement Remote)
-        executeInteraction()
-        task.wait(0.5)
-
-        -- Kiểm tra xem đã nhận hoặc nộp thành công chưa
-        local qType, _, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
-        local success = false
-        if isClaiming then
-            if detectedCd or qType == nil or qType == "none" then
-                success = true
-            end
-        else
-            if qType and qType ~= "none" then
-                success = true
-            end
-        end
-
-        if success then
-            -- Thành công từ xa 100%! Nhân vật đứng yên tại bãi câu không xê dịch!
-            return
-        end
-
-        -- 2. Nếu server Roblox bắt buộc khoảng cách vật lý: Thực hiện Chớp Nhoáng (Blink)
-        -- Bay tới NPC trong 0.15s để server ghi nhận vị trí -> kích hoạt -> trả về vị trí cũ ngay lập tức!
-        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-        task.wait(0.15)
-        executeInteraction()
-        task.wait(0.15)
-        root.CFrame = prevCFrame
-    else
-        root.CFrame = CFrame.new(targetPos + Vector3.new(0, 3, 0))
-        task.wait(0.35)
-        executeInteraction()
-    end
+    end)
 end
 
 function ticketQuestState.DetectActiveQuest()
@@ -3620,177 +3550,197 @@ function ticketQuestState.DetectActiveQuest()
         detectedMax = 100
     end
 
-    -- 2. Quét PlayerGui
+    -- 2. Quét PlayerGui (Kể cả khi khung Quest đang đóng/ẩn)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg then
-        -- 2A. Quét theo cụm Container (Frames/Billboard/ScreenGui) chứa từ khóa Quest/Ticket
-        -- Gom toàn bộ Text bên trong container để bắt trọn: Tiêu đề, Loại quest, Tiến độ X/Y
-        local questContainers = {}
-        for _, obj in ipairs(pg:GetDescendants()) do
-            if obj:IsA("GuiObject") or obj:IsA("ScreenGui") or obj:IsA("BillboardGui") then
-                local oName = obj.Name:lower()
-                if oName:find("ticket") or oName:find("quest") or oName:find("task") or oName:find("mission") then
-                    table.insert(questContainers, obj)
-                end
-            end
-        end
+        -- 2A. Quét chính xác cấu trúc Thẻ "Hard Ticket Quest" như trong ảnh người dùng gửi
+        for _, lbl in ipairs(pg:GetDescendants()) do
+            if lbl:IsA("TextLabel") or lbl:IsA("TextButton") then
+                local txt = cleanStr(lbl.Text)
+                local lower = txt:lower()
 
-        for _, container in ipairs(questContainers) do
-            local combinedText = ""
-            local containerCur = 0
-            local containerMax = 0
-            local containerDone = false
+                if lower:find("hard ticket quest") or (lower:find("ticket") and lower:find("quest")) then
+                    -- Quét mô tả ngay trong chính nhãn này nếu có
+                    local c, m = txt:match("(%d+)%s*/%s*(%d+)")
+                    if c and m then
+                        detectedCur = tonumber(c) or 0
+                        detectedMax = tonumber(m) or 0
+                        if detectedCur >= detectedMax and detectedMax > 0 then isDone = true end
+                        detectedTitle = txt
+                    end
 
-            for _, d in ipairs(container:GetDescendants()) do
-                if (d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox")) and d.Visible then
-                    local raw = cleanStr(d.Text)
-                    if #raw > 0 then
-                        combinedText = combinedText .. " " .. raw
+                    -- Quét các nhãn con/anh em trong cùng khung thẻ (Card Frame)
+                    local card = lbl.Parent
+                    if card then
+                        for _, sibling in ipairs(card:GetDescendants()) do
+                            if (sibling:IsA("TextLabel") or sibling:IsA("TextButton")) and sibling ~= lbl then
+                                local subTxt = cleanStr(sibling.Text)
+                                local subLower = subTxt:lower()
 
-                        -- Quét tiến độ trực tiếp từ nhãn này nếu có
-                        local c, m = raw:match("(%d+)%s*/%s*(%d+)")
-                        if c and m then
-                            local cN = tonumber(c) or 0
-                            local mN = tonumber(m) or 0
-                            if mN > 0 and (containerMax == 0 or mN >= containerMax) then
-                                containerCur = cN
-                                containerMax = mN
-                                if cN >= mN then containerDone = true end
+                                local sc, sm = subTxt:match("(%d+)%s*/%s*(%d+)")
+                                if sc and sm then
+                                    detectedCur = tonumber(sc) or 0
+                                    detectedMax = tonumber(sm) or 0
+                                    if detectedCur >= detectedMax and detectedMax > 0 then isDone = true end
+                                    detectedTitle = subTxt
+
+                                    -- Phân loại quest theo nội dung text trong ảnh
+                                    if subLower:find("skill") or subLower:find("chiêu") or subLower:find("kỹ năng") then
+                                        detectedType = "skill_100"
+                                    elseif subLower:find("bait") or subLower:find("mồi") then
+                                        detectedType = "bait_100"
+                                    elseif subLower:find("1.5") or subLower:find("1,500") or subLower:find("1500") or subLower:find("heavy") then
+                                        detectedType = "fish_15m"
+                                    elseif subLower:find("fish") or subLower:find("cá") or subLower:find("catch") or subLower:find("bắt") then
+                                        detectedType = "fish_100"
+                                    else
+                                        if detectedMax == 10 then
+                                            detectedType = "fish_15m"
+                                        else
+                                            detectedType = "fish_100"
+                                        end
+                                    end
+                                    break
+                                end
                             end
                         end
-
-                        local lowD = raw:lower()
-                        if lowD:find("claim") or lowD:find("completed") or lowD:find("hoàn thành") then
-                            containerDone = true
-                        end
                     end
-                end
-            end
 
-            local lowComb = combinedText:lower()
-            if #lowComb > 0 then
-                -- Kiểm tra thời gian hồi chiêu
-                if lowComb:find("cooldown") or lowComb:find("wait") or lowComb:find("chờ") or lowComb:find("next") then
-                    local m, s = combinedText:match("(%d+)%s*:%s*(%d+)")
-                    if m and s then
-                        local total = (tonumber(m) or 0) * 60 + (tonumber(s) or 0)
-                        if total > 0 and total <= 1800 then detectedCooldownSec = total end
-                    end
+                    if detectedType then break end
                 end
-
-                -- Phân loại nhiệm vụ từ CombinedText của container
-                if not detectedType or mode == "Tự Động (Auto Detect)" then
-                    -- 1.5M Fish
-                    if lowComb:find("1.5") or lowComb:find("1,500,000") or lowComb:find("1500000") or lowComb:find("heavy") or containerMax == 10 then
-                        detectedType = "fish_15m"
-                        detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                        if containerMax == 0 then containerMax = 10 end
-                    -- 100 Bait
-                    elseif lowComb:find("bait") or lowComb:find("mồi") then
-                        detectedType = "bait_100"
-                        detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                        if containerMax == 0 then containerMax = 100 end
-                    -- 100 Skill
-                    elseif lowComb:find("skill") or lowComb:find("chiêu") or lowComb:find("kỹ năng") then
-                        detectedType = "skill_100"
-                        detectedTitle = "Dùng kỹ năng 100 lần"
-                        if containerMax == 0 then containerMax = 100 end
-                    -- 100 Fish (hoặc quest vé thông thường)
-                    elseif (lowComb:find("fish") or lowComb:find("cá") or lowComb:find("catch") or lowComb:find("bắt")) or containerMax == 100 then
-                        detectedType = "fish_100"
-                        detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                        if containerMax == 0 then containerMax = 100 end
-                    elseif containerMax > 0 then
-                        -- Nhiệm vụ random khác của hệ thống
-                        detectedType = "fish_100"
-                        detectedTitle = "Nhiệm Vụ Vé (" .. containerMax .. ")"
-                    end
-                end
-
-                if containerCur > detectedCur then detectedCur = containerCur end
-                if containerMax > detectedMax then detectedMax = containerMax end
-                if containerDone then isDone = true end
             end
         end
 
-        -- 2B. Quét toàn bộ TextLabel đơn lẻ (Fallback nếu không có container)
-        for _, d in ipairs(pg:GetDescendants()) do
-            if (d:IsA("TextLabel") or d:IsA("TextButton")) and d.Visible then
-                local txt = cleanStr(d.Text)
-                if #txt > 0 then
-                    local lower = txt:lower()
+        -- 2B. Quét theo cụm Container (Frames/Billboard/ScreenGui) chứa từ khóa Quest/Ticket (Kể cả khi đóng)
+        if not detectedType then
+            local questContainers = {}
+            for _, obj in ipairs(pg:GetDescendants()) do
+                if obj:IsA("GuiObject") or obj:IsA("ScreenGui") or obj:IsA("BillboardGui") then
+                    local oName = obj.Name:lower()
+                    if oName:find("ticket") or oName:find("quest") or oName:find("task") or oName:find("mission") then
+                        table.insert(questContainers, obj)
+                    end
+                end
+            end
 
-                    -- Quét Cooldown từ text
-                    if (lower:find("ticket") or lower:find("quest")) and (lower:find("cooldown") or lower:find("wait") or lower:find("chờ")) then
-                        local m, s = txt:match("(%d+)%s*:%s*(%d+)")
+            for _, container in ipairs(questContainers) do
+                local combinedText = ""
+                local containerCur = 0
+                local containerMax = 0
+                local containerDone = false
+
+                for _, d in ipairs(container:GetDescendants()) do
+                    if d:IsA("TextLabel") or d:IsA("TextButton") or d:IsA("TextBox") then
+                        local raw = cleanStr(d.Text)
+                        if #raw > 0 then
+                            combinedText = combinedText .. " " .. raw
+
+                            local c, m = raw:match("(%d+)%s*/%s*(%d+)")
+                            if c and m then
+                                local cN = tonumber(c) or 0
+                                local mN = tonumber(m) or 0
+                                if mN > 0 and (containerMax == 0 or mN >= containerMax) then
+                                    containerCur = cN
+                                    containerMax = mN
+                                    if cN >= mN then containerDone = true end
+                                end
+                            end
+
+                            local lowD = raw:lower()
+                            if lowD:find("claim") or lowD:find("completed") or lowD:find("hoàn thành") then
+                                containerDone = true
+                            end
+                        end
+                    end
+                end
+
+                local lowComb = combinedText:lower()
+                if #lowComb > 0 and (lowComb:find("ticket") or lowComb:find("hard") or containerMax == 10 or containerMax == 100) then
+                    -- Kiểm tra thời gian hồi chiêu
+                    if lowComb:find("cooldown") or lowComb:find("wait") or lowComb:find("chờ") or lowComb:find("next") then
+                        local m, s = combinedText:match("(%d+)%s*:%s*(%d+)")
                         if m and s then
                             local total = (tonumber(m) or 0) * 60 + (tonumber(s) or 0)
                             if total > 0 and total <= 1800 then detectedCooldownSec = total end
                         end
                     end
 
-                    -- Quét X/Y
-                    local cur, max = txt:match("(%d+)%s*/%s*(%d+)")
-                    if cur and max then
-                        local cNum = tonumber(cur) or 0
-                        local mNum = tonumber(max) or 0
-                        if mNum == 10 or mNum == 100 or mNum > 0 then
-                            if mNum == 10 then
-                                if not detectedType or mode == "Tự Động (Auto Detect)" then
+                    if not detectedType or mode == "Tự Động (Auto Detect)" then
+                        if lowComb:find("1.5") or lowComb:find("1,500,000") or lowComb:find("1500000") or lowComb:find("heavy") or containerMax == 10 then
+                            detectedType = "fish_15m"
+                            detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
+                            if containerMax == 0 then containerMax = 10 end
+                        elseif lowComb:find("bait") or lowComb:find("mồi") then
+                            detectedType = "bait_100"
+                            detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
+                            if containerMax == 0 then containerMax = 100 end
+                        elseif lowComb:find("skill") or lowComb:find("chiêu") or lowComb:find("kỹ năng") then
+                            detectedType = "skill_100"
+                            detectedTitle = "Dùng kỹ năng 100 lần"
+                            if containerMax == 0 then containerMax = 100 end
+                        elseif (lowComb:find("fish") or lowComb:find("cá") or lowComb:find("catch") or lowComb:find("bắt")) or containerMax == 100 then
+                            detectedType = "fish_100"
+                            detectedTitle = "Câu nhanh 100 con cá (Map 1)"
+                            if containerMax == 0 then containerMax = 100 end
+                        elseif containerMax > 0 then
+                            detectedType = "fish_100"
+                            detectedTitle = "Nhiệm Vụ Vé (" .. containerMax .. ")"
+                        end
+                    end
+
+                    if containerCur > detectedCur then detectedCur = containerCur end
+                    if containerMax > detectedMax then detectedMax = containerMax end
+                    if containerDone then isDone = true end
+                    if detectedType then break end
+                end
+            end
+        end
+
+        -- 2C. Quét toàn bộ TextLabel đơn lẻ (Không phân biệt ẩn/hiện)
+        if not detectedType then
+            for _, d in ipairs(pg:GetDescendants()) do
+                if d:IsA("TextLabel") or d:IsA("TextButton") then
+                    local txt = cleanStr(d.Text)
+                    if #txt > 0 then
+                        local lower = txt:lower()
+
+                        -- Quét Cooldown từ text
+                        if (lower:find("ticket") or lower:find("quest")) and (lower:find("cooldown") or lower:find("wait") or lower:find("chờ")) then
+                            local m, s = txt:match("(%d+)%s*:%s*(%d+)")
+                            if m and s then
+                                local total = (tonumber(m) or 0) * 60 + (tonumber(s) or 0)
+                                if total > 0 and total <= 1800 then detectedCooldownSec = total end
+                            end
+                        end
+
+                        local cur, max = txt:match("(%d+)%s*/%s*(%d+)")
+                        if cur and max then
+                            local cNum = tonumber(cur) or 0
+                            local mNum = tonumber(max) or 0
+                            if mNum == 10 or mNum == 100 then
+                                if mNum == 10 then
                                     detectedType = "fish_15m"
                                     detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
                                     detectedMax = 10
+                                elseif mNum == 100 then
+                                    if lower:find("skill") or lower:find("chiêu") or lower:find("kỹ năng") then
+                                        detectedType = "skill_100"
+                                        detectedTitle = "Dùng kỹ năng 100 lần"
+                                    elseif lower:find("bait") or lower:find("mồi") then
+                                        detectedType = "bait_100"
+                                        detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
+                                    else
+                                        detectedType = "fish_100"
+                                        detectedTitle = "Câu nhanh 100 con cá (Map 1)"
+                                    end
+                                    detectedMax = 100
                                 end
-                            elseif mNum == 100 and not detectedType then
-                                if lower:find("bait") or lower:find("mồi") then
-                                    detectedType = "bait_100"
-                                    detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                                elseif lower:find("skill") or lower:find("chiêu") or lower:find("kỹ năng") then
-                                    detectedType = "skill_100"
-                                    detectedTitle = "Dùng kỹ năng 100 lần"
-                                else
-                                    detectedType = "fish_100"
-                                    detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                                end
-                                detectedMax = 100
+
+                                if cNum > detectedCur then detectedCur = cNum end
+                                if mNum > detectedMax then detectedMax = mNum end
+                                if cNum >= mNum and mNum > 0 then isDone = true end
+                                break
                             end
-
-                            if cNum > detectedCur then detectedCur = cNum end
-                            if mNum > detectedMax then detectedMax = mNum end
-                            if cNum >= mNum and mNum > 0 then isDone = true end
-                        end
-                    end
-
-                    -- Nhận diện từ khóa trực tiếp trên nhãn
-                    if lower:find("1.5m") or lower:find("1,500,000") or lower:find("1500000") or (lower:find("1.5") and (lower:find("weight") or lower:find("kg") or lower:find("size"))) then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "fish_15m"
-                            detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
-                            detectedMax = detectedMax > 0 and detectedMax or 10
-                        end
-                    elseif (lower:find("bait") or lower:find("mồi")) and (lower:find("100") or lower:find("use") or lower:find("consume") or lower:find("tiêu") or lower:find("eat")) then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "bait_100"
-                            detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                            detectedMax = detectedMax > 0 and detectedMax or 100
-                        end
-                    elseif (lower:find("skill") or lower:find("chiêu") or lower:find("kỹ năng")) and (lower:find("100") or lower:find("use") or lower:find("cast")) then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "skill_100"
-                            detectedTitle = "Dùng kỹ năng 100 lần"
-                            detectedMax = detectedMax > 0 and detectedMax or 100
-                        end
-                    elseif (lower:find("catch") or lower:find("fish") or lower:find("cá") or lower:find("bắt")) and lower:find("100") and not lower:find("bait") and not lower:find("skill") then
-                        if not detectedType or mode == "Tự Động (Auto Detect)" then
-                            detectedType = "fish_100"
-                            detectedTitle = "Câu nhanh 100 con cá (Map 1)"
-                            detectedMax = detectedMax > 0 and detectedMax or 100
-                        end
-                    end
-
-                    if lower:find("claim") or lower:find("completed") or lower:find("hoàn thành") then
-                        if lower:find("ticket") or lower:find("quest") or d:FindFirstAncestor("Quest") or d:FindFirstAncestor("Ticket") then
-                            isDone = true
                         end
                     end
                 end
@@ -3804,17 +3754,17 @@ function ticketQuestState.DetectActiveQuest()
         local v = tostring(attrVal):lower()
         if n:find("ticket") or n:find("quest") or v:find("ticket") or v:find("quest") then
             if not detectedType then
-                if v:find("1.5") or n:find("1.5") then
+                if v:find("skill") or n:find("skill") then
+                    detectedType = "skill_100"
+                    detectedTitle = "Dùng kỹ năng 100 lần"
+                    detectedMax = 100
+                elseif v:find("1.5") or n:find("1.5") then
                     detectedType = "fish_15m"
                     detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
                     detectedMax = 10
                 elseif v:find("bait") or n:find("bait") then
                     detectedType = "bait_100"
                     detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                    detectedMax = 100
-                elseif v:find("skill") or n:find("skill") then
-                    detectedType = "skill_100"
-                    detectedTitle = "Dùng kỹ năng 100 lần"
                     detectedMax = 100
                 elseif v:find("fish") or n:find("fish") then
                     detectedType = "fish_100"
@@ -3852,7 +3802,12 @@ function ticketQuestState.DetectActiveQuest()
                 for _, item in ipairs(qFolder:GetChildren()) do
                     local n = item.Name:lower()
                     local valStr = item:IsA("StringValue") and item.Value:lower() or ""
-                    if n:find("1.5") or valStr:find("1.5") or n:find("fish_15") then
+                    if n:find("skill") or valStr:find("skill") or n:find("100skill") then
+                        detectedType = "skill_100"
+                        detectedTitle = "Dùng kỹ năng 100 lần"
+                        detectedMax = 100
+                        break
+                    elseif n:find("1.5") or valStr:find("1.5") or n:find("fish_15") then
                         detectedType = "fish_15m"
                         detectedTitle = "Câu 10 con cá >= 1.5M (Map 9)"
                         detectedMax = 10
@@ -3860,11 +3815,6 @@ function ticketQuestState.DetectActiveQuest()
                     elseif n:find("bait") or valStr:find("bait") or n:find("100bait") then
                         detectedType = "bait_100"
                         detectedTitle = "Tiêu thụ 100 mồi câu (Map 1)"
-                        detectedMax = 100
-                        break
-                    elseif n:find("skill") or valStr:find("skill") or n:find("100skill") then
-                        detectedType = "skill_100"
-                        detectedTitle = "Dùng kỹ năng 100 lần"
                         detectedMax = 100
                         break
                     elseif n:find("catch") or n:find("fish") or valStr:find("fish") then
