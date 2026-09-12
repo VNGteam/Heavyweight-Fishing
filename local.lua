@@ -2028,15 +2028,12 @@ local function GetPlayerCurrentGems()
     if pg then
         local mg = pg:FindFirstChild("MainGui") or pg:FindFirstChild("Fisher_GUI")
         if mg then
-            for _, d in ipairs(mg:GetDescendants()) do
-                if d:IsA("TextLabel") and d.Visible then
-                    local pName = d.Parent and d.Parent.Name:lower() or ""
-                    local dName = d.Name:lower()
-                    if dName:find("gem") or dName:find("diamond") or pName:find("gem") or pName:find("diamond") then
+            local topBar = mg:FindFirstChild("TopBar") or mg:FindFirstChild("Top") or mg:FindFirstChild("Stats") or mg:FindFirstChild("Currencies")
+            if topBar then
+                for _, d in ipairs(topBar:GetChildren()) do
+                    if d:IsA("TextLabel") and (d.Name:lower():find("gem") or d.Name:lower():find("diamond")) then
                         local numStr = d.Text:gsub("[^%d]", "")
-                        if #numStr > 0 and tonumber(numStr) then
-                            return tonumber(numStr)
-                        end
+                        if #numStr > 0 and tonumber(numStr) then return tonumber(numStr) end
                     end
                 end
             end
@@ -2971,19 +2968,18 @@ function secretBossState.ScanForTaoistNPC()
     end
 
     local candidateFolders = {}
-    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns", "Map", "Islands", "SecretRod"}) do
+    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters"}) do
         local f = Workspace:FindFirstChild(fName)
         if f then
             table.insert(candidateFolders, f)
-            for _, subName in ipairs({"NPC", "NPCs", "Entities", "Characters"}) do
+            for _, subName in ipairs({"Function", "Merchant", "Taoist", "SellFish", "SetSpawn"}) do
                 local sf = f:FindFirstChild(subName)
                 if sf then table.insert(candidateFolders, sf) end
             end
         end
     end
-    table.insert(candidateFolders, Workspace)
 
-    -- Đợt 1: Quét nhanh tên Model / BasePart trực tiếp
+    -- Đợt 1: Quét nhanh tên Model / BasePart trực tiếp trong các folder NPC
     for _, folder in ipairs(candidateFolders) do
         for _, n in ipairs(folder:GetChildren()) do
             if n:IsA("Model") or n:IsA("BasePart") then
@@ -3000,7 +2996,7 @@ function secretBossState.ScanForTaoistNPC()
         end
     end
 
-    -- Đợt 2: Quét qua ProximityPrompt (tương tác) và TextLabel (tên hiển thị trên đầu)
+    -- Đợt 2: Quét qua ProximityPrompt và TextLabel trong thư mục NPC
     for _, folder in ipairs(candidateFolders) do
         for _, d in ipairs(folder:GetDescendants()) do
             if d:IsA("ProximityPrompt") then
@@ -3032,6 +3028,14 @@ function secretBossState.ScanForTaoistNPC()
             end
         end
     end
+
+    -- Đợt 3: Chỉ kiểm tra các Model con cấp 1 của Workspace (KHÔNG dùng GetDescendants trên Workspace)
+    for _, n in ipairs(Workspace:GetChildren()) do
+        if n:IsA("Model") and matchesTaoist(n.Name) then
+            local isMaoshan = n.Name:lower():find("maoshan")
+            return n, isMaoshan and "Đạo Sĩ Maoshan" or "Đạo Sĩ (Taoist)", isMaoshan and "Maoshan" or "Taoist", isMaoshan and Colors.PurplePrimary or Colors.AccentOrange, isMaoshan and "✨" or "📜"
+        end
+    end
     return nil
 end
 
@@ -3040,7 +3044,7 @@ function secretBossState.GetTaoist()
         return secretBossState.cachedTaoist.inst, secretBossState.cachedTaoist.displayName, secretBossState.cachedTaoist.category, secretBossState.cachedTaoist.col, secretBossState.cachedTaoist.icon
     end
     local now = tick()
-    if (now - secretBossState.lastTaoistScan) >= 1.5 then
+    if (now - (secretBossState.lastTaoistScan or 0)) >= 5.0 then
         secretBossState.lastTaoistScan = now
         local inst, displayName, category, col, icon = secretBossState.ScanForTaoistNPC()
         if inst then
@@ -3074,11 +3078,10 @@ function secretBossState.ScanForGodSpirit()
     end
 
     local candidateFolders = {}
-    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns", "Map", "Islands"}) do
+    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters"}) do
         local f = Workspace:FindFirstChild(fName)
         if f then table.insert(candidateFolders, f) end
     end
-    table.insert(candidateFolders, Workspace)
 
     for _, folder in ipairs(candidateFolders) do
         for _, n in ipairs(folder:GetChildren()) do
@@ -3102,6 +3105,13 @@ function secretBossState.ScanForGodSpirit()
             end
         end
     end
+
+    -- Chỉ kiểm tra con cấp 1 của Workspace
+    for _, n in ipairs(Workspace:GetChildren()) do
+        if (n:IsA("Model") or n:IsA("BasePart")) and matchesGod(n.Name) then
+            return n
+        end
+    end
     return nil
 end
 
@@ -3110,7 +3120,7 @@ function secretBossState.GetGodSpirit()
         return secretBossState.cachedGod
     end
     local now = tick()
-    if (now - secretBossState.lastGodScan) >= 1.5 then
+    if (now - (secretBossState.lastGodScan or 0)) >= 5.0 then
         secretBossState.lastGodScan = now
         local inst = secretBossState.ScanForGodSpirit()
         secretBossState.cachedGod = inst
@@ -4554,7 +4564,9 @@ function ticketQuestState.Tick()
             if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= baitName and (now - ticketQuestState.lastBaitEquip >= 2.0) then
                 ticketQuestState.lastBaitEquip = now
                 if Events and Events:FindFirstChild("EquipBait") then
-                    Events.EquipBait:InvokeServer(baitName)
+                    task.spawn(function()
+                        Events.EquipBait:InvokeServer(baitName)
+                    end)
                 end
             end
         end
@@ -4564,7 +4576,9 @@ function ticketQuestState.Tick()
         if pData and pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "None" and (now - ticketQuestState.lastBaitEquip >= 2.0) then
             ticketQuestState.lastBaitEquip = now
             if Events and Events:FindFirstChild("EquipBait") then
-                Events.EquipBait:InvokeServer("None")
+                task.spawn(function()
+                    Events.EquipBait:InvokeServer("None")
+                end)
             end
         end
     end
@@ -8176,7 +8190,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
             end
             if Events and Events:FindFirstChild("ToggleHotbar") then
-                Events.ToggleHotbar:InvokeServer(rodSlot)
+                task.spawn(function()
+                    Events.ToggleHotbar:InvokeServer(rodSlot)
+                end)
             end
         end
 
@@ -8767,7 +8783,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
 
                     if desiredBait and pData.EquippedBait.Value ~= desiredBait then
-                        Events.EquipBait:InvokeServer(desiredBait)
+                        task.spawn(function()
+                            Events.EquipBait:InvokeServer(desiredBait)
+                        end)
                     end
                 end
             end
@@ -8783,8 +8801,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                 end
                 if bestRod and pData.FishingRod.Value ~= bestRod then
-                    Events.EquipFishingRod:InvokeServer(bestRod)
-                    task.delay(0.5, function()
+                    task.spawn(function()
+                        Events.EquipFishingRod:InvokeServer(bestRod)
+                        task.wait(0.5)
                         if Events and Events:FindFirstChild("ToggleHotbar") then
                             Events.ToggleHotbar:InvokeServer("1")
                         end
@@ -8796,26 +8815,21 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 local orbs = pData.Orb:GetChildren()
                 if #orbs > 0 then
                     local bestOrb = orbs[#orbs].Name
-                    Events.EquipOrb:InvokeServer(bestOrb)
+                    task.spawn(function()
+                        Events.EquipOrb:InvokeServer(bestOrb)
+                    end)
                 end
             end
 
             if pData:FindFirstChild("FishingRod") and pData.FishingRod.Value ~= "" then infoEquippedRod.Set(pData.FishingRod.Value) end
             if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "" then infoEquippedBait.Set(pData.EquippedBait.Value) end
 
-            -- Đồng bộ trạng thái danh sách cần câu trong Shop mỗi 3 giây
-            if not lastRodShopSync or (tick() - lastRodShopSync >= 3) then
-                lastRodShopSync = tick()
-                if UpdateAllRodShopUI then
-                    UpdateAllRodShopUI()
-                end
-            end
-
-            -- Tự động nhận diện map/đảo hiện tại của người chơi mỗi 2 giây
-            if not lastIslandCheck or (tick() - lastIslandCheck >= 2) then
+            -- Cập nhật tên vị trí hiện tại mỗi 8 giây (chỉ cập nhật chuỗi text, không redraw giao diện đảo)
+            if not lastIslandCheck or (tick() - lastIslandCheck >= 8) then
                 lastIslandCheck = tick()
-                if UpdateAllIslandStatus then
-                    pcall(UpdateAllIslandStatus)
+                if GetCurrentLocationName and infoCurrentMap and infoCurrentMap.Set then
+                    local curLoc = GetCurrentLocationName()
+                    infoCurrentMap.Set(curLoc)
                 end
             end
 
