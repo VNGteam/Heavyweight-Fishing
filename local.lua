@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "4155400"
+local SCRIPT_BUILD_COMMIT = "2409572"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3746,12 +3746,28 @@ function ticketQuestState.InteractNPC(isClaiming)
     local targetPos = npcPos or ticketQuestState.spotNPC
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+
+    if hum then
+        pcall(function()
+            hum.Sit = false
+            hum:UnequipTools()
+        end)
+    end
+    if Events and Events:FindFirstChild("CancelCast") then
+        pcall(function() Events.CancelCast:FireServer() end)
+    end
 
     if root and targetPos then
         local dist = (root.Position - targetPos).Magnitude
         if dist > 6 then
-            -- Đứng trước mặt NPC và nhìn về phía NPC
-            root.CFrame = CFrame.lookAt(targetPos + Vector3.new(0, 1.5, 3.5), targetPos)
+            local npcRot = (npcModel and npcModel:IsA("Model") and npcModel:GetPivot()) or (npcModel and npcModel:IsA("BasePart") and npcModel.CFrame)
+            local frontPos = targetPos + Vector3.new(0, 1.5, 0)
+            if npcRot then
+                frontPos = targetPos + (npcRot.LookVector * 3.2) + Vector3.new(0, 1.2, 0)
+            end
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.lookAt(frontPos, targetPos)
             task.wait(0.35)
         end
     end
@@ -4061,14 +4077,12 @@ function ticketQuestState.ScanAndUpdateStatus()
         ticketQuestState.targetProgress = (max and max > 0) and max or 100
         ticketQuestState.isCompleted = (done == true) or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
 
-        if not ticketQuestState.isCompleted then
-            if not detectedCd or detectedCd <= 0 then
-                ticketQuestState.isCooldown = false
-            end
-        end
+        -- Đang có nhiệm vụ trong người (dù đang làm hay đã vượt chỉ tiêu) thì tuyệt đối KHÔNG PHẢI Cooldown!
+        ticketQuestState.isCooldown = false
+        ticketQuestState.cooldownEnd = 0
 
         if ticketQuestState.isCompleted then
-            ticketQuestState.statusText = ticketQuestState.currentQuestTitle .. " (Đã Hoàn Thành)"
+            ticketQuestState.statusText = ticketQuestState.currentQuestTitle .. " (Đã Hoàn Thành - Đang Nộp Vé)"
         else
             ticketQuestState.statusText = ticketQuestState.currentQuestTitle
         end
@@ -4114,9 +4128,16 @@ function ticketQuestState.Tick()
 
     -- 0. Quét đồng bộ trạng thái và tiến độ nhiệm vụ trước khi thực thi
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.ScanAndUpdateStatus()
+    local isDoneNow = ticketQuestState.isCompleted or done or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
 
-    -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới)
-    if ticketQuestState.isCooldown then
+    -- NẾU CÓ QUEST ĐÃ HOÀN THÀNH HOẶC VƯỢT CHỈ TIÊU (VÍ DỤ 105/100): HỦY COOLDOWN ĐỂ TIẾN HÀNH TRẢ VÉ!
+    if isDoneNow then
+        ticketQuestState.isCooldown = false
+        ticketQuestState.cooldownEnd = 0
+    end
+
+    -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới - CHỈ CHẠY KHI KHÔNG CÓ QUEST HOÀN THÀNH)
+    if ticketQuestState.isCooldown and not isDoneNow then
         local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
         local isReady = ticketQuestState.CheckNPCReady()
         if (remain <= 0 or isReady) and remain <= 0 then
@@ -4190,11 +4211,24 @@ function ticketQuestState.Tick()
     end
 
     -- 2. Đã hoàn thành nhiệm vụ -> Trả vé tại NPC (bấm *Leave* theo ảnh)
-    if ticketQuestState.isCompleted or done then
-        if now - (ticketQuestState.lastClaimAttempt or 0) >= 4.0 then
+    if isDoneNow then
+        if now - (ticketQuestState.lastClaimAttempt or 0) >= 3.5 then
             ticketQuestState.lastClaimAttempt = now
             ticketQuestState.statusText = "Đã xong nhiệm vụ! Đang nộp vé Hard..."
             ticketQuestState.UpdateUI()
+
+            -- Hủy cần câu trước khi bay đến nộp vé
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                pcall(function()
+                    hum.Sit = false
+                    hum:UnequipTools()
+                end)
+            end
+            if Events and Events:FindFirstChild("CancelCast") then
+                pcall(function() Events.CancelCast:FireServer() end)
+            end
 
             local claimSuccess = ticketQuestState.InteractNPC(true)
             task.wait(0.5)
