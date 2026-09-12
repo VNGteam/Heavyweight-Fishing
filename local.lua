@@ -117,6 +117,7 @@ local Config = {
     OpenerSkill = "Z",
     OpenerMaxCount = 1,
     LoopSkills = "X, C",
+    LoopStrictOrder = false,
     EmergencyHealSkill = "V",
     EmergencyHealHp = 40,
     SkillEffectDelay = 1.2,
@@ -283,6 +284,9 @@ local ConfigLabelMap = {
     ["Chiêu Mở Màn (> Ngưỡng HP)"] = "OpenerSkill",
     ["Số Lần Dùng Chiêu Mở Màn"] = "OpenerMaxCount",
     ["Chuỗi Đảo Chiêu Luân Phiên"] = "LoopSkills",
+    ["Tùy Biến Chuỗi Đảo Chiêu"] = "LoopSkills",
+    ["Mẫu Chuỗi Chiêu (Preset)"] = "LoopSkills",
+    ["Giữ Đúng Thứ Tự Combo (Strict Order)"] = "LoopStrictOrder",
     ["Chiêu Hồi Máu / Cứu Nguy"] = "EmergencyHealSkill",
     ["Kích Hoạt Hồi Máu Khi HP Dưới"] = "EmergencyHealHp",
     ["Thời Gian Chờ Ra Chiêu"] = "SkillEffectDelay",
@@ -1220,11 +1224,11 @@ end
 
 local function createInfoRow(parent, labelText, valueText, indexSearch)
     local row = createBaseRow(parent, labelText, "", indexSearch)
-    local vl = Instance.new("TextLabel"); vl.Size = UDim2.new(0, 140, 1, 0); vl.Position = UDim2.new(1, -140, 0, 0); vl.BackgroundTransparency = 1; vl.Font = Enum.Font.GothamBold; vl.Text = valueText; vl.TextColor3 = Colors.PurplePrimary; vl.TextSize = 11; vl.TextXAlignment = Enum.TextXAlignment.Right; vl.Parent = row
+    local vl = Instance.new("TextLabel"); vl.Size = UDim2.new(0, 180, 1, 0); vl.Position = UDim2.new(1, -180, 0, 0); vl.BackgroundTransparency = 1; vl.Font = Enum.Font.GothamBold; vl.Text = valueText; vl.TextColor3 = Colors.PurplePrimary; vl.TextSize = 11; vl.TextXAlignment = Enum.TextXAlignment.Right; vl.Parent = row
     return {frame = row, Set = function(nv) vl.Text = nv end}
 end
 
-local function createInputRow(parent, labelText, descText, initialVal, callback, indexSearch)
+local function createInputRow(parent, labelText, descText, initialVal, callback, indexSearch, placeholder)
     local row = createBaseRow(parent, labelText, descText, indexSearch)
     local tb = Instance.new("TextBox")
     tb.Size = UDim2.new(0, 160, 0, 24)
@@ -1232,7 +1236,7 @@ local function createInputRow(parent, labelText, descText, initialVal, callback,
     tb.BackgroundColor3 = Colors.InputBg
     tb.Font = Enum.Font.Gotham
     tb.Text = initialVal or ""
-    tb.PlaceholderText = "Dán link vào đây..."
+    tb.PlaceholderText = placeholder or "Nhập tại đây..."
     tb.PlaceholderColor3 = Colors.TextMuted
     tb.TextColor3 = Colors.TextWhite
     tb.TextSize = 11
@@ -4748,26 +4752,153 @@ createSliderRow(comboCard, "Số Lần Dùng Chiêu Mở Màn", "Số lần tung
     Config.OpenerMaxCount = v
 end)
 
-local loopOptions = {
-    "X, V",
-    "X, C",
-    "C, V",
-    "Z, X",
-    "Z, C",
-    "Z, V",
-    "X, C, V",
-    "Z, X, C",
-    "Z, X, V",
-    "Z, C, V",
-    "Z, X, C, V",
-    "Z",
-    "X",
-    "C",
-    "V"
-}
-createDropdownRow(comboCard, "Chuỗi Đảo Chiêu Luân Phiên", "Các chiêu đánh xoay vòng liên tục, tự bỏ qua chiêu đang hồi", loopOptions, Config.LoopSkills, function(v)
-    Config.LoopSkills = v
-end)
+do
+    local loopPresets = {
+        "Tùy Biến (Tự Do)",
+        "X, C (Cơ Bản 2 Chiêu)",
+        "X, V (Khống Chế)",
+        "C, V (Bộ Chiêu Cuối)",
+        "X, C, V (Dồn Sát Thương 3 Chiêu)",
+        "Z, X, C, V (Chuỗi Đầy Đủ 4 Chiêu)",
+        "X, C, X, V (Nhịp Kép X)",
+        "Z, X, Z, C (Tối Ưu Cooldown Z)",
+        "X, X, C (Nhồi Liên Hoàn X)",
+        "C, X, C, V (Nhịp Kép C)",
+        "Z, C, V (Hỗ Trợ & Sát Thương)"
+    }
+
+    local function getPresetValue(label)
+        if not label or label == "Tùy Biến (Tự Do)" then return nil end
+        local clean = label:match("^([^%(]+)")
+        if clean then
+            local keys = {}
+            for k in string.gmatch(clean, "([ZXCVzxcv])") do
+                table.insert(keys, k:upper())
+            end
+            if #keys > 0 then
+                return table.concat(keys, ", ")
+            end
+        end
+        return nil
+    end
+
+    local function getPresetLabel(val)
+        local formatted = comboState.FormatCombo(val)
+        for _, l in ipairs(loopPresets) do
+            local pVal = getPresetValue(l)
+            if pVal and pVal == formatted then
+                return l
+            end
+        end
+        return "Tùy Biến (Tự Do)"
+    end
+
+    local isSyncing = false
+    local customInput = nil
+    local presetDropdown = nil
+    local infoPreview = nil
+
+    local function applyComboChange(newVal, source)
+        if isSyncing then return end
+        isSyncing = true
+
+        local cleanStr = comboState.FormatCombo(newVal)
+        Config.LoopSkills = cleanStr
+
+        if source ~= "input" and customInput and customInput.Set then
+            customInput.Set(cleanStr)
+        end
+
+        if source ~= "dropdown" and presetDropdown and presetDropdown.Set then
+            local targetLabel = getPresetLabel(cleanStr)
+            presetDropdown.Set(targetLabel)
+        end
+
+        if infoPreview and infoPreview.Set then
+            infoPreview.Set(comboState.GetComboPreview(cleanStr))
+        end
+
+        isSyncing = false
+    end
+
+    presetDropdown = createDropdownRow(comboCard, "Mẫu Chuỗi Chiêu (Preset)", "Chọn nhanh chuỗi phổ biến hoặc tự do tùy biến ở dưới", loopPresets, getPresetLabel(Config.LoopSkills), function(v)
+        local pVal = getPresetValue(v)
+        if pVal then
+            applyComboChange(pVal, "dropdown")
+        end
+    end)
+
+    customInput = createInputRow(comboCard, "Tùy Biến Chuỗi Đảo Chiêu", "Gõ bất kỳ chiêu nào (VD: X, C, X, V hoặc Z, X, C, V...)", Config.LoopSkills or "X, C", function(v)
+        applyComboChange(v, "input")
+    end, nil, "VD: X, C, X, V")
+
+    -- Bàn phím tạo combo nhanh 1 chạm
+    local quickRow = createBaseRow(comboCard, "Bộ Phím Ghép Combo Nhanh", "Chạm các nút để thêm hoặc xóa nhanh chiêu vào chuỗi combo")
+    local btnContainer = Instance.new("Frame")
+    btnContainer.Size = UDim2.new(0, 190, 0, 24)
+    btnContainer.Position = UDim2.new(1, -190, 0.5, -12)
+    btnContainer.BackgroundTransparency = 1
+    btnContainer.Parent = quickRow
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.FillDirection = Enum.FillDirection.Horizontal
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 3)
+    listLayout.Parent = btnContainer
+
+    local function makeQuickBtn(text, bgColor, textColor, onClick)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 28, 0, 24)
+        btn.BackgroundColor3 = bgColor
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = text
+        btn.TextColor3 = textColor
+        btn.TextSize = 11
+        btn.BorderSizePixel = 0
+        btn.Parent = btnContainer
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        btn.MouseButton1Click:Connect(function()
+            pcall(onClick)
+        end)
+        return btn
+    end
+
+    local function appendKey(k)
+        local current = Config.LoopSkills or ""
+        local keys = {}
+        for char in string.gmatch(current, "([ZXCVzxcv])") do
+            table.insert(keys, char:upper())
+        end
+        table.insert(keys, k:upper())
+        applyComboChange(table.concat(keys, ", "), "quickbtn")
+    end
+
+    makeQuickBtn("+Z", Colors.ControlBg, Colors.PurplePrimary, function() appendKey("Z") end)
+    makeQuickBtn("+X", Colors.ControlBg, Colors.PurplePrimary, function() appendKey("X") end)
+    makeQuickBtn("+C", Colors.ControlBg, Colors.PurplePrimary, function() appendKey("C") end)
+    makeQuickBtn("+V", Colors.ControlBg, Colors.PurplePrimary, function() appendKey("V") end)
+    makeQuickBtn("⌫", Color3.fromRGB(45, 25, 30), Color3.fromRGB(255, 120, 120), function()
+        local current = Config.LoopSkills or ""
+        local keys = {}
+        for char in string.gmatch(current, "([ZXCVzxcv])") do
+            table.insert(keys, char:upper())
+        end
+        if #keys > 0 then
+            table.remove(keys, #keys)
+        end
+        applyComboChange(table.concat(keys, ", "), "quickbtn")
+    end)
+    makeQuickBtn("🗑", Color3.fromRGB(35, 35, 40), Colors.TextMuted, function()
+        applyComboChange("", "quickbtn")
+    end)
+
+    infoPreview = createInfoRow(comboCard, "Thứ Tự Thi Triển Thực Tế", comboState.GetComboPreview(Config.LoopSkills))
+
+    createToggleRow(comboCard, "Giữ Đúng Thứ Tự Combo (Strict Order)", "Chờ chiêu hồi theo đúng nhịp thứ tự, không nhảy cóc qua chiêu khác", Config.LoopStrictOrder, function(v)
+        Config.LoopStrictOrder = v
+    end)
+end
 
 createDropdownRow(comboCard, "Chiêu Hồi Máu / Cứu Nguy", "Ưu tiên tung chiêu này khi máu người chơi xuống thấp", {"Tắt", "Z", "X", "C", "V"}, Config.EmergencyHealSkill, function(v)
     Config.EmergencyHealSkill = v
@@ -7804,8 +7935,41 @@ local comboState = {
         ["X"] = 3.0,
         ["C"] = 5.0,
         ["V"] = 4.0
-    }
+    },
+    loopWaitStartTime = 0
 }
+
+function comboState.SkillExists(sk, fUI)
+    if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = (sk:match("([ZXCVzxcv])") or sk):upper()
+    if not fUI then return true end
+    for _, desc in ipairs(fUI:GetDescendants()) do
+        local nameUpper = desc.Name:upper()
+        if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
+            return true
+        end
+    end
+    return false
+end
+
+function comboState.FormatCombo(str)
+    local keys = {}
+    for k in string.gmatch(str or "", "([ZXCVzxcv])") do
+        table.insert(keys, k:upper())
+    end
+    return table.concat(keys, ", ")
+end
+
+function comboState.GetComboPreview(str)
+    local keys = {}
+    for k in string.gmatch(str or "", "([ZXCVzxcv])") do
+        table.insert(keys, k:upper())
+    end
+    if #keys == 0 then
+        return "(Chưa có chiêu)"
+    end
+    return table.concat(keys, " ➔ ") .. string.format(" (%d chiêu)", #keys)
+end
 
 function comboState.IsSkillReady(sk, fUI)
     if not sk or sk == "" or sk == "Tắt" then return false end
@@ -8221,11 +8385,13 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             comboState.loopTargetIndex = 1
             comboState.loopIndex = 1
             comboState.lastActionTime = 0
+            comboState.loopWaitStartTime = 0
             comboState.minigameStartTime = now
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             minigameDurationTracker = 0
             comboState.lastActionTime = 0
+            comboState.loopWaitStartTime = 0
             secretBossState.webhookSentForCurrent = false
             secretBossState.isCatchingTarget = false
             secretBossState.minigameStartTime = 0
@@ -8685,23 +8851,52 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                                 comboState.loopTargetIndex = 1
                                             end
 
-                                            -- Quét tìm chiêu sẵn sàng trong chuỗi bắt đầu từ vị trí loopTargetIndex
-                                            local chosenIndex = nil
-                                            for offset = 0, #loopKeys - 1 do
-                                                local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
-                                                local sk = loopKeys[idx]
-                                                if comboState.IsSkillReady(sk, fUI) then
-                                                    chosenIndex = idx
-                                                    break
-                                                end
-                                            end
+                                            local targetKey = loopKeys[comboState.loopTargetIndex]
+                                            local isStrict = Config.LoopStrictOrder == true
 
-                                            if chosenIndex then
-                                                local skillToCast = loopKeys[chosenIndex]
-                                                comboState.CastSkill(skillToCast)
-                                                comboState.lastActionTime = now
-                                                -- Dịch con trỏ sang chiêu tiếp theo trong chuỗi luân phiên
-                                                comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
+                                            if isStrict then
+                                                -- Chế độ Tuần Tự Nghiêm Ngặt: Chờ đúng chiêu theo nhịp combo đã cài
+                                                local skillExists = comboState.SkillExists(targetKey, fUI)
+                                                local isReady = skillExists and comboState.IsSkillReady(targetKey, fUI)
+
+                                                if isReady then
+                                                    comboState.CastSkill(targetKey)
+                                                    comboState.lastActionTime = now
+                                                    comboState.loopWaitStartTime = 0
+                                                    comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                                elseif not skillExists then
+                                                    -- Chiêu không có trên cần -> Bỏ qua sang chiêu kế tiếp
+                                                    comboState.loopWaitStartTime = 0
+                                                    comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                                else
+                                                    -- Chiêu đang trong thời gian hồi chiêu (CD)
+                                                    if comboState.loopWaitStartTime == 0 then
+                                                        comboState.loopWaitStartTime = now
+                                                    elseif (now - comboState.loopWaitStartTime >= 5.0) then
+                                                        -- Chờ quá 5s chưa hồi -> Bỏ qua tránh kẹt combo
+                                                        comboState.loopWaitStartTime = 0
+                                                        comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                                    end
+                                                end
+                                            else
+                                                -- Chế độ Bỏ Qua Cooldown (Spam): Quét tìm chiêu sẵn sàng trong chuỗi bắt đầu từ loopTargetIndex
+                                                local chosenIndex = nil
+                                                for offset = 0, #loopKeys - 1 do
+                                                    local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                                    local sk = loopKeys[idx]
+                                                    if comboState.IsSkillReady(sk, fUI) then
+                                                        chosenIndex = idx
+                                                        break
+                                                    end
+                                                end
+
+                                                if chosenIndex then
+                                                    local skillToCast = loopKeys[chosenIndex]
+                                                    comboState.CastSkill(skillToCast)
+                                                    comboState.lastActionTime = now
+                                                    comboState.loopWaitStartTime = 0
+                                                    comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
+                                                end
                                             end
                                         end
                                     end
