@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "81a1a20"
+local SCRIPT_BUILD_COMMIT = "2add94b"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -198,6 +198,11 @@ local Config = {
     AutoServerHopGod = false,
     AutoServerHopMaoshan = false,
     AutoServerHopTaoist = false,
+    
+    AutoWeatherHop = false,
+    TargetWeather = "Bất Kỳ Thời Tiết Nào (Trừ Clear)",
+    WeatherHopAutoFish = true,
+    WeatherHopAlertWebhook = true,
     
     AutoTicketQuest = false,
     TicketDifficulty = "Hard",
@@ -376,6 +381,12 @@ local ConfigLabelMap = {
     ["Tự Đổi Server Khi Hết Boss (Auto-Hop)"] = "AutoServerHopOnDespawn",
     ["Đổi Server Khi Hết Secret Boss"] = "AutoServerHopOnDespawn",
     ["Tự Về Vị Trí Farm Khi Hết Boss / Clear"] = "ReturnToHomeWhenClear",
+
+    -- Tìm Server Thời Tiết
+    ["Tự Động Tìm Server Thời Tiết"] = "AutoWeatherHop",
+    ["Chọn Thời Tiết Cần Tìm"] = "TargetWeather",
+    ["Tự Động Câu / Săn Boss Khi Tìm Thấy"] = "WeatherHopAutoFish",
+    ["Gửi Webhook Khi Tìm Thấy Server"] = "WeatherHopAlertWebhook",
 
     -- Thần linh
     ["Tự Động Quét Trạng Thái Thần Linh"] = "AutoGodSpiritCheck",
@@ -2276,6 +2287,176 @@ local function ServerHop()
     end)
 end
 secretBossState.ServerHop = ServerHop
+
+secretBossState.weatherHopChoices = {
+    "Bất Kỳ Thời Tiết Nào (Trừ Clear)",
+    "Thunderstorm (Bão Sấm)",
+    "Snowy (Bão Tuyết)",
+    "Foggy (Sương Mù)",
+    "Blazing Sun (Nắng Gắt)",
+    "Rainy (Trời Mưa)",
+    "Windy (Trời Gió)",
+    "Acid Rain (Mưa Axit)",
+    "Blood Moon (Trăng Máu)",
+    "Boss Realm",
+}
+
+function secretBossState.IsWeatherMatch(currentWeatherName, targetWeather)
+    if not currentWeatherName or currentWeatherName == "" or currentWeatherName == "Clear" then
+        return false
+    end
+    if not targetWeather or targetWeather == "Bất Kỳ Thời Tiết Nào (Trừ Clear)" or targetWeather == "Bất Kỳ Thời Tiết Nào" then
+        return currentWeatherName ~= "Clear"
+    end
+    local curLow = currentWeatherName:lower()
+    local tgtLow = targetWeather:lower()
+
+    for _, kw in ipairs({"thunderstorm", "snow", "fog", "blazing", "rain", "wind", "acid", "blood", "realm", "sấm", "tuyết", "sương", "nắng", "mưa", "gió", "axit", "trăng máu"}) do
+        if tgtLow:find(kw) and curLow:find(kw) then
+            return true
+        end
+    end
+    return curLow:find(tgtLow, 1, true) ~= nil or tgtLow:find(curLow, 1, true) ~= nil
+end
+
+function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
+    visitedServers = visitedServers or {}
+    table.insert(visitedServers, game.JobId)
+
+    if writefile then
+        pcall(function()
+            writefile("HeavyweightFishing_WeatherHop.json", HttpService:JSONEncode({
+                Active = true,
+                TargetWeather = targetWeather,
+                Visited = visitedServers,
+                AutoFish = Config.WeatherHopAutoFish,
+                Webhook = Config.WeatherHopAlertWebhook,
+                StartTime = tick()
+            }))
+        end)
+    end
+
+    local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    if qot then
+        pcall(function()
+            qot([[loadstring(game:HttpGet("https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/loader.lua"))()]])
+        end)
+    end
+
+    ShowNotification("Tìm Server", string.format("Đang tìm server có: %s...", targetWeather), "WARN", 5)
+
+    task.spawn(function()
+        local placeId = game.PlaceId
+        local cursor = ""
+        local foundJob = nil
+        local visitedMap = {}
+        for _, jid in ipairs(visitedServers) do visitedMap[jid] = true end
+
+        for page = 1, 4 do
+            local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", placeId, cursor ~= "" and ("&cursor=" .. cursor) or "")
+            local ok, res = pcall(function() return game:HttpGet(url) end)
+            if ok and res then
+                local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
+                if bOk and body and body.data then
+                    for _, s in ipairs(body.data) do
+                        if s.playing and s.maxPlayers and s.playing < s.maxPlayers and not visitedMap[s.id] and s.id ~= game.JobId then
+                            foundJob = s.id
+                            break
+                        end
+                    end
+                    if foundJob then break end
+                    cursor = body.nextPageCursor or ""
+                    if not cursor or cursor == "" then break end
+                end
+            end
+            task.wait(0.2)
+        end
+
+        if foundJob then
+            ShowNotification("Đổi Server", "Đã chọn server mới! Đang chuyển...", "SUCCESS", 4)
+            task.wait(0.5)
+            TeleportService:TeleportToPlaceInstance(placeId, foundJob, LocalPlayer)
+        else
+            ShowNotification("Tìm Server", "Đang chuyển sang server ngẫu nhiên...", "INFO", 4)
+            task.wait(1.5)
+            TeleportService:Teleport(placeId, LocalPlayer)
+        end
+    end)
+end
+
+function secretBossState.CheckWeatherHopOnJoin()
+    local hopData = nil
+    if isfile and isfile("HeavyweightFishing_WeatherHop.json") and readfile then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile("HeavyweightFishing_WeatherHop.json"))
+        end)
+        if ok and type(data) == "table" and data.Active then
+            hopData = data
+        end
+    end
+
+    if not hopData then return end
+
+    local targetWeather = hopData.TargetWeather or Config.TargetWeather or "Bất Kỳ Thời Tiết Nào (Trừ Clear)"
+    ShowNotification("Tìm Server", string.format("Đang quét thời tiết server cho: %s...", targetWeather), "INFO", 5)
+
+    task.delay(3.0, function()
+        if not isRunning then return end
+        local matchedEntry, weatherName = secretBossState.DetectWeather()
+        local isMatch = secretBossState.IsWeatherMatch(weatherName, targetWeather)
+
+        if isMatch then
+            if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
+                pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
+            end
+            Config.AutoWeatherHop = false
+
+            local dispName = weatherName or "Đặc Biệt"
+            ShowNotification("TÌM THẤY THỜI TIẾT", string.format("🎉 ĐÃ TÌM THẤY SERVER!\nThời tiết hiện tại: %s\nMục tiêu: %s", dispName, targetWeather), "SUCCESS", 12)
+
+            pcall(function()
+                local sound = Instance.new("Sound")
+                sound.SoundId = "rbxassetid://6534948092"
+                sound.Volume = 1
+                sound.Parent = Workspace
+                sound:Play()
+                game:GetService("Debris"):AddItem(sound, 5)
+            end)
+
+            if hopData.Webhook and Config.WebhookEnabled and Config.WebhookUrl ~= "" then
+                SendDiscordWebhook({
+                    embeds = {{
+                        title = "🌩️ TÌM THẤY SERVER THỜI TIẾT!",
+                        description = string.format("**Người chơi:** %s\n**Thời tiết:** %s\n**Mục tiêu:** %s\n**JobId:** `%s`", LocalPlayer.DisplayName, dispName, targetWeather, game.JobId),
+                        color = 65280,
+                        timestamp = DateTime.now():ToIsoDate()
+                    }}
+                })
+            end
+
+            if hopData.AutoFish then
+                task.delay(1.5, function()
+                    if matchedEntry and matchedEntry.pos then
+                        local char = LocalPlayer.Character
+                        local root = char and char:FindFirstChild("HumanoidRootPart")
+                        if root then
+                            root.CFrame = CFrame.new(matchedEntry.pos + Vector3.new(0, 2, 0))
+                            ShowNotification("Săn Boss", "Đã tự bay đến " .. matchedEntry.islandName .. " để câu cá / săn boss!", "SUCCESS", 5)
+                        end
+                    end
+                    Config.AutoCast = true
+                    Config.AutoHuntBoss = true
+                end)
+            end
+        else
+            local curDisplay = (weatherName and weatherName ~= "" and weatherName ~= "Clear") and weatherName or "Clear (Trời Quang)"
+            ShowNotification("Tìm Server", string.format("Thời tiết hiện tại: %s (Không khớp). Tiếp tục đổi server...", curDisplay), "WARN", 3)
+            task.wait(1.5)
+            secretBossState.HopToNextWeatherServer(targetWeather, hopData.Visited or {})
+        end
+    end)
+end
+
 local ticketQuestState = {}
 
 function ticketQuestState.IsFishingActive()
@@ -5977,6 +6158,55 @@ for _, t in ipairs(weatherTotems) do
         end
     end)
 end
+
+(function()
+    createCategoryHeader(tabBoss, "⚡ TỰ ĐỘNG TÌM SERVER THỜI TIẾT (AUTO WEATHER HOP)")
+    local weatherHopCard = createCardGroup(tabBoss)
+
+    local weatherHopToggleRow, weatherHopToggleFunc
+    weatherHopToggleRow, weatherHopToggleFunc = createToggleRow(weatherHopCard, "Tự Động Tìm Server Thời Tiết", "Tự động đổi server liên tục bằng queue_on_teleport đến khi gặp đúng thời tiết", Config.AutoWeatherHop, function(v)
+        Config.AutoWeatherHop = v
+        if v then
+            local matchedEntry, weatherName = secretBossState.DetectWeather()
+            local isMatch = secretBossState.IsWeatherMatch(weatherName, Config.TargetWeather)
+            if isMatch then
+                ShowNotification("Tìm Server", string.format("Server hiện tại đã có thời tiết: %s!", weatherName or Config.TargetWeather), "SUCCESS", 5)
+                Config.AutoWeatherHop = false
+                if weatherHopToggleFunc then weatherHopToggleFunc(false) end
+            else
+                ShowNotification("Tìm Server", string.format("Bắt đầu tìm kiếm server có: %s...", Config.TargetWeather), "WARN", 5)
+                task.wait(0.8)
+                secretBossState.HopToNextWeatherServer(Config.TargetWeather, {})
+            end
+        else
+            if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
+                pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
+            end
+            ShowNotification("Tìm Server", "Đã tắt tìm kiếm server thời tiết.", "INFO", 4)
+        end
+    end)
+
+    createDropdownRow(weatherHopCard, "Chọn Thời Tiết Cần Tìm", "Loại thời tiết mục tiêu bạn muốn săn lùng", secretBossState.weatherHopChoices, Config.TargetWeather, function(v)
+        Config.TargetWeather = v
+    end)
+
+    createToggleRow(weatherHopCard, "Tự Động Câu / Săn Boss Khi Tìm Thấy", "Tự động bay đến đảo có thời tiết đó và bật AutoCast / Săn Boss", Config.WeatherHopAutoFish, function(v)
+        Config.WeatherHopAutoFish = v
+    end)
+
+    createToggleRow(weatherHopCard, "Gửi Webhook Khi Tìm Thấy Server", "Gửi thông báo JobId và thông tin server về Discord Webhook", Config.WeatherHopAlertWebhook, function(v)
+        Config.WeatherHopAlertWebhook = v
+    end)
+
+    createButtonRow(weatherHopCard, "Dừng Tìm Kiếm Ngay Lập Tức", "Hủy bỏ quá trình nhảy server và xóa dữ liệu ghi nhớ", "Dừng Tìm", function()
+        if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
+            pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
+        end
+        Config.AutoWeatherHop = false
+        if weatherHopToggleFunc then weatherHopToggleFunc(false) end
+        ShowNotification("Tìm Server", "Đã dừng và hủy bỏ quá trình tìm kiếm!", "INFO", 4)
+    end)
+end)()
 
 createCategoryHeader(tabBoss, "Boss Bạch Tuộc Bí Mật (Octoparasite)")
 local octoCard = createCardGroup(tabBoss)
@@ -10250,4 +10480,8 @@ table.insert(activeConnections, UserInputService.InputBegan:Connect(function(inp
     end
 end))
 
-ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Totem Thời Tiết, Discord Webhook, Farm Tracker, Khóa Đột Biến & Khiên Nước Axit!", "SUCCESS", 6)
+if secretBossState.CheckWeatherHopOnJoin then
+    task.spawn(secretBossState.CheckWeatherHopOnJoin)
+end
+
+ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Tự Động Tìm Server Thời Tiết, Totem Thời Tiết & Webhook!", "SUCCESS", 6)
