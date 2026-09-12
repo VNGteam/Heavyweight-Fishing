@@ -181,19 +181,22 @@ function Inspector:ExtractObjectData(obj, rootContext)
         end
     end
 
-    -- 5. ModuleScript Inspection (Safe pcall require)
+    -- 5. ModuleScript (Tuyệt đối KHÔNG tự động require để tránh bị treo luồng vĩnh viễn)
     if obj:IsA("ModuleScript") then
-        local lowerName = string.lower(obj.Name)
-        if lowerName:find("quest") or lowerName:find("mission") or lowerName:find("data") or lowerName:find("config") then
-            local ok, ret = pcall(function() return require(obj) end)
-            if ok and type(ret) == "table" then
-                record.Extra.ModuleData = Utils.tableToString(ret, 2)
-            end
-        end
+        record.Extra.Module = "ModuleScript"
     end
 
     return record
 end
+
+-- Danh sách các class đồ họa/vật lý không chứa dữ liệu gameplay cần bỏ qua để tăng tốc 20x
+local IgnoredClasses = {
+    ["Weld"] = true, ["Motor6D"] = true, ["ManualWeld"] = true, ["WeldConstraint"] = true,
+    ["Attachment"] = true, ["ParticleEmitter"] = true, ["Sparkles"] = true, ["Smoke"] = true,
+    ["Fire"] = true, ["Sound"] = true, ["Highlight"] = true, ["SelectionBox"] = true,
+    ["SpecialMesh"] = true, ["BlockMesh"] = true, ["CylinderMesh"] = true,
+    ["Decal"] = true, ["Texture"] = true, ["ShirtGraphic"] = true, ["CharacterMesh"] = true,
+}
 
 -- Quét linh hoạt theo root chỉ định
 function Inspector:Scan(targetRoot)
@@ -215,6 +218,12 @@ function Inspector:Scan(targetRoot)
         if not obj then return end
         if depth and maxDepth and depth > maxDepth then return end
 
+        local className = obj.ClassName
+        -- Bỏ qua các object đồ họa/vật lý rác không chứa data
+        if IgnoredClasses[className] and next(obj:GetAttributes()) == nil then
+            return
+        end
+
         local record = self:ExtractObjectData(obj)
         table.insert(results, record)
 
@@ -231,12 +240,15 @@ function Inspector:Scan(targetRoot)
             summary.Attributes = summary.Attributes + 1
         end
 
-        for _, child in ipairs(obj:GetChildren()) do
-            process(child, (depth or 0) + 1, maxDepth)
+        local ok, children = pcall(function() return obj:GetChildren() end)
+        if ok and children then
+            for _, child in ipairs(children) do
+                process(child, (depth or 0) + 1, maxDepth)
+            end
         end
     end
 
-    -- Thực hiện quét theo root
+    -- 1. Quét Player & Character
     if targetRoot == "ALL" or targetRoot == "PLAYER" then
         process(LocalPlayer, 0, 15)
         if LocalPlayer.Character then
@@ -244,19 +256,21 @@ function Inspector:Scan(targetRoot)
         end
     end
 
+    -- 2. Quét ReplicatedStorage
     if targetRoot == "ALL" or targetRoot == "REPLICATED_STORAGE" then
         process(ReplicatedStorage, 0, 12)
     end
 
+    -- 3. Quét ReplicatedFirst
     if targetRoot == "ALL" or targetRoot == "REPLICATED_FIRST" then
         process(ReplicatedFirst, 0, 8)
     end
 
-    -- Workspace: Lọc tránh quét hàng chục nghìn Part gây lag
-    if targetRoot == "WORKSPACE" then
-        for _, child in ipairs(Workspace:GetChildren()) do
+    -- 4. Quét Workspace (Lọc các Folder, Model, NPC, Spawner, Quest givers)
+    if targetRoot == "ALL" or targetRoot == "WORKSPACE" then
+        local wsChildren = Workspace:GetChildren()
+        for _, child in ipairs(wsChildren) do
             if child ~= LocalPlayer.Character and not child:IsA("Terrain") then
-                -- Ưu tiên Folders, Models, NPCs, Spawners
                 if child:IsA("Folder") or child:IsA("Model") or child:IsA("Configuration") or child:IsA("ValueBase") then
                     process(child, 0, 6)
                 end
@@ -862,62 +876,111 @@ local function CreateInspectorUI()
 
     -- Scan Action
     BtnScan.MouseButton1Click:Connect(function()
-        ContentText.Text = "Scanning [" .. Inspector.CurrentRoot .. "]..."
-        task.wait()
-        local results, summary = Inspector:Scan(Inspector.CurrentRoot)
-        local lines = {}
-        table.insert(lines, string.format("===== SCAN RESULTS: ROOT [%s] =====", Inspector.CurrentRoot))
-        table.insert(lines, string.format("Total Objects: %d | Values: %d | Remotes: %d | Modules: %d",
-            summary.TotalObjects, summary.ValueObjects, summary.RemoteEvents, summary.ModuleScripts))
-        table.insert(lines, "--------------------------------------------------")
-        for i, item in ipairs(results) do
-            local valText = item.Value and (" = " .. tostring(item.Value)) or ""
-            table.insert(lines, string.format("[%d] %s (%s)%s", i, item.Path, item.ClassName, valText))
-            if item.Extra.Text then table.insert(lines, "    Text: " .. item.Extra.Text) end
-            if item.Extra.ModuleData then table.insert(lines, "    ModuleData: " .. item.Extra.ModuleData) end
-        end
-        ContentText.Text = table.concat(lines, "\n")
+        ContentText.Text = "Scanning [" .. Inspector.CurrentRoot .. "]... Please wait."
+        task.spawn(function()
+            task.wait(0.05)
+            local results, summary = Inspector:Scan(Inspector.CurrentRoot)
+            
+            -- Sắp xếp ưu tiên: ValueBase, Remotes, Modules, Gui Text lên đầu
+            table.sort(results, function(a, b)
+                local function rank(item)
+                    if item.Instance:IsA("ValueBase") then return 1 end
+                    if item.Instance:IsA("RemoteEvent") or item.Instance:IsA("RemoteFunction") then return 2 end
+                    if item.Instance:IsA("ModuleScript") then return 3 end
+                    if item.Extra and item.Extra.Text then return 4 end
+                    if next(item.Attributes) ~= nil then return 5 end
+                    if item.ClassName == "Folder" or item.ClassName == "Configuration" then return 6 end
+                    return 7
+                end
+                return rank(a) < rank(b)
+            end)
+
+            local lines = {}
+            table.insert(lines, string.format("===== SCAN RESULTS: ROOT [%s] =====", Inspector.CurrentRoot))
+            table.insert(lines, string.format("Total: %d | Values: %d | Remotes: %d | Modules: %d | Folders: %d",
+                summary.TotalObjects, summary.ValueObjects, summary.RemoteEvents, summary.ModuleScripts, summary.Folders))
+            table.insert(lines, "--------------------------------------------------")
+
+            local displayLimit = math.min(#results, 350)
+            for i = 1, displayLimit do
+                local item = results[i]
+                local valText = item.Value and (" = " .. tostring(item.Value)) or ""
+                table.insert(lines, string.format("[%d] %s (%s)%s", i, item.Path, item.ClassName, valText))
+                if next(item.Attributes) ~= nil then
+                    for aName, aData in pairs(item.Attributes) do
+                        table.insert(lines, string.format("    Attr: %s = %s", aName, aData.Display))
+                    end
+                end
+                if item.Extra and item.Extra.Text then table.insert(lines, "    UI Text: \"" .. item.Extra.Text .. "\"") end
+            end
+
+            if #results > displayLimit then
+                table.insert(lines, "")
+                table.insert(lines, string.format("... (%d more objects omitted from UI to prevent lag. Use Search Box to find specific objects!)", #results - displayLimit))
+            end
+
+            local outText = table.concat(lines, "\n")
+            ContentText.Text = outText
+            Scroll.CanvasPosition = Vector2.zero
+            print(string.format("[Inspector] Scan finished: %d objects found.", summary.TotalObjects))
+        end)
     end)
 
     -- Quest Focus Button
     BtnQuestFocus.MouseButton1Click:Connect(function()
-        ContentText.Text = "Scanning & Filtering Quests..."
-        task.wait()
-        if not Inspector.LastScanResults or #Inspector.LastScanResults == 0 then
-            Inspector:Scan("ALL")
-        end
-        local quests = Inspector:FindQuests()
-        local lines = {}
-        table.insert(lines, string.format("===== ⭐ QUEST FOCUS DETECTOR (%d POTENTIAL OBJECTS) =====", #quests))
-        table.insert(lines, "Keywords: quest, mission, task, objective, bounty, target, progress, ticket")
-        table.insert(lines, "--------------------------------------------------")
-        for i, item in ipairs(quests) do
-            local valText = item.Value and (" = " .. tostring(item.Value)) or ""
-            table.insert(lines, string.format("[%d] %s [%s]%s", i, item.Path, item.ClassName, valText))
-            if next(item.Attributes) ~= nil then
-                for aName, aData in pairs(item.Attributes) do
-                    table.insert(lines, string.format("    Attr: %s = %s", aName, aData.Display))
+        ContentText.Text = "Scanning & Filtering Quests... Please wait."
+        task.spawn(function()
+            task.wait(0.05)
+            if not Inspector.LastScanResults or #Inspector.LastScanResults == 0 then
+                Inspector:Scan("ALL")
+            end
+            local quests = Inspector:FindQuests()
+            local lines = {}
+            table.insert(lines, string.format("===== ⭐ QUEST FOCUS DETECTOR (%d POTENTIAL OBJECTS) =====", #quests))
+            table.insert(lines, "Keywords: quest, mission, task, objective, bounty, target, progress, ticket")
+            table.insert(lines, "--------------------------------------------------")
+            
+            if #quests == 0 then
+                table.insert(lines, "Không tìm thấy object nào khớp từ khóa nhiệm vụ.")
+                table.insert(lines, "Gợi ý: Thử bấm [Remote Spy: ON] để bắt payload server gửi về, hoặc bấm [Tree View] để duyệt thư mục ReplicatedStorage!")
+            else
+                local limit = math.min(#quests, 300)
+                for i = 1, limit do
+                    local item = quests[i]
+                    local valText = item.Value and (" = " .. tostring(item.Value)) or ""
+                    table.insert(lines, string.format("[%d] %s [%s]%s", i, item.Path, item.ClassName, valText))
+                    if next(item.Attributes) ~= nil then
+                        for aName, aData in pairs(item.Attributes) do
+                            table.insert(lines, string.format("    Attr: %s = %s", aName, aData.Display))
+                        end
+                    end
+                    if item.Extra and item.Extra.Text then
+                        table.insert(lines, string.format("    UI Text: \"%s\"", item.Extra.Text))
+                    end
+                end
+                if #quests > limit then
+                    table.insert(lines, string.format("... (%d more quest objects omitted)", #quests - limit))
                 end
             end
-            if item.Extra.Text then
-                table.insert(lines, string.format("    UI Text: \"%s\"", item.Extra.Text))
-            end
-            if item.Extra.ModuleData then
-                table.insert(lines, string.format("    Module Data: %s", item.Extra.ModuleData))
-            end
-        end
-        ContentText.Text = table.concat(lines, "\n")
+            
+            ContentText.Text = table.concat(lines, "\n")
+            Scroll.CanvasPosition = Vector2.zero
+            print(string.format("[Inspector] Quest Focus found %d potential items.", #quests))
+        end)
     end)
 
     -- Tree View Button
     BtnTree.MouseButton1Click:Connect(function()
-        if not Inspector.LastScanResults or #Inspector.LastScanResults == 0 then
-            Inspector:Scan(Inspector.CurrentRoot)
-        end
-        ContentText.Text = "Building Explorer Tree View..."
-        task.wait()
-        local treeText = Inspector:BuildTreeView(SearchBox.Text)
-        ContentText.Text = "===== EXPLORER TREE VIEW =====\n" .. treeText
+        ContentText.Text = "Building Explorer Tree View... Please wait."
+        task.spawn(function()
+            task.wait(0.05)
+            if not Inspector.LastScanResults or #Inspector.LastScanResults == 0 then
+                Inspector:Scan(Inspector.CurrentRoot)
+            end
+            local treeText = Inspector:BuildTreeView(SearchBox.Text)
+            ContentText.Text = "===== EXPLORER TREE VIEW =====\n" .. treeText
+            Scroll.CanvasPosition = Vector2.zero
+        end)
     end)
 
     -- Remote Spy Button
