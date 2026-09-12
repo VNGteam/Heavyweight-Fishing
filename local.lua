@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "d07f24f"
+local SCRIPT_BUILD_COMMIT = "81a1a20"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -9942,123 +9942,125 @@ task.spawn(function()
 end)
 
 table.insert(activeConnections, RunService.RenderStepped:Connect(function()
-    if not isRunning or not next(activeESP) then return end
+    if not isRunning then return end
 
-    local camPos = Camera.CFrame.Position
-    for inst, data in pairs(activeESP) do
-        local isEnabled = Config["ESP_" .. data.espCategory]
-        if not inst.Parent or not data.part or not data.part.Parent or not isEnabled then
-            RemoveESP(inst)
-        else
-            data.gui.Enabled = true
-            local dist = math.floor((camPos - data.part.Position).Magnitude)
-            local cat = data.espCategory
+    if next(activeESP) then
+        local camPos = Camera.CFrame.Position
+        for inst, data in pairs(activeESP) do
+            local isEnabled = Config["ESP_" .. data.espCategory]
+            if not inst.Parent or not data.part or not data.part.Parent or not isEnabled then
+                RemoveESP(inst)
+            else
+                data.gui.Enabled = true
+                local dist = math.floor((camPos - data.part.Position).Magnitude)
+                local cat = data.espCategory
 
-            if cat == "Players" then
-                local p = data.customData and data.customData.player
-                if not p or not p.Parent or not p.Character or p.Character ~= inst then
-                    RemoveESP(inst)
-                else
-                    local hum = inst:FindFirstChildOfClass("Humanoid")
-                    local curHp = hum and math.floor(hum.Health) or 0
-                    local maxHp = hum and math.floor(hum.MaxHealth) or 100
-                    local isFishing = inst:GetAttribute("Fishing") == true
-                    local isMinigame = inst:GetAttribute("Minigame") == true
-                    local isSwimming = inst:GetAttribute("Swimming") == true
-
-                    local rodVal = "Không cầm"
-                    local pFolder = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(p.UserId))
-                    if pFolder and pFolder:FindFirstChild("FishingRod") and pFolder.FishingRod.Value ~= "" then
-                        rodVal = pFolder.FishingRod.Value
-                    end
-
-                    local act = "💤 Rảnh"
-                    if curHp <= 0 then act = "💀 Đã chết"
-                    elseif isMinigame then act = "⚡ Kéo cá"
-                    elseif isFishing then act = "🎣 Thả cần"
-                    elseif isSwimming then act = "🏊 Bơi"
-                    end
-
-                    data.titleLbl.Text = string.format("👤 %s  •  %dm", p.DisplayName, dist)
-                    data.subLbl.Text = string.format("❤️ %d/%d HP | 🎣 %s | %s", curHp, maxHp, rodVal, act)
-
-                    if isMinigame then
-                        data.stroke.Color = Color3.fromRGB(255, 170, 40)
-                    elseif isFishing then
-                        data.stroke.Color = Color3.fromRGB(60, 220, 255)
+                if cat == "Players" then
+                    local p = data.customData and data.customData.player
+                    if not p or not p.Parent or not p.Character or p.Character ~= inst then
+                        RemoveESP(inst)
                     else
-                        data.stroke.Color = Colors.PurpleAccent
-                    end
-                end
-            elseif cat == "Boss" then
-                local fish = data.customData and data.customData.fish
-                if fish and fish.Parent then
-                    local fName = fish:GetAttribute("FishName") or data.name or "Secret Boss"
-                    local maxHp = fish:GetAttribute("MaxHealth") or 0
-                    local curHp = typeof(fish.Value) == "number" and fish.Value or 0
-                    local hpPct = (maxHp > 0) and math.floor((curHp / maxHp) * 100) or 0
+                        local hum = inst:FindFirstChildOfClass("Humanoid")
+                        local curHp = hum and math.floor(hum.Health) or 0
+                        local maxHp = hum and math.floor(hum.MaxHealth) or 100
+                        local isFishing = inst:GetAttribute("Fishing") == true
+                        local isMinigame = inst:GetAttribute("Minigame") == true
+                        local isSwimming = inst:GetAttribute("Swimming") == true
 
-                    local hooker = nil
-                    local contrib = fish:FindFirstChild("PlayerContribution")
-                    if contrib then
-                        local ch = contrib:GetChildren()
-                        if #ch > 0 then hooker = ch[1].Name end
+                        local rodVal = "Không cầm"
+                        local pFolder = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(p.UserId))
+                        if pFolder and pFolder:FindFirstChild("FishingRod") and pFolder.FishingRod.Value ~= "" then
+                            rodVal = pFolder.FishingRod.Value
+                        end
+
+                        local act = "💤 Rảnh"
+                        if curHp <= 0 then act = "💀 Đã chết"
+                        elseif isMinigame then act = "⚡ Kéo cá"
+                        elseif isFishing then act = "🎣 Thả cần"
+                        elseif isSwimming then act = "🏊 Bơi"
+                        end
+
+                        data.titleLbl.Text = string.format("👤 %s  •  %dm", p.DisplayName, dist)
+                        data.subLbl.Text = string.format("❤️ %d/%d HP | 🎣 %s | %s", curHp, maxHp, rodVal, act)
+
+                        if isMinigame then
+                            data.stroke.Color = Color3.fromRGB(255, 170, 40)
+                        elseif isFishing then
+                            data.stroke.Color = Color3.fromRGB(60, 220, 255)
+                        else
+                            data.stroke.Color = Colors.PurpleAccent
+                        end
                     end
-                    if not hooker then
-                        for _, c in ipairs(fish:GetChildren()) do
-                            if c.Name:find("_PlayerHealth") then
-                                local uid = c.Name:match("^(%d+)_PlayerHealth")
-                                if uid then
-                                    local pl = Players:GetPlayerByUserId(tonumber(uid))
-                                    if pl then hooker = pl.DisplayName break end
+                elseif cat == "Boss" then
+                    local fish = data.customData and data.customData.fish
+                    if fish and fish.Parent then
+                        local fName = fish:GetAttribute("FishName") or data.name or "Secret Boss"
+                        local maxHp = fish:GetAttribute("MaxHealth") or 0
+                        local curHp = typeof(fish.Value) == "number" and fish.Value or 0
+                        local hpPct = (maxHp > 0) and math.floor((curHp / maxHp) * 100) or 0
+
+                        local hooker = nil
+                        local contrib = fish:FindFirstChild("PlayerContribution")
+                        if contrib then
+                            local ch = contrib:GetChildren()
+                            if #ch > 0 then hooker = ch[1].Name end
+                        end
+                        if not hooker then
+                            for _, c in ipairs(fish:GetChildren()) do
+                                if c.Name:find("_PlayerHealth") then
+                                    local uid = c.Name:match("^(%d+)_PlayerHealth")
+                                    if uid then
+                                        local pl = Players:GetPlayerByUserId(tonumber(uid))
+                                        if pl then hooker = pl.DisplayName break end
+                                    end
                                 end
                             end
                         end
-                    end
 
-                    data.titleLbl.Text = string.format("👹 %s [TRÙM]  •  %dm", fName, dist)
-                    if hooker then
-                        data.subLbl.Text = string.format("❤️ HP: %d/%d (%d%%) | 🎯 %s", math.floor(curHp), maxHp, hpPct, hooker)
+                        data.titleLbl.Text = string.format("👹 %s [TRÙM]  •  %dm", fName, dist)
+                        if hooker then
+                            data.subLbl.Text = string.format("❤️ HP: %d/%d (%d%%) | 🎯 %s", math.floor(curHp), maxHp, hpPct, hooker)
+                        else
+                            data.subLbl.Text = string.format("❤️ HP: %d/%d (%d%%)", math.floor(curHp), maxHp, hpPct)
+                        end
+                        data.stroke.Color = Color3.fromRGB(255, 50, 50)
                     else
-                        data.subLbl.Text = string.format("❤️ HP: %d/%d (%d%%)", math.floor(curHp), maxHp, hpPct)
+                        data.titleLbl.Text = string.format("👹 %s  •  %dm", data.name, dist)
+                        data.subLbl.Text = "⚔️ Khu vực triệu hồi & chiến đấu Enzo"
+                        data.stroke.Color = Color3.fromRGB(255, 60, 60)
                     end
-                    data.stroke.Color = Color3.fromRGB(255, 50, 50)
+                elseif cat == "SecretRod" then
+                    local isl = secretBossState.GetNearestIslandName(data.part.Position)
+                    data.titleLbl.Text = string.format("🌟 %s  •  %dm", data.name, dist)
+                    data.subLbl.Text = string.format("📍 Đảo: %s | ⭐ Cần Bí Mật", isl)
+                    data.stroke.Color = Colors.AccentYellow
+                elseif cat == "GodSpirit" then
+                    local isl = secretBossState.GetNearestIslandName(data.part.Position)
+                    data.titleLbl.Text = string.format("⛩️ Thần Linh (God Spirit)  •  %dm", dist)
+                    data.subLbl.Text = string.format("📍 Đảo: %s | 🙏 Cầu Nguyện", isl)
+                    data.stroke.Color = Colors.AccentGreen
+                elseif cat == "Taoist" or cat == "Maoshan" then
+                    local isl = secretBossState.GetNearestIslandName(data.part.Position)
+                    local isMao = cat == "Maoshan"
+                    data.titleLbl.Text = string.format("%s %s  •  %dm", isMao and "✨" or "📜", data.name, dist)
+                    data.subLbl.Text = string.format("📍 Đảo: %s | 📜 Đạo Sĩ Bí Kíp", isl)
+                elseif cat == "Boats" then
+                    local b = data.instance
+                    local driverName = "Trống"
+                    if b and b:IsA("Model") then
+                        local seat = b:FindFirstChildWhichIsA("VehicleSeat", true)
+                        if seat and seat.Occupant and seat.Occupant.Parent then
+                            local p = Players:GetPlayerFromCharacter(seat.Occupant.Parent)
+                            if p then driverName = p.DisplayName else driverName = seat.Occupant.Parent.Name end
+                        end
+                    end
+                    data.titleLbl.Text = string.format("⛵ %s  •  %dm", data.name, dist)
+                    data.subLbl.Text = string.format("👤 Người lái: %s", driverName)
+                    data.stroke.Color = Colors.AccentBlue
                 else
-                    data.titleLbl.Text = string.format("👹 %s  •  %dm", data.name, dist)
-                    data.subLbl.Text = "⚔️ Khu vực triệu hồi & chiến đấu Enzo"
-                    data.stroke.Color = Color3.fromRGB(255, 60, 60)
+                    data.titleLbl.Text = string.format("%s %s  •  %dm", data.icon, data.name, dist)
+                    data.subLbl.Text = ""
                 end
-            elseif cat == "SecretRod" then
-                local isl = secretBossState.GetNearestIslandName(data.part.Position)
-                data.titleLbl.Text = string.format("🌟 %s  •  %dm", data.name, dist)
-                data.subLbl.Text = string.format("📍 Đảo: %s | ⭐ Cần Bí Mật", isl)
-                data.stroke.Color = Colors.AccentYellow
-            elseif cat == "GodSpirit" then
-                local isl = secretBossState.GetNearestIslandName(data.part.Position)
-                data.titleLbl.Text = string.format("⛩️ Thần Linh (God Spirit)  •  %dm", dist)
-                data.subLbl.Text = string.format("📍 Đảo: %s | 🙏 Cầu Nguyện", isl)
-                data.stroke.Color = Colors.AccentGreen
-            elseif cat == "Taoist" or cat == "Maoshan" then
-                local isl = secretBossState.GetNearestIslandName(data.part.Position)
-                local isMao = cat == "Maoshan"
-                data.titleLbl.Text = string.format("%s %s  •  %dm", isMao and "✨" or "📜", data.name, dist)
-                data.subLbl.Text = string.format("📍 Đảo: %s | 📜 Đạo Sĩ Bí Kíp", isl)
-            elseif cat == "Boats" then
-                local b = data.instance
-                local driverName = "Trống"
-                if b and b:IsA("Model") then
-                    local seat = b:FindFirstChildWhichIsA("VehicleSeat", true)
-                    if seat and seat.Occupant and seat.Occupant.Parent then
-                        local p = Players:GetPlayerFromCharacter(seat.Occupant.Parent)
-                        if p then driverName = p.DisplayName else driverName = seat.Occupant.Parent.Name end
-                    end
-                end
-                data.titleLbl.Text = string.format("⛵ %s  •  %dm", data.name, dist)
-                data.subLbl.Text = string.format("👤 Người lái: %s", driverName)
-                data.stroke.Color = Colors.AccentBlue
-            else
-                data.titleLbl.Text = string.format("%s %s  •  %dm", data.icon, data.name, dist)
-                data.subLbl.Text = ""
             end
         end
     end
@@ -10082,67 +10084,111 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
     if Config.FishRedRing then
         local fishPos = nil
         local char = LocalPlayer.Character
+        local hrp = char and (char:FindFirstChild("HumanoidRootPart") or char:FindFirstChild("Torso"))
+        local hrpPos = hrp and hrp.Position or Camera.CFrame.Position
         local fishID = LocalPlayer:GetAttribute("FishID")
-        
-        if fishID and Workspace:FindFirstChild("Fishes") then
-            local f = Workspace.Fishes:FindFirstChild(fishID)
-            if f then
-                if f:FindFirstChild("Model") and f.Model:IsA("Model") then
-                    fishPos = f.Model:GetPivot().Position
-                elseif f:FindFirstChild("Buoy") and f.Buoy:IsA("BasePart") then
-                    fishPos = f.Buoy.Position
+        local uid = tostring(LocalPlayer.UserId)
+        local pName = LocalPlayer.Name
+
+        -- 1. Tim truc tiep tu Workspace.Fishes
+        local fishesFolder = Workspace:FindFirstChild("Fishes")
+        if fishesFolder then
+            local targetFish = nil
+            if fishID and fishID ~= "" then
+                targetFish = fishesFolder:FindFirstChild(fishID)
+            end
+            if not targetFish then
+                for _, f in ipairs(fishesFolder:GetChildren()) do
+                    if f:FindFirstChild(uid .. "_PlayerHealth")
+                       or (f:FindFirstChild("PlayerContribution") and f.PlayerContribution:FindFirstChild(pName)) then
+                        targetFish = f
+                        break
+                    end
                 end
             end
-        end
-        
-        if not fishPos and Workspace:FindFirstChild("Fishes") then
-            local uid = tostring(LocalPlayer.UserId)
-            for _, f in ipairs(Workspace.Fishes:GetChildren()) do
-                if f:FindFirstChild(uid .. "_PlayerHealth") then
-                    if f:FindFirstChild("Model") and f.Model:IsA("Model") then
-                        fishPos = f.Model:GetPivot().Position
-                    elseif f:FindFirstChild("Buoy") and f.Buoy:IsA("BasePart") then
-                        fishPos = f.Buoy.Position
-                    end
-                    break
+            if targetFish then
+                if targetFish:FindFirstChild("Buoy") and targetFish.Buoy:IsA("BasePart") then
+                    fishPos = targetFish.Buoy.Position
+                elseif targetFish:FindFirstChild("Model") and targetFish.Model:IsA("Model") then
+                    fishPos = targetFish.Model:GetPivot().Position
+                elseif targetFish:IsA("Model") then
+                    fishPos = targetFish:GetPivot().Position
+                else
+                    local bp = targetFish:FindFirstChildWhichIsA("BasePart", true)
+                    if bp then fishPos = bp.Position end
                 end
             end
         end
 
+        -- 2. Tim phao / day cau tu Character
         if not fishPos and char then
-            local buoy = char:FindFirstChild("Buoy")
-            if buoy and buoy:IsA("BasePart") then
+            local buoy = char:FindFirstChild("Buoy", true) or char:FindFirstChild("Bobber", true) or char:FindFirstChild("Hook", true)
+            if buoy and buoy:IsA("BasePart") and (buoy.Position - hrpPos).Magnitude > 3 then
                 fishPos = buoy.Position
             else
+                local bestDist = 3
                 for _, d in ipairs(char:GetDescendants()) do
-                    if d:IsA("Beam") and d.Attachment1 and d.Attachment0 then
-                        local p0 = d.Attachment0.Parent
-                        local p1 = d.Attachment1.Parent
-                        if (p1 and p1.Name == "Buoy") or (p0 and p0.Name == "Buoy") then
-                            local buoyAtt = (p1 and p1.Name == "Buoy") and d.Attachment1 or d.Attachment0
-                            fishPos = buoyAtt.WorldPosition
-                            break
+                    if (d:IsA("Beam") or d:IsA("RopeConstraint") or d:IsA("RodConstraint")) and d.Attachment0 and d.Attachment1 then
+                        local p0 = d.Attachment0.WorldPosition
+                        local p1 = d.Attachment1.WorldPosition
+                        local dist0 = (p0 - hrpPos).Magnitude
+                        local dist1 = (p1 - hrpPos).Magnitude
+                        local farAtt = dist1 > dist0 and d.Attachment1 or d.Attachment0
+                        local farDist = math.max(dist0, dist1)
+                        if farDist > bestDist then
+                            bestDist = farDist
+                            fishPos = farAtt.WorldPosition
                         end
                     end
                 end
             end
         end
 
+        -- 3. Tim phao trong Workspace
+        if not fishPos then
+            local wsBuoy = Workspace:FindFirstChild("Buoy") or Workspace:FindFirstChild("Bobber")
+            if wsBuoy and wsBuoy:IsA("BasePart") and (wsBuoy.Position - hrpPos).Magnitude > 3 then
+                fishPos = wsBuoy.Position
+            end
+        end
+
+        -- Dam bao anchor va adornment ton tai trong Workspace
+        if fishRingAnchor.Parent ~= Workspace then
+            fishRingAnchor.Parent = Workspace
+        end
+        if fishRingAdornment.Adornee ~= fishRingAnchor then
+            fishRingAdornment.Adornee = fishRingAnchor
+        end
+        if fishRingBillboard.Adornee ~= fishRingAnchor then
+            fishRingBillboard.Adornee = fishRingAnchor
+        end
+
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         local isHooked = char and (char:GetAttribute("Fishing") == true or char:GetAttribute("Minigame") == true)
         local fUI = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing")
-        if (isHooked or (fUI and fUI.Visible)) and fishPos then
+        local isRodActive = char and (char:GetAttribute("Type") == "Fishing Rod") and fishPos and ((fishPos - hrpPos).Magnitude > 3)
+        local shouldShow = fishPos and (isHooked or (fUI and fUI.Visible) or (fishID and fishID ~= "") or isRodActive)
+
+        if shouldShow then
             fishRingAnchor.Position = fishPos
             fishRingAdornment.Visible = true
 
+            local isPulling = (char and char:GetAttribute("Minigame") == true) or (fUI and fUI.Visible)
+            fishRingAdornment.Color3 = isPulling and Color3.fromRGB(255, 45, 45) or Color3.fromRGB(255, 175, 45)
+
             if Config.ShowFishWeightRing then
                 local fName = GetCurrentHookedFishName()
-                local fWeight = char:GetAttribute("FishWeight") or char:GetAttribute("Weight")
-                local fMutation = char:GetAttribute("FishMutation") or char:GetAttribute("Mutation")
+                local fWeight = char and (char:GetAttribute("FishWeight") or char:GetAttribute("Weight"))
+                local fMutation = char and (char:GetAttribute("FishMutation") or char:GetAttribute("Mutation"))
                 local curHp, maxHp = nil, nil
 
-                if fishID and Workspace:FindFirstChild("Fishes") then
-                    local f = Workspace.Fishes:FindFirstChild(fishID)
+                if fishesFolder then
+                    local f = (fishID and fishesFolder:FindFirstChild(fishID))
+                    if not f then
+                        for _, ch in ipairs(fishesFolder:GetChildren()) do
+                            if ch:FindFirstChild(uid .. "_PlayerHealth") then f = ch break end
+                        end
+                    end
                     if f then
                         if not fName or fName == "" then fName = f:GetAttribute("FishName") end
                         maxHp = f:GetAttribute("MaxHealth")
@@ -10172,9 +10218,14 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
                 if #displayParts > 0 then
                     fishRingText.Text = table.concat(displayParts, " ")
                     fishRingText.Visible = true
-                else
-                    fishRingText.Text = "🎣 Đang Cắn Câu"
+                elseif isPulling then
+                    fishRingText.Text = "⚡ Đang Kéo Cá"
                     fishRingText.Visible = true
+                elseif isHooked then
+                    fishRingText.Text = "🎣 Đang Thả Cần"
+                    fishRingText.Visible = true
+                else
+                    fishRingText.Visible = false
                 end
             else
                 fishRingText.Visible = false
