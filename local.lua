@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "2409574"
+local SCRIPT_BUILD_COMMIT = "2409575"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3376,14 +3376,49 @@ for k, v in pairs({
     ticketQuestState[k] = v
 end
 
+function ticketQuestState.SerializeSpot(spot)
+    if not spot then return nil end
+    if typeof(spot) == "CFrame" then
+        return {
+            x = spot.Position.X,
+            y = spot.Position.Y,
+            z = spot.Position.Z,
+            cframe = {spot:GetComponents()}
+        }
+    elseif typeof(spot) == "Vector3" then
+        return {
+            x = spot.X,
+            y = spot.Y,
+            z = spot.Z
+        }
+    elseif type(spot) == "table" and (spot.cframe or spot.x) then
+        return spot
+    end
+    return nil
+end
+
+function ticketQuestState.DeserializeSpot(data, defaultCf)
+    if not data then return defaultCf end
+    if typeof(data) == "CFrame" then return data end
+    if typeof(data) == "Vector3" then return CFrame.new(data) end
+    if type(data) == "table" then
+        if data.cframe and #data.cframe == 12 then
+            return CFrame.new(table.unpack(data.cframe))
+        elseif data.x and data.y and data.z then
+            return CFrame.new(data.x, data.y, data.z)
+        end
+    end
+    return defaultCf
+end
+
 function ticketQuestState.SaveSpots()
     if not writefile then return end
     pcall(function()
         local data = {
-            spot100Fish = {x = ticketQuestState.spot100Fish.X, y = ticketQuestState.spot100Fish.Y, z = ticketQuestState.spot100Fish.Z},
-            spot100Bait = {x = ticketQuestState.spot100Bait.X, y = ticketQuestState.spot100Bait.Y, z = ticketQuestState.spot100Bait.Z},
-            spot15MFish = {x = ticketQuestState.spot15MFish.X, y = ticketQuestState.spot15MFish.Y, z = ticketQuestState.spot15MFish.Z},
-            spotNPC = {x = ticketQuestState.spotNPC.X, y = ticketQuestState.spotNPC.Y, z = ticketQuestState.spotNPC.Z},
+            spot100Fish = ticketQuestState.SerializeSpot(ticketQuestState.spot100Fish),
+            spot100Bait = ticketQuestState.SerializeSpot(ticketQuestState.spot100Bait),
+            spot15MFish = ticketQuestState.SerializeSpot(ticketQuestState.spot15MFish),
+            spotNPC = ticketQuestState.SerializeSpot(ticketQuestState.spotNPC),
             cooldownEnd = ticketQuestState.cooldownEnd,
         }
         writefile("heavyweight_ticket_spots.json", HttpService:JSONEncode(data))
@@ -3397,17 +3432,17 @@ function ticketQuestState.LoadSpots()
         if content and #content > 0 then
             local dec = HttpService:JSONDecode(content)
             if type(dec) == "table" then
-                if dec.spot100Fish and dec.spot100Fish.x then
-                    ticketQuestState.spot100Fish = Vector3.new(dec.spot100Fish.x, dec.spot100Fish.y, dec.spot100Fish.z)
+                if dec.spot100Fish then
+                    ticketQuestState.spot100Fish = ticketQuestState.DeserializeSpot(dec.spot100Fish, ticketQuestState.spot100Fish)
                 end
-                if dec.spot100Bait and dec.spot100Bait.x then
-                    ticketQuestState.spot100Bait = Vector3.new(dec.spot100Bait.x, dec.spot100Bait.y, dec.spot100Bait.z)
+                if dec.spot100Bait then
+                    ticketQuestState.spot100Bait = ticketQuestState.DeserializeSpot(dec.spot100Bait, ticketQuestState.spot100Bait)
                 end
-                if dec.spot15MFish and dec.spot15MFish.x then
-                    ticketQuestState.spot15MFish = Vector3.new(dec.spot15MFish.x, dec.spot15MFish.y, dec.spot15MFish.z)
+                if dec.spot15MFish then
+                    ticketQuestState.spot15MFish = ticketQuestState.DeserializeSpot(dec.spot15MFish, ticketQuestState.spot15MFish)
                 end
-                if dec.spotNPC and dec.spotNPC.x then
-                    ticketQuestState.spotNPC = Vector3.new(dec.spotNPC.x, dec.spotNPC.y, dec.spotNPC.z)
+                if dec.spotNPC then
+                    ticketQuestState.spotNPC = ticketQuestState.DeserializeSpot(dec.spotNPC, ticketQuestState.spotNPC)
                 end
                 if dec.cooldownEnd and tonumber(dec.cooldownEnd) and dec.cooldownEnd > tick() then
                     ticketQuestState.cooldownEnd = dec.cooldownEnd
@@ -3441,20 +3476,27 @@ function ticketQuestState.UpdateUI()
             ticketQuestState.uiCooldown.Set("Sẵn sàng nhận vé!")
         end
     end
+    local function getSpotPos(p)
+        if not p then return Vector3.zero end
+        if typeof(p) == "CFrame" then return p.Position end
+        if typeof(p) == "Vector3" then return p end
+        if type(p) == "table" and p.x then return Vector3.new(p.x, p.y, p.z) end
+        return Vector3.zero
+    end
     if ticketQuestState.ui100Spot and ticketQuestState.ui100Spot.Set then
-        local p = ticketQuestState.spot100Fish
+        local p = getSpotPos(ticketQuestState.spot100Fish)
         ticketQuestState.ui100Spot.Set(string.format("(%.0f, %.0f, %.0f)", p.X, p.Y, p.Z))
     end
     if ticketQuestState.ui100BaitSpot and ticketQuestState.ui100BaitSpot.Set then
-        local p = ticketQuestState.spot100Bait
+        local p = getSpotPos(ticketQuestState.spot100Bait)
         ticketQuestState.ui100BaitSpot.Set(string.format("(%.0f, %.0f, %.0f)", p.X, p.Y, p.Z))
     end
     if ticketQuestState.ui15MSpot and ticketQuestState.ui15MSpot.Set then
-        local p = ticketQuestState.spot15MFish
+        local p = getSpotPos(ticketQuestState.spot15MFish)
         ticketQuestState.ui15MSpot.Set(string.format("(%.0f, %.0f, %.0f)", p.X, p.Y, p.Z))
     end
     if ticketQuestState.uiNPCSpot and ticketQuestState.uiNPCSpot.Set then
-        local p = ticketQuestState.spotNPC
+        local p = getSpotPos(ticketQuestState.spotNPC)
         ticketQuestState.uiNPCSpot.Set(string.format("(%.0f, %.0f, %.0f)", p.X, p.Y, p.Z))
     end
 end
@@ -3576,12 +3618,30 @@ function ticketQuestState.CheckNPCReady()
     return true
 end
 
-function ticketQuestState.TeleportTo(pos)
+function ticketQuestState.TeleportTo(target)
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root and pos then
-        root.CFrame = CFrame.new(pos + Vector3.new(0, 2.5, 0))
-        task.wait(0.3)
+    if not root or not target then return end
+
+    local targetCf = nil
+    if typeof(target) == "CFrame" then
+        targetCf = target
+    elseif typeof(target) == "Vector3" then
+        targetCf = CFrame.new(target + Vector3.new(0, 1.5, 0))
+    elseif type(target) == "table" then
+        if target.cframe and #target.cframe == 12 then
+            targetCf = CFrame.new(table.unpack(target.cframe))
+        elseif target.x and target.y and target.z then
+            targetCf = CFrame.new(target.x, target.y + 1.5, target.z)
+        end
+    end
+
+    if targetCf then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.CFrame = targetCf + Vector3.new(0, 1.5, 0)
+        task.wait(0.12)
+        root.CFrame = targetCf
+        task.wait(0.12)
     end
 end
 
@@ -4422,7 +4482,8 @@ function ticketQuestState.Tick()
                 end
                 local char = LocalPlayer.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
-                if root and targetSpot and (root.Position - targetSpot).Magnitude > 35 then
+                local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
+                if root and spotPos and (root.Position - spotPos).Magnitude > 35 then
                     ticketQuestState.TeleportTo(targetSpot)
                 end
             else
@@ -4448,8 +4509,9 @@ function ticketQuestState.Tick()
     -- Nếu bị trôi xa khỏi vị trí câu quest (ví dụ đang ở NPC hoặc chỗ khác), bay về vị trí câu
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root and targetSpot then
-        local dist = (root.Position - targetSpot).Magnitude
+    local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
+    if root and spotPos then
+        local dist = (root.Position - spotPos).Magnitude
         if dist > 35 then
             ticketQuestState.TeleportTo(targetSpot)
         end
@@ -6540,14 +6602,14 @@ ticketQuestState.uiCooldown = createInfoRow(questCard, "Hồi Chiêu 20 Phút", 
 local spotCard = createCollapsibleCardGroup(tabQuests, "📍 Cài Đặt Vị Trí Câu & NPC Ticket Quest", false)
 
 ticketQuestState.ui100Spot = createInfoRow(spotCard, "Điểm Câu 100 Con (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot100Fish.X, ticketQuestState.spot100Fish.Y, ticketQuestState.spot100Fish.Z))
-createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Con", "Gán vị trí bạn đang đứng làm nơi câu 100 con cá nhẹ", "Lấy Vị Trí", function()
+createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Con", "Gán vị trí & hướng nhìn bạn đang đứng làm nơi câu 100 con cá nhẹ", "Lấy Vị Trí", function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
-        ticketQuestState.spot100Fish = root.Position
+        ticketQuestState.spot100Fish = root.CFrame
         ticketQuestState.SaveSpots()
         ticketQuestState.UpdateUI()
-        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu điểm câu 100 con: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
+        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí & hướng nhìn câu 100 con: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
     end
 end)
 createButtonRow(spotCard, "Bay Đến Điểm Câu 100 Con", "Dịch chuyển tức thì đến điểm câu 100 con đã cài", "Bay Đến", function()
@@ -6556,14 +6618,14 @@ createButtonRow(spotCard, "Bay Đến Điểm Câu 100 Con", "Dịch chuyển t�
 end)
 
 ticketQuestState.ui100BaitSpot = createInfoRow(spotCard, "Điểm Tiêu Thụ 100 Mồi (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot100Bait.X, ticketQuestState.spot100Bait.Y, ticketQuestState.spot100Bait.Z))
-createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Mồi", "Gán vị trí bạn đang đứng làm nơi câu tiêu thụ 100 mồi", "Lấy Vị Trí", function()
+createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Mồi", "Gán vị trí & hướng nhìn bạn đang đứng làm nơi câu tiêu thụ 100 mồi", "Lấy Vị Trí", function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
-        ticketQuestState.spot100Bait = root.Position
+        ticketQuestState.spot100Bait = root.CFrame
         ticketQuestState.SaveSpots()
         ticketQuestState.UpdateUI()
-        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu điểm 100 mồi: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
+        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí & hướng nhìn 100 mồi: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
     end
 end)
 createButtonRow(spotCard, "Bay Đến Điểm 100 Mồi", "Dịch chuyển tức thì đến điểm câu 100 mồi đã cài", "Bay Đến", function()
@@ -6572,14 +6634,14 @@ createButtonRow(spotCard, "Bay Đến Điểm 100 Mồi", "Dịch chuyển tức
 end)
 
 ticketQuestState.ui15MSpot = createInfoRow(spotCard, "Điểm Câu 1.5M (Map 9)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spot15MFish.X, ticketQuestState.spot15MFish.Y, ticketQuestState.spot15MFish.Z))
-createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 1.5M", "Gán vị trí bạn đang đứng làm nơi câu cá 1.5M+", "Lấy Vị Trí", function()
+createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 1.5M", "Gán vị trí & hướng nhìn bạn đang đứng làm nơi câu cá 1.5M+", "Lấy Vị Trí", function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
-        ticketQuestState.spot15MFish = root.Position
+        ticketQuestState.spot15MFish = root.CFrame
         ticketQuestState.SaveSpots()
         ticketQuestState.UpdateUI()
-        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu điểm câu 1.5M: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
+        ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí & hướng nhìn câu 1.5M: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
     end
 end)
 createButtonRow(spotCard, "Bay Đến Điểm Câu 1.5M", "Dịch chuyển tức thì đến điểm câu cá 1.5M+ đã cài", "Bay Đến", function()
@@ -6588,14 +6650,14 @@ createButtonRow(spotCard, "Bay Đến Điểm Câu 1.5M", "Dịch chuyển tức
 end)
 
 ticketQuestState.uiNPCSpot = createInfoRow(spotCard, "Vị Trí NPC Ticket Quest (Map 1)", string.format("(%.0f, %.0f, %.0f)", ticketQuestState.spotNPC.X, ticketQuestState.spotNPC.Y, ticketQuestState.spotNPC.Z))
-createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Vị Trí NPC", "Gán vị trí bạn đang đứng cạnh NPC Ticket Quest", "Lấy Vị Trí", function()
+createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Vị Trí NPC", "Gán vị trí & hướng nhìn bạn đang đứng cạnh NPC Ticket Quest", "Lấy Vị Trí", function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if root then
-        ticketQuestState.spotNPC = root.Position
+        ticketQuestState.spotNPC = root.CFrame
         ticketQuestState.SaveSpots()
         ticketQuestState.UpdateUI()
-        ShowNotification("Vị Trí NPC", string.format("Đã lưu vị trí NPC Ticket Quest: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
+        ShowNotification("Vị Trí NPC", string.format("Đã lưu vị trí & hướng nhìn NPC Ticket Quest: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
     end
 end)
 createButtonRow(spotCard, "Tìm & Bay Đến NPC Ticket Quest", "Tự động quét và bay thẳng đến NPC Ticket Quest", "Bay Đến NPC", function()
