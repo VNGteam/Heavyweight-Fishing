@@ -52,8 +52,18 @@ local function CleanOldInstances()
 
     pcall(function()
         local ws = game:GetService("Workspace")
-        local esp = ws:FindFirstChild("IdenticalESP")
-        if esp then esp:Destroy() end
+        for _, child in ipairs(ws:GetChildren()) do
+            if child.Name == "IdenticalESP" then child:Destroy() end
+        end
+        for _, p in ipairs(game:GetService("Players"):GetPlayers()) do
+            if p.Character then
+                for _, d in ipairs(p.Character:GetDescendants()) do
+                    if d:IsA("BillboardGui") and d.Name:sub(1, 4) == "ESP_" then
+                        d:Destroy()
+                    end
+                end
+            end
+        end
     end)
 end
 CleanOldInstances()
@@ -224,7 +234,7 @@ local Config = {
     Fullbright = false,
     PerformanceMode = false,
     HideGameUI = false,
-    HideOverheadNames = false,
+    HideOverheadNames = true,
     
     AntiAFK = true,
     AutoRejoin = false,
@@ -5892,13 +5902,18 @@ createToggleRow(espCard, "ESP Maoshan", "Hiện vị trí NPC hoặc cần Maosh
 createToggleRow(espCard, "ESP Đạo Sĩ (Taoist)", "Hiện vị trí NPC hoặc cần Taoist", Config.ESP_Taoist, function(v) Config.ESP_Taoist = v end)
 createToggleRow(espCard, "ESP Trùm Boss", "Hiện vị trí các Boss đang xuất hiện", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
 createToggleRow(espCard, "ESP Người Chơi", "Hiện khung & khoảng cách đến người chơi khác", Config.ESP_Players, function(v) Config.ESP_Players = v end)
-createToggleRow(espCard, "Ẩn Tên Mặc Định Người Chơi", "Ẩn toàn bộ bảng tên và thanh máu mặc định của Roblox trên đầu người chơi khác", Config.HideOverheadNames, function(v)
+createToggleRow(espCard, "Ẩn Tên Mặc Định Người Chơi", "Ẩn toàn bộ bảng tên, danh hiệu và thanh máu trên đầu của người chơi khác", Config.HideOverheadNames, function(v)
     Config.HideOverheadNames = v
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p.Character then
             local hum = p.Character:FindFirstChildOfClass("Humanoid")
             if hum then
                 hum.DisplayDistanceType = v and Enum.HumanoidDisplayDistanceType.None or Enum.HumanoidDisplayDistanceType.Viewer
+            end
+            for _, d in ipairs(p.Character:GetDescendants()) do
+                if d:IsA("BillboardGui") and d.Name:sub(1, 4) ~= "ESP_" then
+                    d.Enabled = not v
+                end
             end
         end
     end
@@ -7763,6 +7778,11 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
                 local hum = p.Character:FindFirstChildOfClass("Humanoid")
                 if hum and hum.DisplayDistanceType ~= Enum.HumanoidDisplayDistanceType.None then
                     hum.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+                end
+                for _, d in ipairs(p.Character:GetDescendants()) do
+                    if d:IsA("BillboardGui") and d.Name:sub(1, 4) ~= "ESP_" then
+                        if d.Enabled then d.Enabled = false end
+                    end
                 end
             end
         end
