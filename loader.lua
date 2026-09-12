@@ -9,8 +9,7 @@
     Mỗi khi bạn sửa code và lưu lên link, game sẽ tự động tải bản mới nhất!
 --]]
 
-local PRIMARY_URL = "https://cdn.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/local.lua"
-local FALLBACK_URL = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/local.lua"
+local SCRIPT_URL = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/local.lua"
 
 -- Cơ chế Anti-Cache: Thêm query ngẫu nhiên để Roblox không bao giờ nạp bản cũ
 local function FetchScript(url)
@@ -35,10 +34,7 @@ pcall(function()
     })
 end)
 
-local ok, content = FetchScript(PRIMARY_URL)
-if not ok or not content or #content == 0 then
-    ok, content = FetchScript(FALLBACK_URL)
-end
+local ok, content = FetchScript(SCRIPT_URL)
 if ok and content and #content > 0 then
     local runOk, runErr = pcall(function()
         loadstring(content)()
