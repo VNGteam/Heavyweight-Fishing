@@ -92,6 +92,9 @@ local isRunning = true
 local activeConnections = {}
 local cleanUpInstances = {}
 
+--// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
+local SCRIPT_BUILD_COMMIT = "bc40337"
+
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
     task.spawn(function()
@@ -819,7 +822,7 @@ local commitBadge = Instance.new("TextLabel")
 commitBadge.Size = UDim2.new(0, 68, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
 commitBadge.BackgroundColor3 = Color3.fromRGB(30, 22, 48)
 commitBadge.Font = Enum.Font.Code
-commitBadge.Text = "#latest"
+commitBadge.Text = "#" .. tostring(SCRIPT_BUILD_COMMIT)
 commitBadge.TextColor3 = Color3.fromRGB(190, 150, 255)
 commitBadge.TextSize = 10
 commitBadge.Parent = titleBar
@@ -827,18 +830,6 @@ Instance.new("UICorner", commitBadge).CornerRadius = UDim.new(0, 4)
 local cStroke = Instance.new("UIStroke", commitBadge)
 cStroke.Color = Colors.PurpleAccent
 cStroke.Thickness = 1
-
-task.spawn(function()
-    pcall(function()
-        local res = (game.HttpGet and game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/commits/main?t=" .. tostring(tick())))
-        if res and #res > 0 then
-            local data = HttpService:JSONDecode(res)
-            if data and data.sha then
-                commitBadge.Text = "#" .. tostring(data.sha):sub(1, 7)
-            end
-        end
-    end)
-end)
 
 local gameSubtitle = Instance.new("TextLabel")
 gameSubtitle.Size = UDim2.new(0, 220, 1, 0); gameSubtitle.Position = UDim2.new(0, 208, 0, 0)
