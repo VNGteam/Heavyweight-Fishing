@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "5908b24"
+local SCRIPT_BUILD_COMMIT = "09ec274"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3505,15 +3505,18 @@ function ticketQuestState.DetectActiveQuest()
                 if #txt > 0 then
                     local lower = txt:lower()
 
-                    -- A. Quét thời gian hồi chiêu hiển thị trực tiếp trên UI game (VD: "Cooldown: 18:45", "Wait 15m 30s", "19:22", "Next quest in 12:00")
-                    if lower:find("cooldown") or lower:find("wait") or lower:find("next") or lower:find("time") or lower:find("hồi") or lower:find("chờ") or lower:find("ticket") then
+                    -- A. Quét thời gian hồi chiêu của riêng Ticket Quest (chỉ quét nếu nhãn nằm trong khung Ticket Quest hoặc chứa rõ "ticket quest" / "ticket cooldown")
+                    local isStrictTicketCd = (lower:find("ticket") and (lower:find("cooldown") or lower:find("wait") or lower:find("next quest") or lower:find("chờ")))
+                        or ((d:FindFirstAncestor("Ticket") or d:FindFirstAncestor("TicketQuest")) and (lower:find("cooldown") or lower:find("wait") or lower:find("time")))
+
+                    if isStrictTicketCd then
                         local m, s = txt:match("(%d+)%s*:%s*(%d+)")
                         if m and s then
                             local mins = tonumber(m)
                             local secs = tonumber(s)
                             if mins and secs and mins < 60 and secs < 60 then
                                 local totalSec = (mins * 60) + secs
-                                if totalSec > 0 and (not detectedCooldownSec or totalSec > detectedCooldownSec) then
+                                if totalSec > 0 and totalSec <= 1800 then
                                     detectedCooldownSec = totalSec
                                 end
                             end
@@ -3522,7 +3525,7 @@ function ticketQuestState.DetectActiveQuest()
                             local sOnly = txt:match("(%d+)%s*[sS]")
                             if mOnly or sOnly then
                                 local totalSec = ((tonumber(mOnly) or 0) * 60) + (tonumber(sOnly) or 0)
-                                if totalSec > 0 and (not detectedCooldownSec or totalSec > detectedCooldownSec) then
+                                if totalSec > 0 and totalSec <= 1800 then
                                     detectedCooldownSec = totalSec
                                 end
                             end
@@ -3678,11 +3681,13 @@ function ticketQuestState.Tick()
     if not Config.AutoTicketQuest then return end
     local now = tick()
 
-    -- 0. Luôn quét UI để đồng bộ thời gian hồi chiêu thực tế của game (nếu game hiển thị thời gian còn lại)
+    -- 0. Đồng bộ thời gian hồi chiêu thực tế của game nếu phát hiện nhãn thời gian từ server
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
     if detectedCd and detectedCd > 0 then
-        ticketQuestState.isCooldown = true
-        ticketQuestState.cooldownEnd = now + detectedCd
+        if not ticketQuestState.isCooldown or math.abs((now + detectedCd) - ticketQuestState.cooldownEnd) > 5 then
+            ticketQuestState.isCooldown = true
+            ticketQuestState.cooldownEnd = now + detectedCd
+        end
     end
 
     -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới)
