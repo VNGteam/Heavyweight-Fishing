@@ -1151,7 +1151,11 @@ local function SwitchTab(tabName)
         end
     end
     if tabName == "Wiki" and Wiki and Wiki.RefreshBagUI then
-        task.spawn(Wiki.RefreshBagUI)
+        if not Wiki._wikiFirstScanDone then
+            Wiki._wikiFirstScanDone = true
+            task.spawn(Wiki.RefreshBagUI)
+        end
+        -- Không scan lại mỗi lần chuyển tab - dùng nút Cập Nhật để scan thủ công
     elseif tabName == "Nhiệm Vụ" and ticketQuestState and ticketQuestState.ScanAndUpdateStatus then
         task.spawn(ticketQuestState.ScanAndUpdateStatus)
     end
@@ -2291,6 +2295,45 @@ function Wiki.UnlockAllKeepFish()
 
     ShowNotification("MỞ KHÓA THÀNH CÔNG", string.format("Đã mở khóa %d con cá quý / boss / nguyên liệu!", unlockedCount), "WARN", 6)
     return unlockedCount
+end
+
+-- Mở khóa TẤT CẢ cá trong balo (cả cá giữ lẫn cá bán)
+function Wiki.UnlockAllFish()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then
+        ShowNotification("Mở Khóa", "Không tìm thấy dữ liệu túi đồ!", "WARN", 4)
+        return 0
+    end
+
+    local toUnlock = {}
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            if Wiki.IsItemFavorited(item) then
+                table.insert(toUnlock, item)
+            end
+        end
+    end
+
+    if #toUnlock == 0 then
+        ShowNotification("Mở Khóa Tất Cả", "Không có cá nào đang bị khóa trong balo.", "INFO", 4)
+        return 0
+    end
+
+    local count = 0
+    for _, item in ipairs(toUnlock) do
+        if Events and Events:FindFirstChild("FavoriteItem") then
+            Events.FavoriteItem:FireServer(item)
+            count = count + 1
+            task.wait(0.04)
+        end
+    end
+
+    ShowNotification("MỞ KHÓA TẤT CẢ", string.format("Đã mở khóa %d con cá (kể cả cá quý)! AutoSell có thể bán tất cả.", count), "SUCCESS", 6)
+    return count
 end
 
 function Wiki.UnlockAllUnnecessaryFish()
@@ -7544,6 +7587,15 @@ local function initWikiTab()
     btnLockBaitBag.Position = UDim2.new(1, -120, 0.5, -13)
     btnLockBaitBag.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
     btnLockBaitBag.TextColor3 = Colors.TextWhite
+
+    local btnUnlockAll = createButtonRow(wikiActionCard, "Mở Khóa TẤT CẢ Cá Trong Balo", "⚠️ Mở khóa TOÀN BỘ cá (kể cả cá quý/boss/nguyên liệu). Chỉ dùng khi muốn bán sạch!", "⚠️ Mở Tất Cả", function()
+        Wiki.UnlockAllFish()
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+    end)
+    btnUnlockAll.Size = UDim2.new(0, 120, 0, 26)
+    btnUnlockAll.Position = UDim2.new(1, -120, 0.5, -13)
+    btnUnlockAll.BackgroundColor3 = Color3.fromRGB(127, 29, 29)
+    btnUnlockAll.TextColor3 = Colors.TextWhite
 
     createButtonRow(wikiActionCard, "Đồng Bộ & Làm Mới Balo", "Quét lại toàn bộ túi đồ và cập nhật số lượng từng loại cá", "🔄 Cập Nhật", function()
         if RefreshWikiBagCounts then RefreshWikiBagCounts() end
