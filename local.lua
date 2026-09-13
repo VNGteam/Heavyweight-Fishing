@@ -9706,6 +9706,19 @@ function comboState.CastSkill(sk)
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
 
+    -- 🛑 KHÓA BẢO VỆ CẤP CAO CHO CHIÊU C: Nếu không có tab nào bật C, cấm 100% việc cast chiêu C!
+    if cleanKey == "C" then
+        local userChoseC = false
+        if Config.LoopSkills and (Config.LoopSkills:find("C") or Config.LoopSkills:find("c")) then userChoseC = true end
+        if Config.TicketQuickSkill and (Config.TicketQuickSkill:find("C") or Config.TicketQuickSkill:find("c")) then userChoseC = true end
+        if Config.TicketSkillKey and (Config.TicketSkillKey:find("C") or Config.TicketSkillKey:find("c")) then userChoseC = true end
+        if Config.TrainSkill and (Config.TrainSkill:find("C") or Config.TrainSkill:find("c")) then userChoseC = true end
+        if Config.QuickCatchSkill == "C" or Config.OpenerSkill == "C" or Config.EmergencyHealSkill == "C" then userChoseC = true end
+        if not userChoseC then
+            return false -- Chặn đứng 100% việc cast C
+        end
+    end
+
     -- KHÓA BẢO VỆ CHẶN CHIÊU SAI: Khi đang có nhiệm vụ 100 Cá, CHỈ cho phép cast duy nhất chiêu TicketQuickSkill (Mặc định: V)
     local curQ = ticketQuestState and ticketQuestState.currentQuestType
     if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
