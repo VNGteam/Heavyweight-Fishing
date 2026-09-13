@@ -9659,6 +9659,7 @@ function comboState.CastSkill(sk)
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
 
+    -- 1. Gửi RemoteEvent tới Server
     pcall(function()
         if Events then
             if Events:FindFirstChild("UseSkill") then
@@ -9669,6 +9670,8 @@ function comboState.CastSkill(sk)
             end
         end
     end)
+
+    -- 2. Giả lập phím bấm bàn phím qua VIM
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
         if vim and Enum.KeyCode[cleanKey] then
@@ -9677,6 +9680,40 @@ function comboState.CastSkill(sk)
             vim:SendKeyEvent(false, Enum.KeyCode[cleanKey], false, game)
         end
     end)
+
+    -- 3. Giả lập click trực tiếp nút chiêu trên GUI Fishing (PlayerGui.MainGui.Fishing.SkillButton.Frame[sk] hoặc tương đương)
+    pcall(function()
+        local function clickBtn(btn)
+            if not btn or not btn:IsA("GuiButton") or not btn.Visible then return false end
+            if firesignal then
+                if btn.Activated then firesignal(btn.Activated) end
+                if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+            end
+            if getconnections then
+                for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end
+                for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end
+            end
+            return true
+        end
+
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local mg = pg and pg:FindFirstChild("MainGui")
+        local f = mg and mg:FindFirstChild("Fishing")
+        if f then
+            local sb = f:FindFirstChild("SkillButton")
+            local fr = sb and sb:FindFirstChild("Frame")
+            local btn = fr and fr:FindFirstChild(cleanKey)
+            if btn and clickBtn(btn) then
+                return
+            end
+            for _, d in ipairs(f:GetDescendants()) do
+                if d:IsA("GuiButton") and (d.Name:upper() == cleanKey or (d.Name:upper():find("SKILL") and d.Name:upper():find(cleanKey))) then
+                    clickBtn(d)
+                end
+            end
+        end
+    end)
+
     comboState.usedTimes[cleanKey] = tick()
     comboState.lastCastTime = tick()
     return true
@@ -9954,6 +9991,17 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
 
             if not skipTriggered then
+                -- Đồng bộ trạng thái Quest Ticket từ hệ thống nếu chưa có
+                if ticketQuestState and (not ticketQuestState.currentQuestType or ticketQuestState.currentQuestType == "none") and ticketQuestState.DetectActiveQuest then
+                    local detQ = select(1, ticketQuestState.DetectActiveQuest())
+                    if detQ and detQ ~= "none" then
+                        ticketQuestState.currentQuestType = detQ
+                        ticketQuestState.active = true
+                    end
+                end
+
+                local hasActiveTicket = ticketQuestState and ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" and not ticketQuestState.isCooldown
+
                 if Config.AutoTrainSkill then
                     if not isTrainingBusy then
                         isTrainingBusy = true
@@ -10063,7 +10111,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             isTrainingBusy = false
                         end)
                     end
-                elseif Config.AutoTicketQuest and ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown and ticketQuestState.currentQuestType ~= "none" then
+                elseif (Config.AutoTicketQuest or hasActiveTicket) and hasActiveTicket then
                     local qType = ticketQuestState.currentQuestType
                     if qType == "bait_100" then
                         if not ticketQuestState.isBusyRoutine then
@@ -10193,19 +10241,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
                                 pcall(function()
-                                    -- 1. Ưu tiên số 1: Dùng đúng chiêu TicketQuickSkill đã cài đặt cho nhiệm vụ 100 Cá (VD: "Chiêu V")
-                                    local comboList = {}
+                                    -- 1. Chỉ dùng duy nhất chiêu TicketQuickSkill (Mặc định: Chiêu V) cho nhiệm vụ 100 Cá (Tuyệt đối không dùng LoopSkills)
                                     local quickKey = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
-                                    if quickKey then
-                                        table.insert(comboList, quickKey:upper())
-                                    elseif Config.LoopSkills and Config.LoopSkills ~= "" then
-                                        for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
-                                            table.insert(comboList, k:upper())
-                                        end
-                                    end
-                                    if #comboList == 0 then
-                                        comboList = {"V"}
-                                    end
+                                    local comboList = {quickKey and quickKey:upper() or "V"}
 
                                     -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
                                     local startTime = tick()
@@ -10343,11 +10381,19 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             if not didHeal then
                                 -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU COMBO (VD: Z -> X -> V...)
                                 local loopKeys = {}
-                                local isTicketFish100 = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown and ticketQuestState.currentQuestType == "fish_100"
-                                if isTicketFish100 and Config.TicketQuickSkill then
-                                    local qk = Config.TicketQuickSkill:match("([ZXCVzxcv])")
-                                    if qk then table.insert(loopKeys, qk:upper()) end
+                                local curQ = ticketQuestState and ticketQuestState.currentQuestType
+                                if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+                                    curQ = select(1, ticketQuestState.DetectActiveQuest())
                                 end
+
+                                if curQ == "fish_100" then
+                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+                                    table.insert(loopKeys, qk and qk:upper() or "V")
+                                elseif curQ == "skill_100" then
+                                    local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+                                    table.insert(loopKeys, sk and sk:upper() or "Z")
+                                end
+
                                 if #loopKeys == 0 then
                                     for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
                                         table.insert(loopKeys, k:upper())
