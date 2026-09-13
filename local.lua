@@ -1982,10 +1982,22 @@ end
 
 function Wiki.IsItemFavorited(item)
     if not item then return false end
-    local name = tostring(item.Name or "")
-    if name:find("Favorite", 1, true) or name:find("Favourite", 1, true) or name:find("Locked", 1, true) then
-        return true
-    end
+
+    -- Cấu trúc thực tế trong game:
+    -- Mỗi item là Folder đặt tên "FishName | ID"
+    -- Bên trong có 1 NumberValue tên là "Weight | Favorite" (nếu khóa) hoặc chỉ "Weight" (nếu mở)
+    -- Kiểm tra child có tên chứa "Favorite" không
+    local ok, result = pcall(function()
+        for _, child in ipairs(item:GetChildren()) do
+            if child.Name:find("Favorite", 1, true) or child.Name:find("Favourite", 1, true) then
+                return true
+            end
+        end
+        return false
+    end)
+    if ok and result then return true end
+
+    -- Fallback: kiểm tra attribute và tên item (cho các cấu trúc khác)
     if item:GetAttribute("IsFavorite") == true or item:GetAttribute("Favorite") == true or item:GetAttribute("Locked") == true then
         return true
     end
@@ -8056,36 +8068,38 @@ local function initWikiTab()
         })
     end
 
-    -- Lắng nghe khi mở Tab Wiki thì tự động làm mới số lượng
-    if tabButtons and tabButtons["Wiki"] then
-        tabButtons["Wiki"].MouseButton1Click:Connect(function()
-            task.spawn(RefreshWikiBagCounts)
-        end)
-    end
+    -- Tab Wiki click: không tự refresh nữa (dùng nút Cập Nhật để scan thủ công và tránh lag)
+    -- if tabButtons and tabButtons["Wiki"] then
+    --     tabButtons["Wiki"].MouseButton1Click:Connect(function()
+    --         task.spawn(RefreshWikiBagCounts)
+    --     end)
+    -- end
 
     -- Tự động làm mới khi có cá mới thêm vào hoặc bán bớt trong balo & hotbar
+    -- DEBOUNCE: tối thiểu 5s giữa các lần tự động refresh (tránh lag khi câu liên tục)
     task.spawn(function()
         local pDataInit = ReplicatedStorage:WaitForChild("Data", 10)
         local userFolder = pDataInit and pDataInit:WaitForChild(tostring(LocalPlayer.UserId), 10)
         local invFolder = userFolder and userFolder:WaitForChild("Inventory", 10)
         local hotbarFolder = userFolder and userFolder:WaitForChild("Hotbar", 10)
+        local lastAutoRefresh = 0
 
         local function attachFolder(folder)
             if not folder then return end
-            table.insert(activeConnections, folder.ChildAdded:Connect(function()
+            local function onChanged()
                 local page = tabFrames and tabFrames["Wiki"]
                 if page and page.Visible then
-                    task.wait(0.4)
-                    pcall(RefreshWikiBagCounts)
+                    local now = tick()
+                    if now - lastAutoRefresh >= 5.0 then
+                        lastAutoRefresh = now
+                        task.delay(1.0, function() -- 1s để server kịp cập nhật Quantity
+                            pcall(RefreshWikiBagCounts)
+                        end)
+                    end
                 end
-            end))
-            table.insert(activeConnections, folder.ChildRemoved:Connect(function()
-                local page = tabFrames and tabFrames["Wiki"]
-                if page and page.Visible then
-                    task.wait(0.4)
-                    pcall(RefreshWikiBagCounts)
-                end
-            end))
+            end
+            table.insert(activeConnections, folder.ChildAdded:Connect(onChanged))
+            table.insert(activeConnections, folder.ChildRemoved:Connect(onChanged))
         end
 
         attachFolder(invFolder)
