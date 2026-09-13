@@ -5240,13 +5240,19 @@ function ticketQuestState.DetectActiveQuest()
             end
         end
 
-        -- Nếu không có folder nhiệm vụ tq, nhưng đang có Cooldown:
+        -- Không có folder nhiệm vụ tq nào trong pData:
+        -- pData là nguồn tin cậy nhất (dữ liệu gốc của server)
+        -- Nếu không thấy quest -> chắc chắn không có quest đang hoạt động
+        -- TUYỆT ĐỐI KHÔNG chạy xuống GUI scan vì sẽ đọc nhầm hội thoại NPC!
         if detectedCooldownSec and detectedCooldownSec > 0 then
             return nil, nil, 0, 0, false, detectedCooldownSec
+        else
+            -- Cooldown hết và không có quest -> sẵn sàng nhận quest mới
+            return nil, nil, 0, 0, false, nil
         end
     end
 
-    -- 1. Ưu tiên chế độ người dùng chọn thủ công nếu không chọn Auto Detect
+    -- CHỈ dùng GUI scan nếu KHAI THAC pData thất bại (không tìm được folder Data)
     local mode = Config.TicketQuestMode or "Tự Động (Auto Detect)"
     if mode == "Câu 10 Con Cá 1.5M+ (Map 9)" then
         detectedType = "fish_15m"
@@ -5478,6 +5484,7 @@ function ticketQuestState.Tick()
         if (remain <= 0 or isReady) and remain <= 0 then
             -- COOLDOWN HẾT: BẬT FLAG SẴN SÀNG ĐỂ NGĂN UpdateUI/ScanStatus reset lại
             ticketQuestState.readyForNewQuest = true
+            ticketQuestState.cachedCard = nil -- Reset cache GUI để không đọc nhầm NPC dialogue cũ
             ticketQuestState.isCooldown = false
             ticketQuestState.isAtHomeSpot = false
             ticketQuestState.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé Hard mới..."
