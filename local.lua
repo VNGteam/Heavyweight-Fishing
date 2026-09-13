@@ -4245,6 +4245,7 @@ for k, v in pairs({
     isCompleted = false,
     isCooldown = false,
     cooldownEnd = 0,
+    readyForNewQuest = false, -- Flag: cooldown đã hết, đang chờ đến NPC nhận quest mới
     lastAcceptTime = 0,
     lastClaimTime = 0,
     lastNpcInteract = 0,
@@ -4373,7 +4374,8 @@ function ticketQuestState.UpdateUI()
         local serverRemain = serverCd > nowServer and (serverCd - nowServer) or 0
 
         local hasQuest = (ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none")
-        if not hasQuest and serverRemain > 0 then
+        -- CHỈ set isCooldown = true nếu chưa sẵn sàng nhận quest mới (readyForNewQuest = false)
+        if not hasQuest and serverRemain > 0 and not ticketQuestState.readyForNewQuest then
             ticketQuestState.isCooldown = true
             ticketQuestState.cooldownEnd = tick() + serverRemain
         end
@@ -4383,7 +4385,7 @@ function ticketQuestState.UpdateUI()
             remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - tick()))
         end
 
-        if remain > 0 then
+        if remain > 0 and not ticketQuestState.readyForNewQuest then
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             local homeStr = ""
@@ -5385,7 +5387,11 @@ function ticketQuestState.ScanAndUpdateStatus()
         ticketQuestState.currentProgress = 0
         ticketQuestState.targetProgress = 100
 
-        if serverRemain > 0 then
+        -- Nếu đang trong trạng thái sẵn sàng nhận quest mới: TUYỆT ĐỐI KHÔNG cho server lag đảo ngược isCooldown
+        if ticketQuestState.readyForNewQuest then
+            ticketQuestState.isCooldown = false
+            ticketQuestState.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé Hard mới..."
+        elseif serverRemain > 0 then
             ticketQuestState.isCooldown = true
             ticketQuestState.cooldownEnd = now + serverRemain
             local mins = math.floor(serverRemain / 60)
@@ -5405,6 +5411,7 @@ end
 function ticketQuestState.ResetCooldown()
     ticketQuestState.isCooldown = false
     ticketQuestState.cooldownEnd = 0
+    ticketQuestState.readyForNewQuest = false
     ticketQuestState.isCompleted = false
     ticketQuestState.isAtHomeSpot = false
     ticketQuestState.currentProgress = 0
@@ -5450,6 +5457,8 @@ function ticketQuestState.Tick()
 
         local isReady = ticketQuestState.CheckNPCReady()
         if (remain <= 0 or isReady) and remain <= 0 then
+            -- COOLDOWN HẾT: BẬT FLAG SẴN SÀNG ĐỂ NGĂN UpdateUI/ScanStatus reset lại
+            ticketQuestState.readyForNewQuest = true
             ticketQuestState.isCooldown = false
             ticketQuestState.isAtHomeSpot = false
             ticketQuestState.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé Hard mới..."
@@ -5508,6 +5517,7 @@ function ticketQuestState.Tick()
                 ticketQuestState.UpdateUI()
                 return -- DỪNG LẠI Ở ĐÂY, TUYỆT ĐỐI KHÔNG CHẠY XUỐNG NPC INTERACT!
             else
+                ticketQuestState.readyForNewQuest = true
                 ticketQuestState.isCooldown = false
                 ticketQuestState.isAtHomeSpot = false
                 ticketQuestState.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé Hard mới..."
@@ -5608,6 +5618,8 @@ function ticketQuestState.Tick()
             task.wait(1.0)
             local freshType, freshTitle, freshCur, freshMax, freshDone = ticketQuestState.DetectActiveQuest()
             if freshType then
+                -- Nhận quest mới thành công: xóa flag ready
+                ticketQuestState.readyForNewQuest = false
                 ticketQuestState.currentQuestType = freshType
                 ticketQuestState.currentQuestTitle = freshTitle or "Nhiệm Vụ Vé"
                 ticketQuestState.targetProgress = freshMax > 0 and freshMax or (freshType == "fish_15m" and 10 or 100)
