@@ -733,26 +733,20 @@ Config._loadEssential = function()
 end
 
 Config._autoSaveTimer = nil
+-- [AUTO SAVE ĐÃ TẮT] Người dùng không muốn tự động lưu config ra file máy
 Config._triggerAutoSave = function(delaySec)
-    delaySec = delaySec or 0.8
-    if Config._autoSaveTimer then
-        pcall(function() task.cancel(Config._autoSaveTimer) end)
-        Config._autoSaveTimer = nil
-    end
-    Config._autoSaveTimer = task.delay(delaySec, function()
-        Config._autoSaveTimer = nil
-        pcall(Config._saveEssential)
-    end)
+    -- Tắt hoàn toàn, không ghi file nào ra máy
 end
 
-pcall(function()
-    if Config._loadEssential() then
-        task.spawn(function()
-            task.wait(1.5)
-            ShowNotification("CẤU HÌNH TỰ ĐỘNG", "Đã nạp cài đặt thiết yếu (Skill, Combo, Tiện ích) từ máy!", "SUCCESS", 5)
-        end)
-    end
-end)
+-- [CONFIG TỰ LƯU ĐÃ TẮT] Người dùng chọn không dùng auto load config từ máy
+-- pcall(function()
+--     if Config._loadEssential() then
+--         task.spawn(function()
+--             task.wait(1.5)
+--             ShowNotification("CẤU HÌNH TỰ ĐỘNG", "Đã nạp cài đặt thiết yếu (Skill, Combo, Tiện ích) từ máy!", "SUCCESS", 5)
+--         end)
+--     end
+-- end)
 
 local Colors = {
     Background       = Color3.fromRGB(15, 12, 22),
@@ -10665,16 +10659,16 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     curQ = select(1, ticketQuestState.DetectActiveQuest())
                                 end
 
+                                -- fish_100 và skill_100: chỉ dùng 1 chiêu cố định theo config vé
+                                -- Tất cả còn lại (fish_15m, bait_100, không có quest...): dùng LoopSkills đầy đủ
                                 if curQ == "fish_100" then
                                     local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, qk and qk:upper() or "V")
                                 elseif curQ == "skill_100" then
                                     local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, sk and sk:upper() or "Z")
-                                elseif Config.AutoTicketQuest and curQ ~= "fish_15m" then
-                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
-                                    table.insert(loopKeys, qk and qk:upper() or "V")
                                 end
+                                -- fish_15m, bait_100, none, hoặc không quest -> loopKeys sẽ rỗng -> dùng LoopSkills bên dưới
 
                                 if #loopKeys == 0 then
                                     for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
@@ -10735,16 +10729,15 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             curQ = select(1, ticketQuestState.DetectActiveQuest())
                         end
 
+                        -- fish_100/skill_100: 1 chiêu cố định. Tất cả còn lại: dùng LoopSkills đầy đủ
                         if curQ == "fish_100" then
                             local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                             comboState.CastSkill(qk and qk:upper() or "V")
                         elseif curQ == "skill_100" then
                             local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                             comboState.CastSkill(sk and sk:upper() or "Z")
-                        elseif Config.AutoTicketQuest and curQ ~= "fish_15m" then
-                            local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
-                            comboState.CastSkill(qk and qk:upper() or "V")
                         else
+                            -- fish_15m, bait_100, không quest, hoặc normal fishing -> dùng LoopSkills
                             local skillList = {}
                             if Config.LoopSkills and Config.LoopSkills ~= "" then
                                 for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
