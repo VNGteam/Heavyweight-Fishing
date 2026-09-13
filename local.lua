@@ -4745,78 +4745,85 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
             actionId = "HardAcceptQuest"
         elseif clean:find("easy") then
             actionId = "EasyAcceptQuest"
-        elseif clean:find("leave") or clean:find("nevermind") or clean:find("close") then
+        elseif clean:find("leave") or clean:find("close") then
             actionId = "Close"
         end
     end
 
-    -- 1. Giả lập chọn và click đối tượng UI bằng nhiều phương thức để tương thích mọi executor
+    -- 1. Ưu tiên gọi hàm xử lý của chính game nếu ModuleScript Dialogue có xuất hàm
     pcall(function()
-        local gs = game:GetService("GuiService")
-        gs.SelectedObject = btn
+        local dm = require(ReplicatedStorage.ClientModule.Dialogue)
+        if type(dm) == "table" then
+            if dm.ChooseOption then dm.ChooseOption(idx)
+            elseif dm.SelectOption then dm.SelectOption(idx)
+            elseif dm.Choose then dm.Choose(idx)
+            elseif dm.Select then dm.Select(idx)
+            end
+        end
     end)
 
+    -- 2. Kích hoạt trực tiếp sự kiện UI của TextButton
     pcall(function()
         if firesignal then
             if btn:IsA("GuiButton") and btn.Activated then firesignal(btn.Activated) end
             if btn:IsA("GuiButton") and btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
-            if btn:IsA("GuiButton") and btn.MouseButton1Down then firesignal(btn.MouseButton1Down) end
-            if btn:IsA("GuiButton") and btn.MouseButton1Up then firesignal(btn.MouseButton1Up) end
-            local titleObj = btn:FindFirstChild("Title") or btn:FindFirstChildWhichIsA("TextLabel", true)
-            if titleObj and titleObj:IsA("GuiObject") and titleObj:FindFirstChild("Activated") then
-                firesignal(titleObj.Activated)
-            end
         end
     end)
 
     pcall(function()
         if getconnections then
-            local evList = {btn.Activated, btn.MouseButton1Click, btn.MouseButton1Down, btn.MouseButton1Up}
-            for _, ev in ipairs(evList) do
-                if ev then
-                    for _, c in ipairs(getconnections(ev)) do
-                        if c.Fire then c:Fire() end
-                        if c.Function then pcall(c.Function) end
-                    end
+            local conns = getconnections(btn.Activated)
+            if not conns or #conns == 0 then conns = getconnections(btn.MouseButton1Click) end
+            if conns then
+                for _, c in ipairs(conns) do
+                    if c.Fire then c:Fire() elseif c.Function then pcall(c.Function) end
                 end
             end
         end
     end)
 
+    -- 3. Giả lập chọn đối tượng UI qua GuiService và phím Enter
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        gs.SelectedObject = btn
+        local vim = game:GetService("VirtualInputManager")
+        if vim then
+            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+            task.wait(0.04)
+            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+        end
+    end)
+
+    -- 4. Giả lập click chuột và chạm màn hình (Mobile Touch) tại tâm nút
     pcall(function()
         local vim = game:GetService("VirtualInputManager")
         if vim and btn.AbsolutePosition and btn.AbsoluteSize then
             local p = btn.AbsolutePosition + btn.AbsoluteSize / 2
             vim:SendMouseButtonEvent(p.X, p.Y, 0, true, game, 0)
-            task.wait(0.03)
+            task.wait(0.04)
             vim:SendMouseButtonEvent(p.X, p.Y, 0, false, game, 0)
+            pcall(function()
+                vim:SendTouchEvent(0, 0, p.X, p.Y)
+                task.wait(0.04)
+                vim:SendTouchEvent(0, 2, p.X, p.Y)
+            end)
         end
     end)
 
-    pcall(function()
-        local vu = game:GetService("VirtualUser")
-        if vu and btn.AbsolutePosition and btn.AbsoluteSize then
-            local p = btn.AbsolutePosition + btn.AbsoluteSize / 2
-            vu:Button1Down(p)
-            task.wait(0.03)
-            vu:Button1Up(p)
-        end
-    end)
-
-    -- 2. Gửi RemoteEvent ChooseDialogueOption trực tiếp lên Server (kèm cả Index và Action Name)
+    -- 5. Gửi RemoteEvent ChooseDialogueOption chuẩn xác lên Server
     if Events and Events:FindFirstChild("ChooseDialogueOption") then
-        pcall(function() Events.ChooseDialogueOption:FireServer(idx) end)
-        pcall(function() Events.ChooseDialogueOption:FireServer(tostring(idx)) end)
         if actionId and #actionId > 0 then
             pcall(function() Events.ChooseDialogueOption:FireServer(actionId) end)
         end
-        if rawTxt and #rawTxt > 0 then
-            pcall(function() Events.ChooseDialogueOption:FireServer(rawTxt) end)
+        if idx and idx > 0 then
+            pcall(function() Events.ChooseDialogueOption:FireServer(idx) end)
         end
     end
 
     if Events and Events:FindFirstChild("Dialogue") and Events.Dialogue:IsA("BindableEvent") then
-        pcall(function() Events.Dialogue:Fire(idx) end)
+        if idx and idx > 0 then
+            pcall(function() Events.Dialogue:Fire(idx) end)
+        end
     end
 
     return true
@@ -4826,7 +4833,7 @@ function ticketQuestState.CloseDialogue()
     pcall(function()
         local buttons = ticketQuestState.GetDialogueButtons()
         for _, b in ipairs(buttons) do
-            if b.clean:find("leave") or b.clean:find("nevermind") or b.clean:find("close") then
+            if b.clean:find("leave") or b.clean:find("close") then
                 ticketQuestState.ClickButtonEntry(b, "Close")
                 break
             end
@@ -4834,8 +4841,6 @@ function ticketQuestState.CloseDialogue()
     end)
     if Events and Events:FindFirstChild("ChooseDialogueOption") then
         pcall(function() Events.ChooseDialogueOption:FireServer("Close") end)
-        pcall(function() Events.ChooseDialogueOption:FireServer("*Leave*") end)
-        pcall(function() Events.ChooseDialogueOption:FireServer(1) end)
     end
     pcall(function()
         local dlg = ticketQuestState.GetDialogueGui()
@@ -4872,7 +4877,6 @@ function ticketQuestState.SelectDialogueOption(optionIndex, optionTextPattern)
 end
 
 -- Xử lý toàn bộ logic tương tác các trang hội thoại của NPC Vé (Ticket Quest Giver)
--- Tái cấu trúc chuẩn xác theo chuỗi sự kiện thực tế thu được từ nhật ký Debug Spy:
 -- Trang 1: "I love big and rare fish..." -> Luôn bấm nút [1] ("Quest", Action: "Quest")
 -- Trang 2:
 --   - Nếu nộp vé thành công: Hiện "YUPPIE..." -> Bấm nút [1] ("*Leave*", Action: "Close")
@@ -4931,7 +4935,8 @@ function ticketQuestState.HandleDialogue(isClaiming)
 
         -- Chờ màn hình thứ 2 cập nhật
         local t0 = tick()
-        while (tick() - t0) < 3.0 do
+        local retriedQuest = false
+        while (tick() - t0) < 3.5 do
             task.wait(0.2)
             if not ticketQuestState.IsDialogueOpen() then
                 return true
@@ -4947,19 +4952,27 @@ function ticketQuestState.HandleDialogue(isClaiming)
                     return true
                 end
 
-                -- Nếu nhận vé mới -> Bấm độ khó tương ứng
-                if not isClaiming and nb.clean:find(targetDiffKeyword) and (nb.clean:find("quest") or nb.clean:find("accept")) then
-                    local act = isHard and "HardAcceptQuest" or "EasyAcceptQuest"
-                    ticketQuestState.ClickButtonEntry(nb, act)
-                    task.wait(0.4)
-                    ticketQuestState.CloseDialogue()
-                    return true
+                -- Nếu nhận vé mới -> Bấm độ khó tương ứng (Hard hoặc Easy)
+                if not isClaiming and (nb.clean:find(targetDiffKeyword) or nb.clean:find("accept")) then
+                    if nb.clean:find(targetDiffKeyword) or not nb.clean:find(isHard and "easy" or "hard") then
+                        local act = isHard and "HardAcceptQuest" or "EasyAcceptQuest"
+                        ticketQuestState.ClickButtonEntry(nb, act)
+                        task.wait(0.4)
+                        ticketQuestState.CloseDialogue()
+                        return true
+                    end
                 end
+            end
+
+            -- Nếu sau 1.2s mà vẫn ở trang 1 có nút Quest -> Bấm lại Quest một lần nữa
+            if (tick() - t0) > 1.2 and not retriedQuest then
+                retriedQuest = true
+                ticketQuestState.ClickButtonEntry(questBtn, "Quest")
             end
         end
 
-        ticketQuestState.CloseDialogue()
-        return true
+        -- Không tự ý bấm Nevermind / Close khi hết giờ
+        return false
     end
 
     return false
