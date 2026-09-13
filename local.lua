@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-cooldown-live-sync"
+local SCRIPT_BUILD_COMMIT = "fix-dialogue-press-timing"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4828,19 +4828,15 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
     -- 3. Chọn đối tượng UI qua GuiService và bấm Enter để kích hoạt lựa chọn hội thoại
     pcall(function()
         local gs = game:GetService("GuiService")
+        local vim = game:GetService("VirtualInputManager")
         if gs then
             gs.SelectedObject = btn
         end
-        local vim = game:GetService("VirtualInputManager")
         if vim then
+            task.wait(0.04)
             vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.03)
+            task.wait(0.06)
             vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-        end
-        -- XÓA NGAY LẬP TỨC SelectedObject để Roblox không bao giờ kịp chuyển ô vuông sang Hotbar / Kho cá (Slot 3)
-        if gs then
-            gs.SelectedObject = nil
-            gs.GuiNavigationEnabled = false
         end
     end)
 
