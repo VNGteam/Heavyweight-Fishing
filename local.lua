@@ -116,7 +116,7 @@ local Config = {
     QuickCatchSkill = "Z",
     OpenerSkill = "Z",
     OpenerMaxCount = 1,
-    LoopSkills = "X, C",
+    LoopSkills = "Z, X, V",
     LoopStrictOrder = false,
     EmergencyHealSkill = "V",
     EmergencyHealHp = 40,
@@ -5806,9 +5806,9 @@ do
         end
     end)
 
-    customInput = createInputRow(comboCard, "Tùy Biến Chuỗi Đảo Chiêu", "Gõ bất kỳ chiêu nào (VD: X, C, X, V hoặc Z, X, C, V...)", Config.LoopSkills or "X, C", function(v)
+    customInput = createInputRow(comboCard, "Tùy Biến Chuỗi Đảo Chiêu", "Gõ bất kỳ chiêu nào (VD: Z, X, V hoặc Z, X, C, V...)", Config.LoopSkills or "Z, X, V", function(v)
         applyComboChange(v, "input")
-    end, nil, "VD: X, C, X, V")
+    end, nil, "VD: Z, X, V")
 
     -- Bàn phím tạo combo nhanh 1 chạm
     local quickRow = createBaseRow(comboCard, "Bộ Phím Ghép Combo Nhanh", "Chạm các nút để thêm hoặc xóa nhanh chiêu vào chuỗi combo")
@@ -9659,6 +9659,26 @@ function comboState.CastSkill(sk)
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
 
+    -- KHÓA BẢO VỆ CHẶN CHIÊU SAI: Khi đang có nhiệm vụ 100 Cá, CHỈ cho phép cast duy nhất chiêu TicketQuickSkill (Mặc định: V)
+    local curQ = ticketQuestState and ticketQuestState.currentQuestType
+    if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+        curQ = select(1, ticketQuestState.DetectActiveQuest())
+    end
+
+    if curQ == "fish_100" then
+        local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+        allowed = allowed and allowed:upper() or "V"
+        if cleanKey ~= allowed then
+            return false -- Chặn đứng 100% các chiêu Z, X, C
+        end
+    elseif curQ == "skill_100" then
+        local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+        allowed = allowed and allowed:upper() or "Z"
+        if cleanKey ~= allowed then
+            return false -- Chặn đứng các chiêu khác
+        end
+    end
+
     -- 1. Gửi RemoteEvent tới Server
     pcall(function()
         if Events then
@@ -9997,10 +10017,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     if detQ and detQ ~= "none" then
                         ticketQuestState.currentQuestType = detQ
                         ticketQuestState.active = true
+                        ticketQuestState.isCooldown = false
                     end
                 end
 
-                local hasActiveTicket = ticketQuestState and ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" and not ticketQuestState.isCooldown
+                local hasActiveTicket = ticketQuestState and ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" and not ticketQuestState.isCompleted
 
                 if Config.AutoTrainSkill then
                     if not isTrainingBusy then
@@ -10448,9 +10469,28 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                         lastSkillTime = now
                     elseif Config.AutoSkills and (now - lastSkillTime >= 0.15) then
-                        for _, sk in ipairs({"Z", "X", "C", "V"}) do
-                            if Events:FindFirstChild("UseSkill") then Events.UseSkill:FireServer(sk) end
-                            if Events:FindFirstChild("TriggerMinigameSkill") then Events.TriggerMinigameSkill:FireServer(sk) end
+                        local curQ = ticketQuestState and ticketQuestState.currentQuestType
+                        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+                            curQ = select(1, ticketQuestState.DetectActiveQuest())
+                        end
+
+                        if curQ == "fish_100" then
+                            local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+                            comboState.CastSkill(qk and qk:upper() or "V")
+                        elseif curQ == "skill_100" then
+                            local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+                            comboState.CastSkill(sk and sk:upper() or "Z")
+                        else
+                            local skillList = {}
+                            if Config.LoopSkills and Config.LoopSkills ~= "" then
+                                for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
+                                    table.insert(skillList, k:upper())
+                                end
+                            end
+                            if #skillList == 0 then skillList = {"Z", "X", "V"} end
+                            for _, sk in ipairs(skillList) do
+                                comboState.CastSkill(sk)
+                            end
                         end
                         lastSkillTime = now
                     end
