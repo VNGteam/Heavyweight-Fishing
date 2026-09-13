@@ -184,6 +184,7 @@ local Config = {
         ["Frost Kingfish"] = true,
         ["Tigerfang Whale"] = true,
         ["Heaven Piercer Turtle"] = true,
+        ["Heavenpiercer Turtle"] = true,
         ["Draconic Koi"] = true,
         ["Sanguine Fish"] = true,
         ["Primordial Kunfish Overlord"] = true,
@@ -1701,7 +1702,7 @@ local secretBossDatabase = {
         weather = "Foggy (Sương Mù)",
         patterns = {"coconut", "quả dừa", "qua dua", "đảo dừa", "dao dua", "đảo 7", "dao 7"},
         weatherPatterns = {"foggy", "sương mù", "suong mu", "dense fog", "mist", "sương", "fog"},
-        bossPatterns = {"tigerfang whale", "tigerfang", "heaven piercer turtle", "piercer turtle"},
+        bossPatterns = {"tigerfang whale", "tigerfang", "tiger fang", "heavenpiercer turtle", "heavenpiercer", "heaven piercer turtle", "heaven piercer", "piercer turtle", "rùa", "rua"},
         pos = Vector3.new(1412.0, 9.3, -1457.7),
         lookAt = Vector3.new(1404.0, 9.3, -1408.4),
         spots = {
@@ -1712,7 +1713,7 @@ local secretBossDatabase = {
         },
         bosses = {
             {name = "Tigerfang Whale", reward = "+5 Gems | Skill Drop"},
-            {name = "Heaven Piercer Turtle", reward = "+5 Gems"},
+            {name = "Heavenpiercer Turtle", reward = "+5 Gems"},
         }
     },
     {
@@ -1795,8 +1796,20 @@ local secretBossLookup = {}
 for _, entry in ipairs(secretBossDatabase) do
     for _, b in ipairs(entry.bosses) do
         secretBossLookup[b.name:lower()] = b.name
+        local clean = b.name:gsub("%s+", ""):lower()
+        secretBossLookup[clean] = b.name
     end
 end
+secretBossLookup["heavenpiercer turtle"] = "Heavenpiercer Turtle"
+secretBossLookup["heaven piercer turtle"] = "Heavenpiercer Turtle"
+secretBossLookup["heavenpiercer"] = "Heavenpiercer Turtle"
+secretBossLookup["heaven piercer"] = "Heavenpiercer Turtle"
+secretBossLookup["tigerfang whale"] = "Tigerfang Whale"
+secretBossLookup["tiger fang whale"] = "Tigerfang Whale"
+secretBossLookup["primordial kunfish overlord"] = "Primordial Kunfish Overlord"
+secretBossLookup["primordial kun fish overlord"] = "Primordial Kunfish Overlord"
+secretBossLookup["warbringer shark"] = "Warbringer Shark"
+secretBossLookup["war bringer shark"] = "Warbringer Shark"
 
 local Wiki = {
     craftMaterialFish = {
@@ -7786,9 +7799,13 @@ for _, entry in ipairs(secretBossDatabase) do
     createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
     local islandBossCard = createCardGroup(tabBoss)
     for _, b in ipairs(entry.bosses) do
-        local isEnabled = Config.SecretBossTargets[b.name] == true
+        local isEnabled = (Config.SecretBossTargets[b.name] == true) or (b.name:find("Heaven") and (Config.SecretBossTargets["Heavenpiercer Turtle"] == true or Config.SecretBossTargets["Heaven Piercer Turtle"] == true))
         local toggleObj = createToggleRow(islandBossCard, b.name, "Phần thưởng: " .. b.reward, isEnabled, function(v)
             Config.SecretBossTargets[b.name] = v
+            if b.name:find("Heaven") then
+                Config.SecretBossTargets["Heavenpiercer Turtle"] = v
+                Config.SecretBossTargets["Heaven Piercer Turtle"] = v
+            end
         end)
         bossTogglesMap[b.name] = toggleObj
     end
@@ -10721,7 +10738,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 local bossDisplay = nil
 
                 if hookedFish then
-                    if Config.SecretBossTargets[hookedFish] == true or (secretBossLookup[hookedFish:lower()] and Config.SecretBossTargets[secretBossLookup[hookedFish:lower()]] == true) then
+                    local cleanHooked = hookedFish:gsub("%s+", ""):lower()
+                    local matchedBoss = secretBossLookup[hookedFish:lower()] or secretBossLookup[cleanHooked]
+                    if Config.SecretBossTargets[hookedFish] == true
+                        or (matchedBoss and (Config.SecretBossTargets[matchedBoss] == true or Config.SecretBossTargets[matchedBoss:gsub("Heavenpiercer", "Heaven Piercer")] == true or Config.SecretBossTargets[matchedBoss:gsub("Heaven Piercer", "Heavenpiercer")] == true))
+                        or (cleanHooked:find("heaven") and cleanHooked:find("turtle") and (Config.SecretBossTargets["Heavenpiercer Turtle"] == true or Config.SecretBossTargets["Heaven Piercer Turtle"] == true)) then
                         isTargetBoss = true
                         bossDisplay = hookedFish
                     end
