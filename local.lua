@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-nav-return-and-skill-v"
+local SCRIPT_BUILD_COMMIT = "fix-cooldown-live-sync"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -3084,6 +3084,12 @@ end
 
 local ticketQuestState = {}
 
+function ticketQuestState.GetServerTimeNow()
+    local ok, t = pcall(function() return Workspace:GetServerTimeNow() end)
+    if ok and t and t > 0 then return math.floor(t) end
+    return os.time()
+end
+
 function ticketQuestState.IsFishingActive()
     if not Config.AutoTicketQuest then return false end
     if ticketQuestState.isCompleted then return false end
@@ -4366,16 +4372,32 @@ function ticketQuestState.UpdateUI()
         ticketQuestState.uiProgress.Set(string.format("%d / %d (%d%%)", ticketQuestState.currentProgress, maxVal, pct))
     end
     if ticketQuestState.uiCooldown and ticketQuestState.uiCooldown.Set then
-        if ticketQuestState.isCooldown then
-            local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - tick()))
+        local pData = ticketQuestState.GetPlayerDataFolder()
+        local cdVal = pData and pData:FindFirstChild("TicketQuestCooldown")
+        local serverCd = cdVal and tonumber(cdVal.Value) or 0
+        local nowServer = ticketQuestState.GetServerTimeNow()
+
+        local remain = 0
+        if serverCd > nowServer then
+            remain = math.max(0, math.floor(serverCd - nowServer))
+            ticketQuestState.cooldownEnd = tick() + remain
+            ticketQuestState.isCooldown = true
+        elseif ticketQuestState.isCooldown and ticketQuestState.cooldownEnd and ticketQuestState.cooldownEnd > tick() then
+            remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - tick()))
+        else
+            ticketQuestState.isCooldown = false
+        end
+
+        if remain > 0 then
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             local homeStr = ""
             if ticketQuestState.isAtHomeSpot then
-                homeStr = " (Đang farm Home Spot)"
+                homeStr = " (Farm Home)"
             end
-            ticketQuestState.uiCooldown.Set(string.format("Chờ 20p: %02d:%02d%s", mins, secs, homeStr))
+            ticketQuestState.uiCooldown.Set(string.format("Còn %02d:%02d%s", mins, secs, homeStr))
         else
+            ticketQuestState.isCooldown = false
             ticketQuestState.uiCooldown.Set("Sẵn sàng nhận vé!")
         end
     end
@@ -4532,8 +4554,9 @@ function ticketQuestState.CheckNPCReady()
     local pData = ticketQuestState.GetPlayerDataFolder()
     if pData and pData:FindFirstChild("TicketQuestCooldown") then
         local cd = tonumber(pData.TicketQuestCooldown.Value) or 0
+        local nowServer = ticketQuestState.GetServerTimeNow()
         if cd > 0 then
-            return cd <= os.time()
+            return cd <= nowServer
         end
     end
 
@@ -5153,8 +5176,9 @@ function ticketQuestState.DetectActiveQuest()
         local cdVal = pData:FindFirstChild("TicketQuestCooldown")
         if cdVal and tonumber(cdVal.Value) then
             local stamp = tonumber(cdVal.Value)
-            if stamp > os.time() then
-                detectedCooldownSec = stamp - os.time()
+            local nowServer = ticketQuestState.GetServerTimeNow()
+            if stamp > nowServer then
+                detectedCooldownSec = stamp - nowServer
             end
         end
 
@@ -5338,9 +5362,20 @@ end
 function ticketQuestState.ScanAndUpdateStatus()
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.DetectActiveQuest()
     local now = tick()
+    local nowServer = ticketQuestState.GetServerTimeNow()
+    local pData = ticketQuestState.GetPlayerDataFolder()
+    local cdVal = pData and pData:FindFirstChild("TicketQuestCooldown")
+    local serverCd = cdVal and tonumber(cdVal.Value) or 0
+    local serverRemain = serverCd > nowServer and (serverCd - nowServer) or 0
 
-    -- Cập nhật hồi chiêu từ Server nếu có
-    if detectedCd and detectedCd > 0 then
+    -- Luôn cập nhật trạng thái hồi chiêu từ Server Data
+    if serverRemain > 0 then
+        ticketQuestState.cooldownEnd = now + serverRemain
+        ticketQuestState.isCooldown = true
+    elseif serverCd > 0 and serverCd <= nowServer then
+        ticketQuestState.isCooldown = false
+        ticketQuestState.cooldownEnd = 0
+    elseif detectedCd and detectedCd > 0 then
         ticketQuestState.cooldownEnd = now + detectedCd
         ticketQuestState.isCooldown = true
     end
@@ -5353,10 +5388,6 @@ function ticketQuestState.ScanAndUpdateStatus()
         ticketQuestState.currentProgress = cur or 0
         ticketQuestState.targetProgress = (max and max > 0) and max or 100
         ticketQuestState.isCompleted = (done == true) or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
-
-        -- Đang có nhiệm vụ trong người (dù đang làm hay đã vượt chỉ tiêu) thì tuyệt đối KHÔNG PHẢI Cooldown!
-        ticketQuestState.isCooldown = false
-        ticketQuestState.cooldownEnd = 0
 
         if ticketQuestState.isCompleted then
             ticketQuestState.statusText = ticketQuestState.currentQuestTitle .. " (Đã Hoàn Thành - Đang Nộp Vé)"
@@ -5371,8 +5402,12 @@ function ticketQuestState.ScanAndUpdateStatus()
         ticketQuestState.currentProgress = 0
         ticketQuestState.targetProgress = 100
 
-        if ticketQuestState.isCooldown and ticketQuestState.cooldownEnd > now then
-            local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
+        local remain = 0
+        if ticketQuestState.isCooldown and ticketQuestState.cooldownEnd and ticketQuestState.cooldownEnd > now then
+            remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
+        end
+
+        if remain > 0 then
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             ticketQuestState.statusText = string.format("Chờ hồi chiêu (%02d:%02d)", mins, secs)
@@ -5415,7 +5450,22 @@ function ticketQuestState.Tick()
 
     -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới - CHỈ CHẠY KHI KHÔNG CÓ QUEST HOÀN THÀNH)
     if ticketQuestState.isCooldown and not isDoneNow then
-        local remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
+        local nowServer = ticketQuestState.GetServerTimeNow()
+        local pData = ticketQuestState.GetPlayerDataFolder()
+        local cdVal = pData and pData:FindFirstChild("TicketQuestCooldown")
+        local serverCd = cdVal and tonumber(cdVal.Value) or 0
+        local remain = 0
+        if serverCd > nowServer then
+            remain = math.max(0, math.floor(serverCd - nowServer))
+            ticketQuestState.cooldownEnd = now + remain
+            ticketQuestState.isCooldown = true
+        else
+            remain = math.max(0, math.floor((ticketQuestState.cooldownEnd or 0) - now))
+            if serverCd > 0 and serverCd <= nowServer then
+                remain = 0
+            end
+        end
+
         local isReady = ticketQuestState.CheckNPCReady()
         if (remain <= 0 or isReady) and remain <= 0 then
             ticketQuestState.isCooldown = false
@@ -5514,12 +5564,13 @@ function ticketQuestState.Tick()
 
             -- Kiểm tra lại sau khi nộp
             local checkType, _, _, _, checkDone, checkCd = ticketQuestState.DetectActiveQuest()
+            local nowServer = ticketQuestState.GetServerTimeNow()
             local pData = ticketQuestState.GetPlayerDataFolder()
             local serverCd = pData and pData:FindFirstChild("TicketQuestCooldown") and tonumber(pData.TicketQuestCooldown.Value) or 0
-            local questCleared = (checkType == nil) or (not checkDone and serverCd > os.time())
+            local questCleared = (checkType == nil) or (not checkDone and serverCd > nowServer)
 
-            if questCleared or (serverCd > os.time()) or claimSuccess then
-                local setCooldown = (serverCd > os.time()) and (serverCd - os.time()) or ((Config.TicketCooldownMinutes or 20) * 60)
+            if questCleared or (serverCd > nowServer) or claimSuccess then
+                local setCooldown = (serverCd > nowServer) and (serverCd - nowServer) or (20 * 60)
                 ticketQuestState.cooldownEnd = now + setCooldown
                 ticketQuestState.isCooldown = true
                 ticketQuestState.isCompleted = false
@@ -5752,12 +5803,20 @@ task.spawn(function()
         end))
     end
 
-    local cdVal = userFolder:FindFirstChild("TicketQuestCooldown")
-    if cdVal and cdVal:IsA("ValueBase") then
-        table.insert(activeConnections, cdVal.Changed:Connect(function()
-            pcall(ticketQuestState.ScanAndUpdateStatus)
-        end))
+    local function hookCd(val)
+        if val and val.Name == "TicketQuestCooldown" and val:IsA("ValueBase") then
+            table.insert(activeConnections, val.Changed:Connect(function()
+                pcall(ticketQuestState.ScanAndUpdateStatus)
+                pcall(ticketQuestState.UpdateUI)
+            end))
+        end
     end
+
+    local cdVal = userFolder:FindFirstChild("TicketQuestCooldown")
+    if cdVal then hookCd(cdVal) end
+    table.insert(activeConnections, userFolder.ChildAdded:Connect(function(child)
+        hookCd(child)
+    end))
 end)
 
 
@@ -8184,10 +8243,6 @@ end)
 
 createDropdownRow(optionCard, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu mạnh nhất dùng để kết liễu cá Map 1 trong 1 hit", skillList, Config.TicketQuickSkill, function(v)
     Config.TicketQuickSkill = v
-end)
-
-createSliderRow(optionCard, "Thời Gian Hồi Chiêu Giữa Các Vé", "Thời gian chờ từ game sau khi nhận vé (mặc định 20p)", 1, 30, Config.TicketCooldownMinutes, false, "phút", function(v)
-    Config.TicketCooldownMinutes = v
 end)
 
 createToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự động bán sạch cá khi balo đạt giới hạn để câu tiếp", Config.TicketAutoSellFull, function(v)
