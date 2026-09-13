@@ -88,6 +88,14 @@ if not LocalPlayer then
 end
 local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildWhichIsA("Camera")
 
+pcall(function()
+    local gs = game:GetService("GuiService")
+    if gs then
+        gs.SelectedObject = nil
+        gs.GuiNavigationEnabled = false
+    end
+end)
+
 local isRunning = true
 local activeConnections = {}
 local cleanUpInstances = {}
@@ -4782,15 +4790,12 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
         end
     end)
 
-    -- 3. Giả lập chọn đối tượng UI qua GuiService và phím Enter
+    -- 3. Đảm bảo xóa bỏ mọi hộp chọn / ô vuông UI (GuiService.SelectedObject) để không khóa phím di chuyển
     pcall(function()
         local gs = game:GetService("GuiService")
-        gs.SelectedObject = btn
-        local vim = game:GetService("VirtualInputManager")
-        if vim then
-            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.04)
-            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+        if gs then
+            gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
         end
     end)
 
@@ -4849,6 +4854,11 @@ function ticketQuestState.CloseDialogue()
         local mg = pg and pg:FindFirstChild("MainGui")
         if mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue") then
             mg.Menu.Dialogue.Visible = false
+        end
+        local gs = game:GetService("GuiService")
+        if gs then
+            gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
         end
     end)
 end
@@ -5106,6 +5116,13 @@ function ticketQuestState.InteractNPC(isClaiming)
 
     local ok, res = pcall(_execute)
     ticketQuestState.isInteracting = false
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        if gs then
+            gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
+        end
+    end)
     return ok and res or false
 end
 
