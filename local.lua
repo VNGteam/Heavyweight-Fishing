@@ -94,15 +94,6 @@ pcall(function()
         gs.SelectedObject = nil
         gs.GuiNavigationEnabled = false
     end
-    local vim = game:GetService("VirtualInputManager")
-    local cam = Workspace.CurrentCamera
-    if vim and cam and cam.ViewportSize then
-        local midX = cam.ViewportSize.X / 2
-        local midY = cam.ViewportSize.Y / 2
-        vim:SendMouseButtonEvent(midX, midY, 0, true, game, 0)
-        task.wait(0.02)
-        vim:SendMouseButtonEvent(midX, midY, 0, false, game, 0)
-    end
 end)
 
 local isRunning = true
@@ -4755,18 +4746,6 @@ function ticketQuestState.ClearUINavigation()
             gs.GuiNavigationEnabled = false
         end
     end)
-    -- Click nhấp vào giữa khung nhìn thế giới 3D để Roblox trả focus từ UI về Nhân Vật
-    pcall(function()
-        local vim = game:GetService("VirtualInputManager")
-        local cam = Workspace.CurrentCamera
-        if vim and cam and cam.ViewportSize then
-            local midX = cam.ViewportSize.X / 2
-            local midY = cam.ViewportSize.Y / 2
-            vim:SendMouseButtonEvent(midX, midY, 0, true, game, 0)
-            task.wait(0.02)
-            vim:SendMouseButtonEvent(midX, midY, 0, false, game, 0)
-        end
-    end)
 end
 
 -- Kích hoạt nút lựa chọn thoại bằng mọi phương thức UI lẫn RemoteEvent tương ứng
@@ -4831,14 +4810,14 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
         local vim = game:GetService("VirtualInputManager")
         if vim then
             vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
-            task.wait(0.04)
+            task.wait(0.03)
             vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
         end
-    end)
-
-    -- Tự động hủy UI navigation ngay sau khi phím Return đã gửi để không bị kẹt ô vuông phím
-    task.delay(0.08, function()
-        ticketQuestState.ClearUINavigation()
+        -- XÓA NGAY LẬP TỨC SelectedObject để Roblox không bao giờ kịp chuyển ô vuông sang Hotbar / Kho cá (Slot 3)
+        if gs then
+            gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
+        end
     end)
 
     -- 4. Giả lập click chuột và chạm màn hình (Mobile Touch) tại tâm nút
@@ -4877,15 +4856,6 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
 end
 
 function ticketQuestState.CloseDialogue()
-    pcall(function()
-        local buttons = ticketQuestState.GetDialogueButtons()
-        for _, b in ipairs(buttons) do
-            if b.clean:find("leave") or b.clean:find("close") then
-                ticketQuestState.ClickButtonEntry(b, "Close")
-                break
-            end
-        end
-    end)
     if Events and Events:FindFirstChild("ChooseDialogueOption") then
         pcall(function() Events.ChooseDialogueOption:FireServer("Close") end)
     end
@@ -4894,12 +4864,19 @@ function ticketQuestState.CloseDialogue()
         if dlg then dlg.Visible = false end
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         local mg = pg and pg:FindFirstChild("MainGui")
-        if mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue") then
-            mg.Menu.Dialogue.Visible = false
+        if mg and mg:FindFirstChild("Menu") then
+            if mg.Menu:FindFirstChild("Dialogue") then
+                mg.Menu.Dialogue.Visible = false
+            end
+            if mg.Menu:FindFirstChild("Inventory") then
+                mg.Menu.Inventory.Visible = false
+            end
+            if mg.Menu:FindFirstChild("FishInventory") then
+                mg.Menu.FishInventory.Visible = false
+            end
         end
     end)
     ticketQuestState.ClearUINavigation()
-    task.delay(0.2, ticketQuestState.ClearUINavigation)
 end
 
 -- Wrapper hỗ trợ tương thích ngược
