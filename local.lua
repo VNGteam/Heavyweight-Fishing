@@ -5885,6 +5885,7 @@ createToggleRow(fishCard, "Tự Dùng Kỹ Năng Cần", "Tự kích hoạt kỹ
 createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động nhấn Slam mức Perfect khi xuất hiện", Config.AutoSlam, function(v) Config.AutoSlam = v end)
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
+createToggleRow(fishCard, "⚡ Bắt Cá Ngay (Instant Catch)", "Bỏ qua thời gian chờ ~3s cá cắn, fire event lại ngay sau 0.3s để câu nhanh hơn", Config.InstantCatch, function(v) Config.InstantCatch = v end)
 
 createCategoryHeader(tabFishing, "🏠 Vị Trí Trở Về Nếu Săn Boss (Home Spot)")
 local returnSpotCard = createCardGroup(tabFishing)
@@ -10237,6 +10238,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
         end
 
+        -- INSTANT CATCH: Fire lại Fishing event sau 0.3s để trigger cá cắn ngay, bỏ qua thời gian chờ ~3s
+        if Config.InstantCatch and isFishing and not isMinigame and fishingStartTime > 0 and (now - fishingStartTime >= 0.3) and Events and Events:FindFirstChild("Fishing") then
+            Events.Fishing:FireServer(root.CFrame)
+            fishingStartTime = now -- Reset để không fire lại quá nhiều lần
+        end
         if isMinigame and Config.AntiStuckEnabled and not Config.AutoTrainSkill and minigameDurationTracker > 0 and (now - minigameDurationTracker >= 22.0) then
             minigameDurationTracker = now
             CancelAndRecastRod()
