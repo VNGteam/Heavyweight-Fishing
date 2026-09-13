@@ -298,6 +298,7 @@ local Config = {
 }
 
 local UIControllers = {}
+local PriorityManager = {}
 
 local comboState = {
     openerUsedCount = 0,
@@ -1423,10 +1424,10 @@ local function createDropdownRow(parent, labelText, descText, options, initialVa
     if indexSearch ~= false then table.insert(rowSearchIndex, {frame = row, query = (labelText .. " " .. (descText or "")):lower()}) end
     local ret = {
         frame = row,
-        Set = function(opt)
+        Set = function(opt, skipCallback)
             selected = opt; ddBtn.Text = tostring(opt) .. "  v"
             for oN, b in pairs(optButtons) do b.BackgroundColor3 = (oN == opt) and Colors.DropdownSelected or Colors.InputBg; b.TextColor3 = (oN == opt) and Colors.PurplePrimary or Colors.TextWhite; b.Text = (oN == opt and "> " or "   ") .. tostring(oN) end
-            if type(callback) == "function" then pcall(callback, opt) end
+            if not skipCallback and type(callback) == "function" then pcall(callback, opt) end
         end,
         Get = function() return selected end,
         Refresh = function(newOpts, keepCurrent)
@@ -6055,10 +6056,10 @@ end)
 -- ===============================================================
 -- 👑 HỆ THỐNG QUẢN LÝ ĐỘ ƯU TIÊN TÙY CHỈNH (PRIORITY MANAGER)
 -- ===============================================================
-local PriorityManager = {
-    uiStatusRow = nil,
-    lastReportedTask = "None"
-}
+PriorityManager.uiStatusRow = nil
+PriorityManager.lastReportedTask = "None"
+PriorityManager.cachedTask = "None"
+PriorityManager.lastTaskScan = 0
 
 function PriorityManager.IsTaskActive(taskId)
     if taskId == "SecretBoss" then
@@ -6067,15 +6068,8 @@ function PriorityManager.IsTaskActive(taskId)
         if secretBossState and secretBossState.activeChatBoss and (tick() - (secretBossState.activeChatBoss.time or 0) < 300) then
             return true
         end
-        if secretBossState and secretBossState.DetectWeather then
-            local wIsland, wName = secretBossState.DetectWeather()
-            if wIsland and wName ~= "Clear" then
-                for _, b in ipairs(wIsland.bosses or {}) do
-                    if Config.SecretBossTargets and Config.SecretBossTargets[b.name] then
-                        return true
-                    end
-                end
-            end
+        if secretBossState and secretBossState.standPos then
+            return true
         end
         return false
     elseif taskId == "TicketQuest" then
@@ -6122,12 +6116,22 @@ function PriorityManager.GetTaskDisplayName(taskId)
     return "💤 Đang Chờ (Idle)"
 end
 
-function PriorityManager.GetActiveTask()
+function PriorityManager.GetActiveTask(forceRefresh)
+    local now = tick()
+    if not forceRefresh and (now - (PriorityManager.lastTaskScan or 0) < 0.5) then
+        return PriorityManager.cachedTask or "None"
+    end
+    PriorityManager.lastTaskScan = now
+
     local candidateTasks = {"SecretBoss", "TicketQuest", "GodSpirit", "TrainSkill", "NormalFarm"}
     if not Config.PrioritySystemEnabled then
         for _, tid in ipairs(candidateTasks) do
-            if PriorityManager.IsTaskActive(tid) then return tid end
+            if PriorityManager.IsTaskActive(tid) then
+                PriorityManager.cachedTask = tid
+                return tid
+            end
         end
+        PriorityManager.cachedTask = "None"
         return "None"
     end
 
@@ -6144,12 +6148,13 @@ function PriorityManager.GetActiveTask()
         end
     end
 
+    PriorityManager.cachedTask = bestTask
     return bestTask
 end
 
 function PriorityManager.UpdateUI()
     if PriorityManager.uiStatusRow and PriorityManager.uiStatusRow.Set then
-        local cur = PriorityManager.GetActiveTask()
+        local cur = PriorityManager.GetActiveTask(true)
         local name = PriorityManager.GetTaskDisplayName(cur)
         local rank = cur ~= "None" and PriorityManager.GetTaskPriority(cur) or "-"
         PriorityManager.uiStatusRow.Set(string.format("%s (Hạng %s)", name, tostring(rank)))
@@ -9664,7 +9669,7 @@ createToggleRow(priCard, "Bật Quản Lý Độ Ưu Tiên", "Tự động phân
     if Config._triggerAutoSave then Config._triggerAutoSave() end
 end)
 
-PriorityManager.uiStatusRow = createInfoRow(priCard, "Tác Vụ Đang Thực Thi", PriorityManager.GetTaskDisplayName(PriorityManager.GetActiveTask()))
+PriorityManager.uiStatusRow = createInfoRow(priCard, "Tác Vụ Đang Thực Thi", "💤 Đang Chờ (Idle)")
 
 local priorityPresetNames = {
     "Mặc Định: Săn Boss > Vé NV > Thần Linh > Luyện Chiêu > Farm Thường",
@@ -9687,9 +9692,13 @@ local function numberToRank(num)
     return tostring(num)
 end
 
+local isUpdatingPriorityUI = false
 local dropSecretBoss, dropTicketQuest, dropGodSpirit, dropTrainSkill, dropNormalFarm
 
 local function applyPriorityPreset(pName)
+    if isUpdatingPriorityUI then return end
+    isUpdatingPriorityUI = true
+
     Config.PriorityPreset = pName
     if pName:find("Mặc Định") then
         Config.Priority_SecretBoss = 1
@@ -9711,14 +9720,16 @@ local function applyPriorityPreset(pName)
         Config.Priority_NormalFarm = 5
     end
 
-    if dropSecretBoss and dropSecretBoss.Set then dropSecretBoss.Set(numberToRank(Config.Priority_SecretBoss)) end
-    if dropTicketQuest and dropTicketQuest.Set then dropTicketQuest.Set(numberToRank(Config.Priority_TicketQuest)) end
-    if dropGodSpirit and dropGodSpirit.Set then dropGodSpirit.Set(numberToRank(Config.Priority_GodSpirit)) end
-    if dropTrainSkill and dropTrainSkill.Set then dropTrainSkill.Set(numberToRank(Config.Priority_TrainSkill)) end
-    if dropNormalFarm and dropNormalFarm.Set then dropNormalFarm.Set(numberToRank(Config.Priority_NormalFarm)) end
+    if dropSecretBoss and dropSecretBoss.Set then dropSecretBoss.Set(numberToRank(Config.Priority_SecretBoss), true) end
+    if dropTicketQuest and dropTicketQuest.Set then dropTicketQuest.Set(numberToRank(Config.Priority_TicketQuest), true) end
+    if dropGodSpirit and dropGodSpirit.Set then dropGodSpirit.Set(numberToRank(Config.Priority_GodSpirit), true) end
+    if dropTrainSkill and dropTrainSkill.Set then dropTrainSkill.Set(numberToRank(Config.Priority_TrainSkill), true) end
+    if dropNormalFarm and dropNormalFarm.Set then dropNormalFarm.Set(numberToRank(Config.Priority_NormalFarm), true) end
 
     PriorityManager.UpdateUI()
     if Config._triggerAutoSave then Config._triggerAutoSave() end
+
+    isUpdatingPriorityUI = false
 end
 
 local dropPreset = createDropdownRow(priCard, "Mẫu Phân Cấp (Preset)", "Chọn nhanh bộ ưu tiên phổ biến hoặc tự do xếp hạng bên dưới", priorityPresetNames, Config.PriorityPreset or priorityPresetNames[1], function(v)
@@ -9726,12 +9737,17 @@ local dropPreset = createDropdownRow(priCard, "Mẫu Phân Cấp (Preset)", "Ch�
 end)
 
 local function onCustomRankChange()
-    if dropPreset and dropPreset.Set then
-        dropPreset.Set("Tùy Biến Thứ Hạng (Custom)")
-    end
+    if isUpdatingPriorityUI then return end
+    isUpdatingPriorityUI = true
+
     Config.PriorityPreset = "Tùy Biến Thứ Hạng (Custom)"
+    if dropPreset and dropPreset.Set then
+        dropPreset.Set("Tùy Biến Thứ Hạng (Custom)", true)
+    end
     PriorityManager.UpdateUI()
     if Config._triggerAutoSave then Config._triggerAutoSave() end
+
+    isUpdatingPriorityUI = false
 end
 
 dropSecretBoss = createDropdownRow(priCard, "Ưu Tiên: 🎯 Săn Secret Boss", "Xếp hạng ưu tiên cho Săn Boss (Chat Sniper & Thời Tiết)", rankOptions, numberToRank(Config.Priority_SecretBoss), function(v)
@@ -9757,6 +9773,10 @@ end)
 dropNormalFarm = createDropdownRow(priCard, "Ưu Tiên: 🎣 Treo Farm Thường", "Xếp hạng ưu tiên cho Câu thường và Farm tại Home Spot", rankOptions, numberToRank(Config.Priority_NormalFarm), function(v)
     Config.Priority_NormalFarm = rankToNumber(v)
     onCustomRankChange()
+end)
+
+task.delay(1.5, function()
+    pcall(PriorityManager.UpdateUI)
 end)
 end
 
