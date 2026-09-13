@@ -4246,6 +4246,7 @@ for k, v in pairs({
     isCooldown = false,
     cooldownEnd = 0,
     readyForNewQuest = false, -- Flag: cooldown đã hết, đang chờ đến NPC nhận quest mới
+    isAcceptingQuest = false, -- Flag: đang trong quá trình tương tác NPC nhận quest (chặn ScanStatus set isCooldown sai)
     lastAcceptTime = 0,
     lastClaimTime = 0,
     lastNpcInteract = 0,
@@ -5407,10 +5408,16 @@ function ticketQuestState.ScanAndUpdateStatus()
         ticketQuestState.currentProgress = 0
         ticketQuestState.targetProgress = 100
 
-        -- Nếu đang trong trạng thái sẵn sàng nhận quest mới: TUYỆT ĐỐI KHÔNG cho server lag đảo ngược isCooldown
-        if ticketQuestState.readyForNewQuest then
+        -- BẢO VỆ: Không set isCooldown = true nếu:
+        -- (1) Đang sẵn sàng nhận quest mới (readyForNewQuest)
+        -- (2) Đang trong quá trình nhận quest (isAcceptingQuest) - tránh race condition với TicketQuestCooldown.Changed
+        if ticketQuestState.readyForNewQuest or ticketQuestState.isAcceptingQuest then
             ticketQuestState.isCooldown = false
-            ticketQuestState.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé Hard mới..."
+            if ticketQuestState.isAcceptingQuest then
+                ticketQuestState.statusText = "Đang nhận nhiệm vụ mới từ NPC..."
+            else
+                ticketQuestState.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé Hard mới..."
+            end
         elseif serverRemain > 0 then
             ticketQuestState.isCooldown = true
             ticketQuestState.cooldownEnd = now + serverRemain
@@ -5631,12 +5638,19 @@ function ticketQuestState.Tick()
             ticketQuestState.lastNpcInteract = now
             ticketQuestState.statusText = "Đang tương tác NPC nhận vé Hard mới..."
             ticketQuestState.UpdateUI()
+
+            -- Bật flag chặn ScanAndUpdateStatus kọi set isCooldown=true trong lúc căn cứ nhận quest
+            ticketQuestState.isAcceptingQuest = true
+            ticketQuestState.isCooldown = false
+            ticketQuestState.isAtHomeSpot = false
+
             ticketQuestState.InteractNPC(false)
             ticketQuestState.ClearUINavigation()
             task.delay(0.3, ticketQuestState.ClearUINavigation)
 
-            -- Quét lại sau khi nhận quest
-            task.wait(1.0)
+            -- Chờ server replicate dữ liệu quest mới (tăng lên 3 giây)
+            task.wait(3.0)
+            ticketQuestState.isAcceptingQuest = false -- Tắt flag sau khi chờ xong
             local freshType, freshTitle, freshCur, freshMax, freshDone = ticketQuestState.DetectActiveQuest()
             if freshType then
                 -- Nhận quest mới thành công: xóa flag ready
