@@ -298,6 +298,22 @@ local Config = {
     AutoLoadProfile = false
 }
 
+-- Tự động khôi phục trạng thái tìm server thời tiết nếu vừa teleport sang server mới
+local pendingWeatherHopData = nil
+if isfile and isfile("HeavyweightFishing_WeatherHop.json") and readfile then
+    local hopOk, hopContent = pcall(function() return readfile("HeavyweightFishing_WeatherHop.json") end)
+    if hopOk and hopContent and #hopContent > 0 then
+        local decOk, hopData = pcall(function() return HttpService:JSONDecode(hopContent) end)
+        if decOk and type(hopData) == "table" and hopData.Active then
+            pendingWeatherHopData = hopData
+            Config.AutoWeatherHop = true
+            if hopData.TargetWeather then Config.TargetWeather = hopData.TargetWeather end
+            if hopData.AutoFish ~= nil then Config.WeatherHopAutoFish = hopData.AutoFish end
+            if hopData.Webhook ~= nil then Config.WeatherHopAlertWebhook = hopData.Webhook end
+        end
+    end
+end
+
 local UIControllers = {}
 local PriorityManager = {}
 
@@ -601,7 +617,7 @@ local function LoadAccountConfig(cfgName)
     for key, ctrl in pairs(UIControllers) do
         if Config[key] ~= nil and ctrl and ctrl.Set then
             pcall(function()
-                ctrl.Set(Config[key])
+                ctrl.Set(Config[key], true)
             end)
         end
     end
@@ -1329,7 +1345,17 @@ local function createToggleRow(parent, labelText, descText, initialVal, callback
             Config._triggerAutoSave()
         end
     end)
-    local ret = {frame = row, Set = function(val) state = val; updateVisuals(); if type(callback) == "function" then callback(state) end end, Get = function() return state end}
+    local ret = {
+        frame = row,
+        Set = function(val, skipCallback)
+            state = val
+            updateVisuals()
+            if not skipCallback and type(callback) == "function" then
+                callback(state)
+            end
+        end,
+        Get = function() return state end
+    }
     local key = ConfigLabelMap[labelText]
     if key then UIControllers[key] = ret end
     return ret
@@ -1364,12 +1390,12 @@ local function createSliderRow(parent, labelText, descText, minVal, maxVal, init
     table.insert(activeConnections, UserInputService.InputChanged:Connect(function(input) if sliding and input.UserInputType == Enum.UserInputType.MouseMovement then updateFromX(input.Position.X) end end))
     local ret = {
         frame = row,
-        Set = function(val)
+        Set = function(val, skipCallback)
             currentVal = math.clamp(val, minVal, maxVal)
             local p2 = (currentVal - minVal) / (maxVal - minVal)
             fill.Size = UDim2.new(p2, 0, 1, 0)
             valLabel.Text = isFloat and string.format("%.2f", currentVal)..suffix or tostring(math.floor(currentVal))..suffix
-            if type(callback) == "function" then callback(currentVal) end
+            if not skipCallback and type(callback) == "function" then callback(currentVal) end
         end
     }
     local key = ConfigLabelMap[labelText]
@@ -2581,6 +2607,9 @@ local secretBossState = {
     isCatchingTarget = false,
     lastSkipTime = 0,
     minigameStartTime = 0,
+    isHopping = (pendingWeatherHopData ~= nil),
+    currentTargetWeather = (pendingWeatherHopData and pendingWeatherHopData.TargetWeather) or Config.TargetWeather,
+    weatherHopToggle = nil,
 }
 
 local statusLabelSecretBoss = nil
@@ -2970,7 +2999,9 @@ function secretBossState.IsWeatherMatch(currentWeatherName, targetWeather)
 end
 
 function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
+    if not secretBossState.isHopping or not Config.AutoWeatherHop then return end
     secretBossState.isHopping = true
+    Config.AutoWeatherHop = true
     secretBossState.currentTargetWeather = targetWeather
     visitedServers = visitedServers or {}
     secretBossState.currentVisited = visitedServers
@@ -3011,6 +3042,7 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
         local tier3 = {} -- freeSlots >= 1
 
         for page = 1, 5 do
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
             local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", placeId, cursor ~= "" and ("&cursor=" .. cursor) or "")
             local ok, res = pcall(function() return game:HttpGet(url) end)
             if ok and res then
@@ -3036,7 +3068,7 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
             task.wait(0.2)
         end
 
-        if not secretBossState.isHopping then return end
+        if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
 
         local chosenPool = (#tier1 > 0 and tier1) or (#tier2 > 0 and tier2) or tier3
         local foundJob = nil
@@ -3049,11 +3081,13 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
             ShowNotification("Đổi Server", "Đã chọn server còn chỗ trống! Đang chuyển...", "SUCCESS", 4)
             task.wait(0.5)
 
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
+
             secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
             local myWatchdog = secretBossState.hopWatchdog
             local myOrigJob = game.JobId
             task.delay(10, function()
-                if secretBossState.isHopping and secretBossState.hopWatchdog == myWatchdog and game.JobId == myOrigJob then
+                if secretBossState.isHopping and Config.AutoWeatherHop and secretBossState.hopWatchdog == myWatchdog and game.JobId == myOrigJob then
                     pcall(function()
                         local gs = game:GetService("GuiService")
                         if gs and gs.ClearError then gs:ClearError() end
@@ -3063,7 +3097,7 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
                     end
                     ShowNotification("Đổi Server", "Không thể vào server (Server đầy / hết hạn). Tự động tìm server khác...", "WARN", 4)
                     task.wait(1)
-                    if secretBossState.isHopping then
+                    if secretBossState.isHopping and Config.AutoWeatherHop then
                         secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
                     end
                 end
@@ -3076,21 +3110,23 @@ function secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
                 table.insert(visitedServers, foundJob)
                 ShowNotification("Đổi Server", "Lỗi kết nối (" .. tostring(teleErr):sub(1, 40) .. "). Đang thử server khác...", "WARN", 4)
                 task.wait(1.5)
-                if secretBossState.isHopping then
+                if secretBossState.isHopping and Config.AutoWeatherHop then
                     secretBossState.HopToNextWeatherServer(targetWeather, visitedServers)
                 end
             end
         else
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
             ShowNotification("Tìm Server", "Không tìm thấy server còn chỗ. Đang chuyển sang server ngẫu nhiên...", "INFO", 4)
             task.wait(1.5)
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
             pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
         end
     end)
 end
 
 function secretBossState.CheckWeatherHopOnJoin()
-    local hopData = nil
-    if isfile and isfile("HeavyweightFishing_WeatherHop.json") and readfile then
+    local hopData = pendingWeatherHopData
+    if not hopData and isfile and isfile("HeavyweightFishing_WeatherHop.json") and readfile then
         local ok, data = pcall(function()
             return HttpService:JSONDecode(readfile("HeavyweightFishing_WeatherHop.json"))
         end)
@@ -3102,20 +3138,57 @@ function secretBossState.CheckWeatherHopOnJoin()
     if not hopData then return end
 
     local targetWeather = hopData.TargetWeather or Config.TargetWeather or "Bất Kỳ Thời Tiết Nào (Trừ Clear)"
+    secretBossState.isHopping = true
+    Config.AutoWeatherHop = true
+    secretBossState.currentTargetWeather = targetWeather
+    if hopData.AutoFish ~= nil then Config.WeatherHopAutoFish = hopData.AutoFish end
+    if hopData.Webhook ~= nil then Config.WeatherHopAlertWebhook = hopData.Webhook end
+
+    -- Đồng bộ giao diện sang trạng thái BẬT
+    if secretBossState.weatherHopToggle and secretBossState.weatherHopToggle.Set then
+        pcall(function() secretBossState.weatherHopToggle.Set(true, true) end)
+    elseif UIControllers["AutoWeatherHop"] and UIControllers["AutoWeatherHop"].Set then
+        pcall(function() UIControllers["AutoWeatherHop"].Set(true, true) end)
+    end
+    if UIControllers["TargetWeather"] and UIControllers["TargetWeather"].Set then
+        pcall(function() UIControllers["TargetWeather"].Set(targetWeather, true) end)
+    end
+
     ShowNotification("Tìm Server", string.format("Đang quét thời tiết server cho: %s...", targetWeather), "INFO", 5)
 
+    if not game:IsLoaded() then
+        pcall(function() game.Loaded:Wait() end)
+    end
+
     task.delay(3.0, function()
-        if not isRunning then return end
+        if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
+
         local matchedEntry, weatherName = secretBossState.DetectWeather()
         local isMatch = secretBossState.IsWeatherMatch(weatherName, targetWeather)
 
+        -- Nếu chưa phát hiện hoặc là Clear, kiểm tra thêm 1 lần sau 1.5s để đảm bảo replication đầy đủ
+        if not isMatch and (not weatherName or weatherName == "" or weatherName == "Clear") then
+            task.wait(1.5)
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
+            matchedEntry, weatherName = secretBossState.DetectWeather()
+            isMatch = secretBossState.IsWeatherMatch(weatherName, targetWeather)
+        end
+
+        if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
+
         if isMatch then
             secretBossState.isHopping = false
+            Config.AutoWeatherHop = false
             secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
             if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
                 pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
             end
-            Config.AutoWeatherHop = false
+
+            if secretBossState.weatherHopToggle and secretBossState.weatherHopToggle.Set then
+                pcall(function() secretBossState.weatherHopToggle.Set(false, true) end)
+            elseif UIControllers["AutoWeatherHop"] and UIControllers["AutoWeatherHop"].Set then
+                pcall(function() UIControllers["AutoWeatherHop"].Set(false, true) end)
+            end
 
             local dispName = weatherName or "Đặc Biệt"
             ShowNotification("TÌM THẤY THỜI TIẾT", string.format("🎉 ĐÃ TÌM THẤY SERVER!\nThời tiết hiện tại: %s\nMục tiêu: %s", dispName, targetWeather), "SUCCESS", 12)
@@ -3152,12 +3225,20 @@ function secretBossState.CheckWeatherHopOnJoin()
                     end
                     Config.AutoCast = true
                     Config.AutoHuntBoss = true
+                    if UIControllers["AutoCast"] and UIControllers["AutoCast"].Set then
+                        pcall(function() UIControllers["AutoCast"].Set(true, false) end)
+                    end
+                    if UIControllers["AutoHuntBoss"] and UIControllers["AutoHuntBoss"].Set then
+                        pcall(function() UIControllers["AutoHuntBoss"].Set(true, false) end)
+                    end
                 end)
             end
         else
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
             local curDisplay = (weatherName and weatherName ~= "" and weatherName ~= "Clear") and weatherName or "Clear (Trời Quang)"
             ShowNotification("Tìm Server", string.format("Thời tiết hiện tại: %s (Không khớp). Tiếp tục đổi server...", curDisplay), "WARN", 3)
             task.wait(1.5)
+            if not isRunning or not secretBossState.isHopping or not Config.AutoWeatherHop then return end
             secretBossState.HopToNextWeatherServer(targetWeather, hopData.Visited or {})
         end
     end)
@@ -7398,23 +7479,29 @@ end
     createCategoryHeader(tabBoss, "⚡ TỰ ĐỘNG TÌM SERVER THỜI TIẾT (AUTO WEATHER HOP)")
     local weatherHopCard = createCardGroup(tabBoss)
 
-    local weatherHopToggleRow, weatherHopToggleFunc
-    weatherHopToggleRow, weatherHopToggleFunc = createToggleRow(weatherHopCard, "Tự Động Tìm Server Thời Tiết", "Tự động đổi server liên tục bằng queue_on_teleport đến khi gặp đúng thời tiết", Config.AutoWeatherHop, function(v)
+    secretBossState.weatherHopToggle = createToggleRow(weatherHopCard, "Tự Động Tìm Server Thời Tiết", "Tự động đổi server liên tục bằng queue_on_teleport đến khi gặp đúng thời tiết", Config.AutoWeatherHop, function(v)
         Config.AutoWeatherHop = v
         if v then
+            secretBossState.isHopping = true
             local matchedEntry, weatherName = secretBossState.DetectWeather()
             local isMatch = secretBossState.IsWeatherMatch(weatherName, Config.TargetWeather)
             if isMatch then
                 ShowNotification("Tìm Server", string.format("Server hiện tại đã có thời tiết: %s!", weatherName or Config.TargetWeather), "SUCCESS", 5)
                 Config.AutoWeatherHop = false
-                if weatherHopToggleFunc then weatherHopToggleFunc(false) end
+                secretBossState.isHopping = false
+                if secretBossState.weatherHopToggle and secretBossState.weatherHopToggle.Set then
+                    secretBossState.weatherHopToggle.Set(false, true)
+                end
             else
                 ShowNotification("Tìm Server", string.format("Bắt đầu tìm kiếm server có: %s...", Config.TargetWeather), "WARN", 5)
                 task.wait(0.8)
-                secretBossState.HopToNextWeatherServer(Config.TargetWeather, {})
+                if secretBossState.isHopping and Config.AutoWeatherHop then
+                    secretBossState.HopToNextWeatherServer(Config.TargetWeather, {})
+                end
             end
         else
             secretBossState.isHopping = false
+            Config.AutoWeatherHop = false
             secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
             pcall(function()
                 local gs = game:GetService("GuiService")
@@ -7441,6 +7528,7 @@ end
 
     createButtonRow(weatherHopCard, "Dừng Tìm Kiếm Ngay Lập Tức", "Hủy bỏ quá trình nhảy server và xóa dữ liệu ghi nhớ", "Dừng Tìm", function()
         secretBossState.isHopping = false
+        Config.AutoWeatherHop = false
         secretBossState.hopWatchdog = (secretBossState.hopWatchdog or 0) + 1
         pcall(function()
             local gs = game:GetService("GuiService")
@@ -7449,8 +7537,11 @@ end
         if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
             pcall(function() delfile("HeavyweightFishing_WeatherHop.json") end)
         end
-        Config.AutoWeatherHop = false
-        if weatherHopToggleFunc then weatherHopToggleFunc(false) end
+        if secretBossState.weatherHopToggle and secretBossState.weatherHopToggle.Set then
+            secretBossState.weatherHopToggle.Set(false, true)
+        elseif UIControllers["AutoWeatherHop"] and UIControllers["AutoWeatherHop"].Set then
+            UIControllers["AutoWeatherHop"].Set(false, true)
+        end
         ShowNotification("Tìm Server", "Đã dừng và hủy bỏ quá trình tìm kiếm!", "INFO", 4)
     end)
 end)()
@@ -9669,7 +9760,7 @@ do
         Config.TrainSkill = "Z"
         for key, ctrl in pairs(UIControllers) do
             if Config[key] ~= nil and ctrl and ctrl.Set then
-                pcall(function() ctrl.Set(Config[key]) end)
+                pcall(function() ctrl.Set(Config[key], true) end)
             end
         end
         ShowNotification("Reset Cache", "Đã xóa sạch file cache máy và đặt lại combo về [Z, X, V]!", "SUCCESS", 6)
@@ -10155,7 +10246,7 @@ task.spawn(function()
     for key, ctrl in pairs(UIControllers) do
         if Config[key] ~= nil and ctrl and ctrl.Set then
             pcall(function()
-                ctrl.Set(Config[key])
+                ctrl.Set(Config[key], true)
             end)
         end
     end
