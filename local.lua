@@ -4376,16 +4376,17 @@ function ticketQuestState.UpdateUI()
         local cdVal = pData and pData:FindFirstChild("TicketQuestCooldown")
         local serverCd = cdVal and tonumber(cdVal.Value) or 0
         local nowServer = ticketQuestState.GetServerTimeNow()
+        local serverRemain = serverCd > nowServer and (serverCd - nowServer) or 0
 
-        local remain = 0
-        if serverCd > nowServer then
-            remain = math.max(0, math.floor(serverCd - nowServer))
-            ticketQuestState.cooldownEnd = tick() + remain
+        local hasQuest = (ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none")
+        if not hasQuest and serverRemain > 0 then
             ticketQuestState.isCooldown = true
-        elseif ticketQuestState.isCooldown and ticketQuestState.cooldownEnd and ticketQuestState.cooldownEnd > tick() then
+            ticketQuestState.cooldownEnd = tick() + serverRemain
+        end
+
+        local remain = serverRemain
+        if remain <= 0 and ticketQuestState.isCooldown and ticketQuestState.cooldownEnd and ticketQuestState.cooldownEnd > tick() then
             remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - tick()))
-        else
-            ticketQuestState.isCooldown = false
         end
 
         if remain > 0 then
@@ -4397,7 +4398,7 @@ function ticketQuestState.UpdateUI()
             end
             ticketQuestState.uiCooldown.Set(string.format("Còn %02d:%02d%s", mins, secs, homeStr))
         else
-            ticketQuestState.isCooldown = false
+            if not hasQuest then ticketQuestState.isCooldown = false end
             ticketQuestState.uiCooldown.Set("Sẵn sàng nhận vé!")
         end
     end
@@ -5368,19 +5369,7 @@ function ticketQuestState.ScanAndUpdateStatus()
     local serverCd = cdVal and tonumber(cdVal.Value) or 0
     local serverRemain = serverCd > nowServer and (serverCd - nowServer) or 0
 
-    -- Luôn cập nhật trạng thái hồi chiêu từ Server Data
-    if serverRemain > 0 then
-        ticketQuestState.cooldownEnd = now + serverRemain
-        ticketQuestState.isCooldown = true
-    elseif serverCd > 0 and serverCd <= nowServer then
-        ticketQuestState.isCooldown = false
-        ticketQuestState.cooldownEnd = 0
-    elseif detectedCd and detectedCd > 0 then
-        ticketQuestState.cooldownEnd = now + detectedCd
-        ticketQuestState.isCooldown = true
-    end
-
-    -- 1. Nếu tìm thấy nhiệm vụ đang hoạt động
+    -- 1. NẾU CÓ NHIỆM VỤ ĐANG HOẠT ĐỘNG: ƯU TIÊN SỐ 1 LÀ LÀM NHIỆM VỤ NÀY!
     if qType then
         ticketQuestState.active = true
         ticketQuestState.currentQuestType = qType
@@ -5389,30 +5378,32 @@ function ticketQuestState.ScanAndUpdateStatus()
         ticketQuestState.targetProgress = (max and max > 0) and max or 100
         ticketQuestState.isCompleted = (done == true) or (ticketQuestState.targetProgress > 0 and ticketQuestState.currentProgress >= ticketQuestState.targetProgress)
 
+        -- ĐANG CÓ NHIỆM VỤ TRONG NGƯỜI -> TUYỆT ĐỐI KHÔNG ĐƯỢC BẬT TRẠNG THÁI COOLDOWN ĐỂ DỪNG BOT!
+        ticketQuestState.isCooldown = false
+        ticketQuestState.cooldownEnd = 0
+
         if ticketQuestState.isCompleted then
             ticketQuestState.statusText = ticketQuestState.currentQuestTitle .. " (Đã Hoàn Thành - Đang Nộp Vé)"
         else
-            ticketQuestState.statusText = ticketQuestState.currentQuestTitle
+            ticketQuestState.statusText = string.format("Đang làm: %s (%d/%d)", ticketQuestState.currentQuestTitle, ticketQuestState.currentProgress, ticketQuestState.targetProgress)
         end
     else
-        -- 2. Không có nhiệm vụ nào -> Chưa nhận nhiệm vụ hoặc đang hồi chiêu
+        -- 2. KHÔNG CÓ NHIỆM VỤ NÀO TRONG NGƯỜI: MỚI ĐƯỢC PHÉP CHUYỂN SANG CHỜ HỒI CHIÊU ĐỂ NHẬN VÉ MỚI
         ticketQuestState.isCompleted = false
         ticketQuestState.currentQuestType = "none"
         ticketQuestState.currentQuestTitle = "Chưa nhận nhiệm vụ"
         ticketQuestState.currentProgress = 0
         ticketQuestState.targetProgress = 100
 
-        local remain = 0
-        if ticketQuestState.isCooldown and ticketQuestState.cooldownEnd and ticketQuestState.cooldownEnd > now then
-            remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - now))
-        end
-
-        if remain > 0 then
-            local mins = math.floor(remain / 60)
-            local secs = remain % 60
-            ticketQuestState.statusText = string.format("Chờ hồi chiêu (%02d:%02d)", mins, secs)
+        if serverRemain > 0 then
+            ticketQuestState.isCooldown = true
+            ticketQuestState.cooldownEnd = now + serverRemain
+            local mins = math.floor(serverRemain / 60)
+            local secs = serverRemain % 60
+            ticketQuestState.statusText = string.format("Đang chờ hồi chiêu vé (còn %02d:%02d)", mins, secs)
         else
             ticketQuestState.isCooldown = false
+            ticketQuestState.cooldownEnd = 0
             ticketQuestState.statusText = "Chưa nhận nhiệm vụ nào"
         end
     end
@@ -5448,8 +5439,9 @@ function ticketQuestState.Tick()
         ticketQuestState.cooldownEnd = 0
     end
 
-    -- 1. Cooldown (Đang trong thời gian chờ nhận vé mới - CHỈ CHẠY KHI KHÔNG CÓ QUEST HOÀN THÀNH)
-    if ticketQuestState.isCooldown and not isDoneNow then
+    -- 1. Cooldown: CHỈ CHẠY KHI KHÔNG CÓ QUEST NÀO VÀ KHÔNG PHẢI QUEST HOÀN THÀNH (Tuyệt đối không chặn khi đang làm quest)
+    local hasActiveQuest = (ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none") or (qType ~= nil)
+    if not hasActiveQuest and not isDoneNow and ticketQuestState.isCooldown then
         local nowServer = ticketQuestState.GetServerTimeNow()
         local pData = ticketQuestState.GetPlayerDataFolder()
         local cdVal = pData and pData:FindFirstChild("TicketQuestCooldown")
