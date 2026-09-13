@@ -787,6 +787,136 @@ end
 --     end
 -- end)
 
+-- ============================================================
+-- SMART COMBO PERSISTENCE (HeavyweightFishing_SmartCombo.json)
+-- Lưu/nạp trạng thái Combo Kỹ Năng Thông Minh tự động mỗi khi thay đổi.
+-- ============================================================
+local SMART_COMBO_FILE = "HeavyweightFishing_SmartCombo.json"
+local SMART_COMBO_KEYS = {
+    "SmartComboEnabled",
+    "FishHpThreshold",
+    "QuickCatchSkill",
+    "OpenerSkill",
+    "OpenerMaxCount",
+    "LoopSkills",
+    "LoopStrictOrder",
+    "EmergencyHealSkill",
+    "EmergencyHealHp",
+    "SkillEffectDelay",
+    "SmartEffectAutoDetect",
+}
+
+local _smartComboSavePending = false
+local function SaveSmartCombo()
+    if not writefile then return end
+    -- Debounce: ghi file sau 0.3s nếu liên tục thay đổi (tránh ghi quá nhiều lần)
+    if _smartComboSavePending then return end
+    _smartComboSavePending = true
+    task.delay(0.3, function()
+        _smartComboSavePending = false
+        local data = {}
+        for _, k in ipairs(SMART_COMBO_KEYS) do
+            data[k] = Config[k]
+        end
+        local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+        if ok and encoded then
+            pcall(function() writefile(SMART_COMBO_FILE, encoded) end)
+        end
+    end)
+end
+
+local function LoadSmartComboAndSyncUI()
+    if not isfile or not isfile(SMART_COMBO_FILE) or not readfile then return end
+    local ok, content = pcall(function() return readfile(SMART_COMBO_FILE) end)
+    if not ok or not content or #content == 0 then return end
+    local decOk, data = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(data) ~= "table" then return end
+
+    -- Bước 1: Nạp vào Config (không qua UI)
+    local changed = false
+    for _, k in ipairs(SMART_COMBO_KEYS) do
+        if data[k] ~= nil then
+            Config[k] = data[k]
+            changed = true
+        end
+    end
+
+    if not changed then return end
+
+    -- Bước 2: Đồng bộ UI (dùng skipCallback=true để tránh kích hoạt lại SaveSmartCombo)
+    task.spawn(function()
+        task.wait(0.1) -- đảm bảo UIControllers đã khởi tạo xong
+        local syncKeys = {
+            "SmartComboEnabled", "FishHpThreshold", "QuickCatchSkill",
+            "OpenerSkill", "OpenerMaxCount", "LoopStrictOrder",
+            "EmergencyHealSkill", "EmergencyHealHp", "SkillEffectDelay",
+            "SmartEffectAutoDetect",
+        }
+        for _, k in ipairs(syncKeys) do
+            local ctrl = UIControllers[k]
+            if ctrl and ctrl.Set and Config[k] ~= nil then
+                pcall(function() ctrl.Set(Config[k], true) end)
+            end
+        end
+        -- LoopSkills cần sync qua applyComboChange vì nó quản lý cả custom input + preset dropdown + preview
+        -- Nhưng applyComboChange là local, nên ta sync UIControllers["LoopSkills"] nếu tồn tại
+        -- (Dropdown preset và text input tự cập nhật nếu UIControllers đã map)
+        local loopCtrl = UIControllers["LoopSkills"]
+        if loopCtrl and loopCtrl.Set and Config.LoopSkills ~= nil then
+            pcall(function() loopCtrl.Set(Config.LoopSkills, true) end)
+        end
+    end)
+end
+
+-- ============================================================
+-- BOSS TARGETS PERSISTENCE (HeavyweightFishing_BossTargets.json)
+-- Lưu/nạp trạng thái bật/tắt từng Secret Boss tự động.
+-- ============================================================
+local BOSS_TARGETS_FILE = "HeavyweightFishing_BossTargets.json"
+
+local _bossTargetsSavePending = false
+local function SaveBossTargets()
+    if not writefile then return end
+    if _bossTargetsSavePending then return end
+    _bossTargetsSavePending = true
+    task.delay(0.3, function()
+        _bossTargetsSavePending = false
+        local data = {}
+        for k, v in pairs(Config.SecretBossTargets) do
+            data[k] = v
+        end
+        local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+        if ok and encoded then
+            pcall(function() writefile(BOSS_TARGETS_FILE, encoded) end)
+        end
+    end)
+end
+
+local function LoadBossTargetsAndSyncUI()
+    if not isfile or not isfile(BOSS_TARGETS_FILE) or not readfile then return end
+    local ok, content = pcall(function() return readfile(BOSS_TARGETS_FILE) end)
+    if not ok or not content or #content == 0 then return end
+    local decOk, data = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(data) ~= "table" then return end
+
+    -- Bước 1: Nạp vào Config.SecretBossTargets
+    for k, v in pairs(data) do
+        if Config.SecretBossTargets[k] ~= nil then
+            Config.SecretBossTargets[k] = v
+        end
+    end
+
+    -- Bước 2: Đồng bộ UI toggle từng boss (skipCallback=true tránh lưu lại ngay)
+    task.spawn(function()
+        task.wait(0.1)
+        for bName, val in pairs(Config.SecretBossTargets) do
+            if bossTogglesMap and bossTogglesMap[bName] and bossTogglesMap[bName].Set then
+                pcall(function() bossTogglesMap[bName].Set(val, true) end)
+            end
+        end
+    end)
+end
+
 local Colors = {
     Background       = Color3.fromRGB(15, 12, 22),
     SidebarBg        = Color3.fromRGB(11, 9, 17),
@@ -6362,22 +6492,27 @@ local comboCard = createCardGroup(tabFishing)
 
 createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
     Config.SmartComboEnabled = v
+    SaveSmartCombo()
 end)
 
 createSliderRow(comboCard, "Ngưỡng Máu Cá Phân Loại", "Máu cá <= mức này sẽ kết liễu nhanh; > mức này sẽ bật combo", 100, 3000, Config.FishHpThreshold, false, " HP", function(v)
     Config.FishHpThreshold = v
+    SaveSmartCombo()
 end)
 
 createDropdownRow(comboCard, "Chiêu Bắt Nhanh (<= Ngưỡng HP)", "Tung 1 hit kết liễu ngay khi cá yếu / cá thường", {"Tắt", "Z", "X", "C", "V"}, Config.QuickCatchSkill, function(v)
     Config.QuickCatchSkill = v
+    SaveSmartCombo()
 end)
 
 createDropdownRow(comboCard, "Chiêu Mở Màn (> Ngưỡng HP)", "Chiêu tung 1 lần duy nhất đầu trận khi gặp cá to / boss", {"Tắt", "Z", "X", "C", "V"}, Config.OpenerSkill, function(v)
     Config.OpenerSkill = v
+    SaveSmartCombo()
 end)
 
 createSliderRow(comboCard, "Số Lần Dùng Chiêu Mở Màn", "Số lần tung chiêu mở màn trước khi chuyển sang đảo chiêu", 1, 3, Config.OpenerMaxCount, false, " lần", function(v)
     Config.OpenerMaxCount = v
+    SaveSmartCombo()
 end)
 
 do
@@ -6432,8 +6567,9 @@ do
 
         local cleanStr = comboState.FormatCombo(newVal)
         Config.LoopSkills = cleanStr
-        if Config._triggerAutoSave then
-            Config._triggerAutoSave()
+        -- Lưu chuỗi combo mới vào local mỗi khi thay đổi
+        if source ~= "__load_sync" then
+            SaveSmartCombo()
         end
 
         if source ~= "input" and customInput and customInput.Set then
@@ -6528,23 +6664,28 @@ do
 
     createToggleRow(comboCard, "Giữ Đúng Thứ Tự Combo (Strict Order)", "Chờ chiêu hồi theo đúng nhịp thứ tự, không nhảy cóc qua chiêu khác", Config.LoopStrictOrder, function(v)
         Config.LoopStrictOrder = v
+        SaveSmartCombo()
     end)
 end
 
 createDropdownRow(comboCard, "Chiêu Hồi Máu / Cứu Nguy", "Ưu tiên tung chiêu này khi máu người chơi xuống thấp", {"Tắt", "Z", "X", "C", "V"}, Config.EmergencyHealSkill, function(v)
     Config.EmergencyHealSkill = v
+    SaveSmartCombo()
 end)
 
 createSliderRow(comboCard, "Kích Hoạt Hồi Máu Khi HP Dưới", "Ngưỡng máu người chơi cần cứu nguy khẩn cấp", 10, 80, Config.EmergencyHealHp, false, "%", function(v)
     Config.EmergencyHealHp = v
+    SaveSmartCombo()
 end)
 
 createSliderRow(comboCard, "Thời Gian Chờ Ra Chiêu", "Thời gian tối thiểu chờ hết hiệu ứng trước khi tung chiêu tiếp theo", 0.5, 3.5, Config.SkillEffectDelay, true, "s", function(v)
     Config.SkillEffectDelay = v
+    SaveSmartCombo()
 end)
 
 createToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Quan sát hoạt ảnh đòn đánh trên nhân vật để chống nuốt chiêu 100%", Config.SmartEffectAutoDetect, function(v)
     Config.SmartEffectAutoDetect = v
+    SaveSmartCombo()
 end)
 
 createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
@@ -7668,6 +7809,7 @@ createButtonRow(chatBossCard, "Chọn Tất Cả Secret Boss", "Bật săn toàn
             bossTogglesMap[bName].Set(true)
         end
     end
+    SaveBossTargets()
     ShowNotification("Secret Boss", "Đã chọn tất cả Secret Boss!", "SUCCESS")
 end)
 
@@ -7678,6 +7820,7 @@ createButtonRow(chatBossCard, "Bỏ Chọn Tất Cả", "Tắt săn tất cả S
             bossTogglesMap[bName].Set(false)
         end
     end
+    SaveBossTargets()
     ShowNotification("Secret Boss", "Đã bỏ chọn tất cả Secret Boss.", "INFO")
 end)
 
@@ -7904,10 +8047,145 @@ for _, entry in ipairs(secretBossDatabase) do
                 Config.SecretBossTargets["Heavenpiercer Turtle"] = v
                 Config.SecretBossTargets["Heaven Piercer Turtle"] = v
             end
+            SaveBossTargets()
         end)
         bossTogglesMap[b.name] = toggleObj
     end
 end
+
+-- ====================================================================
+-- SECTION: CẦN CÂU CẦN RÁP (Rod Crafting Guide + Quick Filter)
+-- ====================================================================
+createCategoryHeader(tabBoss, "🎣 Cần Câu Cần Ráp (Rod Crafting Guide)")
+local rodGuideCard = createCardGroup(tabBoss)
+
+local rodRecipes = {
+    {
+        rod = "Heavenpiercer Rod",
+        desc = "Cần Thiên Xuyên (Cao Cấp)",
+        bosses = {"Flying Fish Emperor", "Flying Fish Empress", "Rainbow Dragonfish", "Heavenpiercer Turtle"},
+        notes = {
+            ["Flying Fish Emperor"]  = "Nguyên liệu chính",
+            ["Flying Fish Empress"]  = "Nguyên liệu chính",
+            ["Rainbow Dragonfish"]   = "Nguyên liệu + Trả Quest Hạ Diêu",
+            ["Heavenpiercer Turtle"] = "Nguyên liệu + Mồi Rainbow",
+        }
+    },
+    {
+        rod = "Pure Diamond Rod",
+        desc = "Cần Kim Cương Thuần (Cao Cấp)",
+        bosses = {"Frost Kingfish", "Frost Queenfish", "Sanguine Fish", "Draconic Koi"},
+        notes = {
+            ["Frost Kingfish"]  = "Nguyên liệu + Mồi Frost",
+            ["Frost Queenfish"] = "Nguyên liệu chính",
+            ["Sanguine Fish"]   = "Nguyên liệu chính",
+            ["Draconic Koi"]    = "Nguyên liệu phụ",
+        }
+    },
+    {
+        rod = "Sacred Bamboo Rod",
+        desc = "Cần Trúc Thánh (Cao Cấp)",
+        bosses = {"Nameless Octoparasite", "Reborn Puffer Beast", "Mountain Dragonwhale"},
+        notes = {
+            ["Nameless Octoparasite"] = "Nguyên liệu + Trả Quest Đạo Sĩ",
+            ["Reborn Puffer Beast"]   = "Nguyên liệu + Trả Quest",
+            ["Mountain Dragonwhale"]  = "Nguyên liệu + Mồi Nameless",
+        }
+    },
+    {
+        rod = "Huyết Long Rod",
+        desc = "Cần Huyết Long (Trung Cấp)",
+        bosses = {"Scarlet Fish", "Elder Scarlet Fish", "Verdant Bonefang", "Verdant Alligator Gar"},
+        notes = {
+            ["Scarlet Fish"]          = "Nguyên liệu cơ bản",
+            ["Elder Scarlet Fish"]    = "Nguyên liệu chính",
+            ["Verdant Bonefang"]      = "Nguyên liệu phụ",
+            ["Verdant Alligator Gar"] = "Nguyên liệu phụ",
+        }
+    },
+    {
+        rod = "Rainbow Bait (Mồi)",
+        desc = "Mồi Rainbow Bait (Gọi Boss Rùa)",
+        bosses = {"Crimson Electric Eel", "Colossal Tigerfish", "Golden Guardian Fish"},
+        notes = {
+            ["Crimson Electric Eel"]  = "Nguyên liệu chính",
+            ["Colossal Tigerfish"]    = "Nguyên liệu chính",
+            ["Golden Guardian Fish"]  = "Nguyên liệu phụ",
+        }
+    },
+    {
+        rod = "Nameless Bait (Mồi)",
+        desc = "Mồi Nameless Bait (Gọi Bạch Tuộc)",
+        bosses = {"Mirage Lanternfish", "Tiger Mirefish", "Octoparasitic Fish"},
+        notes = {
+            ["Mirage Lanternfish"]  = "Nguyên liệu chính",
+            ["Tiger Mirefish"]      = "Nguyên liệu phụ",
+            ["Octoparasitic Fish"]  = "Nguyên liệu chế mồi",
+        }
+    },
+}
+
+for _, recipe in ipairs(rodRecipes) do
+    -- Hiển thị từng cần câu như một info row
+    local bossListStr = table.concat(recipe.bosses, "  •  ")
+    createInfoRow(rodGuideCard, "🪝 " .. recipe.rod, recipe.desc)
+
+    for _, bName in ipairs(recipe.bosses) do
+        local note = recipe.notes[bName] or ""
+        createInfoRow(rodGuideCard, "   ↳ " .. bName, note)
+    end
+
+    -- Nút lọc nhanh: chỉ bật những boss cần cho cần này
+    createButtonRow(rodGuideCard,
+        "Ưu Tiên Chỉ Săn Cho: " .. recipe.rod,
+        "Tắt hết boss khác, chỉ bật những boss cần để ráp " .. recipe.rod,
+        "⚡ Chỉ Săn Cần Này",
+        function()
+            -- Tắt hết
+            for bName, _ in pairs(Config.SecretBossTargets) do
+                Config.SecretBossTargets[bName] = false
+                if bossTogglesMap[bName] and bossTogglesMap[bName].Set then
+                    pcall(function() bossTogglesMap[bName].Set(false, true) end)
+                end
+            end
+            -- Bật những boss cần cho cần này
+            local enabled = {}
+            for _, bName in ipairs(recipe.bosses) do
+                Config.SecretBossTargets[bName] = true
+                -- Xử lý alias Heavenpiercer Turtle
+                if bName:find("Heaven") then
+                    Config.SecretBossTargets["Heavenpiercer Turtle"] = true
+                    Config.SecretBossTargets["Heaven Piercer Turtle"] = true
+                    if bossTogglesMap["Heavenpiercer Turtle"] and bossTogglesMap["Heavenpiercer Turtle"].Set then
+                        pcall(function() bossTogglesMap["Heavenpiercer Turtle"].Set(true, true) end)
+                    end
+                end
+                if bossTogglesMap[bName] and bossTogglesMap[bName].Set then
+                    pcall(function() bossTogglesMap[bName].Set(true, true) end)
+                end
+                table.insert(enabled, bName)
+            end
+            SaveBossTargets()
+            ShowNotification(
+                "Đã Lọc Boss Cho: " .. recipe.rod,
+                "Chỉ săn: " .. table.concat(enabled, ", "),
+                "SUCCESS", 6
+            )
+        end
+    )
+end
+
+-- Nút khôi phục tất cả
+createButtonRow(rodGuideCard, "Bật Lại Tất Cả Secret Boss", "Bật lại toàn bộ secret boss sau khi đã lọc theo cần câu", "↩ Bật Hết Lại", function()
+    for bName, _ in pairs(Config.SecretBossTargets) do
+        Config.SecretBossTargets[bName] = true
+        if bossTogglesMap[bName] and bossTogglesMap[bName].Set then
+            pcall(function() bossTogglesMap[bName].Set(true, true) end)
+        end
+    end
+    SaveBossTargets()
+    ShowNotification("Đã Bật Hết", "Đã bật lại toàn bộ secret boss!", "SUCCESS")
+end)
 
 createCategoryHeader(tabBoss, "Đấu Trường Boss Enzo")
 local bossFarmCard = createCardGroup(tabBoss)
@@ -9485,6 +9763,80 @@ table.insert(activeConnections, Players.PlayerRemoving:Connect(function()
 end))
 end
 
+-- ============================================================
+-- SECTION: DỊCH CHUYỂN ĐẾN NPC NHIỆM VỤ
+-- ============================================================
+createCategoryHeader(tabTeleports, "🧙 Dịch Chuyển Đến NPC Nhiệm Vụ")
+local npcTeleCard = createCardGroup(tabTeleports)
+
+local questNPCList = {
+    -- Main Quest NPCs
+    { name="Ha Dieu De",            path="Function",  icon="🏆", role="Main Quest",          desc="Trả quest câu Rainbow Dragonfish (≥7M KG) & Heavenpiercer Turtle • Mở khóa Cần Heavenpiercer", island="Bamboo / Coconut / Frost" },
+    { name="Giang Lao",             path="Function",  icon="🎣", role="Main Quest",          desc="NPC nhiệm vụ chính • Trả quest câu cá nặng • Mở khóa tiến trình game", island="Bamboo / Mistpeak / World Angler" },
+    { name="Sage Yijiu",            path="Function",  icon="🔮", role="Skill Shop + Quest",  desc="Bán skill Heavenpiercer & Pure Diamond • Trả quest câu cá Frost", island="Frost Isle / World Angler" },
+    { name="Blind Grand Angler",    path="Function",  icon="👁️", role="Main Quest",          desc="Lão ngư ông mù • Trả quest nhiệm vụ chính • Mở khóa câu cá bí mật", island="Battlefield Isle" },
+    { name="Duan Gan",              path="Function",  icon="🗡️", role="Main Quest",          desc="NPC võ sĩ gãy cần • Quest chính • Liên quan cần Huyết Long", island="Đảo chính" },
+    -- Skill Upgrade NPCs
+    { name="Bac Minh",              path="Function",  icon="⬆️", role="Skill Shop",          desc="Bán và nâng cấp kỹ năng câu cá • Cần Gems để nâng level", island="Đảo chính" },
+    { name="Zeng Tianguo",          path="Function",  icon="⚡", role="Skill Upgrade",       desc="Nâng cấp kỹ năng đặc biệt • Có ở Perch Isle & Sovereign Isle", island="Perch / Sovereign" },
+    { name="Tang Thien Quoc",       path="Function",  icon="🌟", role="Skill Upgrade",       desc="NPC nâng cấp kỹ năng cấp cao • Sovereign Isle (Power 39) & Perch Isle", island="Sovereign / Perch" },
+    -- Craft & Shop NPCs
+    { name="Biao Di",               path="Function",  icon="🎯", role="Thợ Chế Cần Câu",    desc="Craft & mua bán cần câu • Chế Heavenpiercer, Pure Diamond, Sacred Bamboo • Cần nguyên liệu boss", island="Mọi đảo chính" },
+    { name="Hua Heshang",           path="Function",  icon="🐉", role="Dragon Quest",        desc="NPC mới • Yêu cầu skill Dragon Subjugation (drop từ Dark Kingfish)", island="Đảo chính" },
+    { name="The Shadow",            path="Function",  icon="🌑", role="Bí Mật / PVP",       desc="NPC bí ẩn • Liên quan nhiệm vụ bí mật và PVP arena đặc biệt", island="Đảo chính" },
+    { name="Lao Ngo",               path="Function",  icon="👴", role="Quest Phụ",           desc="Lão Ngô • Nhiệm vụ phụ • Cung cấp thông tin câu cá bí ẩn", island="Đảo chính" },
+    { name="Nanjiang",              path="Function",  icon="🗺️", role="Quest Phụ",           desc="Nam Giang • Nhiệm vụ phụ • Thông tin đảo và vị trí câu hiếm", island="Đảo chính" },
+    { name="Giang Lao PVP",         path="Function",  icon="⚔️", role="PVP Arena",           desc="Tham gia đấu trường PVP câu cá • Nhận Stars để đổi skin cần câu", island="Battlefield Isle" },
+    { name="Battlefield Isle's Giang Lao", path="Function", icon="🏟️", role="Battlefield Quest", desc="Quest đấu trường Battlefield • Mở khóa khu vực đặc biệt", island="Battlefield Isle" },
+    { name="Ticket Quest Giver",    path="Function",  icon="🎫", role="Sự Kiện",             desc="Phát nhiệm vụ vé sự kiện • Đổi vé lấy phần thưởng giới hạn", island="Đảo chính" },
+    -- Utility NPCs
+    { name="Nana",                  path="SellFish",  icon="🐟", role="Bán Cá",             desc="Thu mua & bán cá • Bán cá nhanh lấy Gems • Có mặt ở mọi đảo", island="Mọi đảo" },
+    { name="Ba Chang",              path="BuyBait",   icon="🪱", role="Bán Mồi Câu",        desc="Bán mồi câu cơ bản (Worm, Shrimp Bait...) • Giá rẻ cho người mới", island="Đảo chính / Coconut" },
+}
+
+local function findNPCModel(npcName, npcPath)
+    local npcFolder = Workspace:FindFirstChild("NPC")
+    if npcFolder then
+        local pathFolder = npcFolder:FindFirstChild(npcPath)
+        if pathFolder then
+            local found = pathFolder:FindFirstChild(npcName)
+            if found and (found:FindFirstChild("HumanoidRootPart") or found:IsA("BasePart")) then
+                return found
+            end
+        end
+        for _, sub in ipairs(npcFolder:GetChildren()) do
+            local found = sub:FindFirstChild(npcName)
+            if found then return found end
+        end
+    end
+    return Workspace:FindFirstChild(npcName, true)
+end
+
+for _, npc in ipairs(questNPCList) do
+    createButtonRow(
+        npcTeleCard,
+        npc.icon .. " " .. npc.name .. "  [" .. npc.role .. "]",
+        npc.desc .. "\n📍 " .. npc.island,
+        "Bay Đến",
+        function()
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if not root then ShowNotification("Lỗi", "Nhân vật chưa spawn!", "ERROR") return end
+            local model = findNPCModel(npc.name, npc.path)
+            if model then
+                local npcRoot = model:FindFirstChild("HumanoidRootPart")
+                    or model:FindFirstChildWhichIsA("BasePart")
+                if npcRoot then
+                    root.CFrame = CFrame.new(npcRoot.Position + Vector3.new(0, 3, 3))
+                    ShowNotification("✅ Đến " .. npc.name, "Đã bay đến NPC " .. npc.name .. "!", "SUCCESS", 4)
+                    return
+                end
+            end
+            ShowNotification("❌ Không Tìm Thấy", "NPC '" .. npc.name .. "' không có trong map lúc này. Có thể chưa spawn hoặc đang ở đảo khác.", "WARN", 5)
+        end
+    )
+end
+
 do
 createCategoryHeader(tabVisuals, "ESP Nhìn Xuyên Tường")
 local espCard = createCardGroup(tabVisuals)
@@ -9543,15 +9895,41 @@ createToggleRow(perfCard, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương m
     end
 end)
 
-createToggleRow(perfCard, "Sáng Màn Hình (Fullbright)", "Tăng độ sáng tối đa, nhìn rõ mọi thứ trong đêm", Config.Fullbright, function(v)
-    Config.Fullbright = v
-    if not v then
+local function ApplyFullbright(enabled)
+    if enabled then
+        Lighting.Brightness = 10
+        Lighting.Ambient = Color3.fromRGB(178, 178, 178)
+        Lighting.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
+        Lighting.GlobalShadows = false
+        Lighting.ExposureCompensation = 1
+        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
+        if atmo then
+            atmo.Density = 0
+            atmo.Haze = 0
+        end
+    else
         Lighting.Brightness = 2
         Lighting.Ambient = Color3.fromRGB(70, 70, 70)
         Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
         Lighting.GlobalShadows = true
+        Lighting.ExposureCompensation = 0
+        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
+        if atmo then
+            atmo.Density = 0.3
+            atmo.Haze = 0.5
+        end
     end
+end
+
+createToggleRow(perfCard, "Sáng Màn Hình (Fullbright)", "Tăng độ sáng tối đa, nhìn rõ mọi thứ trong đêm", Config.Fullbright, function(v)
+    Config.Fullbright = v
+    ApplyFullbright(v)
 end)
+
+-- Áp dụng ngay khi script load nếu bật sẵn
+if Config.Fullbright then
+    ApplyFullbright(true)
+end
 
 createToggleRow(perfCard, "Chế Độ Giảm Lag (Low GFX)", "Tắt bóng đổ và giảm tải đồ họa giúp game siêu mượt", Config.PerformanceMode, function(v)
     Config.PerformanceMode = v
@@ -12620,5 +12998,11 @@ end))
 if secretBossState.CheckWeatherHopOnJoin then
     task.spawn(secretBossState.CheckWeatherHopOnJoin)
 end
+
+-- Nạp cài đặt Combo Kỹ Năng Thông Minh từ file local và đồng bộ UI
+pcall(LoadSmartComboAndSyncUI)
+
+-- Nạp trạng thái bật/tắt từng Secret Boss từ file local và đồng bộ UI toggle
+pcall(LoadBossTargetsAndSyncUI)
 
 ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Tự Động Tìm Server Thời Tiết, Totem Thời Tiết & Webhook!", "SUCCESS", 6)
