@@ -94,6 +94,15 @@ pcall(function()
         gs.SelectedObject = nil
         gs.GuiNavigationEnabled = false
     end
+    local vim = game:GetService("VirtualInputManager")
+    local cam = Workspace.CurrentCamera
+    if vim and cam and cam.ViewportSize then
+        local midX = cam.ViewportSize.X / 2
+        local midY = cam.ViewportSize.Y / 2
+        vim:SendMouseButtonEvent(midX, midY, 0, true, game, 0)
+        task.wait(0.02)
+        vim:SendMouseButtonEvent(midX, midY, 0, false, game, 0)
+    end
 end)
 
 local isRunning = true
@@ -101,7 +110,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-skill-v"
+local SCRIPT_BUILD_COMMIT = "fix-nav-return-and-skill-v"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4737,6 +4746,29 @@ function ticketQuestState.GetDialogueButtons()
     return buttons
 end
 
+-- Hủy triệt để trạng thái UI Navigation / Hộp chọn ô vuông của Roblox và trả lại quyền điều khiển phím cho nhân vật
+function ticketQuestState.ClearUINavigation()
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        if gs then
+            gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
+        end
+    end)
+    -- Click nhấp vào giữa khung nhìn thế giới 3D để Roblox trả focus từ UI về Nhân Vật
+    pcall(function()
+        local vim = game:GetService("VirtualInputManager")
+        local cam = Workspace.CurrentCamera
+        if vim and cam and cam.ViewportSize then
+            local midX = cam.ViewportSize.X / 2
+            local midY = cam.ViewportSize.Y / 2
+            vim:SendMouseButtonEvent(midX, midY, 0, true, game, 0)
+            task.wait(0.02)
+            vim:SendMouseButtonEvent(midX, midY, 0, false, game, 0)
+        end
+    end)
+end
+
 -- Kích hoạt nút lựa chọn thoại bằng mọi phương thức UI lẫn RemoteEvent tương ứng
 function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
     if not entry or not entry.button then return false end
@@ -4790,13 +4822,23 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
         end
     end)
 
-    -- 3. Đảm bảo xóa bỏ mọi hộp chọn / ô vuông UI (GuiService.SelectedObject) để không khóa phím di chuyển
+    -- 3. Chọn đối tượng UI qua GuiService và bấm Enter để kích hoạt lựa chọn hội thoại
     pcall(function()
         local gs = game:GetService("GuiService")
         if gs then
-            gs.SelectedObject = nil
-            gs.GuiNavigationEnabled = false
+            gs.SelectedObject = btn
         end
+        local vim = game:GetService("VirtualInputManager")
+        if vim then
+            vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
+            task.wait(0.04)
+            vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+        end
+    end)
+
+    -- Tự động hủy UI navigation ngay sau khi phím Return đã gửi để không bị kẹt ô vuông phím
+    task.delay(0.08, function()
+        ticketQuestState.ClearUINavigation()
     end)
 
     -- 4. Giả lập click chuột và chạm màn hình (Mobile Touch) tại tâm nút
@@ -4855,12 +4897,9 @@ function ticketQuestState.CloseDialogue()
         if mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue") then
             mg.Menu.Dialogue.Visible = false
         end
-        local gs = game:GetService("GuiService")
-        if gs then
-            gs.SelectedObject = nil
-            gs.GuiNavigationEnabled = false
-        end
     end)
+    ticketQuestState.ClearUINavigation()
+    task.delay(0.2, ticketQuestState.ClearUINavigation)
 end
 
 -- Wrapper hỗ trợ tương thích ngược
@@ -5116,13 +5155,9 @@ function ticketQuestState.InteractNPC(isClaiming)
 
     local ok, res = pcall(_execute)
     ticketQuestState.isInteracting = false
-    pcall(function()
-        local gs = game:GetService("GuiService")
-        if gs then
-            gs.SelectedObject = nil
-            gs.GuiNavigationEnabled = false
-        end
-    end)
+    ticketQuestState.ClearUINavigation()
+    task.delay(0.25, ticketQuestState.ClearUINavigation)
+    task.delay(0.6, ticketQuestState.ClearUINavigation)
     return ok and res or false
 end
 
@@ -5496,6 +5531,8 @@ function ticketQuestState.Tick()
             end
 
             local claimSuccess = ticketQuestState.InteractNPC(true)
+            ticketQuestState.ClearUINavigation()
+            task.delay(0.3, ticketQuestState.ClearUINavigation)
             task.wait(0.5)
 
             -- Kiểm tra lại sau khi nộp
@@ -5554,6 +5591,8 @@ function ticketQuestState.Tick()
             ticketQuestState.statusText = "Đang tương tác NPC nhận vé Hard mới..."
             ticketQuestState.UpdateUI()
             ticketQuestState.InteractNPC(false)
+            ticketQuestState.ClearUINavigation()
+            task.delay(0.3, ticketQuestState.ClearUINavigation)
 
             -- Quét lại sau khi nhận quest
             task.wait(1.0)
@@ -9830,10 +9869,10 @@ function comboState.CastSkill(sk)
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
 
-    -- 🛑 KHÓA BẢO VỆ CẤP CAO CHO CHIÊU C: Nếu không có tab nào bật C, cấm 100% việc cast chiêu C!
+    -- 🛑 KHÓA BẢO VỆ CẤP CAO CHO CHIÊU C: Nếu không có tab nào chọn C, cấm 100% việc cast chiêu C!
     if cleanKey == "C" then
         local userChoseC = false
-        if Config.LoopSkills and (Config.LoopSkills:find("C") or Config.LoopSkills:find("c")) then userChoseC = true end
+        -- TUYỆT ĐỐI KHÔNG dùng Config.LoopSkills để cấp phép cho C vì preset/dữ liệu cũ có thể chứa C
         if Config.TicketQuickSkill and (Config.TicketQuickSkill:find("C") or Config.TicketQuickSkill:find("c")) then userChoseC = true end
         if Config.TicketSkillKey and (Config.TicketSkillKey:find("C") or Config.TicketSkillKey:find("c")) then userChoseC = true end
         if Config.TrainSkill and (Config.TrainSkill:find("C") or Config.TrainSkill:find("c")) then userChoseC = true end
@@ -9843,23 +9882,43 @@ function comboState.CastSkill(sk)
         end
     end
 
-    -- KHÓA BẢO VỆ CHẶN CHIÊU SAI: Khi đang có nhiệm vụ 100 Cá, CHỈ cho phép cast duy nhất chiêu TicketQuickSkill (Mặc định: V)
-    local curQ = ticketQuestState and ticketQuestState.currentQuestType
-    if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-        curQ = select(1, ticketQuestState.DetectActiveQuest())
-    end
+    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Khi bật Auto Ticket Quest, CHỈ cho phép cast chiêu vé đã cài đặt!
+    if Config.AutoTicketQuest then
+        local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+        allowedQuick = allowedQuick and allowedQuick:upper() or "V"
+        local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+        allowedSkill = allowedSkill and allowedSkill:upper() or "Z"
 
-    if curQ == "fish_100" then
-        local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
-        allowed = allowed and allowed:upper() or "V"
-        if cleanKey ~= allowed then
-            return false -- Chặn đứng 100% các chiêu Z, X, C
+        local curQ = ticketQuestState and ticketQuestState.currentQuestType
+        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+            curQ = select(1, ticketQuestState.DetectActiveQuest())
         end
-    elseif curQ == "skill_100" then
-        local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
-        allowed = allowed and allowed:upper() or "Z"
-        if cleanKey ~= allowed then
-            return false -- Chặn đứng các chiêu khác
+
+        if curQ == "skill_100" then
+            if cleanKey ~= allowedSkill then return false end
+        else
+            -- Mặc định là nhiệm vụ 100 cá hoặc lúc chưa xác định xong nhiệm vụ vé
+            if cleanKey ~= allowedQuick then return false end
+        end
+    else
+        -- KHÓA BẢO VỆ CHẶN CHIÊU SAI KHI KHÔNG BẬT AUTO TICKET QUEST NHƯNG ĐANG CÓ QUEST VÉ
+        local curQ = ticketQuestState and ticketQuestState.currentQuestType
+        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+            curQ = select(1, ticketQuestState.DetectActiveQuest())
+        end
+
+        if curQ == "fish_100" then
+            local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+            allowed = allowed and allowed:upper() or "V"
+            if cleanKey ~= allowed then
+                return false -- Chặn đứng 100% các chiêu Z, X, C
+            end
+        elseif curQ == "skill_100" then
+            local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+            allowed = allowed and allowed:upper() or "Z"
+            if cleanKey ~= allowed then
+                return false -- Chặn đứng các chiêu khác
+            end
         end
     end
 
@@ -10597,6 +10656,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 elseif curQ == "skill_100" then
                                     local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, sk and sk:upper() or "Z")
+                                elseif Config.AutoTicketQuest then
+                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+                                    table.insert(loopKeys, qk and qk:upper() or "V")
                                 end
 
                                 if #loopKeys == 0 then
@@ -10664,6 +10726,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         elseif curQ == "skill_100" then
                             local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                             comboState.CastSkill(sk and sk:upper() or "Z")
+                        elseif Config.AutoTicketQuest then
+                            local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+                            comboState.CastSkill(qk and qk:upper() or "V")
                         else
                             local skillList = {}
                             if Config.LoopSkills and Config.LoopSkills ~= "" then
