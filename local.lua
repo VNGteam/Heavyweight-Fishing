@@ -222,6 +222,16 @@ local Config = {
     TicketReturnHomeWhenDone = true,
     TicketAutoCastAtHome = true,
     TicketRemoteClaim = true,
+    
+    -- Hệ Thống Quản Lý Độ Ưu Tiên (Priority Manager)
+    PrioritySystemEnabled = true,
+    PriorityPreset = "Mặc Định: Săn Boss > Vé NV > Thần Linh > Luyện Chiêu > Farm Thường",
+    Priority_SecretBoss = 1,
+    Priority_TicketQuest = 2,
+    Priority_GodSpirit = 3,
+    Priority_TrainSkill = 4,
+    Priority_NormalFarm = 5,
+
     AutoClaimDaily = false,
     DailyClaimDelay = 0.5,
     
@@ -428,6 +438,15 @@ local ConfigLabelMap = {
     ["Vòng Quay May Mắn (Auto Gacha)"] = "AutoGacha",
     ["Chọn Vòng Quay Gacha"] = "GachaBanner",
     ["Số Vé Mỗi Lần Quay"] = "GachaPullsPerAction",
+
+    -- Quản Lý Độ Ưu Tiên (Priority Manager)
+    ["Bật Quản Lý Độ Ưu Tiên"] = "PrioritySystemEnabled",
+    ["Mẫu Phân Cấp (Preset)"] = "PriorityPreset",
+    ["Ưu Tiên: 🎯 Săn Secret Boss"] = "Priority_SecretBoss",
+    ["Ưu Tiên: 📜 Làm Vé Nhiệm Vụ"] = "Priority_TicketQuest",
+    ["Ưu Tiên: ⛩️ Cúng Thần Linh"] = "Priority_GodSpirit",
+    ["Ưu Tiên: ⚔️ Auto Luyện Chiêu"] = "Priority_TrainSkill",
+    ["Ưu Tiên: 🎣 Treo Farm Thường"] = "Priority_NormalFarm",
 
     -- ESP & Thị giác
     ["ESP Thần Linh (God Spirit)"] = "ESP_GodSpirit",
@@ -4147,6 +4166,17 @@ function secretBossState.HandleChatMessage(msg)
                 time = tick(),
                 reqPower = reqPower
             }
+
+            -- KIỂM TRA PHÂN CẤP ĐỘ ƯU TIÊN (PRIORITY MANAGER)
+            if Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
+                local curTask = PriorityManager.GetActiveTask()
+                local bossPri = PriorityManager.GetTaskPriority("SecretBoss")
+                if curTask ~= "None" and curTask ~= "SecretBoss" and PriorityManager.GetTaskPriority(curTask) < bossPri then
+                    ShowNotification("Ưu Tiên", string.format("Phát hiện %s tại %s nhưng đang ưu tiên [%s] (Hạng %d)!", tostring(detectedName), matchedIsland.islandName, PriorityManager.GetTaskDisplayName(curTask), PriorityManager.GetTaskPriority(curTask)), "WARN", 5)
+                    return
+                end
+            end
+
             secretBossState.Teleport(matchedIsland, detectedName, reqPower)
         end
     end
@@ -5517,6 +5547,18 @@ function ticketQuestState.Tick()
         ticketQuestState.cooldownEnd = 0
     end
 
+    -- KIỂM TRA PHÂN CẤP ĐỘ ƯU TIÊN (PRIORITY MANAGER)
+    if Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
+        local curTask = PriorityManager.GetActiveTask()
+        local ticketPri = PriorityManager.GetTaskPriority("TicketQuest")
+        if curTask ~= "None" and curTask ~= "TicketQuest" and PriorityManager.GetTaskPriority(curTask) < ticketPri then
+            local taskName = PriorityManager.GetTaskDisplayName(curTask)
+            ticketQuestState.statusText = string.format("Tạm hoãn vé: Đang nhường quyền cho [%s] (Hạng %d)", taskName, PriorityManager.GetTaskPriority(curTask))
+            ticketQuestState.UpdateUI()
+            return
+        end
+    end
+
     -- 1. Cooldown: CHỈ CHẠY KHI KHÔNG CÓ QUEST NÀO VÀ KHÔNG PHẢI QUEST HOÀN THÀNH (Tuyệt đối không chặn khi đang làm quest)
     local hasActiveQuest = (ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none") or (qType ~= nil)
     if not hasActiveQuest and not isDoneNow and ticketQuestState.isCooldown then
@@ -5846,6 +5888,11 @@ task.spawn(function()
         task.wait(1.0)
         -- Luôn cập nhật tiến độ nhiệm vụ và hồi chiêu vào giao diện thời gian thực
         pcall(ticketQuestState.ScanAndUpdateStatus)
+        pcall(function()
+            if PriorityManager and PriorityManager.UpdateUI then
+                PriorityManager.UpdateUI()
+            end
+        end)
         if Config.AutoTicketQuest then
             pcall(function()
                 ticketQuestState.Tick()
@@ -5901,6 +5948,107 @@ task.spawn(function()
         hookCd(child)
     end))
 end)
+-- ===============================================================
+-- 👑 HỆ THỐNG QUẢN LÝ ĐỘ ƯU TIÊN TÙY CHỈNH (PRIORITY MANAGER)
+-- ===============================================================
+local PriorityManager = {
+    uiStatusRow = nil,
+    lastReportedTask = "None"
+}
+
+function PriorityManager.IsTaskActive(taskId)
+    if taskId == "SecretBoss" then
+        if not (Config.AutoChatSecretBoss or Config.AutoHuntBoss) then return false end
+        if secretBossState and secretBossState.active then return true end
+        if secretBossState and secretBossState.activeChatBoss and (tick() - (secretBossState.activeChatBoss.time or 0) < 300) then
+            return true
+        end
+        if secretBossState and secretBossState.DetectWeather then
+            local wIsland, wName = secretBossState.DetectWeather()
+            if wIsland and wName ~= "Clear" then
+                for _, b in ipairs(wIsland.bosses or {}) do
+                    if Config.SecretBossTargets and Config.SecretBossTargets[b.name] then
+                        return true
+                    end
+                end
+            end
+        end
+        return false
+    elseif taskId == "TicketQuest" then
+        if not Config.AutoTicketQuest then return false end
+        if not ticketQuestState then return false end
+        -- Nếu đang trong thời gian hồi chiêu (Cooldown 20p) thì KHÔNG giữ quyền
+        if ticketQuestState.isCooldown then return false end
+        if ticketQuestState.isCompleted then return true end
+        if ticketQuestState.readyForNewQuest then return true end
+        if ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" then return true end
+        return false
+    elseif taskId == "GodSpirit" then
+        if not Config.AutoPrayGodSpirit then return false end
+        local npc = Workspace:FindFirstChild("NPC")
+        if npc and (npc:FindFirstChild("Spirit") or npc:FindFirstChild("God")) then
+            return true
+        end
+        return false
+    elseif taskId == "TrainSkill" then
+        return Config.AutoTrainSkill == true
+    elseif taskId == "NormalFarm" then
+        return Config.AutoCast == true
+    end
+    return false
+end
+
+function PriorityManager.GetTaskPriority(taskId)
+    if taskId == "SecretBoss" then return tonumber(Config.Priority_SecretBoss) or 1 end
+    if taskId == "TicketQuest" then return tonumber(Config.Priority_TicketQuest) or 2 end
+    if taskId == "GodSpirit" then return tonumber(Config.Priority_GodSpirit) or 3 end
+    if taskId == "TrainSkill" then return tonumber(Config.Priority_TrainSkill) or 4 end
+    if taskId == "NormalFarm" then return tonumber(Config.Priority_NormalFarm) or 5 end
+    return 999
+end
+
+function PriorityManager.GetTaskDisplayName(taskId)
+    if taskId == "SecretBoss" then return "🎯 Săn Secret Boss" end
+    if taskId == "TicketQuest" then return "📜 Làm Vé Nhiệm Vụ" end
+    if taskId == "GodSpirit" then return "⛩️ Cúng Thần Linh" end
+    if taskId == "TrainSkill" then return "⚔️ Auto Luyện Chiêu" end
+    if taskId == "NormalFarm" then return "🎣 Treo Farm Thường" end
+    return "💤 Đang Chờ (Idle)"
+end
+
+function PriorityManager.GetActiveTask()
+    local candidateTasks = {"SecretBoss", "TicketQuest", "GodSpirit", "TrainSkill", "NormalFarm"}
+    if not Config.PrioritySystemEnabled then
+        for _, tid in ipairs(candidateTasks) do
+            if PriorityManager.IsTaskActive(tid) then return tid end
+        end
+        return "None"
+    end
+
+    local bestTask = "None"
+    local bestPriority = 9999
+
+    for _, tid in ipairs(candidateTasks) do
+        if PriorityManager.IsTaskActive(tid) then
+            local p = PriorityManager.GetTaskPriority(tid)
+            if p < bestPriority then
+                bestPriority = p
+                bestTask = tid
+            end
+        end
+    end
+
+    return bestTask
+end
+
+function PriorityManager.UpdateUI()
+    if PriorityManager.uiStatusRow and PriorityManager.uiStatusRow.Set then
+        local cur = PriorityManager.GetActiveTask()
+        local name = PriorityManager.GetTaskDisplayName(cur)
+        local rank = cur ~= "None" and PriorityManager.GetTaskPriority(cur) or "-"
+        PriorityManager.uiStatusRow.Set(string.format("%s (Hạng %s)", name, tostring(rank)))
+    end
+end
 
 
 local tabFishing   = CreateTab("Câu Cá")
@@ -9101,6 +9249,7 @@ table.insert(activeConnections, Players.PlayerRemoving:Connect(function()
 end))
 end
 
+do
 createCategoryHeader(tabVisuals, "ESP Nhìn Xuyên Tường")
 local espCard = createCardGroup(tabVisuals)
 
@@ -9218,7 +9367,9 @@ createButtonRow(perfCard, "Mở Khóa Toàn Bộ Sách Cá (Index)", "Mở khóa
     end
     ShowNotification("Mở Khóa Index", string.format("Đã mở khóa %d loài cá trong Sách Cá Index!", count > 0 and count or 109), "SUCCESS")
 end)
+end
 
+do
 createCategoryHeader(tabPlayer, "📜 Trích Xuất Dữ Liệu Kỹ Năng (Skill Info Exporter)")
 local exportSkillCard = createCardGroup(tabPlayer)
 local infoSkillCount = createInfoRow(exportSkillCard, "Kỹ Năng Đã Quét", "Chưa quét dữ liệu")
@@ -9262,6 +9413,7 @@ createCategoryHeader(tabPlayer, "Chống Văng Game & Ổn Định")
 local stabCard = createCardGroup(tabPlayer)
 createToggleRow(stabCard, "Chống Văng Game (Anti-AFK)", "Chống bị Roblox kick sau 20 phút treo máy", Config.AntiAFK, function(v) Config.AntiAFK = v end)
 createToggleRow(stabCard, "Tự Động Kết Nối Lại", "Tự động vào lại server nếu bị mất kết nối", Config.AutoRejoin, function(v) Config.AutoRejoin = v end)
+end
 
 do
     createCategoryHeader(tabProfiles, "Quản Lý Cấu Hình (Profile)")
@@ -9386,6 +9538,113 @@ do
     end)
 end
 
+do
+createCategoryHeader(tabProfiles, "👑 Quản Lý Độ Ưu Tiên (Priority Manager)")
+local priCard = createCardGroup(tabProfiles)
+
+createToggleRow(priCard, "Bật Quản Lý Độ Ưu Tiên", "Tự động phân định thứ bậc khi nhiều tính năng chạy cùng lúc, tránh xung đột", Config.PrioritySystemEnabled, function(v)
+    Config.PrioritySystemEnabled = v
+    PriorityManager.UpdateUI()
+    if Config._triggerAutoSave then Config._triggerAutoSave() end
+end)
+
+PriorityManager.uiStatusRow = createInfoRow(priCard, "Tác Vụ Đang Thực Thi", PriorityManager.GetTaskDisplayName(PriorityManager.GetActiveTask()))
+
+local priorityPresetNames = {
+    "Mặc Định: Săn Boss > Vé NV > Thần Linh > Luyện Chiêu > Farm Thường",
+    "Cày Vé: Vé NV > Săn Boss > Thần Linh > Luyện Chiêu > Farm Thường",
+    "Luyện Chiêu: Luyện Chiêu > Săn Boss > Vé NV > Thần Linh > Farm Thường",
+    "Tùy Biến Thứ Hạng (Custom)"
+}
+
+local rankOptions = {"1 (Cao Nhất)", "2", "3", "4", "5 (Thấp Nhất)"}
+local function rankToNumber(str)
+    if not str then return 5 end
+    local num = tostring(str):match("(%d+)")
+    return tonumber(num) or 5
+end
+
+local function numberToRank(num)
+    num = tonumber(num) or 5
+    if num == 1 then return "1 (Cao Nhất)" end
+    if num == 5 then return "5 (Thấp Nhất)" end
+    return tostring(num)
+end
+
+local dropSecretBoss, dropTicketQuest, dropGodSpirit, dropTrainSkill, dropNormalFarm
+
+local function applyPriorityPreset(pName)
+    Config.PriorityPreset = pName
+    if pName:find("Mặc Định") then
+        Config.Priority_SecretBoss = 1
+        Config.Priority_TicketQuest = 2
+        Config.Priority_GodSpirit = 3
+        Config.Priority_TrainSkill = 4
+        Config.Priority_NormalFarm = 5
+    elseif pName:find("Cày Vé") then
+        Config.Priority_TicketQuest = 1
+        Config.Priority_SecretBoss = 2
+        Config.Priority_GodSpirit = 3
+        Config.Priority_TrainSkill = 4
+        Config.Priority_NormalFarm = 5
+    elseif pName:find("Luyện Chiêu") then
+        Config.Priority_TrainSkill = 1
+        Config.Priority_SecretBoss = 2
+        Config.Priority_TicketQuest = 3
+        Config.Priority_GodSpirit = 4
+        Config.Priority_NormalFarm = 5
+    end
+
+    if dropSecretBoss and dropSecretBoss.Set then dropSecretBoss.Set(numberToRank(Config.Priority_SecretBoss)) end
+    if dropTicketQuest and dropTicketQuest.Set then dropTicketQuest.Set(numberToRank(Config.Priority_TicketQuest)) end
+    if dropGodSpirit and dropGodSpirit.Set then dropGodSpirit.Set(numberToRank(Config.Priority_GodSpirit)) end
+    if dropTrainSkill and dropTrainSkill.Set then dropTrainSkill.Set(numberToRank(Config.Priority_TrainSkill)) end
+    if dropNormalFarm and dropNormalFarm.Set then dropNormalFarm.Set(numberToRank(Config.Priority_NormalFarm)) end
+
+    PriorityManager.UpdateUI()
+    if Config._triggerAutoSave then Config._triggerAutoSave() end
+end
+
+local dropPreset = createDropdownRow(priCard, "Mẫu Phân Cấp (Preset)", "Chọn nhanh bộ ưu tiên phổ biến hoặc tự do xếp hạng bên dưới", priorityPresetNames, Config.PriorityPreset or priorityPresetNames[1], function(v)
+    applyPriorityPreset(v)
+end)
+
+local function onCustomRankChange()
+    if dropPreset and dropPreset.Set then
+        dropPreset.Set("Tùy Biến Thứ Hạng (Custom)")
+    end
+    Config.PriorityPreset = "Tùy Biến Thứ Hạng (Custom)"
+    PriorityManager.UpdateUI()
+    if Config._triggerAutoSave then Config._triggerAutoSave() end
+end
+
+dropSecretBoss = createDropdownRow(priCard, "Ưu Tiên: 🎯 Săn Secret Boss", "Xếp hạng ưu tiên cho Săn Boss (Chat Sniper & Thời Tiết)", rankOptions, numberToRank(Config.Priority_SecretBoss), function(v)
+    Config.Priority_SecretBoss = rankToNumber(v)
+    onCustomRankChange()
+end)
+
+dropTicketQuest = createDropdownRow(priCard, "Ưu Tiên: 📜 Làm Vé Nhiệm Vụ", "Xếp hạng ưu tiên cho Tự Động Làm Vé Nhiệm Vụ 20p", rankOptions, numberToRank(Config.Priority_TicketQuest), function(v)
+    Config.Priority_TicketQuest = rankToNumber(v)
+    onCustomRankChange()
+end)
+
+dropGodSpirit = createDropdownRow(priCard, "Ưu Tiên: ⛩️ Cúng Thần Linh", "Xếp hạng ưu tiên cho Tự Động Cầu Nguyện / Cúng Thần", rankOptions, numberToRank(Config.Priority_GodSpirit), function(v)
+    Config.Priority_GodSpirit = rankToNumber(v)
+    onCustomRankChange()
+end)
+
+dropTrainSkill = createDropdownRow(priCard, "Ưu Tiên: ⚔️ Auto Luyện Chiêu", "Xếp hạng ưu tiên cho Fast Cancel luyện cấp kỹ năng", rankOptions, numberToRank(Config.Priority_TrainSkill), function(v)
+    Config.Priority_TrainSkill = rankToNumber(v)
+    onCustomRankChange()
+end)
+
+dropNormalFarm = createDropdownRow(priCard, "Ưu Tiên: 🎣 Treo Farm Thường", "Xếp hạng ưu tiên cho Câu thường và Farm tại Home Spot", rankOptions, numberToRank(Config.Priority_NormalFarm), function(v)
+    Config.Priority_NormalFarm = rankToNumber(v)
+    onCustomRankChange()
+end)
+end
+
+do
 createCategoryHeader(tabProfiles, "📢 Discord Webhook Báo Cáo Từ Xa")
 local hookCard = createCardGroup(tabProfiles)
 
@@ -9438,6 +9697,7 @@ createButtonRow(credCard, "🔴 Diệt Toàn Bộ Script (Kill Script)", "Ngắt
     task.wait(0.2)
     UnloadScript()
 end)
+end
 
 local function initExperimentalTab()
     -- 1. 👻 CHẾ ĐỘ TÀNG HÌNH (GHOST / INVISIBILITY MODE)
@@ -10394,7 +10654,12 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                 local hasActiveTicket = ticketQuestState and ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" and not ticketQuestState.isCompleted
 
-                if Config.AutoTrainSkill then
+                local isTrainActive = Config.AutoTrainSkill
+                if isTrainActive and Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
+                    isTrainActive = (PriorityManager.GetActiveTask() == "TrainSkill")
+                end
+
+                if isTrainActive then
                     if not isTrainingBusy then
                         isTrainingBusy = true
                         task.spawn(function()
@@ -11307,6 +11572,15 @@ task.spawn(function()
         task.wait(2.0)
         if (Config.AutoChatSecretBoss or Config.AutoHuntBoss) and isRunning then
             pcall(function()
+                -- KIỂM TRA PHÂN CẤP ĐỘ ƯU TIÊN (PRIORITY MANAGER)
+                if Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
+                    local curTask = PriorityManager.GetActiveTask()
+                    local bossPri = PriorityManager.GetTaskPriority("SecretBoss")
+                    if curTask ~= "None" and curTask ~= "SecretBoss" and PriorityManager.GetTaskPriority(curTask) < bossPri then
+                        return
+                    end
+                end
+
                 -- 1. Ưu tiên quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
                 local wIsland, wName = secretBossState.DetectWeather()
                 local isWeatherClear = (wIsland == nil) or (wName == "Clear")
