@@ -9892,34 +9892,36 @@ function comboState.CastSkill(sk)
     -- 🛑 KHÓA BẢO VỆ CẤP CAO CHO CHIÊU C: Nếu không có tab nào chọn C, cấm 100% việc cast chiêu C!
     if cleanKey == "C" then
         local userChoseC = false
-        -- TUYỆT ĐỐI KHÔNG dùng Config.LoopSkills để cấp phép cho C vì preset/dữ liệu cũ có thể chứa C
         if Config.TicketQuickSkill and (Config.TicketQuickSkill:find("C") or Config.TicketQuickSkill:find("c")) then userChoseC = true end
         if Config.TicketSkillKey and (Config.TicketSkillKey:find("C") or Config.TicketSkillKey:find("c")) then userChoseC = true end
         if Config.TrainSkill and (Config.TrainSkill:find("C") or Config.TrainSkill:find("c")) then userChoseC = true end
         if Config.QuickCatchSkill == "C" or Config.OpenerSkill == "C" or Config.EmergencyHealSkill == "C" then userChoseC = true end
+        -- Cho phép C nếu người chơi cài đặt C trong LoopSkills và đang bật SmartCombo hoặc AutoSkills
+        if (Config.SmartComboEnabled or Config.AutoSkills) and Config.LoopSkills and (Config.LoopSkills:find("C") or Config.LoopSkills:find("c")) then
+            userChoseC = true
+        end
         if not userChoseC then
             return false -- Chặn đứng 100% việc cast C
         end
     end
 
-    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Khi bật Auto Ticket Quest, CHỈ cho phép cast chiêu vé đã cài đặt!
+    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Khi bật Auto Ticket Quest, CHỈ khóa 1 chiêu cho quest 100 cá & 100 skill!
     if Config.AutoTicketQuest then
-        local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
-        allowedQuick = allowedQuick and allowedQuick:upper() or "V"
-        local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
-        allowedSkill = allowedSkill and allowedSkill:upper() or "Z"
-
         local curQ = ticketQuestState and ticketQuestState.currentQuestType
         if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
             curQ = select(1, ticketQuestState.DetectActiveQuest())
         end
 
         if curQ == "skill_100" then
+            local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+            allowedSkill = allowedSkill and allowedSkill:upper() or "Z"
             if cleanKey ~= allowedSkill then return false end
-        else
-            -- Mặc định là nhiệm vụ 100 cá hoặc lúc chưa xác định xong nhiệm vụ vé
+        elseif curQ == "fish_100" then
+            local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+            allowedQuick = allowedQuick and allowedQuick:upper() or "V"
             if cleanKey ~= allowedQuick then return false end
         end
+        -- Đối với fish_15m hoặc nhiệm vụ khác: TUYỆT ĐỐI KHÔNG CHẶN, cho phép xả combo đầy đủ theo cài đặt người chơi!
     else
         -- KHÓA BẢO VỆ CHẶN CHIÊU SAI KHI KHÔNG BẬT AUTO TICKET QUEST NHƯNG ĐANG CÓ QUEST VÉ
         local curQ = ticketQuestState and ticketQuestState.currentQuestType
@@ -10395,7 +10397,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             isTrainingBusy = false
                         end)
                     end
-                elseif (Config.AutoTicketQuest or hasActiveTicket) and hasActiveTicket then
+                elseif (Config.AutoTicketQuest or hasActiveTicket) and hasActiveTicket and (ticketQuestState.currentQuestType == "bait_100" or ticketQuestState.currentQuestType == "skill_100" or ticketQuestState.currentQuestType == "fish_100") then
                     local qType = ticketQuestState.currentQuestType
                     if qType == "bait_100" then
                         if not ticketQuestState.isBusyRoutine then
@@ -10596,20 +10598,13 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 ticketQuestState.isBusyRoutine = false
                             end)
                         end
-                    elseif qType == "fish_15m" and fUI and fUI.Visible then
-                        local barFrame = fUI:FindFirstChild("BarFrame")
-                        if barFrame and barFrame:FindFirstChild("Bar") then
-                            barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
-                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                        end
-                        if Events and Events:FindFirstChild("Slam") then Events.Slam:FireServer("Perfect") end
-                        if Events and Events:FindFirstChild("Charge") then Events.Charge:FireServer(100) end
-                        if Events and Events:FindFirstChild("UpdateFishProgression") then Events.UpdateFishProgression:FireServer() end
                     end
                 elseif fUI and fUI.Visible then
+                    local is15mQuest = (Config.AutoTicketQuest or hasActiveTicket) and ticketQuestState and ticketQuestState.currentQuestType == "fish_15m"
+
                     -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
                     local isHomeFishing = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot and Config.TicketAutoCastAtHome
-                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss or isHomeFishing) then
+                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss or isHomeFishing or is15mQuest) then
                         local barFrame = fUI:FindFirstChild("BarFrame")
                         if barFrame and barFrame:FindFirstChild("Bar") then
                             barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
@@ -10617,26 +10612,26 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                     end
 
-                    if Config.AutoSlam and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
+                    if (Config.AutoSlam or is15mQuest) and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
                         if Events:FindFirstChild("Slam") then
-                            Events.Slam:FireServer()
+                            Events.Slam:FireServer("Perfect")
                         end
                     end
 
-                    if Config.AutoCharge and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
+                    if (Config.AutoCharge or is15mQuest) and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
                         if Events:FindFirstChild("Charge") then
-                            Events.Charge:FireServer()
+                            Events.Charge:FireServer(100)
                         end
                     end
 
-                    if Config.AnchorBar and (now - lastProgressionTime >= 0.08) then
+                    if (Config.AnchorBar or is15mQuest) and (now - lastProgressionTime >= 0.08) then
                         if Events and Events:FindFirstChild("UpdateFishProgression") then
                             Events.UpdateFishProgression:FireServer()
                         end
                         lastProgressionTime = now
                     end
 
-                    if Config.SmartComboEnabled and (now - lastSkillTime >= 0.1) then
+                    if (Config.SmartComboEnabled or is15mQuest) and (now - lastSkillTime >= 0.1) then
                         lastSkillTime = now
 
                         -- 1. KIỂM TRA NHỊP CHỜ RA CHIÊU & HOẠT ẢNH NHÂN VẬT (Chống nuốt chiêu & kẹt combo)
@@ -10676,7 +10671,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 elseif curQ == "skill_100" then
                                     local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, sk and sk:upper() or "Z")
-                                elseif Config.AutoTicketQuest then
+                                elseif Config.AutoTicketQuest and curQ ~= "fish_15m" then
                                     local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, qk and qk:upper() or "V")
                                 end
@@ -10734,7 +10729,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             end
                         end
                         lastSkillTime = now
-                    elseif Config.AutoSkills and (now - lastSkillTime >= 0.15) then
+                    elseif (Config.AutoSkills or is15mQuest) and (now - lastSkillTime >= 0.15) then
                         local curQ = ticketQuestState and ticketQuestState.currentQuestType
                         if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
                             curQ = select(1, ticketQuestState.DetectActiveQuest())
@@ -10746,7 +10741,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         elseif curQ == "skill_100" then
                             local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                             comboState.CastSkill(sk and sk:upper() or "Z")
-                        elseif Config.AutoTicketQuest then
+                        elseif Config.AutoTicketQuest and curQ ~= "fish_15m" then
                             local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                             comboState.CastSkill(qk and qk:upper() or "V")
                         else
