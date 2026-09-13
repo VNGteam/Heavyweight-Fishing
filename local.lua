@@ -4402,6 +4402,7 @@ end
 
 ticketQuestState.cachedNPCModel = nil
 ticketQuestState.cachedNPCPos = nil
+ticketQuestState.cachedNPCCFrame = nil
 ticketQuestState.cachedNPCPrompt = nil
 ticketQuestState.lastNPCSearch = 0
 
@@ -4415,14 +4416,27 @@ end
 
 function ticketQuestState.FindTicketNPC()
     if ticketQuestState.cachedNPCModel and ticketQuestState.cachedNPCModel.Parent and ticketQuestState.cachedNPCPos then
-        return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt
+        return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt, ticketQuestState.cachedNPCCFrame
     end
 
     local now = tick()
     if now - (ticketQuestState.lastNPCSearch or 0) < 5.0 and ticketQuestState.cachedNPCPos then
-        return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt
+        return ticketQuestState.cachedNPCModel, ticketQuestState.cachedNPCPos, ticketQuestState.cachedNPCPrompt, ticketQuestState.cachedNPCCFrame
     end
     ticketQuestState.lastNPCSearch = now
+
+    local function extractModelData(model)
+        if not model then return nil, nil, nil end
+        local p = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+        local hrp = (p and p.Parent:IsA("BasePart") and p.Parent)
+            or model:FindFirstChild("HumanoidRootPart")
+            or model:FindFirstChild("Torso")
+            or model:FindFirstChild("UpperTorso")
+            or model.PrimaryPart
+            or model:FindFirstChildWhichIsA("BasePart")
+        local cf = (hrp and hrp.CFrame) or (model:IsA("Model") and model:GetPivot()) or model.CFrame
+        return cf, p, hrp
+    end
 
     -- 1. Ưu tiên tìm đúng cấu trúc từ Explorer export: Workspace.NPC.Function["Ticket Quest Giver"]
     local directModel = nil
@@ -4452,13 +4466,15 @@ function ticketQuestState.FindTicketNPC()
     end
 
     if directModel then
-        local cf = directModel:IsA("Model") and directModel:GetPivot() or directModel.CFrame
-        local p = directModel:FindFirstChildWhichIsA("ProximityPrompt", true)
-        ticketQuestState.cachedNPCModel = directModel
-        ticketQuestState.cachedNPCPos = cf.Position
-        ticketQuestState.cachedNPCPrompt = p
-        ticketQuestState.spotNPC = cf.Position
-        return directModel, cf.Position, p
+        local cf, p = extractModelData(directModel)
+        if cf then
+            ticketQuestState.cachedNPCModel = directModel
+            ticketQuestState.cachedNPCPos = cf.Position
+            ticketQuestState.cachedNPCCFrame = cf
+            ticketQuestState.cachedNPCPrompt = p
+            ticketQuestState.spotNPC = cf.Position
+            return directModel, cf.Position, p, cf
+        end
     end
 
     -- 2. Tìm trong các folder NPC / Spawns / Entities
@@ -4468,13 +4484,15 @@ function ticketQuestState.FindTicketNPC()
             for _, inst in ipairs(folder:GetChildren()) do
                 local n = inst.Name:lower()
                 if n:find("ticket") or n:find("giver") then
-                    local cf = inst:IsA("Model") and inst:GetPivot() or inst.CFrame
-                    local p = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    ticketQuestState.cachedNPCModel = inst
-                    ticketQuestState.cachedNPCPos = cf.Position
-                    ticketQuestState.cachedNPCPrompt = p
-                    ticketQuestState.spotNPC = cf.Position
-                    return inst, cf.Position, p
+                    local cf, p = extractModelData(inst)
+                    if cf then
+                        ticketQuestState.cachedNPCModel = inst
+                        ticketQuestState.cachedNPCPos = cf.Position
+                        ticketQuestState.cachedNPCCFrame = cf
+                        ticketQuestState.cachedNPCPrompt = p
+                        ticketQuestState.spotNPC = cf.Position
+                        return inst, cf.Position, p, cf
+                    end
                 end
             end
         end
@@ -4485,18 +4503,20 @@ function ticketQuestState.FindTicketNPC()
         if inst:IsA("Model") then
             local n = inst.Name:lower()
             if n:find("ticket") and (n:find("quest") or n:find("giver") or n:find("npc")) then
-                local cf = inst:GetPivot()
-                local p = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
-                ticketQuestState.cachedNPCModel = inst
-                ticketQuestState.cachedNPCPos = cf.Position
-                ticketQuestState.cachedNPCPrompt = p
-                ticketQuestState.spotNPC = cf.Position
-                return inst, cf.Position, p
+                local cf, p = extractModelData(inst)
+                if cf then
+                    ticketQuestState.cachedNPCModel = inst
+                    ticketQuestState.cachedNPCPos = cf.Position
+                    ticketQuestState.cachedNPCCFrame = cf
+                    ticketQuestState.cachedNPCPrompt = p
+                    ticketQuestState.spotNPC = cf.Position
+                    return inst, cf.Position, p, cf
+                end
             end
         end
     end
 
-    return nil, ticketQuestState.spotNPC, nil
+    return nil, ticketQuestState.spotNPC, nil, nil
 end
 
 function ticketQuestState.CheckNPCReady()
@@ -4555,6 +4575,100 @@ function ticketQuestState.TeleportTo(target)
         root.CFrame = targetCf
         task.wait(0.12)
     end
+end
+
+function ticketQuestState.OrientCameraTo(focusPos, standPos)
+    local cam = Workspace.CurrentCamera or Camera
+    if not cam or not focusPos then return end
+    pcall(function()
+        local dir = standPos and (standPos - focusPos) or -cam.CFrame.LookVector
+        local dir2D = Vector3.new(dir.X, 0, dir.Z)
+        if dir2D.Magnitude < 0.1 then
+            dir2D = Vector3.new(0, 0, 1)
+        else
+            dir2D = dir2D.Unit
+        end
+        local refPos = standPos or (focusPos + dir2D * 3.0)
+        -- Đặt camera ở phía sau lưng nhân vật 4.5 studs, cao 2.2 studs, nhìn trực diện vào ngực/đầu NPC
+        local camPos = refPos + (dir2D * 4.5) + Vector3.new(0, 2.2, 0)
+        local camFocus = focusPos + Vector3.new(0, 0.8, 0)
+        cam.CameraType = Enum.CameraType.Custom
+        cam.CFrame = CFrame.lookAt(camPos, camFocus)
+        cam.Focus = CFrame.new(camFocus)
+    end)
+end
+
+function ticketQuestState.TeleportToNPC()
+    local npcModel, npcPos, prompt, npcCFrame = ticketQuestState.FindTicketNPC()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function()
+            hum.Sit = false
+            hum:UnequipTools()
+        end)
+    end
+    if Events and Events:FindFirstChild("CancelCast") then
+        pcall(function() Events.CancelCast:FireServer() end)
+    end
+
+    local promptFound = prompt
+    if not promptFound and npcModel then
+        promptFound = npcModel:FindFirstChildWhichIsA("ProximityPrompt", true)
+    end
+
+    local focusPos, standPos, targetCF = nil, nil, nil
+
+    if npcCFrame then
+        focusPos = npcCFrame.Position
+        local fwd = npcCFrame.LookVector
+        local fwd2D = Vector3.new(fwd.X, 0, fwd.Z)
+        if fwd2D.Magnitude > 0.05 then
+            fwd2D = fwd2D.Unit
+        else
+            fwd2D = Vector3.new(0, 0, 1)
+        end
+        standPos = focusPos + (fwd2D * 2.8)
+        standPos = Vector3.new(standPos.X, focusPos.Y, standPos.Z)
+        targetCF = CFrame.lookAt(standPos, Vector3.new(focusPos.X, standPos.Y, focusPos.Z))
+    elseif typeof(ticketQuestState.spotNPC) == "CFrame" then
+        targetCF = ticketQuestState.spotNPC
+        standPos = targetCF.Position
+        focusPos = standPos + (targetCF.LookVector * 2.8)
+    elseif npcPos or ticketQuestState.spotNPC then
+        local rawPos = npcPos or (typeof(ticketQuestState.spotNPC) == "Vector3" and ticketQuestState.spotNPC) or (ticketQuestState.spotNPC and ticketQuestState.spotNPC.Position)
+        if rawPos then
+            focusPos = rawPos
+            standPos = focusPos + Vector3.new(0, 0, 2.8)
+            targetCF = CFrame.lookAt(standPos, focusPos)
+        end
+    end
+
+    if root and targetCF and standPos then
+        local dist = (root.Position - standPos).Magnitude
+        if dist > 3.0 then
+            ticketQuestState.TeleportTo(targetCF)
+            task.wait(0.25)
+        else
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = targetCF
+            task.wait(0.08)
+        end
+
+        -- Căn chỉnh góc nhìn Camera nhìn thẳng vào NPC và bảng Prompt
+        ticketQuestState.OrientCameraTo(focusPos, standPos)
+    end
+
+    if promptFound then
+        pcall(function()
+            promptFound.RequiresLineOfSight = false
+            promptFound.MaxActivationDistance = math.max(promptFound.MaxActivationDistance or 10, 35)
+            promptFound.Enabled = true
+        end)
+    end
+
+    return npcModel, focusPos or npcPos, promptFound, standPos
 end
 
 -- Hàm lấy Frame hội thoại của game (PlayerGui.MainGui.Menu.Dialogue)
@@ -4873,55 +4987,31 @@ function ticketQuestState.InteractNPC(isClaiming)
             return false
         end
 
-        -- 2. Di chuyển trực tiếp đến NPC nếu đang ở xa
-        local npcModel, npcPos, prompt = ticketQuestState.FindTicketNPC()
-        local targetPos = npcPos or ticketQuestState.spotNPC
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-
-        if hum then
-            pcall(function()
-                hum.Sit = false
-                hum:UnequipTools()
-            end)
-        end
-        if Events and Events:FindFirstChild("CancelCast") then
-            pcall(function() Events.CancelCast:FireServer() end)
-        end
-
-        if root and targetPos then
-            local dist = (root.Position - targetPos).Magnitude
-            if dist > 6 then
-                local npcRot = (npcModel and npcModel:IsA("Model") and npcModel:GetPivot()) or (npcModel and npcModel:IsA("BasePart") and npcModel.CFrame)
-                local frontPos = targetPos + Vector3.new(0, 1.5, 0)
-                if npcRot then
-                    frontPos = targetPos + (npcRot.LookVector * 3.2) + Vector3.new(0, 1.2, 0)
-                end
-                ticketQuestState.TeleportTo(CFrame.lookAt(frontPos, targetPos))
-                task.wait(0.35)
-            end
-        end
+        -- 2. Di chuyển trực diện đến NPC & căn chỉnh góc nhìn camera thẳng vào NPC
+        local npcModel, focusPos, promptFound, standPos = ticketQuestState.TeleportToNPC()
 
         -- 3. Chỉ kích hoạt Prompt hoặc bấm E khi bảng thoại CHƯA MỞ
-        local promptFound = prompt
         if not promptFound and npcModel then
             promptFound = npcModel:FindFirstChildWhichIsA("ProximityPrompt", true)
         end
-        if not promptFound then
-            local _, _, freshPrompt = ticketQuestState.FindTicketNPC()
-            promptFound = freshPrompt
-        end
-        if not promptFound and targetPos then
+        if not promptFound and focusPos then
             for _, p in ipairs(Workspace:GetDescendants()) do
                 if p:IsA("ProximityPrompt") then
                     local pPos = (p.Parent:IsA("BasePart") and p.Parent.Position) or (p.Parent:IsA("Model") and p.Parent:GetPivot().Position)
-                    if pPos and (pPos - targetPos).Magnitude <= 18 then
+                    if pPos and (pPos - focusPos).Magnitude <= 18 then
                         promptFound = p
                         break
                     end
                 end
             end
+        end
+
+        if promptFound then
+            pcall(function()
+                promptFound.RequiresLineOfSight = false
+                promptFound.MaxActivationDistance = math.max(promptFound.MaxActivationDistance or 10, 35)
+                promptFound.Enabled = true
+            end)
         end
 
         if not ticketQuestState.IsDialogueOpen() then
@@ -4939,7 +5029,7 @@ function ticketQuestState.InteractNPC(isClaiming)
                 end
             end)
 
-            -- Click TextButton trên GUI ProximityPrompts nếu có
+            -- Click TextButton trên GUI ProximityPrompts nếu có (Mobile UI)
             pcall(function()
                 local pg = LocalPlayer:FindFirstChild("PlayerGui")
                 local pPrompts = pg and pg:FindFirstChild("ProximityPrompts")
@@ -4965,9 +5055,14 @@ function ticketQuestState.InteractNPC(isClaiming)
                     break
                 end
             else
-                if (tick() - t0) > 1.6 and not retryTriggered and promptFound then
+                if (tick() - t0) > 1.2 and not retryTriggered then
                     retryTriggered = true
-                    TriggerPrompt(promptFound)
+                    if focusPos and standPos then
+                        ticketQuestState.OrientCameraTo(focusPos, standPos)
+                    end
+                    if promptFound then
+                        TriggerPrompt(promptFound)
+                    end
                     pcall(function()
                         local vim = game:GetService("VirtualInputManager")
                         if vim then
@@ -8015,14 +8110,13 @@ createButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Vị Trí NPC", "
         ShowNotification("Vị Trí NPC", string.format("Đã lưu vị trí & hướng nhìn NPC Ticket Quest: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS")
     end
 end)
-createButtonRow(spotCard, "Tìm & Bay Đến NPC Ticket Quest", "Tự động quét và bay thẳng đến NPC Ticket Quest", "Bay Đến NPC", function()
-    local npcModel, npcPos = ticketQuestState.FindTicketNPC()
-    if npcPos then
-        ticketQuestState.spotNPC = npcPos
-        ticketQuestState.TeleportTo(npcPos)
+createButtonRow(spotCard, "Tìm & Bay Đến NPC Ticket Quest", "Tự động quét, xoay góc nhìn và bay thẳng đến NPC Ticket Quest", "Bay Đến NPC", function()
+    local npcModel, focusPos, prompt = ticketQuestState.TeleportToNPC()
+    if focusPos then
+        ticketQuestState.spotNPC = focusPos
         ticketQuestState.SaveSpots()
         ticketQuestState.UpdateUI()
-        ShowNotification("Dịch Chuyển", "Đã tìm thấy và bay đến NPC Ticket Quest!", "SUCCESS")
+        ShowNotification("Dịch Chuyển", "Đã tìm thấy, căn góc nhìn chuẩn và bay đến NPC Ticket Quest!", "SUCCESS")
     else
         ticketQuestState.TeleportTo(ticketQuestState.spotNPC)
         ShowNotification("Dịch Chuyển", "Đã bay đến tọa độ lưu của NPC Ticket Quest!", "SUCCESS")
