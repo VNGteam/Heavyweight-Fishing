@@ -5300,7 +5300,14 @@ function ticketQuestState.DetectActiveQuest()
                                 local subLower = subTxt:lower()
 
                                 local sc, sm = subTxt:match("(%d+)%s*/%s*(%d+)")
-                                if sc and sm then
+                                -- Bỏ qua nếu text này là hội thoại NPC báo cooldown ("come back in", "sorting out", "minutes")
+                                local isNpcCooldownMsg = subLower:find("come back") or subLower:find("sorting out") 
+                                    or subLower:find("still busy") or subLower:find("not ready")
+                                    or subLower:find("minute") or subLower:find("hãy quay lại")
+                                    or subLower:find("chưa sẵn sàng") or subLower:find("quản lý")
+                                if isNpcCooldownMsg then
+                                    -- Đây là thông báo NPC cooldown, bỏ qua hoàn toàn
+                                elseif sc and sm then
                                     detectedCur = tonumber(sc) or 0
                                     detectedMax = tonumber(sm) or 0
 
@@ -5346,6 +5353,11 @@ function ticketQuestState.DetectActiveQuest()
 
                         if detectedMax > 0 and detectedCur >= detectedMax then
                             isDone = true
+                        end
+
+                        -- BẢO VỆ: Nếu cooldown server còn > 5 giây VÀ tiến độ = 0 -> dữ liệu cũ / NPC chưa ready
+                        if detectedCooldownSec and detectedCooldownSec > 5 and detectedCur == 0 and not isDone then
+                            return nil, nil, 0, 0, false, detectedCooldownSec
                         end
 
                         return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
