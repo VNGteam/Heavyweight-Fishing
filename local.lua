@@ -188,7 +188,6 @@ local Config = {
         ["Draconic Koi"] = true,
         ["Sanguine Fish"] = true,
         ["Primordial Kunfish Overlord"] = true,
-        ["Warbringer Shark"] = true,
         ["Mountain Fish"] = true,
         ["Octoparasitic Fish"] = true,
     },
@@ -1766,7 +1765,7 @@ local secretBossDatabase = {
         weather = "Boss Realm",
         patterns = {"battlefield", "chiến trường", "chien truong", "đảo 9", "dao 9"},
         weatherPatterns = {"boss realm", "realm"},
-        bossPatterns = {"primordial kunfish", "kunfish overlord", "kunfish", "warbringer shark", "warbringer"},
+        bossPatterns = {"primordial kunfish", "kunfish overlord", "kunfish"},
         pos = Vector3.new(1365.5, 8.9, 270.4),
         lookAt = Vector3.new(1316.1, 8.9, 262.6),
         spots = {
@@ -1777,7 +1776,6 @@ local secretBossDatabase = {
         },
         bosses = {
             {name = "Primordial Kunfish Overlord", reward = "+30 Gems"},
-            {name = "Warbringer Shark", reward = "+25 Gems"},
         }
     },
     {
@@ -1834,8 +1832,6 @@ secretBossLookup["tigerfang whale"] = "Tigerfang Whale"
 secretBossLookup["tiger fang whale"] = "Tigerfang Whale"
 secretBossLookup["primordial kunfish overlord"] = "Primordial Kunfish Overlord"
 secretBossLookup["primordial kun fish overlord"] = "Primordial Kunfish Overlord"
-secretBossLookup["warbringer shark"] = "Warbringer Shark"
-secretBossLookup["war bringer shark"] = "Warbringer Shark"
 
 local Wiki = {
     craftMaterialFish = {
