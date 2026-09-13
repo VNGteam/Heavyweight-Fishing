@@ -37,7 +37,11 @@ end)
 local ok, content = FetchScript(SCRIPT_URL)
 if ok and content and #content > 0 then
     local runOk, runErr = pcall(function()
-        loadstring(content)()
+        local fn, compileErr = loadstring(content)
+        if not fn then
+            error("Lỗi biên dịch: " .. tostring(compileErr))
+        end
+        fn()
     end)
     if not runOk then
         warn("[Identical Loader] Lỗi thực thi script:", runErr)

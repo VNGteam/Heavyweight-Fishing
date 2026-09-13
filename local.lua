@@ -7485,6 +7485,7 @@ local function ExportAllPlayerSkills(infoRow, ownedOnly)
     return #skillList
 end
 
+do
 createCategoryHeader(tabFishing, "Tự Động Trang Bị Tối Ưu")
 local equipCard = createCardGroup(tabFishing)
 
@@ -7597,7 +7598,9 @@ createToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá qu�
 createDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName, function(v) Config.FavouriteFishName = v end)
 createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
 createToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
+end
 
+do
 createCategoryHeader(tabBoss, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)")
 local totemCard = createCardGroup(tabBoss)
 
@@ -7621,6 +7624,7 @@ for _, t in ipairs(weatherTotems) do
             end)
         end
     end)
+end
 end
 
 (function()
@@ -8056,6 +8060,7 @@ end
 -- ====================================================================
 -- SECTION: CẦN CÂU CẦN RÁP (Rod Crafting Guide + Quick Filter)
 -- ====================================================================
+do
 createCategoryHeader(tabBoss, "🎣 Cần Câu Cần Ráp (Rod Crafting Guide)")
 local rodGuideCard = createCardGroup(tabBoss)
 
@@ -8186,6 +8191,7 @@ createButtonRow(rodGuideCard, "Bật Lại Tất Cả Secret Boss", "Bật lại
     SaveBossTargets()
     ShowNotification("Đã Bật Hết", "Đã bật lại toàn bộ secret boss!", "SUCCESS")
 end)
+end
 
 createCategoryHeader(tabBoss, "Đấu Trường Boss Enzo")
 local bossFarmCard = createCardGroup(tabBoss)
@@ -9202,6 +9208,7 @@ createInputRow(dailyCard, "Nhập Mã Code Thủ Công", "Gõ mã giftcode riên
 end)
 end
 
+do
 createCategoryHeader(tabShop, "Chế Tạo & Mua Mồi Câu")
 local baitCard = createCardGroup(tabShop)
 
@@ -9281,6 +9288,7 @@ local gachaCard = createCardGroup(tabShop)
 createDropdownRow(gachaCard, "Chọn Vòng Quay Gacha", "Vòng quay muốn rút thưởng", {"Taiji Banner", "Egoless Banner"}, Config.GachaBanner, function(v) Config.GachaBanner = v end)
 createSliderRow(gachaCard, "Số Vé Mỗi Lần Quay", "Số lượng vé dùng cho mỗi lượt rút thưởng", 1, 10, Config.GachaPullsPerAction, false, "", function(v) Config.GachaPullsPerAction = v end)
 createToggleRow(gachaCard, "Vòng Quay May Mắn (Auto Gacha)", "Tự động rút thưởng liên tục từ banner đã chọn", Config.AutoGacha, function(v) Config.AutoGacha = v end)
+end
 
 createCategoryHeader(tabShop, "Danh Sách Cần Câu (Xếp Theo Giá)")
 local rodShopCard = createCardGroup(tabShop)
@@ -9576,6 +9584,7 @@ for _, isl in ipairs(islands) do
     updateVisuals(GetCurrentLocationName())
 end
 
+do
 createCategoryHeader(tabTeleports, "Đấu Trường Boss & Vùng Đất Bí Mật")
 local bossRealmCard = createCardGroup(tabTeleports)
 
@@ -9642,6 +9651,7 @@ for _, sr in ipairs(secretRods) do
             ShowNotification("Cần Bí Mật", "Đã bay đến " .. sr.name .. "!", "SUCCESS")
         end
     end)
+end
 end
 
 createCategoryHeader(tabTeleports, "👥 Dịch Chuyển Đến Người Chơi Trong Map")
@@ -9766,6 +9776,7 @@ end
 -- ============================================================
 -- SECTION: DỊCH CHUYỂN ĐẾN NPC NHIỆM VỤ
 -- ============================================================
+do
 createCategoryHeader(tabTeleports, "🧙 Dịch Chuyển Đến NPC Nhiệm Vụ")
 local npcTeleCard = createCardGroup(tabTeleports)
 
@@ -9835,6 +9846,7 @@ for _, npc in ipairs(questNPCList) do
             ShowNotification("❌ Không Tìm Thấy", "NPC '" .. npc.name .. "' không có trong map lúc này. Có thể chưa spawn hoặc đang ở đảo khác.", "WARN", 5)
         end
     )
+end
 end
 
 do
