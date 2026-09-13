@@ -10108,21 +10108,18 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
                                 pcall(function()
-                                    -- 1. Lấy danh sách chuỗi combo mà người chơi đã cài (VD: "Z, X, V")
+                                    -- 1. Ưu tiên số 1: Dùng đúng chiêu TicketSkillKey đã cài đặt cho nhiệm vụ 100 Skill (VD: "Chiêu Z")
                                     local comboList = {}
-                                    if Config.LoopSkills and Config.LoopSkills ~= "" then
+                                    local skillKey = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
+                                    if skillKey then
+                                        table.insert(comboList, skillKey:upper())
+                                    elseif Config.LoopSkills and Config.LoopSkills ~= "" then
                                         for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
                                             table.insert(comboList, k:upper())
                                         end
                                     end
                                     if #comboList == 0 then
-                                        local fallback = Config.TicketSkillKey or Config.TrainSkill or "Z"
-                                        for k in string.gmatch(fallback, "([ZXCVzxcv])") do
-                                            table.insert(comboList, k:upper())
-                                        end
-                                    end
-                                    if #comboList == 0 then
-                                        comboList = {"Z", "X", "V"}
+                                        comboList = {"Z"}
                                     end
 
                                     -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
@@ -10196,21 +10193,18 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
                                 pcall(function()
-                                    -- 1. Lấy danh sách chuỗi combo mà người chơi đã cài (VD: "Z, X, V")
+                                    -- 1. Ưu tiên số 1: Dùng đúng chiêu TicketQuickSkill đã cài đặt cho nhiệm vụ 100 Cá (VD: "Chiêu V")
                                     local comboList = {}
-                                    if Config.LoopSkills and Config.LoopSkills ~= "" then
+                                    local quickKey = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
+                                    if quickKey then
+                                        table.insert(comboList, quickKey:upper())
+                                    elseif Config.LoopSkills and Config.LoopSkills ~= "" then
                                         for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
                                             table.insert(comboList, k:upper())
                                         end
                                     end
                                     if #comboList == 0 then
-                                        local fallback = Config.TicketQuickSkill or Config.TicketSkillKey or Config.TrainSkill or "V"
-                                        for k in string.gmatch(fallback, "([ZXCVzxcv])") do
-                                            table.insert(comboList, k:upper())
-                                        end
-                                    end
-                                    if #comboList == 0 then
-                                        comboList = {"Z", "X", "V"}
+                                        comboList = {"V"}
                                     end
 
                                     -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
@@ -10349,8 +10343,15 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             if not didHeal then
                                 -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU COMBO (VD: Z -> X -> V...)
                                 local loopKeys = {}
-                                for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
-                                    table.insert(loopKeys, k:upper())
+                                local isTicketFish100 = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.active and not ticketQuestState.isCooldown and ticketQuestState.currentQuestType == "fish_100"
+                                if isTicketFish100 and Config.TicketQuickSkill then
+                                    local qk = Config.TicketQuickSkill:match("([ZXCVzxcv])")
+                                    if qk then table.insert(loopKeys, qk:upper()) end
+                                end
+                                if #loopKeys == 0 then
+                                    for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
+                                        table.insert(loopKeys, k:upper())
+                                    end
                                 end
 
                                 if #loopKeys > 0 then
