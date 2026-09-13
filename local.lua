@@ -258,6 +258,16 @@ local Config = {
     AutoExecuteOnJoin = false,
     AutoProtectMutations = true,
     AcidWaterShield = false,
+    
+    -- Cài đặt Tab Thử Nghiệm (Experimental)
+    GhostInvisibility = false,
+    AutoRerollTrait = false,
+    TargetTraitName = "Azure Dragon",
+    SelectedBoat = "Boat",
+    SelectedRodColor = "Vàng Kim (Gold)",
+    RainbowRodColor = false,
+    SelectedExchangeItem = "Trait Reroll",
+    ExchangeAmount = 1,
     ShowFishWeightRing = false,
     WebhookEnabled = false,
     WebhookUrl = "",
@@ -1749,25 +1759,40 @@ end
 
 local Wiki = {
     craftMaterialFish = {
-        ["Mountain Fish"] = true,
-        ["Catfish"] = true,
-        ["Crimson Catfish"] = true,
-        ["Scarlet Fish"] = true,
-        ["Elder Scarlet Fish"] = true,
-        ["Octoparasitic Fish"] = true,
-        ["Tiger Mirefish"] = true,
-        ["Mirage Lanternfish"] = true,
-        ["Golden Guardian Fish"] = true,
-        ["Frost Kingfish"] = true,
-        ["Frost Queenfish"] = true,
-        ["Rainbow Dragonfish"] = true,
-        ["Sanguine Fish"] = true,
-        ["Verdant Bonefang"] = true,
-        ["Verdant Alligator Gar"] = true,
-        ["Draconic Koi"] = true,
-        ["Heaven Piercer Turtle"] = true,
-        ["Flying Fish Empress"] = true,
-        ["Flying Fish Emperor"] = true,
+        -- Nguyên liệu chế Cần Heavenpiercer Rod
+        ["Flying Fish Emperor"] = "Cần Heavenpiercer Rod",
+        ["Flying Fish Empress"] = "Cần Heavenpiercer Rod",
+        ["Heavenpiercer Turtle"] = "Cần Heavenpiercer & Mồi Rainbow",
+        ["Heaven Piercer Turtle"] = "Cần Heavenpiercer & Mồi Rainbow",
+        ["Rainbow Dragonfish"] = "Cần Heavenpiercer & Trả Quest",
+        -- Nguyên liệu chế Cần Pure Diamond Rod
+        ["Frost Kingfish"] = "Cần Pure Diamond & Mồi Frost",
+        ["Frost Queenfish"] = "Cần Pure Diamond Rod",
+        ["Sanguine Fish"] = "Cần Pure Diamond Rod",
+        ["Draconic Koi"] = "Cần Pure Diamond Rod",
+        -- Nguyên liệu chế Cần Sacred Bamboo Rod
+        ["Nameless Octoparasite"] = "Cần Sacred Bamboo & Trả Quest",
+        ["Reborn Puffer Beast"] = "Cần Sacred Bamboo & Trả Quest",
+        ["Ascended Perch"] = "Cần Sacred Bamboo & Mồi Frost",
+        ["Mountain Fish"] = "Cần Sacred Bamboo & Mồi Nameless",
+        -- Nguyên liệu chế Mồi Nameless Bait
+        ["Tiger Mirefish"] = "Mồi Nameless Bait",
+        ["Mirage Lanternfish"] = "Mồi Nameless Bait",
+        ["Octoparasitic Fish"] = "Mồi Nameless Bait (Gọi Boss Bạch Tuộc)",
+        -- Nguyên liệu chế Mồi Rainbow Bait
+        ["Colossal Tigerfish"] = "Mồi Rainbow Bait & Boss",
+        ["Golden Guardian Fish"] = "Mồi Rainbow Bait",
+        ["Crimson Electric Eel"] = "Mồi Rainbow Bait",
+        -- Nguyên liệu chế Mồi Frost Bait
+        ["Primordial Kunfish Overlord"] = "Mồi Frost Bait & Boss Realm",
+        ["Warbringer Shark"] = "Mồi Frost Bait & Boss Realm",
+        -- Nguyên liệu chế tạo khác & cá quý
+        ["Catfish"] = "Nguyên liệu chế tạo cơ bản",
+        ["Crimson Catfish"] = "Nguyên liệu đúc Cần Huyết Long",
+        ["Scarlet Fish"] = "Nguyên liệu chế Cần Huyết Long",
+        ["Elder Scarlet Fish"] = "Nguyên liệu Cần Huyết Long",
+        ["Verdant Bonefang"] = "Nguyên liệu & Boss Mưa",
+        ["Verdant Alligator Gar"] = "Nguyên liệu & Boss Mưa",
     },
     rarityColors = {
         ["Mythic"]    = Color3.fromRGB(248, 113, 113),  -- Đỏ neon Thần Thoại
@@ -1778,89 +1803,185 @@ local Wiki = {
         ["Common"]    = Color3.fromRGB(168, 150, 200),  -- Xám bạc Phổ Thông
     },
     wikiFishData = {
-        -- 1. Thần Thoại (Mythic) & Secret Boss
-        {name = "Primordial Kunfish Overlord", rarity = "Mythic", keep = true, use = "💎 +30 Gems • Vũ khí Thần Thoại • Boss Realm • BẢO VỆ TUYỆT ĐỐI", origin = "Đấu Trường Boss Realm", icon = "rbxassetid://10709791437"},
-        {name = "Warbringer Shark", rarity = "Mythic", keep = true, use = "💎 +25 Gems • Vũ khí Chiến Tranh • Boss Realm • BẢO VỆ TUYỆT ĐỐI", origin = "Đấu Trường Boss Realm", icon = "rbxassetid://10709791437"},
-        {name = "Octoparasitic Fish", rarity = "Mythic", keep = true, use = "💎 +50 Gems • Đổi Cần Thần • Event Nameless Bait • KHÔNG ĐƯỢC BÁN", origin = "Sự Kiện Bạch Tuộc Biển", icon = "rbxassetid://10709791437"},
-        {name = "Mountain Fish", rarity = "Mythic", keep = true, use = "💎 +20 Gems • Rơi Kỹ Năng 5% • Nguyên liệu chế đồ thần • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
-        {name = "Sanguine Fish", rarity = "Mythic", keep = true, use = "💎 +20 Gems • Secret Boss Trời Nắng Gắt • Cực hiếm • KHÔNG BÁN", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Frost Kingfish", rarity = "Mythic", keep = true, use = "💎 +10 Gems • Rơi Bí Kíp Võ Công • Boss Bão Tuyết • KHÔNG BÁN", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Tigerfang Whale", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Rơi Kỹ Năng Đòn Đánh • Boss Sương Mù • KHÔNG BÁN", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Verdant Bonefang", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Rơi Kỹ Năng 5% • Boss Trời Mưa • KHÔNG BÁN", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Crimson Electric Eel", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Luyện Cooldown & Gems • Boss Bão Sấm • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Elder Scarlet Fish", rarity = "Mythic", keep = true, use = "💎 +5 Gems • Nguyên liệu chế Cần Huyết Long • Boss Bão Sấm • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Flying Fish Emperor", rarity = "Mythic", keep = true, use = "💎 +10 Gems • Rơi Kỹ Năng 10% • Boss Trời Gió • KHÔNG BÁN", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Rainbow Dragonfish", rarity = "Mythic", keep = true, use = "💎 Thần Ngư Cực Hiếm • Chế tác Cần Thần Hoàng Kim • KHÔNG BÁN", origin = "Vùng Nước Ngầm Lòng Đất", icon = "rbxassetid://10709791437"},
+        -- 1. THẦN THOẠI (MYTHIC) & SIÊU BOSS (BẢO VỆ TUYỆT ĐỐI)
+        {name = "Primordial Kunfish Overlord", rarity = "Mythic", keep = true, role = "CRAFT_BAIT_BOSS", use = "💎 Thần thú Boss Realm • Nguyên liệu Mồi Frost Bait • +30 Gems • BẢO VỆ", origin = "Đấu Trường Boss Realm", icon = "rbxassetid://10709791437"},
+        {name = "Warbringer Shark", rarity = "Mythic", keep = true, role = "CRAFT_BAIT_BOSS", use = "💎 Thần thú Boss Realm • Nguyên liệu Mồi Frost Bait • +25 Gems • BẢO VỆ", origin = "Đấu Trường Boss Realm", icon = "rbxassetid://10709791437"},
+        {name = "Nameless Octoparasite", rarity = "Mythic", keep = true, role = "CRAFT_ROD_QUEST", use = "💎 Siêu Boss Biển Sâu • Chế Cần Trúc Thánh • Trả Quest Đạo Sĩ (>=7M KG) & Mao Sơn", origin = "Phao Vùng Biển Sâu (Nameless Bait)", icon = "rbxassetid://10709791437"},
+        {name = "Octoparasitic Fish", rarity = "Mythic", keep = true, role = "CRAFT_BAIT", use = "💎 Boss Bạch Tuộc • Nguyên liệu chế Mồi Nameless Bait • +50 Gems • BẢO VỆ", origin = "Phao Vùng Biển Sâu", icon = "rbxassetid://10709791437"},
+        {name = "Rainbow Dragonfish", rarity = "Mythic", keep = true, role = "CRAFT_ROD_QUEST", use = "💎 Thần Ngư Vô Giá • Chế Cần Heavenpiercer Rod • Trả Quest Hạ Diêu Đệ (>=7M KG) & Tiên Nhân (>=6.5M KG)", origin = "Vùng Nước Ngầm Lòng Đất", icon = "rbxassetid://10709791437"},
+        {name = "Mountain Fish", rarity = "Mythic", keep = true, role = "CRAFT_ROD_BAIT", use = "💎 Boss Đỉnh Núi • Chế Cần Trúc Thánh & Mồi Nameless Bait • Rơi Skill 5% • +20 Gems", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
+        {name = "Frost Kingfish", rarity = "Mythic", keep = true, role = "CRAFT_ROD_BAIT", use = "💎 Boss Bão Tuyết • Chế Cần Pure Diamond Rod & Mồi Frost Bait • Rơi Skill • +10 Gems", origin = "Đảo Băng Giá (Trời Bão Tuyết)", icon = "rbxassetid://10709791437"},
+        {name = "Sanguine Fish", rarity = "Mythic", keep = true, role = "CRAFT_ROD", use = "💎 Boss Nắng Gắt • Chế Cần Pure Diamond Rod • Rơi Skill 10% • +20 Gems", origin = "Đảo Hổ Phách (Trời Nắng Gắt)", icon = "rbxassetid://10709791437"},
+        {name = "Flying Fish Emperor", rarity = "Mythic", keep = true, role = "CRAFT_ROD", use = "💎 Boss Trời Gió • Chế Cần Heavenpiercer Rod • Rơi Skill 10% • +10 Gems", origin = "Đảo Cá Chép (Trời Gió)", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Electric Eel", rarity = "Mythic", keep = true, role = "CRAFT_BAIT", use = "💎 Boss Bão Sấm • Nguyên liệu chế Mồi Rainbow Bait • +5 Gems • BẢO VỆ", origin = "Đảo Tre (Trời Bão Sấm)", icon = "rbxassetid://10709791437"},
+        {name = "Elder Scarlet Fish", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Boss Bão Sấm • Chế Cần Huyết Long • +5 Gems • KHÔNG BÁN", origin = "Đảo Tre (Trời Bão Sấm)", icon = "rbxassetid://10709791437"},
+        {name = "Verdant Bonefang", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Boss Trời Mưa • Rơi Kỹ Năng 5% • +5 Gems • BẢO VỆ", origin = "Đảo Phóng Xạ (Trời Mưa)", icon = "rbxassetid://10709791437"},
+        {name = "Tigerfang Whale", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Boss Sương Mù • Rơi Kỹ Năng Đòn Đánh • +5 Gems • BẢO VỆ", origin = "Đảo Quả Dừa (Trời Sương Mù)", icon = "rbxassetid://10709791437"},
+        {name = "Colossal Tigerfish", rarity = "Mythic", keep = true, role = "CRAFT_BAIT_BOSS", use = "💎 Boss Đảo Chiến Trường • Nguyên liệu chế Mồi Rainbow Bait • BẢO VỆ", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Mountain Dragonwhale", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Thần Long Kình • Cá Boss Thần Thoại • Rơi Thần Trang • BẢO VỆ", origin = "Đảo Đỉnh Sương Mù", icon = "rbxassetid://10709791437"},
+        {name = "Radiant Goldfish", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Kim Ngư Phát Sáng • Cá Boss Thần Thoại Cực Hiếm • BẢO VỆ", origin = "Vùng Biển Đặc Biệt", icon = "rbxassetid://10709791437"},
+        {name = "Trueform Jiaolongfish", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Giao Long Chân Thân • Thần Ngư Thần Thoại • BẢO VỆ", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Elder Jiaolong Dragonfish", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Cổ Đại Giao Long • Long Ngư Thần Thoại • BẢO VỆ", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Adult Jiaolong Dragonfish", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Trưởng Thành Giao Long • Long Ngư Quý Hiếm • BẢO VỆ", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Mutated Koi Whale", rarity = "Mythic", keep = true, role = "BOSS", use = "💎 Kình Ngư Biến Dị • Thần Thú Biển Sâu • BẢO VỆ", origin = "Vùng Biển Sâu", icon = "rbxassetid://10709791437"},
 
-        -- 2. Huyền Thoại (Legendary)
-        {name = "Reborn Puffer Beast", rarity = "Legendary", keep = true, use = "💎 +10 Gems • Secret Boss Bão Tuyết • KHÔNG ĐƯỢC BÁN", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Flying Fish Empress", rarity = "Legendary", keep = true, use = "💎 +10 Gems • Rơi Kỹ Năng 10% • Boss Trời Gió • KHÔNG BÁN", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Draconic Koi", rarity = "Legendary", keep = true, use = "💎 +5 Gems • Long Ngư Hổ Phách • Boss Nắng Gắt • KHÔNG BÁN", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Heaven Piercer Turtle", rarity = "Legendary", keep = true, use = "💎 +5 Gems • Thần Quy Xuyên Trời • Boss Sương Mù • KHÔNG BÁN", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Verdant Alligator Gar", rarity = "Legendary", keep = true, use = "💎 +3 Gems • Rơi Kỹ Năng 25% • Boss Trời Mưa • KHÔNG BÁN", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Scarlet Fish", rarity = "Legendary", keep = true, use = "💎 +3 Gems • Chế tạo Cần Huyết Long • Boss Bão Sấm • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Verdant Grouper", rarity = "Legendary", keep = true, use = "💎 +3 Gems • Rơi Kỹ Năng 25% • Boss Trời Mưa • KHÔNG BÁN", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
+        -- 2. HUYỀN THOẠI (LEGENDARY) & BOSS CHÍNH
+        {name = "Reborn Puffer Beast", rarity = "Legendary", keep = true, role = "CRAFT_ROD_QUEST", use = "⭐ Boss Bão Tuyết • Chế Cần Trúc Thánh • Trả Quest Giang Lão 3 (>=5M KG) • +10 Gems", origin = "Đảo Băng Giá (Trời Bão Tuyết)", icon = "rbxassetid://10709791437"},
+        {name = "Heavenpiercer Turtle", rarity = "Legendary", keep = true, role = "CRAFT_ROD_BAIT", use = "⭐ Boss Sương Mù • Chế Cần Heavenpiercer Rod & Mồi Rainbow Bait • +5 Gems", origin = "Đảo Quả Dừa (Trời Sương Mù)", icon = "rbxassetid://10709791437"},
+        {name = "Ascended Perch", rarity = "Legendary", keep = true, role = "CRAFT_ROD_BAIT", use = "⭐ Cá Boss • Chế Cần Trúc Thánh & Mồi Frost Bait • BẢO VỆ TUYỆT ĐỐI", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Draconic Koi", rarity = "Legendary", keep = true, role = "CRAFT_ROD", use = "⭐ Boss Nắng Gắt • Chế Cần Pure Diamond Rod • +5 Gems • BẢO VỆ", origin = "Đảo Hổ Phách (Trời Nắng Gắt)", icon = "rbxassetid://10709791437"},
+        {name = "Flying Fish Empress", rarity = "Legendary", keep = true, role = "CRAFT_ROD", use = "⭐ Boss Trời Gió • Chế Cần Heavenpiercer Rod • Rơi Skill 10% • +10 Gems", origin = "Đảo Cá Chép (Trời Gió)", icon = "rbxassetid://10709791437"},
+        {name = "Verdant Alligator Gar", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Boss Trời Mưa • Rơi Kỹ Năng 25% • +3 Gems • BẢO VỆ", origin = "Đảo Phóng Xạ (Trời Mưa)", icon = "rbxassetid://10709791437"},
+        {name = "Verdant Grouper", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Boss Trời Mưa • Rơi Kỹ Năng 25% • +3 Gems • BẢO VỆ", origin = "Đảo Phóng Xạ (Trời Mưa)", icon = "rbxassetid://10709791437"},
+        {name = "Scarlet Fish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Boss Bão Sấm • Chế Cần Huyết Long • +3 Gems • BẢO VỆ", origin = "Đảo Tre (Trời Bão Sấm)", icon = "rbxassetid://10709791437"},
+        {name = "Primordial Kunfish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Côn Ngư Viễn Cổ • Đấu trường Boss Realm • BẢO VỆ", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Adult Kunfish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Côn Ngư Trưởng Thành • Cá Boss Đảo Chiến Trường • BẢO VỆ", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Elder Kunfish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Côn Ngư Cổ Đại • Cá Boss Đảo Chiến Trường • BẢO VỆ", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Azure Carp", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Lam Long Diệp • Cá Boss Huyền Thoại • BẢO VỆ", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Chromatic Koi", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Thất Sắc Cẩm Lý • Cá Boss Huyền Thoại • BẢO VỆ", origin = "Đảo Hổ Phách", icon = "rbxassetid://10709791437"},
+        {name = "Toxic Chromatic Koi", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Thất Sắc Kịch Độc • Cá Boss Đảo Phóng Xạ • BẢO VỆ", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Bonefang", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Huyết Cốt Nha • Cá Boss Huyền Thoại • BẢO VỆ", origin = "Đảo Hổ Phách", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Bream Sovereign", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Huyết Điêu Chúa • Cá Boss Huyền Thoại • BẢO VỆ", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Silver Bream Sovereign", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Ngân Điêu Chúa • Cá Boss Huyền Thoại • BẢO VỆ", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Dreadmare Eel", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Kinh Hoàng Hải Man • Cá Boss Biển Sâu • BẢO VỆ", origin = "Vùng Biển Sâu", icon = "rbxassetid://10709791437"},
+        {name = "Golden Dragonfish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Kim Long Ngư • Cá Thần Huyền Thoại • BẢO VỆ", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Serpent Fish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Mãng Xà Ngư • Cá Boss Đảo Phóng Xạ • BẢO VỆ", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
+        {name = "Trueform Perch", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Chân Thân Cá Chép • Cá Boss Đảo Cá Chép • BẢO VỆ", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Dark Kingfish", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Hắc Ám Vương Ngư • Cá Boss Đảo Băng Giá • BẢO VỆ", origin = "Đảo Băng Giá", icon = "rbxassetid://10709791437"},
+        {name = "Elder Chainbound Shark", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Cổ Đại Tỏa Liên Sa • Thần Thú Biển Sâu • BẢO VỆ", origin = "Vùng Biển Sâu", icon = "rbxassetid://10709791437"},
+        {name = "Glorious Elder Turtle", rarity = "Legendary", keep = true, role = "BOSS", use = "⭐ Huy Hoàng Cổ Quy • Thần Quy Huyền Thoại • BẢO VỆ", origin = "Đảo Quả Dừa", icon = "rbxassetid://10709791437"},
+        {name = "Valentine Dolphin", rarity = "Legendary", keep = true, role = "EVENT", use = "⭐ Cá Heo Tình Nhân • Vật phẩm sự kiện Valentine 2026 • BẢO VỆ", origin = "Sự Kiện Valentine", icon = "rbxassetid://10709791437"},
 
-        -- 3. Sử Thi (Epic)
-        {name = "Frost Queenfish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu chế Cần Băng Giá Hoàng Kim • KHÔNG BÁN", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Golden Guardian Fish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu chế Cần Vàng Hộ Vệ • KHÔNG BÁN", origin = "Đảo Thống Trị (Sovereign Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Tiger Mirefish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu tinh luyện Cần Hổ Trảo • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
-        {name = "Mirage Lanternfish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu chế Cần Ảo Ảnh Quang Học • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
-        {name = "Crimson Catfish", rarity = "Epic", keep = true, use = "⭐ Nguyên liệu đúc Cần Huyết Long V2 • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Catfish", rarity = "Rare", keep = true, use = "⭐ Nguyên liệu cơ bản ghép Cần Câu Sơ Cấp • KHÔNG BÁN", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Colossal Tigerfish", rarity = "Epic", keep = false, use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Chiến Trường (Battlefield)", icon = "rbxassetid://10709791437"},
-        {name = "Sunburst Trout", rarity = "Epic", keep = false, use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
+        -- 3. SỬ THI (EPIC)
+        {name = "Frost Queenfish", rarity = "Epic", keep = true, role = "CRAFT_ROD", use = "❄️ Nguyên liệu chế Cần Pure Diamond Rod • KHÔNG BÁN", origin = "Đảo Băng Giá", icon = "rbxassetid://10709791437"},
+        {name = "Golden Guardian Fish", rarity = "Epic", keep = true, role = "CRAFT_BAIT", use = "🛡️ Boss Thống Trị • Nguyên liệu chế Mồi Rainbow Bait • KHÔNG BÁN", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Tiger Mirefish", rarity = "Epic", keep = true, role = "CRAFT_BAIT", use = "🐅 Nguyên liệu chế Mồi Nameless Bait • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù", icon = "rbxassetid://10709791437"},
+        {name = "Mirage Lanternfish", rarity = "Epic", keep = true, role = "CRAFT_BAIT", use = "🏮 Nguyên liệu chế Mồi Nameless Bait • KHÔNG BÁN", origin = "Đảo Đỉnh Sương Mù", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Catfish", rarity = "Epic", keep = true, role = "CRAFT", use = "⚡ Nguyên liệu đúc Cần Huyết Long V2 • KHÔNG BÁN", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Chainbound Shark", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Glorious Oarfish", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Vùng Biển Sâu", icon = "rbxassetid://10709791437"},
+        {name = "Glorious Blobfish", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Vùng Biển Sâu", icon = "rbxassetid://10709791437"},
+        {name = "Golden Shark", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Jiaolong Dragonfish", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Kunfish III", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Terratiger Depthfish III", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Giá trị kinh tế cao)", origin = "Đảo Đỉnh Sương Mù", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch VIII", rarity = "Epic", keep = false, role = "SELL", use = "💰 Bán lấy nhiều tiền vàng (Cá Chép Thâm Niên VIII)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
 
-        -- 4. Hiếm (Rare)
-        {name = "Ascended Perch", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Glacial Trout", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền mua mồi và phụ kiện", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Tropical Angelfish", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền trang trải mua Cần mới", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Amber Koi", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng mua đồ shop", origin = "Đảo Hổ Phách (Amber Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Bladefin Snapper", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền mua vật phẩm hỗ trợ", origin = "Đảo Chiến Trường (Battlefield)", icon = "rbxassetid://10709791437"},
-        {name = "Mist Salmon", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng làm giàu", origin = "Đảo Đỉnh Sương Mù (Mistpeak)", icon = "rbxassetid://10709791437"},
-        {name = "Glow Perch", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng trang trải", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Crowned Trout", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng nâng cấp", origin = "Đảo Thống Trị (Sovereign Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Flying Fish", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng mua sắm", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Salmon", rarity = "Rare", keep = false, use = "💰 Bán kiếm tiền vàng cơ bản", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
+        -- 4. HIẾM (RARE)
+        {name = "Catfish", rarity = "Rare", keep = true, role = "CRAFT", use = "🐟 Nguyên liệu cơ bản ghép Cần Câu Sơ Cấp • KHÔNG BÁN", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Armored Battlefish", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Darkness Battlefish", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Dragon Battlefish", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Phantom Battlefish", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Crimson War Carp", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Emerald War Carp", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Dragonstride Carp", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền mua phụ kiện", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Dreadscale Grouper", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
+        {name = "Elder Dragonhead Tilapia", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Baby Jiaolong Dragonfish", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Fleshripper Fish", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền mua mồi và phụ kiện", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
+        {name = "Kunfish I", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Kunfish II", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp trang bị", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Runic Horn Grouper", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
+        {name = "Sovereign Grass Carp", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Spiked Salmon", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Stormscale Tautog", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Sunscale Salmon", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Hổ Phách", icon = "rbxassetid://10709791437"},
+        {name = "Terratiger Depthfish I", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng", origin = "Đảo Đỉnh Sương Mù", icon = "rbxassetid://10709791437"},
+        {name = "Terratiger Depthfish II", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng", origin = "Đảo Đỉnh Sương Mù", icon = "rbxassetid://10709791437"},
+        {name = "Azure Salmon", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền nâng cấp", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch I", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên I)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch II", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên II)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch III", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên III)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch IV", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên IV)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch V", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên V)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch VI", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên VI)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Elder Perch VII", rarity = "Rare", keep = false, role = "SELL", use = "💰 Bán kiếm tiền vàng (Cá Chép Thâm Niên VII)", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
 
-        -- 5. Đặc Biệt (Uncommon)
-        {name = "Coconut Crabfish", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Quả Dừa (Coconut Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Sovereign Fish", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Thống Trị (Sovereign Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Silver Bass", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Cá Chép (Perch Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Armored Carp", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Chiến Trường (Battlefield)", icon = "rbxassetid://10709791437"},
-        {name = "Toxic Trout", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Green Carp", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Bass", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
-        {name = "Trout", rarity = "Uncommon", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
-
-        -- 6. Phổ Thông (Common)
-        {name = "Carp", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
-        {name = "Perch", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
-        {name = "Minnow", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu (Spawn)", icon = "rbxassetid://10709791437"},
-        {name = "Bamboo Fish", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre (Bamboo Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Radioactive Carp", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Phóng Xạ (Fallout Isle)", icon = "rbxassetid://10709791437"},
-        {name = "Ice Fish", rarity = "Common", keep = false, use = "💰 Bán tự động dọn trống balo", origin = "Đảo Băng Giá (Frost Isle)", icon = "rbxassetid://10709791437"},
+        -- 5. ĐẶC BIỆT (UNCOMMON) & PHỔ THÔNG (COMMON) - AUTO SELL
+        {name = "Carp", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Perch", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Minnow", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Tilapia", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Trout", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Bamboo Fish", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Ice Fish", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Băng Giá", icon = "rbxassetid://10709791437"},
+        {name = "Radioactive Carp", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
+        {name = "Coconut Crabfish", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Quả Dừa", icon = "rbxassetid://10709791437"},
+        {name = "Sovereign Fish", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Thống Trị", icon = "rbxassetid://10709791437"},
+        {name = "Silver Bass", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Armored Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Chiến Trường", icon = "rbxassetid://10709791437"},
+        {name = "Green Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Bass", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Gold Crucian Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Golden Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Goldfin Grass Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Azurefin Grass Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Blackfin Grass Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Crimsonfin Grass Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Rosefin Grass Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Volt Grass Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Darkscale Fish", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Crimson Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Emerald Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Platinum Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Royal Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Boundeye Fish", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Sand Anchovy", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Arrogant Fish", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Cá Chép", icon = "rbxassetid://10709791437"},
+        {name = "Platescale Tilapia", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Grass Tilapia", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Dragonhead Tilapia", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Ironhorn Flounder", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Horned Silver Carp", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Lapis Fish", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Khởi Đầu", icon = "rbxassetid://10709791437"},
+        {name = "Scarlet Fringehead", rarity = "Uncommon", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Tre", icon = "rbxassetid://10709791437"},
+        {name = "Abyssal Glow Fish", rarity = "Common", keep = false, role = "SELL", use = "💰 Bán tự động dọn trống balo", origin = "Đảo Phóng Xạ", icon = "rbxassetid://10709791437"},
     }
 }
 
+function Wiki.GetItemRawName(item)
+    if not item then return "" end
+    local v = item:FindFirstChild("ValueName")
+    if v and v:IsA("StringValue") and #v.Value > 0 then
+        local raw = tostring(v.Value)
+        local base = raw:match("^%s*([^|]+)")
+        return base and base:gsub("%s+$", "") or raw
+    end
+    local attName = item:GetAttribute("FishName") or item:GetAttribute("Name") or item:GetAttribute("ItemName")
+    if attName and #tostring(attName) > 0 then
+        local raw = tostring(attName)
+        local base = raw:match("^%s*([^|]+)")
+        return base and base:gsub("%s+$", "") or raw
+    end
+    local raw = tostring(item.Name or "")
+    local base = raw:match("^%s*([^|]+)")
+    return base and base:gsub("%s+$", "") or raw
+end
+
 function Wiki.IsItemFavorited(item)
     if not item then return false end
-    local favVal = item:FindFirstChild("Favorite")
+    local name = tostring(item.Name or "")
+    if name:find("Favorite", 1, true) or name:find("Favourite", 1, true) or name:find("Locked", 1, true) then
+        return true
+    end
+    if item:GetAttribute("IsFavorite") == true or item:GetAttribute("Favorite") == true or item:GetAttribute("Locked") == true then
+        return true
+    end
+    local favVal = item:FindFirstChild("Favorite") or item:FindFirstChild("Favourite")
     if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
-    if item:GetAttribute("Favorite") == true then return true end
     local lockVal = item:FindFirstChild("Locked")
     if lockVal and (lockVal.Value == true or lockVal.Value == 1) then return true end
-    if item:GetAttribute("Locked") == true then return true end
     return false
 end
 
 function Wiki.IsSecretBossFish(item)
     if not item then return false end
-    local rawName = tostring(item.Name or "")
-    local lowerName = rawName:lower()
+    local rawName = Wiki.GetItemRawName(item):lower()
+    local fullName = tostring(item.Name or ""):lower()
 
     for bLower, _ in pairs(secretBossLookup) do
-        if lowerName:find(bLower, 1, true) then
+        if rawName:find(bLower, 1, true) or fullName:find(bLower, 1, true) then
             return true
         end
     end
@@ -1891,17 +2012,25 @@ function Wiki.IsMutatedFish(item)
     return false
 end
 
-function Wiki.GetItemRawName(item)
-    if not item then return "" end
-    local v = item:FindFirstChild("ValueName")
-    if v and v:IsA("StringValue") and #v.Value > 0 then
-        return v.Value
+function Wiki.IsPlayerIndexUnlocked(fishName)
+    if not fishName or #fishName == 0 then return false end
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData or not pData:FindFirstChild("Index") then return false end
+    local fishLower = fishName:lower():gsub("^%s+", ""):gsub("%s+$", "")
+
+    local direct = pData.Index:FindFirstChild(fishName)
+    if direct and direct:IsA("BoolValue") and direct.Value == true then
+        return true
     end
-    local attName = item:GetAttribute("FishName") or item:GetAttribute("Name") or item:GetAttribute("ItemName")
-    if attName and #tostring(attName) > 0 then
-        return tostring(attName)
+
+    for _, idxItem in ipairs(pData.Index:GetChildren()) do
+        if idxItem.Name:lower():gsub("^%s+", ""):gsub("%s+$", "") == fishLower then
+            if idxItem:IsA("BoolValue") and idxItem.Value == true then
+                return true
+            end
+        end
     end
-    return tostring(item.Name or "")
+    return false
 end
 
 function Wiki.GetPlayerFishCount(fishName)
@@ -1923,14 +2052,16 @@ function Wiki.GetPlayerFishCount(fishName)
         if not folder then return end
         for _, item in ipairs(folder:GetChildren()) do
             local rawName = Wiki.GetItemRawName(item):lower():gsub("^%s+", ""):gsub("%s+$", "")
-            local instName = tostring(item.Name or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
             local cleanRaw = cleanFishName(rawName)
-            local cleanInst = cleanFishName(instName)
 
-            local isMatch = (rawName == fishLower) or (instName == fishLower) or (cleanRaw == fishLower) or (cleanInst == fishLower)
+            local isMatch = (rawName == fishLower) or (cleanRaw == fishLower)
+            if not isMatch and (rawName:find(fishLower, 1, true) or fishLower:find(rawName, 1, true)) then
+                isMatch = true
+            end
+
             if isMatch then
                 local qtyVal = item:FindFirstChild("Quantity") or item:FindFirstChild("Count") or item:FindFirstChild("Amount") or item:FindFirstChild("Stack")
-                local qty = (qtyVal and tonumber(qtyVal.Value)) or 1
+                local qty = (qtyVal and tonumber(qtyVal.Value)) or (item:IsA("NumberValue") and tonumber(item.Value)) or 1
                 count = count + qty
             end
         end
@@ -1946,26 +2077,203 @@ function Wiki.IsEssentialKeepItem(item)
     if Wiki.IsSecretBossFish(item) then return true end
     if Wiki.IsMutatedFish(item) then return true end
 
-    local itName = tostring(item.Name or "")
-    local vName = item:FindFirstChild("ValueName") and tostring(item.ValueName.Value or "") or ""
-    if Wiki.craftMaterialFish[itName] or Wiki.craftMaterialFish[vName] then return true end
+    local rawName = Wiki.GetItemRawName(item)
+    if Wiki.craftMaterialFish[rawName] or Wiki.craftMaterialFish[item.Name] then return true end
 
-    if Config.AutoFavouriteFish and (itName == Config.FavouriteFishName or vName == Config.FavouriteFishName) then
+    if Config.AutoFavouriteFish and (rawName == Config.FavouriteFishName or item.Name == Config.FavouriteFishName) then
         return true
     end
 
-    local itLower = itName:lower()
-    local vLower = vName:lower()
+    local weightStr = tostring(item.Name or ""):match("|%s*([%d%.]+)")
+    local wNum = tonumber(weightStr)
+    if wNum and wNum >= 1000000 then
+        return true
+    end
 
+    local rawLower = rawName:lower()
     for _, f in ipairs(Wiki.wikiFishData) do
         if f.keep then
             local fLower = f.name:lower()
-            if itLower == fLower or vLower == fLower or itLower:find(fLower, 1, true) or (vLower ~= "" and vLower:find(fLower, 1, true)) then
+            if rawLower == fLower or rawLower:find(fLower, 1, true) or fLower:find(rawLower, 1, true) then
                 return true
             end
         end
     end
     return false
+end
+
+Wiki.baitIngredients = {
+    ["Nameless Bait"] = {"Mountain Fish", "Octoparasitic Fish", "Mirage Lanternfish", "Tiger Mirefish"},
+    ["Frost Bait"] = {"Primordial Kunfish Overlord", "Warbringer Shark", "Frost Kingfish", "Ascended Perch"},
+    ["Rainbow Bait"] = {"Heavenpiercer Turtle", "Colossal Tigerfish", "Crimson Electric Eel", "Golden Guardian Fish"},
+}
+
+Wiki.allBaitFishSet = {
+    ["mountain fish"] = true,
+    ["octoparasitic fish"] = true,
+    ["mirage lanternfish"] = true,
+    ["tiger mirefish"] = true,
+    ["primordial kunfish overlord"] = true,
+    ["warbringer shark"] = true,
+    ["frost kingfish"] = true,
+    ["ascended perch"] = true,
+    ["heavenpiercer turtle"] = true,
+    ["colossal tigerfish"] = true,
+    ["crimson electric eel"] = true,
+    ["golden guardian fish"] = true,
+}
+
+Wiki.temporarilyUnlockedBaitFish = {}
+
+function Wiki.IsBaitIngredient(fishName, baitName)
+    local fn = tostring(fishName or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+    if baitName and baitName ~= "All" and Wiki.baitIngredients[baitName] then
+        for _, ing in ipairs(Wiki.baitIngredients[baitName]) do
+            local ingLower = ing:lower()
+            if fn == ingLower or fn:find(ingLower, 1, true) or ingLower:find(fn, 1, true) then
+                return true
+            end
+        end
+        return false
+    else
+        return Wiki.allBaitFishSet[fn] == true
+    end
+end
+
+function Wiki.UnlockBaitFish(baitName, silent)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then
+        if not silent then ShowNotification("Mở Khóa Mồi", "Không tìm thấy dữ liệu túi đồ!", "WARN", 4) end
+        return 0
+    end
+
+    local toUnlock = {}
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            if Wiki.IsItemFavorited(item) then
+                local rawName = Wiki.GetItemRawName(item)
+                if Wiki.IsBaitIngredient(rawName, baitName) then
+                    table.insert(toUnlock, item)
+                end
+            end
+        end
+    end
+
+    local bLabel = (baitName and baitName ~= "All") and ("[" .. baitName .. "]") or "chế mồi"
+    if #toUnlock == 0 then
+        if not silent then
+            ShowNotification("Mở Khóa Mồi", string.format("Không có cá nguyên liệu %s nào đang bị khóa trong balo.", bLabel), "INFO", 4)
+        end
+        return 0
+    end
+
+    local unlockedCount = 0
+    for _, item in ipairs(toUnlock) do
+        if Events and Events:FindFirstChild("FavoriteItem") then
+            Events.FavoriteItem:FireServer(item)
+            unlockedCount = unlockedCount + 1
+            local raw = Wiki.GetItemRawName(item):lower()
+            Wiki.temporarilyUnlockedBaitFish[raw] = true
+            task.wait(0.04)
+        end
+    end
+
+    if not silent then
+        ShowNotification("MỞ KHÓA MỒI THÀNH CÔNG", string.format("Đã mở khóa %d con cá làm mồi %s! Bạn có thể chế tạo ngay.", unlockedCount, (baitName and baitName ~= "All") and ("[" .. baitName .. "]") or "3 Loại Mồi"), "SUCCESS", 6)
+    end
+    return unlockedCount
+end
+
+function Wiki.LockBaitFish(baitName, silent)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then
+        if not silent then ShowNotification("Khóa Lại Mồi", "Không tìm thấy dữ liệu túi đồ!", "WARN", 4) end
+        return 0
+    end
+
+    local toLock = {}
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            if not Wiki.IsItemFavorited(item) then
+                local rawName = Wiki.GetItemRawName(item)
+                if Wiki.IsBaitIngredient(rawName, baitName) then
+                    table.insert(toLock, item)
+                end
+            end
+        end
+    end
+
+    local bLabel = (baitName and baitName ~= "All") and ("[" .. baitName .. "]") or "chế mồi"
+    if #toLock == 0 then
+        if not silent then
+            ShowNotification("Khóa Lại Mồi", string.format("Tất cả cá nguyên liệu %s trong balo đã được khóa an toàn.", bLabel), "INFO", 4)
+        end
+        return 0
+    end
+
+    local lockedCount = 0
+    for _, item in ipairs(toLock) do
+        if Events and Events:FindFirstChild("FavoriteItem") then
+            Events.FavoriteItem:FireServer(item)
+            lockedCount = lockedCount + 1
+            local raw = Wiki.GetItemRawName(item):lower()
+            Wiki.temporarilyUnlockedBaitFish[raw] = nil
+            task.wait(0.04)
+        end
+    end
+
+    if not silent then
+        ShowNotification("KHÓA MỒI THÀNH CÔNG", string.format("Đã khóa bảo vệ lại %d con cá làm mồi %s an toàn trước AutoSell!", lockedCount, (baitName and baitName ~= "All") and ("[" .. baitName .. "]") or "3 Loại Mồi"), "SUCCESS", 6)
+    end
+    return lockedCount
+end
+
+function Wiki.UnlockAllKeepFish()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then
+        ShowNotification("Mở Khóa Balo", "Không tìm thấy dữ liệu túi đồ người chơi!", "WARN", 4)
+        return 0
+    end
+
+    local toUnlock = {}
+    local folders = {}
+    if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
+    if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
+
+    for _, folder in ipairs(folders) do
+        for _, item in ipairs(folder:GetChildren()) do
+            if Wiki.IsItemFavorited(item) then
+                if Wiki.IsEssentialKeepItem(item) then
+                    table.insert(toUnlock, item)
+                end
+            end
+        end
+    end
+
+    if #toUnlock == 0 then
+        ShowNotification("Mở Khóa Cá Quý", "Không có cá cần giữ nào đang bị khóa trong balo.", "INFO", 4)
+        return 0
+    end
+
+    local unlockedCount = 0
+    for _, item in ipairs(toUnlock) do
+        if Events and Events:FindFirstChild("FavoriteItem") then
+            Events.FavoriteItem:FireServer(item)
+            unlockedCount = unlockedCount + 1
+            task.wait(0.04)
+        end
+    end
+
+    ShowNotification("MỞ KHÓA THÀNH CÔNG", string.format("Đã mở khóa %d con cá quý / boss / nguyên liệu!", unlockedCount), "WARN", 6)
+    return unlockedCount
 end
 
 function Wiki.UnlockAllUnnecessaryFish()
@@ -2009,6 +2317,7 @@ function Wiki.UnlockAllUnnecessaryFish()
 end
 
 function Wiki.LockAllKeepFish()
+    Wiki.temporarilyUnlockedBaitFish = {}
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if not pData then
         ShowNotification("Khóa Bảo Vệ", "Không tìm thấy dữ liệu túi đồ!", "WARN", 4)
@@ -2058,63 +2367,76 @@ function Wiki.ToggleLockSpecificFish(fishName, targetKeepState)
     if pData:FindFirstChild("Inventory") then table.insert(folders, pData.Inventory) end
     if pData:FindFirstChild("Hotbar") then table.insert(folders, pData.Hotbar) end
 
+    local itemsFound = {}
+    local anyLocked = false
+
     for _, folder in ipairs(folders) do
         for _, item in ipairs(folder:GetChildren()) do
             local rawName = Wiki.GetItemRawName(item):lower()
             local instName = tostring(item.Name or ""):lower()
             if rawName == fishLower or instName == fishLower or rawName:find(fishLower, 1, true) then
                 local isFav = Wiki.IsItemFavorited(item)
-                if targetKeepState and not isFav then
-                    if Events and Events:FindFirstChild("FavoriteItem") then
-                        Events.FavoriteItem:FireServer(item)
-                        toggled = toggled + 1
-                        task.wait(0.04)
-                    end
-                elseif not targetKeepState and isFav then
-                    if Events and Events:FindFirstChild("FavoriteItem") then
-                        Events.FavoriteItem:FireServer(item)
-                        toggled = toggled + 1
-                        task.wait(0.04)
-                    end
-                end
+                if isFav then anyLocked = true end
+                table.insert(itemsFound, {item = item, isFav = isFav})
             end
         end
     end
 
-    local actText = targetKeepState and "Đã khóa bảo vệ" or "Đã mở khóa"
+    if #itemsFound == 0 then
+        ShowNotification("Thao Tác Cá", string.format("Không có con [%s] nào trong túi để chuyển trạng thái.", fishName), "INFO", 4)
+        return
+    end
+
+    local wantLock = targetKeepState
+    if wantLock == nil then
+        wantLock = not anyLocked
+    end
+
+    for _, data in ipairs(itemsFound) do
+        if wantLock and not data.isFav then
+            if Events and Events:FindFirstChild("FavoriteItem") then
+                Events.FavoriteItem:FireServer(data.item)
+                toggled = toggled + 1
+                task.wait(0.04)
+            end
+        elseif not wantLock and data.isFav then
+            if Events and Events:FindFirstChild("FavoriteItem") then
+                Events.FavoriteItem:FireServer(data.item)
+                toggled = toggled + 1
+                task.wait(0.04)
+            end
+        end
+    end
+
+    local actText = wantLock and "Đã khóa bảo vệ" or "Đã mở khóa"
     if toggled > 0 then
         ShowNotification("Thao Tác Cá", string.format("%s %d con [%s] thành công!", actText, toggled, fishName), "SUCCESS", 5)
     else
-        ShowNotification("Thao Tác Cá", string.format("Không có con [%s] nào cần chuyển trạng thái trong túi.", fishName), "INFO", 4)
+        ShowNotification("Thao Tác Cá", string.format("Tất cả con [%s] đã ở trạng thái %s rồi.", fishName, wantLock and "khóa" or "mở khóa"), "INFO", 4)
     end
 end
 
 function Wiki.ResolveFishIcon(fishName, defaultIcon)
     local ok, icon = pcall(function()
-        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-        if pData then
-            for _, fName in ipairs({"Inventory", "Hotbar"}) do
-                local f = pData:FindFirstChild(fName)
-                if f then
-                    for _, it in ipairs(f:GetChildren()) do
-                        local rawName = Wiki.GetItemRawName(it)
-                        if rawName == fishName or it.Name == fishName then
-                            for _, prop in ipairs({"Icon", "Image", "Texture", "Thumbnail"}) do
-                                local p = it:FindFirstChild(prop)
-                                if p and p:IsA("StringValue") and #p.Value > 0 then
-                                    return p.Value
-                                end
-                                local att = it:GetAttribute(prop)
-                                if att and #tostring(att) > 0 then
-                                    return tostring(att)
-                                end
-                            end
+        -- 1. Trích xuất trực tiếp icon hình ảnh thật từ cây Indexlist trong PlayerGui
+        local playerGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if playerGui then
+            local mainGui = playerGui:FindFirstChild("MainGui")
+            if mainGui then
+                local indexList = mainGui:FindFirstChild("Indexlist", true)
+                if indexList then
+                    local frame = indexList:FindFirstChild(fishName)
+                    if frame then
+                        local img = frame:FindFirstChild("Image", true)
+                        if img and img:IsA("ImageLabel") and #img.Image > 0 then
+                            return img.Image
                         end
                     end
                 end
             end
         end
 
+        -- 2. Trích xuất từ ReplicatedStorage
         if ReplicatedStorage then
             local found = ReplicatedStorage:FindFirstChild(fishName, true)
             if found then
@@ -2143,6 +2465,7 @@ function Wiki.ResolveFishIcon(fishName, defaultIcon)
 
     return defaultIcon or "rbxassetid://10709791437"
 end
+
 
 local secretBossState = {
     active = false,
@@ -5209,15 +5532,61 @@ function ticketQuestState.Tick()
     end
 end
 
+-- Vòng lặp ngầm: LUÔN LUÔN quét và cập nhật tiến độ nhiệm vụ (Dù có bật Auto làm vé hay không, dù ở bất kỳ Tab nào)
 task.spawn(function()
     pcall(function() ticketQuestState.LoadSpots() end)
+    task.delay(1.0, function()
+        pcall(ticketQuestState.ScanAndUpdateStatus)
+    end)
     while isRunning do
-        task.wait(2.5)
+        task.wait(1.0)
+        -- Luôn cập nhật tiến độ nhiệm vụ và hồi chiêu vào giao diện thời gian thực
+        pcall(ticketQuestState.ScanAndUpdateStatus)
         if Config.AutoTicketQuest then
             pcall(function()
                 ticketQuestState.Tick()
             end)
         end
+    end
+end)
+
+-- Lắng nghe trực tiếp khi có sự kiện thay đổi dữ liệu Quest trong Data người chơi (0ms phản hồi)
+task.spawn(function()
+    local pDataInit = ReplicatedStorage:WaitForChild("Data", 15)
+    local userFolder = pDataInit and pDataInit:WaitForChild(tostring(LocalPlayer.UserId), 15)
+    if not userFolder then return end
+
+    local questFolder = userFolder:WaitForChild("Quest", 15)
+    if questFolder then
+        local function bindQuestDescendant(desc)
+            if desc:IsA("ValueBase") then
+                table.insert(activeConnections, desc.Changed:Connect(function()
+                    pcall(ticketQuestState.ScanAndUpdateStatus)
+                end))
+            end
+        end
+
+        for _, d in ipairs(questFolder:GetDescendants()) do
+            bindQuestDescendant(d)
+        end
+
+        table.insert(activeConnections, questFolder.DescendantAdded:Connect(function(newDesc)
+            bindQuestDescendant(newDesc)
+            task.wait(0.1)
+            pcall(ticketQuestState.ScanAndUpdateStatus)
+        end))
+
+        table.insert(activeConnections, questFolder.DescendantRemoving:Connect(function()
+            task.wait(0.1)
+            pcall(ticketQuestState.ScanAndUpdateStatus)
+        end))
+    end
+
+    local cdVal = userFolder:FindFirstChild("TicketQuestCooldown")
+    if cdVal and cdVal:IsA("ValueBase") then
+        table.insert(activeConnections, cdVal.Changed:Connect(function()
+            pcall(ticketQuestState.ScanAndUpdateStatus)
+        end))
     end
 end)
 
@@ -5232,6 +5601,7 @@ local tabTeleports = CreateTab("Dịch Chuyển")
 local tabVisuals   = CreateTab("ESP & Đồ Hoạ")
 local tabPlayer    = CreateTab("Nhân Vật")
 local tabProfiles  = CreateTab("Cài Đặt")
+local tabExperimental = CreateTab("Thử Nghiệm")
 
 SwitchTab("Câu Cá")
 
@@ -6867,29 +7237,56 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
     end
 end)
 
-do
+local function initWikiTab()
     createCategoryHeader(tabWiki, "⚡ THAO TÁC NHANH TÚI ĐỒ (BAG QUICK ACTIONS)")
     local wikiActionCard = createCardGroup(tabWiki)
 
     local RefreshWikiBagCounts
 
-    local btnUnlockUnnecessary = createButtonRow(wikiActionCard, "Mở Khóa Toàn Bộ Cá Không Cần Thiết", "Mở khóa tất cả cá thường để AutoSell tự động bán dọn trống balo", "🔓 Mở Khóa", function()
+    local btnUnlockUnnecessary = createButtonRow(wikiActionCard, "Mở Khóa Toàn Bộ Cá Cần Bán", "Mở khóa tất cả cá thường/rác không cần giữ để AutoSell tự động bán dọn trống balo", "🔓 Mở Cá Bán", function()
         Wiki.UnlockAllUnnecessaryFish()
         if RefreshWikiBagCounts then RefreshWikiBagCounts() end
     end)
-    btnUnlockUnnecessary.Size = UDim2.new(0, 110, 0, 26)
-    btnUnlockUnnecessary.Position = UDim2.new(1, -110, 0.5, -13)
+    btnUnlockUnnecessary.Size = UDim2.new(0, 120, 0, 26)
+    btnUnlockUnnecessary.Position = UDim2.new(1, -120, 0.5, -13)
     btnUnlockUnnecessary.BackgroundColor3 = Color3.fromRGB(220, 38, 38)
     btnUnlockUnnecessary.TextColor3 = Colors.TextWhite
 
-    local btnLockAllKeep = createButtonRow(wikiActionCard, "Khóa Bảo Vệ Toàn Bộ Cá Cần Giữ", "Khóa bảo vệ tất cả Secret Boss, Cá Nguyên Liệu và Cá Đột Biến", "🔒 Khóa Bảo Vệ", function()
+    local btnLockAllKeep = createButtonRow(wikiActionCard, "Khóa Bảo Vệ Toàn Bộ Cá Cần Giữ", "Khóa bảo vệ tất cả Secret Boss, Cá Nguyên Liệu (Cần + Mồi) và Cá Đột Biến", "🔒 Khóa Cá Giữ", function()
         Wiki.LockAllKeepFish()
         if RefreshWikiBagCounts then RefreshWikiBagCounts() end
     end)
-    btnLockAllKeep.Size = UDim2.new(0, 110, 0, 26)
-    btnLockAllKeep.Position = UDim2.new(1, -110, 0.5, -13)
+    btnLockAllKeep.Size = UDim2.new(0, 120, 0, 26)
+    btnLockAllKeep.Position = UDim2.new(1, -120, 0.5, -13)
     btnLockAllKeep.BackgroundColor3 = Colors.PurpleDark
     btnLockAllKeep.TextColor3 = Colors.TextWhite
+
+    local btnUnlockKeep = createButtonRow(wikiActionCard, "Mở Khóa Toàn Bộ Cá Không Nên Bán", "Mở khóa toàn bộ cá quý / boss / nguyên liệu nếu bạn muốn sắp xếp hoặc giao dịch", "🔓 Mở Cá Giữ", function()
+        Wiki.UnlockAllKeepFish()
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+    end)
+    btnUnlockKeep.Size = UDim2.new(0, 120, 0, 26)
+    btnUnlockKeep.Position = UDim2.new(1, -120, 0.5, -13)
+    btnUnlockKeep.BackgroundColor3 = Color3.fromRGB(180, 83, 9)
+    btnUnlockKeep.TextColor3 = Colors.TextWhite
+
+    local btnUnlockBaitBag = createButtonRow(wikiActionCard, "Mở Khóa Cá Làm Mồi (3 Loại Mồi)", "Chỉ mở khóa các con cá làm mồi (Nameless, Frost, Rainbow) để đem chế tạo", "🔓 Mở Cá Mồi", function()
+        Wiki.UnlockBaitFish("All")
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+    end)
+    btnUnlockBaitBag.Size = UDim2.new(0, 120, 0, 26)
+    btnUnlockBaitBag.Position = UDim2.new(1, -120, 0.5, -13)
+    btnUnlockBaitBag.BackgroundColor3 = Color3.fromRGB(37, 99, 235)
+    btnUnlockBaitBag.TextColor3 = Colors.TextWhite
+
+    local btnLockBaitBag = createButtonRow(wikiActionCard, "Khóa Lại Cá Làm Mồi (3 Loại Mồi)", "Khóa bảo vệ lại toàn bộ cá làm mồi sau khi chế tạo xong để tránh AutoSell bán mất", "🔒 Khóa Cá Mồi", function()
+        Wiki.LockBaitFish("All")
+        if RefreshWikiBagCounts then RefreshWikiBagCounts() end
+    end)
+    btnLockBaitBag.Size = UDim2.new(0, 120, 0, 26)
+    btnLockBaitBag.Position = UDim2.new(1, -120, 0.5, -13)
+    btnLockBaitBag.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+    btnLockBaitBag.TextColor3 = Colors.TextWhite
 
     createButtonRow(wikiActionCard, "Đồng Bộ & Làm Mới Balo", "Quét lại toàn bộ túi đồ và cập nhật số lượng từng loại cá", "🔄 Cập Nhật", function()
         if RefreshWikiBagCounts then RefreshWikiBagCounts() end
@@ -6921,11 +7318,11 @@ do
     searchStroke.Color = Colors.BorderSubtle
     searchStroke.Thickness = 1
 
-    -- Row 2: Filter Buttons (All, Keep, Sell, InBag)
+    -- Row 2: Filter Buttons (All, Keep, Sell, InBag, Unlocked, Locked)
     local filterRow = createBaseRow(wikiFilterCard, "Chế Độ Lọc", "Chọn danh mục cá muốn tra cứu", false)
     local filterBtnContainer = Instance.new("Frame")
-    filterBtnContainer.Size = UDim2.new(0, 280, 0, 26)
-    filterBtnContainer.Position = UDim2.new(1, -280, 0.5, -13)
+    filterBtnContainer.Size = UDim2.new(0, 390, 0, 26)
+    filterBtnContainer.Position = UDim2.new(1, -390, 0.5, -13)
     filterBtnContainer.BackgroundTransparency = 1
     filterBtnContainer.Parent = filterRow
     local fLayout = Instance.new("UIListLayout")
@@ -6954,10 +7351,12 @@ do
         return b
     end
 
-    local btnFAll   = makeFilterBtn("ALL", "Tất Cả (51)", 66)
-    local btnFKeep  = makeFilterBtn("KEEP", "⭐ Cần Giữ", 70)
-    local btnFSell  = makeFilterBtn("SELL", "💰 Nên Bán", 70)
-    local btnFInBag = makeFilterBtn("IN_BAG", "🎒 Trong Túi", 70)
+    local btnFAll      = makeFilterBtn("ALL", "Tất Cả (113)", 72)
+    local btnFUnlocked = makeFilterBtn("UNLOCKED", "🟢 Đã Có", 62)
+    local btnFLocked   = makeFilterBtn("LOCKED", "🔴 Chưa Có", 65)
+    local btnFKeep     = makeFilterBtn("KEEP", "⭐ Cần Giữ", 62)
+    local btnFSell     = makeFilterBtn("SELL", "💰 Nên Bán", 62)
+    local btnFInBag    = makeFilterBtn("IN_BAG", "🎒 Trong Túi", 64)
 
     createCategoryHeader(tabWiki, "📖 BÁCH KHOA TOÀN THƯ CÁ (FISH ENCYCLOPEDIA)")
     local wikiListContainer = Instance.new("Frame")
@@ -6992,6 +7391,10 @@ do
                 matchF = (f.keep == false)
             elseif currentWikiFilter == "IN_BAG" then
                 matchF = (entry.currentCount > 0)
+            elseif currentWikiFilter == "UNLOCKED" then
+                matchF = (entry.isIndexUnlocked == true)
+            elseif currentWikiFilter == "LOCKED" then
+                matchF = (entry.isIndexUnlocked ~= true)
             end
 
             entry.cardFrame.Visible = matchQ and matchF
@@ -7009,6 +7412,8 @@ do
     end
 
     btnFAll.MouseButton1Click:Connect(function() SetFilterMode("ALL") end)
+    btnFUnlocked.MouseButton1Click:Connect(function() SetFilterMode("UNLOCKED") end)
+    btnFLocked.MouseButton1Click:Connect(function() SetFilterMode("LOCKED") end)
     btnFKeep.MouseButton1Click:Connect(function() SetFilterMode("KEEP") end)
     btnFSell.MouseButton1Click:Connect(function() SetFilterMode("SELL") end)
     btnFInBag.MouseButton1Click:Connect(function() SetFilterMode("IN_BAG") end)
@@ -7035,7 +7440,7 @@ do
             for _, folder in ipairs(folders) do
                 for _, item in ipairs(folder:GetChildren()) do
                     local qVal = item:FindFirstChild("Quantity") or item:FindFirstChild("Count") or item:FindFirstChild("Amount")
-                    local qty = (qVal and tonumber(qVal.Value)) or 1
+                    local qty = (qVal and tonumber(qVal.Value)) or (item:IsA("NumberValue") and tonumber(item.Value)) or 1
                     totalItems = totalItems + qty
                     if Wiki.IsEssentialKeepItem(item) then
                         totalKeepInBag = totalKeepInBag + qty
@@ -7047,14 +7452,31 @@ do
         end
 
         local typesInBagCount = 0
+        local totalUnlockedCount = 0
         for _, entry in ipairs(cardEntries) do
             local f = entry.fishData
             local cnt = Wiki.GetPlayerFishCount(f.name)
+            local isUnlocked = Wiki.IsPlayerIndexUnlocked(f.name)
             entry.currentCount = cnt
+            entry.isIndexUnlocked = isUnlocked
 
+            if isUnlocked then
+                totalUnlockedCount = totalUnlockedCount + 1
+            end
+
+            -- Trạng thái vòng tròn Index (Xanh = Đã có, Đỏ = Chưa có)
+            if entry.indexCircle then
+                entry.indexCircle.BackgroundColor3 = isUnlocked and Colors.AccentGreen or Colors.AccentRed
+                entry.indexCircleStroke.Color = isUnlocked and Colors.AccentGreen or Colors.AccentRed
+            end
+            if entry.indexText then
+                entry.indexText.Text = isUnlocked and "🟢 ĐÃ MỞ KHÓA INDEX" or "🔴 CHƯA CÓ TRONG BỘ SƯU TẬP"
+                entry.indexText.TextColor3 = isUnlocked and Colors.AccentGreen or Colors.TextMuted
+            end
+
+            -- Trạng thái trong Balo
             if cnt > 0 then
                 typesInBagCount = typesInBagCount + 1
-                -- Cá đã có: xếp lên đầu bảng theo thứ tự phẩm chất
                 entry.cardFrame.LayoutOrder = entry.defaultOrder
                 entry.cardFrame.BackgroundTransparency = 0
                 if entry.cardStroke then
@@ -7062,22 +7484,21 @@ do
                     entry.cardStroke.Thickness = 1.2
                 end
                 if entry.countLabel then
-                    entry.countLabel.Text = string.format("✔ Đang có: %d con", cnt)
+                    entry.countLabel.Text = string.format("✔ Trong túi: %d con", cnt)
                     entry.countLabel.TextColor3 = f.keep and Colors.AccentYellow or Colors.AccentGreen
                 end
                 if entry.countBox then
                     entry.countBox.BackgroundColor3 = Colors.ControlBg
                 end
             else
-                -- Cá chưa có: xếp xuống dưới bảng
-                entry.cardFrame.LayoutOrder = 10000 + entry.defaultOrder
-                entry.cardFrame.BackgroundTransparency = 0.35
+                entry.cardFrame.LayoutOrder = isUnlocked and (1000 + entry.defaultOrder) or (10000 + entry.defaultOrder)
+                entry.cardFrame.BackgroundTransparency = isUnlocked and 0.15 or 0.4
                 if entry.cardStroke then
                     entry.cardStroke.Color = Colors.BorderSubtle
                     entry.cardStroke.Thickness = 0.8
                 end
                 if entry.countLabel then
-                    entry.countLabel.Text = "Chưa có (0 con)"
+                    entry.countLabel.Text = isUnlocked and "Hết trong túi (0)" or "Chưa có (0 con)"
                     entry.countLabel.TextColor3 = Colors.TextMuted
                 end
                 if entry.countBox then
@@ -7086,9 +7507,11 @@ do
             end
         end
 
+        btnFUnlocked.Text = string.format("🟢 Đã Có (%d)", totalUnlockedCount)
+        btnFLocked.Text = string.format("🔴 Chưa Có (%d)", #cardEntries - totalUnlockedCount)
         btnFInBag.Text = string.format("🎒 Trong Túi (%d)", typesInBagCount)
         if infoBagSummary and infoBagSummary.Set then
-            infoBagSummary.Set(string.format("%d / %d ô (%d cá cần giữ | %d cá nên bán | %d loài đang có)", totalItems, invLimit, totalKeepInBag, totalSellInBag, typesInBagCount))
+            infoBagSummary.Set(string.format("%d / %d ô (%d cá cần giữ | %d cá nên bán | %d/%d loài đã sưu tập)", totalItems, invLimit, totalKeepInBag, totalSellInBag, totalUnlockedCount, #cardEntries))
         end
         UpdateCardFilter()
     end
@@ -7099,8 +7522,8 @@ do
         local rColor = Wiki.rarityColors[f.rarity] or Colors.PurplePrimary
 
         local card = Instance.new("Frame")
-        card.Name = "FishCard_" .. f.name:gsub("%s+", "_")
-        card.Size = UDim2.new(1, 0, 0, 74)
+        card.Name = "FishCard_" .. f.name:gsub("[%s%p]+", "_")
+        card.Size = UDim2.new(1, 0, 0, 78)
         card.BackgroundColor3 = Colors.RowNormal
         card.BorderSizePixel = 0
         card.LayoutOrder = idx
@@ -7117,10 +7540,10 @@ do
             TweenService:Create(card, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowNormal}):Play()
         end)
 
-        -- 1. Icon & Rarity (Trái)
+        -- 1. Icon & Rarity & Vòng Xanh/Đỏ (Trái)
         local iconFrame = Instance.new("Frame")
-        iconFrame.Size = UDim2.new(0, 50, 0, 50)
-        iconFrame.Position = UDim2.new(0, 10, 0.5, -25)
+        iconFrame.Size = UDim2.new(0, 52, 0, 52)
+        iconFrame.Position = UDim2.new(0, 10, 0.5, -26)
         iconFrame.BackgroundColor3 = Colors.InputBg
         iconFrame.BorderSizePixel = 0
         iconFrame.Parent = card
@@ -7133,13 +7556,15 @@ do
         img.Size = UDim2.new(1, -6, 1, -6)
         img.Position = UDim2.new(0, 3, 0, 3)
         img.BackgroundTransparency = 1
-        local cardIcon = f.icon or "rbxassetid://10709791437"
-        pcall(function()
-            cardIcon = Wiki.ResolveFishIcon(f.name, f.icon)
-        end)
-        img.Image = cardIcon
+        img.Image = "rbxassetid://10709791437"
         img.ScaleType = Enum.ScaleType.Fit
         img.Parent = iconFrame
+        task.spawn(function()
+            local resolved = Wiki.ResolveFishIcon(f.name, f.icon)
+            if img and img.Parent then
+                img.Image = resolved
+            end
+        end)
 
         local rarityTag = Instance.new("TextLabel")
         rarityTag.Size = UDim2.new(1, 0, 0, 12)
@@ -7154,8 +7579,8 @@ do
 
         -- 2. Chi Tiết Cá & Công Dụng (Giữa)
         local infoContainer = Instance.new("Frame")
-        infoContainer.Size = UDim2.new(1, -195, 1, -12)
-        infoContainer.Position = UDim2.new(0, 68, 0, 6)
+        infoContainer.Size = UDim2.new(1, -195, 1, -10)
+        infoContainer.Position = UDim2.new(0, 70, 0, 5)
         infoContainer.BackgroundTransparency = 1
         infoContainer.Parent = card
 
@@ -7193,25 +7618,54 @@ do
         badgeTxt.TextSize = 9
         badgeTxt.Parent = badge
 
+        -- Dòng trạng thái Vòng Xanh / Đỏ Index
+        local indexStatusLine = Instance.new("Frame")
+        indexStatusLine.Size = UDim2.new(1, 0, 0, 14)
+        indexStatusLine.Position = UDim2.new(0, 0, 0, 18)
+        indexStatusLine.BackgroundTransparency = 1
+        indexStatusLine.Parent = infoContainer
+
+        local indexCircle = Instance.new("Frame")
+        indexCircle.Size = UDim2.new(0, 8, 0, 8)
+        indexCircle.Position = UDim2.new(0, 0, 0.5, -4)
+        indexCircle.BackgroundColor3 = Colors.AccentRed
+        indexCircle.BorderSizePixel = 0
+        indexCircle.Parent = indexStatusLine
+        Instance.new("UICorner", indexCircle).CornerRadius = UDim.new(1, 0)
+        local indexCircleStroke = Instance.new("UIStroke", indexCircle)
+        indexCircleStroke.Color = Colors.AccentRed
+        indexCircleStroke.Thickness = 1
+
+        local indexText = Instance.new("TextLabel")
+        indexText.Size = UDim2.new(1, -12, 1, 0)
+        indexText.Position = UDim2.new(0, 12, 0, 0)
+        indexText.BackgroundTransparency = 1
+        indexText.Font = Enum.Font.GothamBold
+        indexText.Text = "🔴 CHƯA CÓ TRONG BỘ SƯU TẬP"
+        indexText.TextColor3 = Colors.TextMuted
+        indexText.TextSize = 9
+        indexText.TextXAlignment = Enum.TextXAlignment.Left
+        indexText.Parent = indexStatusLine
+
         local originLbl = Instance.new("TextLabel")
-        originLbl.Size = UDim2.new(1, 0, 0, 14)
-        originLbl.Position = UDim2.new(0, 0, 0, 18)
+        originLbl.Size = UDim2.new(1, 0, 0, 13)
+        originLbl.Position = UDim2.new(0, 0, 0, 32)
         originLbl.BackgroundTransparency = 1
         originLbl.Font = Enum.Font.Gotham
         originLbl.Text = "📍 " .. f.origin
         originLbl.TextColor3 = Colors.TextMuted
-        originLbl.TextSize = 10
+        originLbl.TextSize = 9
         originLbl.TextXAlignment = Enum.TextXAlignment.Left
         originLbl.Parent = infoContainer
 
         local useLbl = Instance.new("TextLabel")
-        useLbl.Size = UDim2.new(1, 0, 0, 26)
-        useLbl.Position = UDim2.new(0, 0, 0, 32)
+        useLbl.Size = UDim2.new(1, 0, 0, 24)
+        useLbl.Position = UDim2.new(0, 0, 0, 45)
         useLbl.BackgroundTransparency = 1
         useLbl.Font = Enum.Font.Gotham
         useLbl.Text = f.use
         useLbl.TextColor3 = Colors.TextSubtle
-        useLbl.TextSize = 10
+        useLbl.TextSize = 9
         useLbl.TextXAlignment = Enum.TextXAlignment.Left
         useLbl.TextWrapped = true
         useLbl.Parent = infoContainer
@@ -7272,7 +7726,7 @@ do
         end)
 
         singleBtn.MouseButton1Click:Connect(function()
-            Wiki.ToggleLockSpecificFish(f.name, f.keep)
+            Wiki.ToggleLockSpecificFish(f.name)
             task.delay(0.3, RefreshWikiBagCounts)
         end)
 
@@ -7284,7 +7738,11 @@ do
             countLabel = countLbl,
             countStroke = countStroke,
             singleBtn = singleBtn,
+            indexCircle = indexCircle,
+            indexCircleStroke = indexCircleStroke,
+            indexText = indexText,
             currentCount = 0,
+            isIndexUnlocked = false,
             defaultOrder = idx
         })
     end
@@ -7330,6 +7788,7 @@ do
         pcall(RefreshWikiBagCounts)
     end)
 end
+initWikiTab()
 
 do
 createCategoryHeader(tabGod, "Tương Tác Thần Linh (God Spirit)")
@@ -7422,9 +7881,9 @@ createToggleRow(questCard, "Tự Động Làm Vé Nhiệm Vụ", "Tự động n
         ShowNotification("Nhiệm Vụ Vé", "Đã bật tự động làm vé nhiệm vụ! Script sẽ quét và thực hiện quest.", "SUCCESS", 6)
     else
         ticketQuestState.active = false
-        ticketQuestState.statusText = "Đã tắt tự động làm vé."
-        ticketQuestState.UpdateUI()
+        ShowNotification("Nhiệm Vụ Vé", "Đã tắt tự động làm vé (Tiến độ vẫn được theo dõi liên tục).", "INFO", 4)
     end
+    ticketQuestState.ScanAndUpdateStatus()
 end)
 
 createDropdownRow(questCard, "Độ Khó Nhiệm Vụ", "Chọn độ khó vé nhiệm vụ nhận từ NPC (Mặc định: Hard)", {"Hard", "Easy"}, Config.TicketDifficulty, function(v)
@@ -7769,7 +8228,48 @@ local baitCard = createCardGroup(tabShop)
 local craftBaits = {"Nameless Bait", "Frost Bait", "Rainbow Bait"}
 createDropdownRow(baitCard, "Chọn Mồi Cần Chế", "Loại mồi thần thoại muốn chế tạo", craftBaits, Config.CraftBaitName, function(v) Config.CraftBaitName = v end)
 createSliderRow(baitCard, "Số Lượng Chế Mỗi Lần", "Số lượng mồi chế trong 1 lượt", 1, 10, Config.CraftAmount, false, "", function(v) Config.CraftAmount = v end)
-createToggleRow(baitCard, "Tự Động Chế Mồi", "Liên tục chế mồi khi trong kho đủ nguyên liệu", Config.AutoCraftBait, function(v) Config.AutoCraftBait = v end)
+createToggleRow(baitCard, "Tự Động Chế Mồi", "Liên tục chế mồi khi trong kho đủ nguyên liệu (tự mở khóa NL)", Config.AutoCraftBait, function(v)
+    Config.AutoCraftBait = v
+    if not v then
+        Wiki.LockBaitFish(Config.CraftBaitName, true)
+    end
+end)
+
+local btnUnlockCurBait = createButtonRow(baitCard, "Mở Khóa Cá Chế Mồi Đang Chọn", "Chỉ mở khóa các con cá làm nguyên liệu cho mồi đang chọn ở trên để chế tạo", "🔓 Mở Khóa NL", function()
+    Wiki.UnlockBaitFish(Config.CraftBaitName)
+    if Wiki.RefreshBagUI then Wiki.RefreshBagUI() end
+end)
+btnUnlockCurBait.Size = UDim2.new(0, 115, 0, 24)
+btnUnlockCurBait.Position = UDim2.new(1, -115, 0.5, -12)
+btnUnlockCurBait.BackgroundColor3 = Color3.fromRGB(37, 99, 235)
+btnUnlockCurBait.TextColor3 = Colors.TextWhite
+
+local btnLockCurBait = createButtonRow(baitCard, "Khóa Lại Cá Chế Mồi Đang Chọn", "Khóa bảo vệ lại cá làm mồi sau khi chế xong để tránh AutoSell bán mất", "🔒 Khóa Lại NL", function()
+    Wiki.LockBaitFish(Config.CraftBaitName)
+    if Wiki.RefreshBagUI then Wiki.RefreshBagUI() end
+end)
+btnLockCurBait.Size = UDim2.new(0, 115, 0, 24)
+btnLockCurBait.Position = UDim2.new(1, -115, 0.5, -12)
+btnLockCurBait.BackgroundColor3 = Color3.fromRGB(16, 185, 129)
+btnLockCurBait.TextColor3 = Colors.TextWhite
+
+local btnUnlockAllBait = createButtonRow(baitCard, "Mở Khóa NL Cả 3 Loại Mồi Thần Thoại", "Mở khóa toàn bộ cá làm mồi Nameless, Frost, Rainbow Bait để chế tạo", "🔓 Mở Cả 3 Mồi", function()
+    Wiki.UnlockBaitFish("All")
+    if Wiki.RefreshBagUI then Wiki.RefreshBagUI() end
+end)
+btnUnlockAllBait.Size = UDim2.new(0, 115, 0, 24)
+btnUnlockAllBait.Position = UDim2.new(1, -115, 0.5, -12)
+btnUnlockAllBait.BackgroundColor3 = Color3.fromRGB(180, 83, 9)
+btnUnlockAllBait.TextColor3 = Colors.TextWhite
+
+local btnLockAllBait = createButtonRow(baitCard, "Khóa Lại NL Cả 3 Loại Mồi Thần Thoại", "Khóa bảo vệ lại toàn bộ cá làm mồi của cả 3 loại mồi sau khi chế xong", "🔒 Khóa Cả 3 Mồi", function()
+    Wiki.LockBaitFish("All")
+    if Wiki.RefreshBagUI then Wiki.RefreshBagUI() end
+end)
+btnLockAllBait.Size = UDim2.new(0, 115, 0, 24)
+btnLockAllBait.Position = UDim2.new(1, -115, 0.5, -12)
+btnLockAllBait.BackgroundColor3 = Colors.PurpleDark
+btnLockAllBait.TextColor3 = Colors.TextWhite
 
 local buyBaits = {"Ancestral Bait", "Elite Bait", "Corrupted Essence Bait", "Crude Mash Bait", "Basic Bait"}
 createDropdownRow(baitCard, "Chọn Mồi Cần Mua", "Loại mồi muốn mua từ NPC Ba Chang", buyBaits, Config.BuyBaitName, function(v) Config.BuyBaitName = v end)
@@ -8602,6 +9102,303 @@ createButtonRow(credCard, "🔴 Diệt Toàn Bộ Script (Kill Script)", "Ngắt
     UnloadScript()
 end)
 
+local function initExperimentalTab()
+    -- 1. 👻 CHẾ ĐỘ TÀNG HÌNH (GHOST / INVISIBILITY MODE)
+    createCategoryHeader(tabExperimental, "👻 CHẾ ĐỘ TÀNG HÌNH (GHOST / INVISIBILITY MODE)")
+    local ghostCard = createCardGroup(tabExperimental)
+
+    local function ApplyGhostInvisibility(state)
+        Config.GhostInvisibility = state
+        pcall(function()
+            local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+            if remotesFolder and remotesFolder:FindFirstChild("ToggleInvisibility") then
+                remotesFolder.ToggleInvisibility:InvokeServer(state)
+            end
+        end)
+
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.LocalTransparencyModifier = state and 0.65 or 0
+                elseif part:IsA("BillboardGui") then
+                    part.Enabled = not state
+                end
+            end
+        end
+
+        ShowNotification("Tàng Hình", state and "Đã BẬT Tàng Hình Server! Người chơi khác không thể nhìn thấy bạn." or "Đã TẮT Tàng Hình! Nhân vật hiển thị bình thường.", state and "SUCCESS" or "INFO", 4)
+    end
+
+    createToggleRow(ghostCard, "Bật Tàng Hình Server (Ghost Mode)", "Ẩn hoàn toàn nhân vật khỏi tầm nhìn của người chơi khác và admin", Config.GhostInvisibility, function(v)
+        ApplyGhostInvisibility(v)
+    end)
+
+    createButtonRow(ghostCard, "Làm Mới Trạng Thái Tàng Hình", "Bắn lại remote tàng hình phòng khi server vừa hồi sinh nhân vật", "Làm Mới", function()
+        ApplyGhostInvisibility(Config.GhostInvisibility)
+    end)
+
+
+    -- 2. 🎯 TỰ ĐỘNG TẨY LUYỆN TRAIT (AUTO REROLL & LOCK TRAIT)
+    createCategoryHeader(tabExperimental, "🎯 TỰ ĐỘNG TẨY LUYỆN TRAIT (AUTO REROLL & LOCK TRAIT)")
+    local traitCard = createCardGroup(tabExperimental)
+
+    local traitList = {
+        "Azure Dragon", "White Tiger", "Vermilion Bird", "Black Tortoise",
+        "Assassin", "Berserk", "Chrono", "Executioner", "Powerful",
+        "Precision", "Rapid", "Sharp", "Swift"
+    }
+
+    createDropdownRow(traitCard, "Chọn Trait Cần Săn", "Trait mục tiêu bot sẽ tự động roll cho đến khi trúng", traitList, Config.TargetTraitName, function(v)
+        Config.TargetTraitName = v
+    end)
+
+    local infoTraitRerolls = createInfoRow(traitCard, "Vé Reroll Hiện Có", "Đang tải...")
+    local function UpdateTraitRerollInfo()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local count = pData and pData:FindFirstChild("Trait Reroll") and pData["Trait Reroll"].Value or 0
+        infoTraitRerolls.Set(string.format("%d Vé", count))
+    end
+    task.spawn(UpdateTraitRerollInfo)
+
+    local isAutoRerolling = false
+    local function RunAutoRerollTrait()
+        if isAutoRerolling then return end
+        isAutoRerolling = true
+        task.spawn(function()
+            local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+            ShowNotification("Reroll Trait", "Bắt đầu tự động Reroll săn Trait: " .. tostring(Config.TargetTraitName), "INFO", 4)
+
+            while isAutoRerolling and Config.AutoRerollTrait do
+                local currentRerolls = pData and pData:FindFirstChild("Trait Reroll") and pData["Trait Reroll"].Value or 0
+                UpdateTraitRerollInfo()
+
+                if currentRerolls <= 0 then
+                    ShowNotification("Hết Vé", "Đã hết vé Reroll Trait!", "WARN", 5)
+                    Config.AutoRerollTrait = false
+                    isAutoRerolling = false
+                    break
+                end
+
+                if Events and Events:FindFirstChild("RerollTrait") then
+                    local res = Events.RerollTrait:InvokeServer()
+                    local targetLower = Config.TargetTraitName:lower()
+                    local isHit = false
+
+                    if type(res) == "string" and res:lower():find(targetLower, 1, true) then
+                        isHit = true
+                    end
+
+                    if not isHit and pData and pData:FindFirstChild("LockTrait") then
+                        local tVal = pData.LockTrait:FindFirstChild(Config.TargetTraitName)
+                        if tVal and tVal.Value == true then
+                            isHit = true
+                        end
+                    end
+
+                    if isHit then
+                        ShowNotification("TRÚNG TRAIT!", string.format("Đã roll trúng [%s]! Tự động khóa bảo vệ ngay lập tức.", Config.TargetTraitName), "SUCCESS", 8)
+                        if Events:FindFirstChild("LockTrait") then
+                            Events.LockTrait:FireServer(Config.TargetTraitName)
+                        end
+                        Config.AutoRerollTrait = false
+                        isAutoRerolling = false
+                        break
+                    end
+                end
+                task.wait(0.35)
+            end
+            isAutoRerolling = false
+            UpdateTraitRerollInfo()
+        end)
+    end
+
+    createToggleRow(traitCard, "Tự Động Reroll Đến Khi Trúng", "Tự động roll liên tục và khóa lại khi ra đúng Trait mục tiêu", Config.AutoRerollTrait, function(v)
+        Config.AutoRerollTrait = v
+        if v then
+            RunAutoRerollTrait()
+        else
+            isAutoRerolling = false
+        end
+    end)
+
+    createButtonRow(traitCard, "Reroll 1 Lần Thủ Công", "Thực hiện roll trait 1 lần ngay lập tức", "Reroll 1 Lần", function()
+        if Events and Events:FindFirstChild("RerollTrait") then
+            local res = Events.RerollTrait:InvokeServer()
+            UpdateTraitRerollInfo()
+            ShowNotification("Reroll Trait", "Kết quả roll: " .. tostring(res or "Đã roll thành công"), "INFO", 4)
+        end
+    end)
+
+    createButtonRow(traitCard, "Khóa / Mở Khóa Trait Đang Chọn", "Chuyển đổi trạng thái khóa bảo vệ cho Trait đang chọn", "Khóa / Mở", function()
+        if Events and Events:FindFirstChild("LockTrait") then
+            Events.LockTrait:FireServer(Config.TargetTraitName)
+            ShowNotification("Khóa Trait", "Đã gửi lệnh đổi trạng thái khóa cho: " .. tostring(Config.TargetTraitName), "SUCCESS", 3)
+        end
+    end)
+
+
+    -- 3. ⛵ TRIỆU HỒI THUYỀN TỨC THÌ (INSTANT BOAT SPAWNER)
+    createCategoryHeader(tabExperimental, "⛵ TRIỆU HỒI THUYỀN TỨC THÌ (INSTANT BOAT SPAWNER)")
+    local boatCard = createCardGroup(tabExperimental)
+
+    local boatList = {"Boat", "Golden Boat", "Rainbow Boat", "Ascended Perch", "Kunfish Overlord"}
+    createDropdownRow(boatCard, "Chọn Loại Thuyền", "Chọn thuyền muốn triệu hồi hoặc mua", boatList, Config.SelectedBoat, function(v)
+        Config.SelectedBoat = v
+    end)
+
+    local function SpawnBoatNow(boatName)
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local bShop = remotes and remotes:FindFirstChild("BoatShop")
+        if bShop and bShop:FindFirstChild("Spawn") then
+            bShop.Spawn:FireServer(boatName)
+            ShowNotification("Triệu Hồi Thuyền", "Đã triệu hồi thuyền [" .. tostring(boatName) .. "] tại vị trí của bạn!", "SUCCESS", 4)
+        elseif Events and Events:FindFirstChild("SpawnBoat") then
+            Events.SpawnBoat:FireServer(boatName)
+            ShowNotification("Triệu Hồi Thuyền", "Đã triệu hồi thuyền [" .. tostring(boatName) .. "] tại vị trí của bạn!", "SUCCESS", 4)
+        else
+            ShowNotification("Thuyền", "Không tìm thấy remote triệu hồi thuyền!", "WARN", 4)
+        end
+    end
+
+    createButtonRow(boatCard, "Triệu Hồi Thuyền Đang Chọn", "Triệu hồi thuyền xuất hiện ngay tại vị trí bạn đang đứng", "Triệu Hồi", function()
+        SpawnBoatNow(Config.SelectedBoat)
+    end)
+
+    createButtonRow(boatCard, "Mua Thuyền Đang Chọn (Từ Xa)", "Mua thuyền từ xa qua Remote mà không cần gặp NPC bến tàu", "Mua Thuyền", function()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local bShop = remotes and remotes:FindFirstChild("BoatShop")
+        if bShop and bShop:FindFirstChild("Buy") then
+            bShop.Buy:FireServer(Config.SelectedBoat)
+            ShowNotification("Mua Thuyền", "Đã gửi yêu cầu mua thuyền: " .. tostring(Config.SelectedBoat), "SUCCESS", 4)
+        end
+    end)
+
+
+    -- 4. 🔄 CỬA HÀNG TRAO ĐỔI TỪ XA (REMOTE EXCHANGE SHOP)
+    createCategoryHeader(tabExperimental, "🔄 CỬA HÀNG TRAO ĐỔI TỪ XA (REMOTE EXCHANGE SHOP)")
+    local exCard = createCardGroup(tabExperimental)
+
+    local exchangeItems = {"Trait Reroll", "EssenceOrb"}
+    createDropdownRow(exCard, "Vật Phẩm Cần Đổi", "Chọn loại vật phẩm muốn trao đổi", exchangeItems, Config.SelectedExchangeItem, function(v)
+        Config.SelectedExchangeItem = v
+    end)
+
+    createSliderRow(exCard, "Số Lượng Đổi", "Số lượng vật phẩm đổi trong 1 lần bấm", 1, 20, Config.ExchangeAmount, false, "cái", function(v)
+        Config.ExchangeAmount = v
+    end)
+
+    createButtonRow(exCard, "Thực Hiện Đổi Vật Phẩm", "Gửi remote đổi vật phẩm đã chọn ngay lập tức", "Đổi Ngay", function()
+        if Events and Events:FindFirstChild("Exchange") then
+            Events.Exchange:FireServer(Config.SelectedExchangeItem, Config.ExchangeAmount)
+            ShowNotification("Đổi Đồ", string.format("Đã gửi yêu cầu đổi %d [%s]!", Config.ExchangeAmount, Config.SelectedExchangeItem), "SUCCESS", 4)
+            task.delay(1, UpdateTraitRerollInfo)
+        else
+            ShowNotification("Lỗi", "Không tìm thấy Remote Exchange!", "WARN", 4)
+        end
+    end)
+
+    createButtonRow(exCard, "Đổi Nhanh 5 Vé Trait Reroll", "Đổi nhanh 5 Vé Reroll Trait chỉ với 1 click", "Đổi 5 Vé", function()
+        if Events and Events:FindFirstChild("Exchange") then
+            Events.Exchange:FireServer("Trait Reroll", 5)
+            ShowNotification("Đổi Vé", "Đã gửi yêu cầu đổi nhanh 5 Vé Trait Reroll!", "SUCCESS", 4)
+            task.delay(1, UpdateTraitRerollInfo)
+        end
+    end)
+
+    createButtonRow(exCard, "Đổi Nhanh 5 Ngọc EssenceOrb", "Đổi nhanh 5 Ngọc EssenceOrb chỉ với 1 click", "Đổi 5 Ngọc", function()
+        if Events and Events:FindFirstChild("Exchange") then
+            Events.Exchange:FireServer("EssenceOrb", 5)
+            ShowNotification("Đổi Ngọc", "Đã gửi yêu cầu đổi nhanh 5 Ngọc EssenceOrb!", "SUCCESS", 4)
+        end
+    end)
+
+
+    -- 5. 🎨 TÙY BIẾN MÀU SẮC CẦN CÂU (ROD COLOR & RGB RAINBOW)
+    createCategoryHeader(tabExperimental, "🎨 TÙY BIẾN MÀU SẮC CẦN CÂU (ROD COLOR & RGB RAINBOW)")
+    local colorCard = createCardGroup(tabExperimental)
+
+    local colorMap = {
+        ["Vàng Kim (Gold)"] = Color3.fromRGB(255, 215, 0),
+        ["Đỏ Rực (Red)"] = Color3.fromRGB(255, 30, 30),
+        ["Xanh Biển (Cyan)"] = Color3.fromRGB(0, 220, 255),
+        ["Xanh Lá (Emerald)"] = Color3.fromRGB(40, 255, 120),
+        ["Tím Huyền Bí (Purple)"] = Color3.fromRGB(180, 50, 255),
+        ["Trắng Tuyết (White)"] = Color3.fromRGB(255, 255, 255),
+        ["Hồng Neon (Pink)"] = Color3.fromRGB(255, 105, 180),
+    }
+    local colorNames = {"Vàng Kim (Gold)", "Đỏ Rực (Red)", "Xanh Biển (Cyan)", "Xanh Lá (Emerald)", "Tím Huyền Bí (Purple)", "Trắng Tuyết (White)", "Hồng Neon (Pink)"}
+
+    local function ApplyRodColor(c3)
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local rodName = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value or ""
+        if Events and Events:FindFirstChild("SetRodSkinColor") then
+            Events.SetRodSkinColor:FireServer(rodName, c3)
+        end
+    end
+
+    createDropdownRow(colorCard, "Màu Sắc Cần Câu", "Chọn màu phát sáng yêu thích cho cần câu", colorNames, Config.SelectedRodColor, function(v)
+        Config.SelectedRodColor = v
+        local c3 = colorMap[v]
+        if c3 then ApplyRodColor(c3) end
+    end)
+
+    createButtonRow(colorCard, "Áp Dụng Màu Đã Chọn", "Đổi màu cần câu theo màu được chọn ở trên", "Đổi Màu", function()
+        local c3 = colorMap[Config.SelectedRodColor] or Color3.fromRGB(255, 215, 0)
+        ApplyRodColor(c3)
+        ShowNotification("Màu Cần Câu", "Đã đổi màu cần câu sang: " .. tostring(Config.SelectedRodColor), "SUCCESS", 4)
+    end)
+
+    createToggleRow(colorCard, "Chế Độ RGB Cầu Vồng (Rainbow Cycle)", "Tự động xoay chuyển màu liên tục theo dải quang phổ 7 màu", Config.RainbowRodColor, function(v)
+        Config.RainbowRodColor = v
+        if v then
+            ShowNotification("Màu Cầu Vồng", "Đã BẬT hiệu ứng đổi màu RGB Cầu Vồng cho cần câu!", "SUCCESS", 4)
+        end
+    end)
+
+    createButtonRow(colorCard, "Đặt Lại Màu Mặc Định (Reset)", "Khôi phục màu cần câu về ban đầu của game", "Reset Màu", function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        local rodName = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value or ""
+        if Events and Events:FindFirstChild("ResetRodSkinColor") then
+            Events.ResetRodSkinColor:FireServer(rodName)
+            ShowNotification("Màu Cần", "Đã reset màu cần câu về mặc định!", "SUCCESS", 4)
+        end
+    end)
+
+
+    -- 6. 🏰 QUẢN LÝ BỂ NUÔI CÁ & GIA VIÊN (FISH TANK & PLOT)
+    createCategoryHeader(tabExperimental, "🏰 QUẢN LÝ BỂ NUÔI CÁ & GIA VIÊN (FISH TANK & PLOT)")
+    local tankCard = createCardGroup(tabExperimental)
+
+    createButtonRow(tankCard, "Thả Cá Quý / Đột Biến Vào Bể", "Tự quét balo và thả các con cá Secret Boss / Đột biến vào bể nuôi", "Thả Vào Bể", function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        if not pData or not pData:FindFirstChild("Inventory") then return end
+        local count = 0
+        for _, item in ipairs(pData.Inventory:GetChildren()) do
+            if Wiki.IsSecretBossFish(item) or Wiki.IsMutatedFish(item) then
+                if Events and Events:FindFirstChild("AddFishToFishTank") then
+                    Events.AddFishToFishTank:FireServer(item)
+                    count = count + 1
+                    task.wait(0.1)
+                end
+            end
+        end
+        if count > 0 then
+            ShowNotification("Bể Cá", string.format("Đã thả %d con cá quý / đột biến vào bể nuôi!", count), "SUCCESS", 5)
+        else
+            ShowNotification("Bể Cá", "Không có cá Secret Boss hoặc đột biến trong balo.", "INFO", 4)
+        end
+    end)
+
+    createButtonRow(tankCard, "Nâng Cấp Gia Viên (Upgrade Plot)", "Nâng cấp hòn đảo cá nhân của bạn từ xa", "Nâng Cấp", function()
+        if Events and Events:FindFirstChild("UpgradePlot") then
+            local res = Events.UpgradePlot:InvokeServer()
+            ShowNotification("Gia Viên", "Đã gửi lệnh nâng cấp Plot! " .. tostring(res or ""), "SUCCESS", 4)
+        end
+    end)
+end
+initExperimentalTab()
+
 local lastCastTime = 0
 local lastSellTime = 0
 local lastSkillTime = 0
@@ -8888,25 +9685,38 @@ local wasMinigame = false
 
 local function ProtectInventoryItem(item, showNotify)
     if not item or Wiki.IsItemFavorited(item) then return false end
-    local itemName = item.Name
+    local rawName = Wiki.GetItemRawName(item)
+    local rawLower = rawName:lower()
+
+    if Wiki.temporarilyUnlockedBaitFish and Wiki.temporarilyUnlockedBaitFish[rawLower] then
+        return false
+    end
+
+    local itemName = tostring(item.Name or "")
     local shouldProtect = false
     local reason = ""
 
     if Config.AutoProtectMutations and Wiki.IsMutatedFish(item) then
         shouldProtect = true
         reason = "Cá Đột Biến"
-    elseif Config.MaterialFarming and Wiki.craftMaterialFish[itemName] then
+    elseif Wiki.IsSecretBossFish(item) then
         shouldProtect = true
-        reason = "Nguyên Liệu"
-    elseif Config.AutoFavouriteFish and itemName == Config.FavouriteFishName then
+        reason = "Cá Secret Boss"
+    elseif Config.MaterialFarming and (Wiki.craftMaterialFish[rawName] or Wiki.craftMaterialFish[itemName]) then
+        shouldProtect = true
+        reason = "Nguyên Liệu Chế Tạo"
+    elseif Config.AutoFavouriteFish and (rawName == Config.FavouriteFishName or itemName == Config.FavouriteFishName) then
         shouldProtect = true
         reason = "Cá Quý Chỉ Định"
+    elseif Wiki.IsEssentialKeepItem(item) then
+        shouldProtect = true
+        reason = "Cá Cần Giữ"
     end
 
     if shouldProtect and Events and Events:FindFirstChild("FavoriteItem") then
         Events.FavoriteItem:FireServer(item)
-        if showNotify and reason == "Cá Quý Chỉ Định" then
-            ShowNotification("Khóa Cá", "Đã tự động KHÓA bảo vệ [" .. itemName .. "]!", "SUCCESS", 6)
+        if showNotify then
+            ShowNotification("Khóa Cá", string.format("Đã tự động KHÓA bảo vệ [%s] (%s)!", rawName, reason), "SUCCESS", 5)
         end
         return true
     end
@@ -9863,6 +10673,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
         if Config.AutoCraftBait and (now - lastCastTime >= 2.0) then
             if Events and Events:FindFirstChild("CraftBait") then
+                Wiki.UnlockBaitFish(Config.CraftBaitName, true)
                 Events.CraftBait:FireServer(Config.CraftBaitName, Config.CraftAmount)
             end
         end
@@ -9881,6 +10692,25 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         end
     end)
 end))
+
+-- Background task: RGB Rainbow Rod Color Cycle
+task.spawn(function()
+    local hue = 0
+    while isRunning do
+        if Config.RainbowRodColor then
+            hue = (hue + 0.02) % 1
+            local c3 = Color3.fromHSV(hue, 0.9, 1)
+            local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+            local rodName = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value or ""
+            if Events and Events:FindFirstChild("SetRodSkinColor") then
+                Events.SetRodSkinColor:FireServer(rodName, c3)
+            end
+            task.wait(0.25)
+        else
+            task.wait(1)
+        end
+    end
+end)
 
 local flyBV, flyBG = nil, nil
 table.insert(activeConnections, RunService.RenderStepped:Connect(function()
