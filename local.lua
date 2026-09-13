@@ -172,24 +172,28 @@ local Config = {
     FastSkipNonBoss = true,
     SecretBossCheckPower = true,
     SecretBossTargets = {
-        ["Scarlet Fish"] = true,
-        ["Elder Scarlet Fish"] = true,
-        ["Crimson Electric Eel"] = true,
         ["Verdant Alligator Gar"] = true,
         ["Verdant Grouper"] = true,
         ["Verdant Bonefang"] = true,
-        ["Flying Fish Empress"] = true,
+        ["Crimson Bonefang"] = true,
+        ["Scarlet Fish"] = true,
+        ["Elder Scarlet Fish"] = true,
+        ["Crimson Electric Eel"] = true,
+        ["Golden Dragonfish"] = true,
+        ["Rainbow Dragonfish"] = true,
         ["Flying Fish Emperor"] = true,
-        ["Reborn Puffer Beast"] = true,
-        ["Frost Kingfish"] = true,
-        ["Tigerfang Whale"] = true,
-        ["Heaven Piercer Turtle"] = true,
-        ["Heavenpiercer Turtle"] = true,
+        ["Flying Fish Empress"] = true,
         ["Draconic Koi"] = true,
         ["Sanguine Fish"] = true,
-        ["Primordial Kunfish Overlord"] = true,
-        ["Mountain Fish"] = true,
-        ["Octoparasitic Fish"] = true,
+        ["Tigerfang Whale"] = true,
+        ["Heavenpiercer Turtle"] = true,
+        ["Heaven Piercer Turtle"] = true,
+        ["Reborn Puffer Beast"] = true,
+        ["Frost Kingfish"] = true,
+        ["Frost Queenfish"] = true,
+        ["Mountain Dragonwhale"] = true,
+        ["Mirage Lanternfish"] = true,
+        ["Nameless Octoparasite"] = true,
     },
     CustomBossSpots = {},
     SelectedCustomSpotIsland = "Đảo Tre (Bamboo Isle)",
@@ -1649,7 +1653,7 @@ local secretBossDatabase = {
         weather = "Thunderstorm (Bão Sấm)",
         patterns = {"bamboo", "đảo tre", "dao tre", "đảo 2", "dao 2"},
         weatherPatterns = {"thunderstorm", "bão sấm", "bao sam", "thunder", "sấm", "lightning"},
-        bossPatterns = {"scarlet fish", "elder scarlet", "crimson electric eel", "electric eel"},
+        bossPatterns = {"scarlet fish", "elder scarlet", "crimson electric eel", "electric eel", "golden dragonfish", "rainbow dragonfish"},
         pos = Vector3.new(-1187.8, 7.5, -22.5),
         lookAt = Vector3.new(-1137.9, 7.5, -24.9),
         spots = {
@@ -1662,6 +1666,8 @@ local secretBossDatabase = {
             {name = "Scarlet Fish", reward = "+3 Gems"},
             {name = "Elder Scarlet Fish", reward = "+5 Gems"},
             {name = "Crimson Electric Eel", reward = "+5 Gems"},
+            {name = "Golden Dragonfish", reward = "+20 Gems"},
+            {name = "Rainbow Dragonfish", reward = "+50 Gems | Rainbow"},
         }
     },
     {
@@ -1669,7 +1675,7 @@ local secretBossDatabase = {
         weather = "Rainy (Trời Mưa)",
         patterns = {"fallout", "phóng xạ", "phong xa", "đảo 3", "dao 3"},
         weatherPatterns = {"rainy", "trời mưa", "troi mua", "heavy rain", "mưa", "rain"},
-        bossPatterns = {"alligator gar", "verdant alligator", "verdant grouper", "verdant bonefang", "bonefang"},
+        bossPatterns = {"alligator gar", "verdant alligator", "verdant grouper", "verdant bonefang", "crimson bonefang", "bonefang"},
         pos = Vector3.new(12.0, 19.0, 1413.0),
         lookAt = Vector3.new(8.3, 19.0, 1363.2),
         spots = {
@@ -1682,6 +1688,7 @@ local secretBossDatabase = {
             {name = "Verdant Alligator Gar", reward = "+3 Gems | Skill 25%"},
             {name = "Verdant Grouper", reward = "+3 Gems | Skill 25%"},
             {name = "Verdant Bonefang", reward = "+5 Gems | Skill 5%"},
+            {name = "Crimson Bonefang", reward = "+15 Gems | Skill 10%"},
         }
     },
     {
@@ -1699,8 +1706,8 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Flying Fish Empress", reward = "+10 Gems | Skill 10%"},
             {name = "Flying Fish Emperor", reward = "+10 Gems | Skill 10%"},
+            {name = "Flying Fish Empress", reward = "+10 Gems | Skill 10%"},
         }
     },
     {
@@ -1708,7 +1715,7 @@ local secretBossDatabase = {
         weather = "Snowy (Bão Tuyết)",
         patterns = {"frost", "băng giá", "bang gia", "đảo băng", "dao bang", "đảo 6", "dao 6"},
         weatherPatterns = {"snowy", "bão tuyết", "bao tuyet", "blizzard", "tuyết", "snow", "frosty"},
-        bossPatterns = {"reborn puffer beast", "puffer beast", "frost kingfish"},
+        bossPatterns = {"reborn puffer beast", "puffer beast", "frost kingfish", "frost queenfish"},
         pos = Vector3.new(-1347.6, 8.9, -1454.2),
         lookAt = Vector3.new(-1353.8, 8.9, -1404.6),
         spots = {
@@ -1720,6 +1727,7 @@ local secretBossDatabase = {
         bosses = {
             {name = "Reborn Puffer Beast", reward = "+10 Gems"},
             {name = "Frost Kingfish", reward = "+10 Gems | Skill Drop"},
+            {name = "Frost Queenfish", reward = "+20 Gems | Queen"},
         }
     },
     {
@@ -1761,29 +1769,11 @@ local secretBossDatabase = {
         }
     },
     {
-        islandName = "Đảo Chiến Trường (Battlefield)",
-        weather = "Boss Realm",
-        patterns = {"battlefield", "chiến trường", "chien truong", "đảo 9", "dao 9"},
-        weatherPatterns = {"boss realm", "realm"},
-        bossPatterns = {"primordial kunfish", "kunfish overlord", "kunfish"},
-        pos = Vector3.new(1365.5, 8.9, 270.4),
-        lookAt = Vector3.new(1316.1, 8.9, 262.6),
-        spots = {
-            [1] = {
-                pos = Vector3.new(1365.5, 8.9, 270.4),
-                lookAt = Vector3.new(1316.1, 8.9, 262.6),
-            },
-        },
-        bosses = {
-            {name = "Primordial Kunfish Overlord", reward = "+30 Gems"},
-        }
-    },
-    {
         islandName = "Đảo Đỉnh Sương Mù (Mistpeak)",
         weather = "Mountain Peak",
         patterns = {"mistpeak", "đỉnh sương mù", "dinh suong mu", "đảo 10", "dao 10"},
         weatherPatterns = {"mountain peak", "mistpeak", "đỉnh núi"},
-        bossPatterns = {"mountain fish"},
+        bossPatterns = {"mountain dragonwhale", "dragonwhale", "mountain fish"},
         pos = Vector3.new(2579.1, 9.3, 11.7),
         lookAt = Vector3.new(2529.3, 9.3, 7.3),
         spots = {
@@ -1793,7 +1783,7 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Mountain Fish", reward = "+20 Gems | Skill 5%"},
+            {name = "Mountain Dragonwhale", reward = "+20 Gems | Skill 5%"},
         }
     },
     {
@@ -1801,7 +1791,7 @@ local secretBossDatabase = {
         weather = "Special Event",
         patterns = {"octo", "bạch tuộc", "bach tuoc", "phao", "buoy", "secret ocean"},
         weatherPatterns = {"special event", "octo", "bạch tuộc"},
-        bossPatterns = {"octoparasitic fish", "octoparasitic", "octoparasite"},
+        bossPatterns = {"mirage lanternfish", "lanternfish", "nameless octoparasite", "octoparasite"},
         pos = Vector3.new(1608.2, 5.5, -218.3),
         lookAt = Vector3.new(1635.0, 5.0, -235.0),
         spots = {
@@ -1811,7 +1801,8 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Octoparasitic Fish", reward = "+50 Gems | Secret"},
+            {name = "Mirage Lanternfish", reward = "+20 Gems"},
+            {name = "Nameless Octoparasite", reward = "+50 Gems | Secret"},
         }
     }
 }
@@ -1830,8 +1821,22 @@ secretBossLookup["heavenpiercer"] = "Heavenpiercer Turtle"
 secretBossLookup["heaven piercer"] = "Heavenpiercer Turtle"
 secretBossLookup["tigerfang whale"] = "Tigerfang Whale"
 secretBossLookup["tiger fang whale"] = "Tigerfang Whale"
-secretBossLookup["primordial kunfish overlord"] = "Primordial Kunfish Overlord"
-secretBossLookup["primordial kun fish overlord"] = "Primordial Kunfish Overlord"
+secretBossLookup["mountain dragonwhale"] = "Mountain Dragonwhale"
+secretBossLookup["mountain dragon whale"] = "Mountain Dragonwhale"
+secretBossLookup["mountain fish"] = "Mountain Dragonwhale"
+secretBossLookup["nameless octoparasite"] = "Nameless Octoparasite"
+secretBossLookup["octoparasite"] = "Nameless Octoparasite"
+secretBossLookup["octoparasitic fish"] = "Nameless Octoparasite"
+secretBossLookup["frost queenfish"] = "Frost Queenfish"
+secretBossLookup["frost queen fish"] = "Frost Queenfish"
+secretBossLookup["crimson bonefang"] = "Crimson Bonefang"
+secretBossLookup["crimson bone fang"] = "Crimson Bonefang"
+secretBossLookup["golden dragonfish"] = "Golden Dragonfish"
+secretBossLookup["golden dragon fish"] = "Golden Dragonfish"
+secretBossLookup["rainbow dragonfish"] = "Rainbow Dragonfish"
+secretBossLookup["rainbow dragon fish"] = "Rainbow Dragonfish"
+secretBossLookup["mirage lanternfish"] = "Mirage Lanternfish"
+secretBossLookup["mirage lantern fish"] = "Mirage Lanternfish"
 
 local Wiki = {
     craftMaterialFish = {
@@ -7440,7 +7445,13 @@ createButtonRow(sellCard, "Bán Ngay & Bay Đến Nana", "Dịch chuyển tức 
     end
 end)
 
-local fishList = {"Colossal Tigerfish", "Heavenpiercer Turtle", "Golden Guardian Fish", "Crimson Electric Eel", "Frost Kingfish", "Ascended Perch", "Primordial Kunfish Overlord", "Warbringer Shark", "Mountain Fish", "Tiger Mirefish", "Mirage Lanternfish", "Octoparasitic Fish", "Elder Scarlet Fish", "Verdant Bonefang", "Draconic Koi", "Sanguine Fish", "Flying Fish Emperor", "Reborn Puffer Beast"}
+local fishList = {
+    "Verdant Alligator Gar", "Verdant Grouper", "Verdant Bonefang", "Crimson Bonefang",
+    "Scarlet Fish", "Elder Scarlet Fish", "Crimson Electric Eel", "Golden Dragonfish", "Rainbow Dragonfish",
+    "Flying Fish Emperor", "Flying Fish Empress", "Draconic Koi", "Sanguine Fish",
+    "Tigerfang Whale", "Heavenpiercer Turtle", "Reborn Puffer Beast", "Frost Kingfish", "Frost Queenfish",
+    "Mountain Dragonwhale", "Mirage Lanternfish", "Nameless Octoparasite"
+}
 createToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá quý hiếm đã chọn, không bao giờ bị bán nhầm", Config.AutoFavouriteFish, function(v) Config.AutoFavouriteFish = v end)
 createDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName, function(v) Config.FavouriteFishName = v end)
 createToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Tự động khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
