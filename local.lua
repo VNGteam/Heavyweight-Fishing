@@ -93,7 +93,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "dc47f4a"
+local SCRIPT_BUILD_COMMIT = "fix-skill-v"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -705,6 +705,22 @@ Config._loadEssential = function()
             end
         end
     end
+
+    -- VỆ SINH CẤU HÌNH TỰ ĐỘNG TỪ Ổ ĐĨA:
+    -- Nếu file config cũ trên máy còn lưu chuỗi combo cũ có C (như "X, C"), tự động dọn sạch sang "Z, X, V"
+    if Config.LoopSkills and (Config.LoopSkills:find("C") or Config.LoopSkills:find("c")) then
+        Config.LoopSkills = Config.LoopSkills:gsub("%s*,?%s*[Cc]%s*,?", "")
+        if Config.LoopSkills == "" or Config.LoopSkills == "X" or Config.LoopSkills == "X, " then
+            Config.LoopSkills = "Z, X, V"
+        end
+        pcall(Config._saveEssential)
+    end
+
+    if Config.TicketQuickSkill and (Config.TicketQuickSkill:find("C") or Config.TicketQuickSkill:find("c")) then
+        Config.TicketQuickSkill = "Chiêu V"
+        pcall(Config._saveEssential)
+    end
+
     return true
 end
 
@@ -9060,6 +9076,25 @@ do
             ShowNotification("Xóa Thất Bại", tostring(res), "ERROR")
         end
     end)
+
+    createButtonRow(profCard, "Xóa Bộ Nhớ Cấu Hình Tự Lưu (Reset Cache Máy)", "Xóa file essential_config.json lưu ngầm trên máy để xóa triệt để cài đặt cũ", "⚠️ Xóa Cache Máy", function()
+        EnsureAccountConfigDir()
+        local accDir = GetAccountConfigDir()
+        local filePath = accDir .. "/essential_config.json"
+        if isfile and isfile(filePath) and delfile then
+            pcall(function() delfile(filePath) end)
+        end
+        Config.LoopSkills = "Z, X, V"
+        Config.TicketQuickSkill = "Chiêu V"
+        Config.TicketSkillKey = "Chiêu Z"
+        Config.TrainSkill = "Z"
+        for key, ctrl in pairs(UIControllers) do
+            if Config[key] ~= nil and ctrl and ctrl.Set then
+                pcall(function() ctrl.Set(Config[key]) end)
+            end
+        end
+        ShowNotification("Reset Cache", "Đã xóa sạch file cache máy và đặt lại combo về [Z, X, V]!", "SUCCESS", 6)
+    end)
 end
 
 createCategoryHeader(tabProfiles, "📢 Discord Webhook Báo Cáo Từ Xa")
@@ -9411,6 +9446,18 @@ local function initExperimentalTab()
     end)
 end
 initExperimentalTab()
+
+-- ĐỒNG BỘ TOÀN BỘ GIÁ TRỊ TỪ CONFIG VÀO GIAO DIỆN GUI (ĐẢM BẢO CONFIG = GIAO DIỆN 100%)
+task.spawn(function()
+    task.wait(0.2)
+    for key, ctrl in pairs(UIControllers) do
+        if Config[key] ~= nil and ctrl and ctrl.Set then
+            pcall(function()
+                ctrl.Set(Config[key])
+            end)
+        end
+    end
+end)
 
 local lastCastTime = 0
 local lastSellTime = 0
