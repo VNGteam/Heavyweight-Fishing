@@ -4470,7 +4470,9 @@ function ticketQuestState.UpdateUI()
             remain = math.max(0, math.floor(ticketQuestState.cooldownEnd - tick()))
         end
 
-        if remain > 0 and not ticketQuestState.readyForNewQuest then
+        if ticketQuestState.IsAllQuestsDoneToday and ticketQuestState.IsAllQuestsDoneToday() then
+            ticketQuestState.uiCooldown.Set("Đã hết nhiệm vụ hôm nay!")
+        elseif remain > 0 and not ticketQuestState.readyForNewQuest then
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             local homeStr = ""
@@ -5003,12 +5005,44 @@ function ticketQuestState.SelectDialogueOption(optionIndex, optionTextPattern)
     return false
 end
 
+-- Kiểm tra nếu NPC hiển thị câu thoại hết quest hôm nay:
+-- "That's all the quests I've got for today! Come back tomorrow for more."
+function ticketQuestState.CheckAllQuestsDoneToday()
+    local dlg = ticketQuestState.GetDialogueGui()
+    if not dlg then return false end
+    for _, d in ipairs(dlg:GetDescendants()) do
+        if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
+            local low = d.Text:lower()
+            if (low:find("all the quests") or low:find("all the quest") or low:find("come back tomorrow"))
+               and (low:find("today") or low:find("tomorrow") or low:find("more")) then
+                return true, d.Text
+            end
+        end
+    end
+    return false
+end
+
+function ticketQuestState.IsAllQuestsDoneToday()
+    if not ticketQuestState.allQuestsDoneForToday then return false end
+    local today = os.date("%Y-%m-%d")
+    if ticketQuestState.allQuestsDoneDate and ticketQuestState.allQuestsDoneDate ~= today then
+        -- Đã sang ngày mới -> Tự động giải phóng cờ để tiếp tục nhận vé ngày mới!
+        ticketQuestState.allQuestsDoneForToday = false
+        ticketQuestState.allQuestsDoneDate = nil
+        ticketQuestState.readyForNewQuest = true
+        ticketQuestState.isCooldown = false
+        return false
+    end
+    return true
+end
+
 -- Xử lý toàn bộ logic tương tác các trang hội thoại của NPC Vé (Ticket Quest Giver)
 -- Trang 1: "I love big and rare fish..." -> Luôn bấm nút [1] ("Quest", Action: "Quest")
 -- Trang 2:
 --   - Nếu nộp vé thành công: Hiện "YUPPIE..." -> Bấm nút [1] ("*Leave*", Action: "Close")
 --   - Nếu nhận vé mới: Hiện "Oh, you are going to help me?..." -> Bấm nút [2] ("Accept Hard Quest", Action: "HardAcceptQuest") hoặc [1] ("Accept Easy Quest")
 --   - Nếu chưa xong: Hiện "You didn't complete my task yet..." -> Bấm nút [1] ("*Leave*", Action: "Close")
+--   - Nếu hết vé hôm nay: "That's all the quests I've got for today! Come back tomorrow for more." -> Bấm *Leave* và bật cờ hết vé!
 function ticketQuestState.HandleDialogue(isClaiming)
     if not ticketQuestState.IsDialogueOpen() then return false end
 
@@ -5037,6 +5071,24 @@ function ticketQuestState.HandleDialogue(isClaiming)
         if b.clean:find(targetDiffKeyword) and (b.clean:find("quest") or b.clean:find("accept")) then
             diffBtn = b
         end
+    end
+
+    -- KIỂM TRA ĐẶC BIỆT: Nếu NPC thông báo hết vé hôm nay ("That's all the quests I've got for today! Come back tomorrow for more.")
+    local isDoneToday, doneMsg = ticketQuestState.CheckAllQuestsDoneToday()
+    if isDoneToday then
+        ticketQuestState.allQuestsDoneForToday = true
+        ticketQuestState.allQuestsDoneDate = os.date("%Y-%m-%d")
+        ticketQuestState.readyForNewQuest = false
+        ticketQuestState.isCooldown = true
+        ticketQuestState.statusText = "Đã hết nhiệm vụ hôm nay! (Hẹn ngày mai quay lại)"
+        ticketQuestState.UpdateUI()
+        ShowNotification("Hết Nhiệm Vụ", "NPC: Đã hết tất cả vé nhiệm vụ hôm nay! Hẹn gặp lại ngày mai.", "WARN", 8)
+        if leaveBtn then
+            ticketQuestState.ClickButtonEntry(leaveBtn, "Close")
+        end
+        task.wait(0.3)
+        ticketQuestState.CloseDialogue()
+        return true
     end
 
     -- TH1: Đang ở màn hình kết quả/rời đi có nút Leave / *Leave*
@@ -5522,20 +5574,72 @@ end
 function ticketQuestState.ResetCooldown()
     ticketQuestState.isCooldown = false
     ticketQuestState.cooldownEnd = 0
-    ticketQuestState.readyForNewQuest = false
+    ticketQuestState.readyForNewQuest = true
     ticketQuestState.isCompleted = false
     ticketQuestState.isAtHomeSpot = false
+    ticketQuestState.allQuestsDoneForToday = false
+    ticketQuestState.allQuestsDoneDate = nil
     ticketQuestState.currentProgress = 0
     ticketQuestState.currentQuestType = "none"
     ticketQuestState.statusText = "Đã đặt lại! Sẵn sàng nhận vé mới."
     ticketQuestState.SaveSpots()
     ticketQuestState.UpdateUI()
-    ShowNotification("Nhiệm Vụ Vé", "Đã xóa hồi chiêu và đặt lại bộ đếm!", "SUCCESS", 5)
+    ShowNotification("Nhiệm Vụ Vé", "Đã xóa hồi chiêu, cờ hết vé và đặt lại bộ đếm!", "SUCCESS", 5)
 end
 
 function ticketQuestState.Tick()
     if not Config.AutoTicketQuest then return end
     local now = tick()
+
+    -- KIỂM TRA NẾU ĐÃ HẾT VÉ NHIỆM VỤ HÔM NAY (NPC "That's all the quests I've got for today! Come back tomorrow for more.")
+    if ticketQuestState.IsAllQuestsDoneToday() then
+        ticketQuestState.statusText = "Đã hết nhiệm vụ hôm nay! (Hẹn ngày mai quay lại)"
+        ticketQuestState.isCooldown = true
+        ticketQuestState.readyForNewQuest = false
+
+        -- Tự động đưa về Home Spot để farm câu thường nếu có cài đặt
+        if Config.TicketReturnHomeWhenDone and Config.HomeFarmSpot and not ticketQuestState.isAtHomeSpot then
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                local homeCf = nil
+                if Config.HomeFarmSpot.cframe and #Config.HomeFarmSpot.cframe == 12 then
+                    homeCf = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+                elseif Config.HomeFarmSpot.x and Config.HomeFarmSpot.y and Config.HomeFarmSpot.z then
+                    homeCf = CFrame.new(Config.HomeFarmSpot.x, Config.HomeFarmSpot.y, Config.HomeFarmSpot.z)
+                end
+                if homeCf then
+                    local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
+                    if not wp then
+                        wp = Instance.new("Part")
+                        wp.Name = "IdenticalWaterPlatform"
+                        wp.Size = Vector3.new(30, 2, 30)
+                        wp.Transparency = 1
+                        wp.Anchored = true
+                        wp.CanCollide = true
+                        wp.Parent = Workspace
+                    end
+                    wp.CFrame = CFrame.new(homeCf.Position.X, homeCf.Position.Y - 2.8, homeCf.Position.Z)
+                    wp.CanCollide = true
+                    root.CFrame = homeCf + Vector3.new(0, 1.5, 0)
+                    task.wait(0.2)
+                    root.CFrame = homeCf
+                    ticketQuestState.isAtHomeSpot = true
+                    ticketQuestState.statusText = "Hết quest hôm nay: đã về Home Spot farm combo!"
+                    ShowNotification("Home Spot", "Đã về vị trí Home Spot farm vì đã hết vé hôm nay!", "SUCCESS", 5)
+                    if Config.TicketAutoCastAtHome then
+                        task.delay(1.0, function()
+                            if isRunning and ticketQuestState.isAtHomeSpot then
+                                CancelAndRecastRod()
+                            end
+                        end)
+                    end
+                end
+            end
+        end
+        ticketQuestState.UpdateUI()
+        return
+    end
 
     -- 0. Quét đồng bộ trạng thái và tiến độ nhiệm vụ trước khi thực thi
     local qType, qTitle, cur, max, done, detectedCd = ticketQuestState.ScanAndUpdateStatus()
@@ -5977,6 +6081,8 @@ function PriorityManager.IsTaskActive(taskId)
     elseif taskId == "TicketQuest" then
         if not Config.AutoTicketQuest then return false end
         if not ticketQuestState then return false end
+        -- Nếu đã hết tất cả nhiệm vụ vé hôm nay thì KHÔNG giữ quyền ưu tiên
+        if ticketQuestState.IsAllQuestsDoneToday and ticketQuestState.IsAllQuestsDoneToday() then return false end
         -- Nếu đang trong thời gian hồi chiêu (Cooldown 20p) thì KHÔNG giữ quyền
         if ticketQuestState.isCooldown then return false end
         if ticketQuestState.isCompleted then return true end
@@ -8520,6 +8626,16 @@ end)
 createButtonRow(manualCard, "Quét Lại Tiến Độ Nhiệm Vụ", "Quét ngay lập tức PlayerGui để kiểm tra nhiệm vụ và tiến độ hiện tại", "Quét Ngay", function()
     ticketQuestState.ScanAndUpdateStatus()
     ShowNotification("Nhiệm Vụ Vé", tostring(ticketQuestState.statusText), "INFO", 5)
+end)
+
+createButtonRow(manualCard, "Đặt Lại / Bỏ Chặn Hết Vé Hôm Nay", "Xóa cờ đánh dấu hết vé hôm nay để bot thử tương tác nhận vé lại", "🔄 Đặt Lại", function()
+    ticketQuestState.allQuestsDoneForToday = false
+    ticketQuestState.allQuestsDoneDate = nil
+    ticketQuestState.readyForNewQuest = true
+    ticketQuestState.isCooldown = false
+    ticketQuestState.statusText = "Đã đặt lại! Sẵn sàng thử nhận vé mới."
+    ticketQuestState.UpdateUI()
+    ShowNotification("Nhiệm Vụ Vé", "Đã xóa cờ hết vé hôm nay! Bot sẽ thử nhận vé lại.", "SUCCESS", 5)
 end)
 
 createCategoryHeader(tabQuests, "Điểm Danh & Nhiệm Vụ Hàng Ngày")
