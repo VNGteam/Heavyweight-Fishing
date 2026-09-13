@@ -5229,6 +5229,13 @@ function ticketQuestState.DetectActiveQuest()
                     isDone = true
                 end
 
+                -- BẢO VỆ QUAN TRỌNG: Nếu cooldown server còn > 5 giây VÀ tiến độ = 0
+                -- -> Đây là dữ liệu quest cũ chưa xóa (NPC nói "come back in X:XX")
+                -- -> Ưu tiên trả về cooldown, KHÔNG trả về quest để bot không đến NPC sớm!
+                if detectedCooldownSec and detectedCooldownSec > 5 and detectedCur == 0 and not isDone then
+                    return nil, nil, 0, 0, false, detectedCooldownSec
+                end
+
                 return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
             end
         end
