@@ -317,6 +317,21 @@ if isfile and isfile("HeavyweightFishing_WeatherHop.json") and readfile then
     end
 end
 
+-- Tự động khôi phục trạng thái tìm server NPC (Taoist / Maoshan / Thần Linh)
+local pendingNPCHopData = nil
+if isfile and isfile("HeavyweightFishing_NPCHop.json") and readfile then
+    local hopOk, hopContent = pcall(function() return readfile("HeavyweightFishing_NPCHop.json") end)
+    if hopOk and hopContent and #hopContent > 0 then
+        local decOk, hopData = pcall(function() return HttpService:JSONDecode(hopContent) end)
+        if decOk and type(hopData) == "table" and hopData.Active then
+            pendingNPCHopData = hopData
+            if hopData.Taoist then Config.AutoServerHopTaoist = true end
+            if hopData.Maoshan then Config.AutoServerHopMaoshan = true end
+            if hopData.God then Config.AutoServerHopGod = true end
+        end
+    end
+end
+
 local UIControllers = {}
 local PriorityManager = {}
 
@@ -442,6 +457,7 @@ local ConfigLabelMap = {
     ["Đổi Server Tìm Thần Linh"] = "AutoServerHopGod",
     ["Đổi Server Tìm Maoshan"] = "AutoServerHopMaoshan",
     ["Đổi Server Tìm Đạo Sĩ (Taoist)"] = "AutoServerHopTaoist",
+    ["Đổi Server Tìm Taoist"] = "AutoServerHopTaoist",
 
     -- Nhiệm vụ & Gacha
     ["Tự Động Nộp Vé Nhiệm Vụ (Tickets)"] = "AutoTicketQuest",
@@ -3005,9 +3021,19 @@ local function GetCurrentHookedFishName()
     return nil
 end
 
-local function ServerHop()
+local function QueueScriptOnTeleport()
+    local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    if qot then
+        pcall(function()
+            qot([[loadstring(game:HttpGet("https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/loader.lua"))()]])
+        end)
+    end
+end
+
+local function ServerHop(avoidServers)
     ShowNotification("Đổi Server", "Đang tìm kiếm server phù hợp...", "WARN")
     secretBossState.isNormalHopping = true
+    QueueScriptOnTeleport()
     task.spawn(function()
         local placeId = game.PlaceId
         local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
@@ -3015,9 +3041,15 @@ local function ServerHop()
         if ok and res then
             local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
             if bOk and body and body.data then
+                local avoidMap = {}
+                if avoidServers and type(avoidServers) == "table" then
+                    for _, sid in ipairs(avoidServers) do avoidMap[sid] = true end
+                end
+                avoidMap[game.JobId] = true
+
                 local candidates = {}
                 for _, s in ipairs(body.data) do
-                    if s.playing and s.maxPlayers and s.id ~= game.JobId then
+                    if s.playing and s.maxPlayers and not avoidMap[s.id] then
                         local free = s.maxPlayers - s.playing
                         if free >= 2 then
                             table.insert(candidates, s.id)
@@ -3027,7 +3059,7 @@ local function ServerHop()
                 local chosen = (#candidates > 0 and candidates[math.random(1, #candidates)]) or nil
                 if not chosen then
                     for _, s in ipairs(body.data) do
-                        if s.playing and s.maxPlayers and s.playing < s.maxPlayers and s.id ~= game.JobId then
+                        if s.playing and s.maxPlayers and s.playing < s.maxPlayers and not avoidMap[s.id] then
                             chosen = s.id
                             break
                         end
@@ -8897,12 +8929,58 @@ createButtonRow(godCard, "Cầu Nguyện Ngay Lập Tức", "Tương tác với 
     end
 end)
 
+local function SaveNPCHopState(visitedList)
+    if not (writefile and isfile) then return end
+    local isAnyActive = Config.AutoServerHopTaoist or Config.AutoServerHopMaoshan or Config.AutoServerHopGod
+    if isAnyActive then
+        pcall(function()
+            writefile("HeavyweightFishing_NPCHop.json", HttpService:JSONEncode({
+                Active = true,
+                Taoist = Config.AutoServerHopTaoist,
+                Maoshan = Config.AutoServerHopMaoshan,
+                God = Config.AutoServerHopGod,
+                Visited = visitedList or (secretBossState.npcHopVisited or {}),
+                StartTime = tick()
+            }))
+        end)
+    else
+        pcall(function()
+            if isfile("HeavyweightFishing_NPCHop.json") and delfile then
+                delfile("HeavyweightFishing_NPCHop.json")
+            end
+        end)
+    end
+end
+
+local function ClearNPCHopState()
+    Config.AutoServerHopTaoist = false
+    Config.AutoServerHopMaoshan = false
+    Config.AutoServerHopGod = false
+    if UIControllers["AutoServerHopTaoist"] then UIControllers["AutoServerHopTaoist"].Set(false, true) end
+    if UIControllers["AutoServerHopMaoshan"] then UIControllers["AutoServerHopMaoshan"].Set(false, true) end
+    if UIControllers["AutoServerHopGod"] then UIControllers["AutoServerHopGod"].Set(false, true) end
+    pcall(function()
+        if isfile and isfile("HeavyweightFishing_NPCHop.json") and delfile then
+            delfile("HeavyweightFishing_NPCHop.json")
+        end
+    end)
+end
+
 createCategoryHeader(tabGod, "Tự Động Đổi Server (Server Hop)")
 local hopCard = createCardGroup(tabGod)
-createToggleRow(hopCard, "Đổi Server Tìm Thần Linh", "Tự động nhảy server liên tục đến khi gặp God Spirit", Config.AutoServerHopGod, function(v) Config.AutoServerHopGod = v end)
-createToggleRow(hopCard, "Đổi Server Tìm Maoshan", "Tự động nhảy server liên tục đến khi gặp Maoshan", Config.AutoServerHopMaoshan, function(v) Config.AutoServerHopMaoshan = v end)
-createToggleRow(hopCard, "Đổi Server Tìm Taoist", "Tự động nhảy server liên tục đến khi gặp Đạo sĩ Taoist", Config.AutoServerHopTaoist, function(v) Config.AutoServerHopTaoist = v end)
-createButtonRow(hopCard, "Đổi Server Ngay", "Chuyển sang một server ngẫu nhiên khác ngay lập tức", "Đổi Server", ServerHop)
+createToggleRow(hopCard, "Đổi Server Tìm Thần Linh", "Tự động nhảy server liên tục đến khi gặp God Spirit", Config.AutoServerHopGod, function(v)
+    Config.AutoServerHopGod = v
+    SaveNPCHopState()
+end)
+createToggleRow(hopCard, "Đổi Server Tìm Maoshan", "Tự động nhảy server liên tục đến khi gặp Maoshan", Config.AutoServerHopMaoshan, function(v)
+    Config.AutoServerHopMaoshan = v
+    SaveNPCHopState()
+end)
+createToggleRow(hopCard, "Đổi Server Tìm Taoist", "Tự động nhảy server liên tục đến khi gặp Đạo sĩ Taoist", Config.AutoServerHopTaoist, function(v)
+    Config.AutoServerHopTaoist = v
+    SaveNPCHopState()
+end)
+createButtonRow(hopCard, "Đổi Server Ngay", "Chuyển sang một server ngẫu nhiên khác ngay lập tức", "Đổi Server", function() ServerHop() end)
 end
 
 do
@@ -12480,49 +12558,66 @@ end)
 task.spawn(function()
     task.wait(6)
     local lastHopAttempt = 0
+    secretBossState.npcHopVisited = (pendingNPCHopData and pendingNPCHopData.Visited) or {}
+    if not table.find(secretBossState.npcHopVisited, game.JobId) then
+        table.insert(secretBossState.npcHopVisited, game.JobId)
+    end
+
     while isRunning do
         task.wait(3.0)
         if isRunning and (Config.AutoServerHopTaoist or Config.AutoServerHopGod or Config.AutoServerHopMaoshan) then
             pcall(function()
                 local now = tick()
-                if (now - lastHopAttempt) < 12 then return end
+                if (now - lastHopAttempt) < 10 then return end
 
-                local shouldHop = false
-                local hopReason = ""
+                local enabledTargets = {}
+                local foundTargets = {}
 
+                -- 1. Kiểm tra Taoist nếu đang bật
                 if Config.AutoServerHopTaoist then
+                    table.insert(enabledTargets, "Đạo Sĩ (Taoist)")
                     local tInst, tName = secretBossState.ScanForTaoistNPC()
                     if tInst then
-                        ShowNotification("Đạo Sĩ (Taoist)", "Đã tìm thấy " .. tostring(tName) .. " trong server này! Đang dừng đổi server.", "SUCCESS", 6)
-                    else
-                        shouldHop = true
-                        hopReason = "Không tìm thấy Đạo Sĩ (Taoist) trong server này. Đang đổi server khác..."
-                    end
-                elseif Config.AutoServerHopMaoshan then
-                    local tInst, tName = secretBossState.ScanForMaoshanNPC()
-                    if tInst then
-                        ShowNotification("Đạo Sĩ Maoshan", "Đã tìm thấy " .. tostring(tName) .. " trong server này! Đang dừng đổi server.", "SUCCESS", 6)
-                    else
-                        shouldHop = true
-                        hopReason = "Không tìm thấy Đạo Sĩ Maoshan trong server này. Đang đổi server khác..."
-                    end
-                elseif Config.AutoServerHopGod then
-                    local sp = secretBossState.ScanForGodSpirit()
-                    if sp then
-                        ShowNotification("Thần Linh", "Đã tìm thấy God Spirit trong server này! Đang dừng đổi server.", "SUCCESS", 6)
-                    else
-                        shouldHop = true
-                        hopReason = "Không tìm thấy Thần Linh trong server này. Đang đổi server khác..."
+                        table.insert(foundTargets, tostring(tName or "Đạo Sĩ (Taoist)"))
                     end
                 end
 
-                if shouldHop then
-                    lastHopAttempt = now
-                    ShowNotification("Đổi Server Tìm NPC", hopReason, "WARN", 4)
-                    task.wait(1.5)
-                    if secretBossState.ServerHop then
-                        secretBossState.ServerHop()
+                -- 2. Kiểm tra Maoshan nếu đang bật
+                if Config.AutoServerHopMaoshan then
+                    table.insert(enabledTargets, "Đạo Sĩ Maoshan")
+                    local mInst, mName = secretBossState.ScanForMaoshanNPC()
+                    if mInst then
+                        table.insert(foundTargets, tostring(mName or "Đạo Sĩ Maoshan"))
                     end
+                end
+
+                -- 3. Kiểm tra Thần Linh (God Spirit) nếu đang bật
+                if Config.AutoServerHopGod then
+                    table.insert(enabledTargets, "Thần Linh (God Spirit)")
+                    local sp = secretBossState.ScanForGodSpirit()
+                    if sp then
+                        table.insert(foundTargets, "Thần Linh (God Spirit)")
+                    end
+                end
+
+                -- Nếu tìm được BẤT KỲ mục tiêu nào trong số các mục tiêu đã bật:
+                if #foundTargets > 0 then
+                    local foundStr = table.concat(foundTargets, ", ")
+                    ShowNotification("ĐÃ TÌM THẤY!", "Đã phát hiện " .. foundStr .. " trong server này! Đã dừng đổi server.", "SUCCESS", 8)
+                    ClearNPCHopState()
+                    return
+                end
+
+                -- Nếu KHÔNG tìm thấy bất kỳ mục tiêu nào trong các mục tiêu đang bật -> ĐỔI SERVER TIẾP
+                lastHopAttempt = now
+                local targetListStr = table.concat(enabledTargets, " / ")
+                ShowNotification("Đổi Server Tìm NPC", "Server này không có " .. targetListStr .. ". Đang đổi server tiếp theo...", "WARN", 4)
+
+                SaveNPCHopState(secretBossState.npcHopVisited)
+                QueueScriptOnTeleport()
+                task.wait(1.5)
+                if secretBossState.ServerHop then
+                    secretBossState.ServerHop(secretBossState.npcHopVisited)
                 end
             end)
         end
