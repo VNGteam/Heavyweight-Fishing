@@ -72,7 +72,7 @@ end
 -- Hiển thị thông báo tải script
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Identical Hub",
+        Title = "Identical Hub (v1.5)",
         Text = "Đang tải bản cập nhật mới nhất...",
         Duration = 3
     })

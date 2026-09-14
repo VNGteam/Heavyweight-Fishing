@@ -100,8 +100,9 @@ local isRunning = true
 local activeConnections = {}
 local cleanUpInstances = {}
 
---// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-dialogue-press-timing"
+--// THÔNG TIN PHIÊN BẢN SCRIPT //--
+local SCRIPT_VERSION = "v1.5"
+local SCRIPT_BUILD_COMMIT = "050f0ee"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -1255,10 +1256,10 @@ brandTitle.TextSize = 14; brandTitle.TextXAlignment = Enum.TextXAlignment.Left
 brandTitle.Parent = titleBar
 
 local commitBadge = Instance.new("TextLabel")
-commitBadge.Size = UDim2.new(0, 68, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
+commitBadge.Size = UDim2.new(0, 95, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
 commitBadge.BackgroundColor3 = Color3.fromRGB(30, 22, 48)
 commitBadge.Font = Enum.Font.Code
-commitBadge.Text = "#" .. tostring(SCRIPT_BUILD_COMMIT)
+commitBadge.Text = SCRIPT_VERSION .. " #" .. tostring(SCRIPT_BUILD_COMMIT)
 commitBadge.TextColor3 = Color3.fromRGB(190, 150, 255)
 commitBadge.TextSize = 10
 commitBadge.Parent = titleBar
@@ -1268,9 +1269,9 @@ cStroke.Color = Colors.PurpleAccent
 cStroke.Thickness = 1
 
 local gameSubtitle = Instance.new("TextLabel")
-gameSubtitle.Size = UDim2.new(0, 220, 1, 0); gameSubtitle.Position = UDim2.new(0, 208, 0, 0)
+gameSubtitle.Size = UDim2.new(0, 220, 1, 0); gameSubtitle.Position = UDim2.new(0, 234, 0, 0)
 gameSubtitle.BackgroundTransparency = 1; gameSubtitle.Font = Enum.Font.Gotham
-gameSubtitle.Text = "HEAVYWEIGHT FISHING | BẢN VIỆT HOÁ"; gameSubtitle.TextColor3 = Colors.PurpleMuted
+gameSubtitle.Text = "HEAVYWEIGHT FISHING | VIỆT HOÁ"; gameSubtitle.TextColor3 = Colors.PurpleMuted
 gameSubtitle.TextSize = 10; gameSubtitle.TextXAlignment = Enum.TextXAlignment.Left
 gameSubtitle.Parent = titleBar
 
@@ -1381,7 +1382,7 @@ do
     local tf = Instance.new("Frame"); tf.Size = UDim2.new(1, 0, 0, 10); tf.BackgroundColor3 = Colors.SidebarBg; tf.BorderSizePixel = 0; tf.Parent = footerBar
     local fd = Instance.new("Frame"); fd.Size = UDim2.new(1, 0, 0, 1); fd.BackgroundColor3 = Colors.Divider; fd.BorderSizePixel = 0; fd.Parent = footerBar
 end
-local footerBrand = Instance.new("TextLabel"); footerBrand.Size = UDim2.new(0, 260, 1, 0); footerBrand.Position = UDim2.new(0, 12, 0, 0); footerBrand.BackgroundTransparency = 1; footerBrand.Font = Enum.Font.Gotham; footerBrand.Text = "Heavyweight Fishing | Việt Hoá V1.1"; footerBrand.TextColor3 = Colors.TextMuted; footerBrand.TextSize = 10; footerBrand.TextXAlignment = Enum.TextXAlignment.Left; footerBrand.Parent = footerBar
+local footerBrand = Instance.new("TextLabel"); footerBrand.Size = UDim2.new(0, 280, 1, 0); footerBrand.Position = UDim2.new(0, 12, 0, 0); footerBrand.BackgroundTransparency = 1; footerBrand.Font = Enum.Font.Gotham; footerBrand.Text = "Heavyweight Fishing | Việt Hoá " .. SCRIPT_VERSION .. " (#" .. SCRIPT_BUILD_COMMIT .. ")"; footerBrand.TextColor3 = Colors.TextMuted; footerBrand.TextSize = 10; footerBrand.TextXAlignment = Enum.TextXAlignment.Left; footerBrand.Parent = footerBar
 local footerKey = Instance.new("TextLabel"); footerKey.Size = UDim2.new(0, 280, 1, 0); footerKey.Position = UDim2.new(1, -292, 0, 0); footerKey.BackgroundTransparency = 1; footerKey.Font = Enum.Font.Gotham; footerKey.Text = "[R-CTRL] Menu | [END] Tắt Script"; footerKey.TextColor3 = Colors.TextMuted; footerKey.TextSize = 10; footerKey.TextXAlignment = Enum.TextXAlignment.Right; footerKey.Parent = footerBar
 
 ToggleUiVisibility = function()
@@ -13334,4 +13335,4 @@ pcall(LoadSmartComboAndSyncUI)
 -- Nạp trạng thái bật/tắt từng Secret Boss từ file local và đồng bộ UI toggle
 pcall(LoadBossTargetsAndSyncUI)
 
-ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Tự Động Tìm Server Thời Tiết, Totem Thời Tiết & Webhook!", "SUCCESS", 6)
+ShowNotification("VIỆT HOÁ " .. SCRIPT_VERSION, "Heavyweight Fishing #" .. SCRIPT_BUILD_COMMIT .. ": Sửa Combo Z-X-C, Auto Server Hop & ESP!", "SUCCESS", 6)
