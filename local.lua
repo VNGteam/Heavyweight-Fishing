@@ -11836,7 +11836,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             end)
                         end
                     end
-                elseif fUI and fUI.Visible then
+                elseif fUI and fUI.Visible and not isTrainingBusy then -- [FIX#1] Không chạy SmartCombo khi Train đang busy (tránh nhiễm usedTimes)
                     local is15mQuest = (Config.AutoTicketQuest or hasActiveTicket) and ticketQuestState and ticketQuestState.currentQuestType == "fish_15m"
 
                     -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
@@ -11897,10 +11897,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             if not didHeal then
                                 -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU COMBO (VD: Z -> X -> V...)
                                 local loopKeys = {}
-                                local curQ = ticketQuestState and ticketQuestState.currentQuestType
-                                if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-                                    curQ = select(1, ticketQuestState.DetectActiveQuest())
-                                end
+                                -- [FIX#2] Dùng cached currentQuestType (đã sync ở trên), KHÔNG gọi DetectActiveQuest() trên hot-path mỗi 0.1s
+                                local curQ = (ticketQuestState and ticketQuestState.currentQuestType) or "none"
 
                                 -- fish_100 và skill_100: chỉ dùng 1 chiêu cố định theo config vé
                                 -- Tất cả còn lại (fish_15m, bait_100, không có quest...): dùng LoopSkills đầy đủ
@@ -11925,6 +11923,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     end
 
                                     local chosenIndex = nil
+                                    local prevTargetIndex = comboState.loopTargetIndex -- [FIX#3] Lưu target gốc trước khi tìm chiêu ready
                                     if Config.LoopStrictOrder then
                                         local targetKey = loopKeys[comboState.loopTargetIndex]
                                         if comboState.IsSkillReady(targetKey, fUI) then
@@ -11951,7 +11950,13 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         comboState.CastSkill(skillToCast)
                                         comboState.lastActionTime = now
                                         comboState.loopWaitStartTime = 0
-                                        comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
+                                        -- [FIX#3] Non-strict: nếu bị buộc skip chiêu target gốc → advance từ target, không từ vị trí cast
+                                        -- Giữ đúng thứ tự Z→X→V dù frame đó phải cast chiêu khác vì CD
+                                        if Config.LoopStrictOrder or chosenIndex == prevTargetIndex then
+                                            comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
+                                        else
+                                            comboState.loopTargetIndex = (prevTargetIndex % #loopKeys) + 1
+                                        end
                                     end
                                 else
                                     local fallbackKey = (Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" and Config.QuickCatchSkill:match("([ZXCVzxcv])"))
@@ -11967,10 +11972,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                         lastSkillTime = now
                     elseif (Config.AutoSkills or is15mQuest) and (now - lastSkillTime >= 0.15) then
-                        local curQ = ticketQuestState and ticketQuestState.currentQuestType
-                        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-                            curQ = select(1, ticketQuestState.DetectActiveQuest())
-                        end
+                        -- [FIX#2] Dùng cached currentQuestType, KHÔNG gọi DetectActiveQuest() trên hot-path
+                        local curQ = (ticketQuestState and ticketQuestState.currentQuestType) or "none"
 
                         -- fish_100/skill_100: 1 chiêu cố định. Tất cả còn lại: dùng LoopSkills đầy đủ
                         if curQ == "fish_100" then
