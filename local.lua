@@ -804,6 +804,8 @@ local SMART_COMBO_KEYS = {
     "EmergencyHealHp",
     "SkillEffectDelay",
     "SmartEffectAutoDetect",
+    "TicketSkillKey",
+    "TicketQuickSkill",
 }
 
 local _smartComboSavePending = false
@@ -850,7 +852,7 @@ local function LoadSmartComboAndSyncUI()
             "SmartComboEnabled", "FishHpThreshold", "QuickCatchSkill",
             "OpenerSkill", "OpenerMaxCount", "LoopStrictOrder",
             "EmergencyHealSkill", "EmergencyHealHp", "SkillEffectDelay",
-            "SmartEffectAutoDetect",
+            "SmartEffectAutoDetect", "TicketSkillKey", "TicketQuickSkill",
         }
         for _, k in ipairs(syncKeys) do
             local ctrl = UIControllers[k]
@@ -6492,6 +6494,13 @@ local comboCard = createCardGroup(tabFishing)
 
 createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
     Config.SmartComboEnabled = v
+    -- Reset combo state để áp dụng ngay khi bật/tắt
+    comboState.loopTargetIndex = 1
+    comboState.loopIndex = 1
+    comboState.loopWaitStartTime = 0
+    comboState.lastActionTime = 0
+    comboState.openerUsedCount = 0
+    comboState.openerDone = false
     SaveSmartCombo()
 end)
 
@@ -6570,6 +6579,16 @@ do
         -- Lưu chuỗi combo mới vào local mỗi khi thay đổi
         if source ~= "__load_sync" then
             SaveSmartCombo()
+        end
+
+        -- Reset combo state để áp dụng thứ tự mới ngay lập tức
+        if source ~= "__load_sync" then
+            comboState.loopTargetIndex = 1
+            comboState.loopIndex = 1
+            comboState.loopWaitStartTime = 0
+            comboState.lastActionTime = 0
+            comboState.openerUsedCount = 0
+            comboState.openerDone = false
         end
 
         if source ~= "input" and customInput and customInput.Set then
@@ -8991,10 +9010,12 @@ end)
 local skillList = {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}
 createDropdownRow(optionCard, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Kỹ năng bot dùng sau 3s khóa chiêu rồi cất cần lặp lại", skillList, Config.TicketSkillKey, function(v)
     Config.TicketSkillKey = v
+    SaveSmartCombo()
 end)
 
 createDropdownRow(optionCard, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu mạnh nhất dùng để kết liễu cá Map 1 trong 1 hit", skillList, Config.TicketQuickSkill, function(v)
     Config.TicketQuickSkill = v
+    SaveSmartCombo()
 end)
 
 createToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự động bán sạch cá khi balo đạt giới hạn để câu tiếp", Config.TicketAutoSellFull, function(v)
@@ -11705,6 +11726,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                     local chosenIndex = nil
                                     if Config.LoopStrictOrder then
+                                        -- Strict Order: chờ đúng chiêu trong thứ tự, timeout 3s mới skip
                                         local targetKey = loopKeys[comboState.loopTargetIndex]
                                         if comboState.IsSkillReady(targetKey, fUI) then
                                             chosenIndex = comboState.loopTargetIndex
@@ -11715,12 +11737,27 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
                                         end
                                     else
-                                        for offset = 0, #loopKeys - 1 do
-                                            local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
-                                            local sk = loopKeys[idx]
-                                            if comboState.IsSkillReady(sk, fUI) then
-                                                chosenIndex = idx
-                                                break
+                                        -- Non-strict: ưu tiên giữ đúng thứ tự, chờ chiêu hiện tại sẵn sàng.
+                                        -- Chỉ nhảy sang chiêu tiếp theo nếu chiêu đang chờ bị CD quá 3s (tránh kẹt).
+                                        local targetKey = loopKeys[comboState.loopTargetIndex]
+                                        if comboState.IsSkillReady(targetKey, fUI) then
+                                            chosenIndex = comboState.loopTargetIndex
+                                            comboState.loopWaitStartTime = 0
+                                        else
+                                            -- Chiêu hiện tại chưa ready: bắt đầu hoặc tiếp tục đếm timeout
+                                            if comboState.loopWaitStartTime == 0 then
+                                                comboState.loopWaitStartTime = now
+                                            elseif (now - comboState.loopWaitStartTime >= 3.0) then
+                                                -- Timeout: cho phép nhảy sang chiêu tiếp theo sẵn sàng gần nhất
+                                                comboState.loopWaitStartTime = 0
+                                                for offset = 1, #loopKeys - 1 do
+                                                    local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                                    local sk = loopKeys[idx]
+                                                    if comboState.IsSkillReady(sk, fUI) then
+                                                        chosenIndex = idx
+                                                        break
+                                                    end
+                                                end
                                             end
                                         end
                                     end
