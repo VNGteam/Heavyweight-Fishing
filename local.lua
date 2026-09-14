@@ -11496,29 +11496,38 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         comboList = {"Z"}
                                     end
 
-                                    -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
+                                    -- 2. Giữ thăng bằng + bắn chiêu LIÊN TỤC cho đến khi server nhận (chiêu vào CD)
+                                    -- (Giống AutoTrain: game lock chiêu 3s đầu, cần bắn lặp để catch đúng khoảnh khắc mở khóa)
                                     local startTime = tick()
+                                    local skillCast = false
                                     while isRunning and (fUI and fUI.Visible) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
                                         if barFrame and barFrame:FindFirstChild("Bar") then
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
-                                        if (tick() - startTime) >= 3.05 then
-                                            break
+
+                                        local sk = comboList[1] or "Z"
+                                        comboState.CastSkill(sk)
+
+                                        task.wait(0.08)
+
+                                        local elapsed = tick() - startTime
+                                        -- Sau 3s: kiểm tra xem chiêu đã vào CD chưa (server đã nhận)
+                                        if elapsed >= 3.05 then
+                                            if comboState.IsSkillOnCooldown(sk, fUI) then
+                                                -- Server xác nhận đã nhận chiêu → thoát vòng lặp
+                                                skillCast = true
+                                                break
+                                            elseif elapsed >= 5.0 then
+                                                -- Timeout an toàn: sau 5s vẫn không vào CD thì thoát
+                                                skillCast = true
+                                                break
+                                            end
                                         end
-                                        task.wait(0.05)
                                     end
 
-                                    -- 3. Lần lượt tung TOÀN BỘ chuỗi combo đã cài (Z -> X -> V...)
-                                    for _, sk in ipairs(comboList) do
-                                        if not isRunning or not (fUI and fUI.Visible) then break end
-
-                                        local barFrame = fUI:FindFirstChild("BarFrame")
-                                        if barFrame and barFrame:FindFirstChild("Bar") then
-                                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                        end
-
-                                        comboState.CastSkill(sk)
+                                    -- 3. Cập nhật tiến độ (1 lần cast = 1 skill dùng)
+                                    if skillCast then
                                         ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                         ticketQuestState.UpdateUI()
                                         if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
@@ -11526,17 +11535,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         elseif ticketQuestState.currentProgress >= 100 then
                                             ticketQuestState.isCompleted = true
                                         end
-
-                                        -- Đợi nhịp giữa các chiêu để server nhận diện và animation nhân vật chạy (0.35s)
-                                        local waitFinish = tick()
-                                        while isRunning and (fUI and fUI.Visible) and (tick() - waitFinish < 0.35) do
-                                            local bf = fUI:FindFirstChild("BarFrame")
-                                            if bf and bf:FindFirstChild("Bar") then
-                                                bf.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                            end
-                                            task.wait(0.05)
-                                        end
                                     end
+
+                                    -- Đợi nhịp ngắn cho animation nhân vật
+                                    task.wait(0.2)
 
                                     -- 4. Kéo cá lên (Charge 100 + Slam Perfect + UpdateFishProgression)
                                     local pullStartTime = tick()
