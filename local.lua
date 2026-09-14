@@ -102,7 +102,7 @@ local cleanUpInstances = {}
 
 --// THÔNG TIN PHIÊN BẢN SCRIPT //--
 local SCRIPT_VERSION = "v1.5"
-local SCRIPT_BUILD_COMMIT = "f01172b"
+local SCRIPT_BUILD_COMMIT = "31c3704"
 
 --// HỆ THỐNG DEBUG & NHẬT KÝ HOẠT ĐỘNG (REAL-TIME LOGGING) //--
 local debugLogs = {}
@@ -6889,11 +6889,7 @@ do
     end)
 
     infoPreview = createInfoRow(comboCard, "Thứ Tự Thi Triển Thực Tế", comboState.GetComboPreview(Config.LoopSkills))
-
-    createToggleRow(comboCard, "Giữ Đúng Thứ Tự Combo (Strict Order)", "Chờ chiêu hồi theo đúng nhịp thứ tự, không nhảy cóc qua chiêu khác", Config.LoopStrictOrder, function(v)
-        Config.LoopStrictOrder = v
-        SaveSmartCombo()
-    end)
+    createInfoRow(comboCard, "Quy Tắc Đảo Chiêu", "Mỗi khi có cá mới, script luôn tự động bắt đầu tung chiêu từ đầu chuỗi (Vị trí 1)")
 end
 
 createDropdownRow(comboCard, "Chiêu Hồi Máu / Cứu Nguy", "Ưu tiên tung chiêu này khi máu người chơi xuống thấp", {"Tắt", "Z", "X", "C", "V"}, Config.EmergencyHealSkill, function(v)
@@ -10955,7 +10951,7 @@ local function initDebugTab()
 
     local lblSmartCombo = createInfoLine(infoContainer, "• Combo Thông Minh (SmartCombo):", "---")
     local lblLoopSkills = createInfoLine(infoContainer, "• Chuỗi Phím Tuần Hoàn (LoopSkills):", "---")
-    local lblStrictOrder = createInfoLine(infoContainer, "• Thứ Tự Nghiêm Ngặt (StrictOrder):", "---")
+    local lblStrictOrder = createInfoLine(infoContainer, "• Khởi Đầu Mỗi Con Cá:", "---")
     local lblTicketQuest = createInfoLine(infoContainer, "• Làm Vé Nhiệm Vụ (AutoTicketQuest):", "---")
     local lblOldAutoSkills = createInfoLine(infoContainer, "• Tự Động Chiêu Cũ (AutoSkills):", "---")
     local lblNextTarget = createInfoLine(infoContainer, "• Chiêu Mục Tiêu Tiếp Theo:", "---")
@@ -10970,13 +10966,8 @@ local function initDebugTab()
             lblLoopSkills.Text = string.format("Phím: [%s]", loopStr)
             lblLoopSkills.TextColor3 = Colors.PurplePrimary
 
-            if Config.LoopStrictOrder then
-                lblStrictOrder.Text = "🔒 BẬT (Chờ đúng thứ tự, KHÔNG nhảy cóc)"
-                lblStrictOrder.TextColor3 = Colors.AccentYellow
-            else
-                lblStrictOrder.Text = "⚡ TẮT (Tự do nhảy chiêu nếu chiêu trước CD)"
-                lblStrictOrder.TextColor3 = Colors.AccentOrange
-            end
+            lblStrictOrder.Text = "🔄 Bắt Đầu Từ Vị Trí 1 (Đã set) Cho Mỗi Con Cá"
+            lblStrictOrder.TextColor3 = Colors.AccentGreen
 
             local curQ = "Không có"
             if ticketQuestState and ticketQuestState.DetectActiveQuest then
@@ -11133,7 +11124,7 @@ local function initDebugTab()
         if tag:find("CHẶN") then return Colors.AccentRed end
         if tag:find("CHỌN") then return Colors.AccentBlue end
         if tag:find("CHỜ") then return Colors.AccentYellow end
-        if tag:find("NHẢY") then return Colors.AccentOrange end
+        if tag:find("LINH_HOẠT") or tag:find("NHẢY") then return Colors.AccentOrange end
         if tag:find("BỎ_QUA") or tag:find("SKIP") then return Colors.TextMuted end
         return Colors.PurplePrimary
     end
@@ -12309,41 +12300,17 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     end
 
                                     local chosenIndex = nil
-                                    if Config.LoopStrictOrder then
-                                        local targetKey = loopKeys[comboState.loopTargetIndex]
-                                        local sFrame = fUI and fUI:FindFirstChild("SkillButton") and fUI.SkillButton:FindFirstChild("Frame")
-                                        local keyExistsOnRod = sFrame and sFrame:FindFirstChild(targetKey) ~= nil
-
-                                        if comboState.IsSkillReady(targetKey, fUI) then
-                                            chosenIndex = comboState.loopTargetIndex
-                                            DebugLog("COMBO_CHỌN", string.format("Chiêu '%s' (vị trí %d/%d) đã sẵn sàng! Chuẩn bị tung chiêu.", targetKey, chosenIndex, #loopKeys), comboSource)
-                                        elseif not keyExistsOnRod and sFrame then
-                                            -- Chiêu này thực sự không có trên cần câu của người chơi -> Bỏ qua sau 1.5s
-                                            if comboState.loopWaitStartTime == 0 then
-                                                comboState.loopWaitStartTime = now
-                                                DebugLog("COMBO_SKIP_START", string.format("Chiêu '%s' không có trên cần -> Đếm 1.5s để bỏ qua...", targetKey), comboSource)
-                                            elseif (now - comboState.loopWaitStartTime >= 1.5) then
-                                                comboState.loopWaitStartTime = 0
-                                                comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                                DebugLog("COMBO_BỎ_QUA", string.format("Đã bỏ qua chiêu '%s' do cần không có. Chuyển sang vị trí %d ('%s')", targetKey, comboState.loopTargetIndex, tostring(loopKeys[comboState.loopTargetIndex])), comboSource)
+                                    for offset = 0, #loopKeys - 1 do
+                                        local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                        local sk = loopKeys[idx]
+                                        if comboState.IsSkillReady(sk, fUI) then
+                                            chosenIndex = idx
+                                            if offset == 0 then
+                                                DebugLog("COMBO_CHỌN", string.format("Bắn chiêu '%s' (vị trí %d/%d) theo chuỗi đã set.", sk, idx, #loopKeys), comboSource)
+                                            else
+                                                DebugLog("COMBO_LINH_HOẠT", string.format("Chiêu trước chưa hồi -> Linh hoạt bắn chiêu '%s' (vị trí %d/%d) đang sáng.", sk, idx, #loopKeys), comboSource)
                                             end
-                                        else
-                                            -- Chiêu CÓ trên cần câu nhưng đang trong thời gian hồi chiêu hoặc game đang khóa:
-                                            -- BẮT BUỘC CHỜ HỒI CHIÊU XONG! TUYỆT ĐỐI KHÔNG BỎ QUA ĐỂ ĐẢM BẢO 100% ĐÚNG THỨ TỰ!
-                                            comboState.loopWaitStartTime = 0
-                                            DebugLog("COMBO_CHỜ", string.format("Strict Order: Chiêu '%s' (vị trí %d/%d) đang hồi chiêu/khóa -> Kiên quyết chờ đúng nhịp, KHÔNG nhảy cóc.", targetKey, comboState.loopTargetIndex, #loopKeys), comboSource)
-                                        end
-                                    else
-                                        for offset = 0, #loopKeys - 1 do
-                                            local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
-                                            local sk = loopKeys[idx]
-                                            if comboState.IsSkillReady(sk, fUI) then
-                                                chosenIndex = idx
-                                                if offset > 0 then
-                                                    DebugLog("COMBO_NHẢY_CÓC", string.format("Strict Order TẮT: Chiêu trước chưa hồi, tự động nhảy sang chiêu '%s' (vị trí %d)", sk, idx), comboSource)
-                                                end
-                                                break
-                                            end
+                                            break
                                         end
                                     end
 
@@ -12394,17 +12361,15 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             end
                             if #skillList == 0 then skillList = {"Z", "X", "V"} end
 
-                            if Config.LoopStrictOrder then
-                                local targetIdx = comboState.loopTargetIndex or 1
-                                if targetIdx < 1 or targetIdx > #skillList then targetIdx = 1 end
-                                local sk = skillList[targetIdx]
+                            local targetIdx = comboState.loopTargetIndex or 1
+                            if targetIdx < 1 or targetIdx > #skillList then targetIdx = 1 end
+                            for offset = 0, #skillList - 1 do
+                                local idx = ((targetIdx - 1 + offset) % #skillList) + 1
+                                local sk = skillList[idx]
                                 if sk and comboState.IsSkillReady(sk, fUI) then
-                                    comboState.CastSkill(sk, string.format("AutoSkills Strict [%d/%d]", targetIdx, #skillList))
-                                    comboState.loopTargetIndex = (targetIdx % #skillList) + 1
-                                end
-                            else
-                                for _, sk in ipairs(skillList) do
-                                    comboState.CastSkill(sk, "AutoSkills (Tự do)")
+                                    comboState.CastSkill(sk, string.format("AutoSkills [%d/%d]", idx, #skillList))
+                                    comboState.loopTargetIndex = (idx % #skillList) + 1
+                                    break
                                 end
                             end
                         end
