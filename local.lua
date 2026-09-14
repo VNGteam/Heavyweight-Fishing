@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.1"
+local SCRIPT_BUILD_COMMIT = "fix-dialogue-press-timing"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -787,26 +787,6 @@ end
 --     end
 -- end)
 
--- Load riêng TicketSkillKey và TicketQuickSkill từ essential_config.json khi script khởi động
-pcall(function()
-    local TICKET_SKILL_KEYS = {"TicketSkillKey", "TicketQuickSkill"}
-    local accDir = GetAccountConfigDir and GetAccountConfigDir() or ""
-    local filePath = accDir .. "/essential_config.json"
-    if isfile and isfile(filePath) and readfile then
-        local ok, content = pcall(function() return readfile(filePath) end)
-        if ok and content and #content > 0 then
-            local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
-            if decOk and type(decoded) == "table" then
-                for _, k in ipairs(TICKET_SKILL_KEYS) do
-                    if decoded[k] ~= nil and Config[k] ~= nil then
-                        Config[k] = decoded[k]
-                    end
-                end
-            end
-        end
-    end
-end)
-
 -- ============================================================
 -- SMART COMBO PERSISTENCE (HeavyweightFishing_SmartCombo.json)
 -- Lưu/nạp trạng thái Combo Kỹ Năng Thông Minh tự động mỗi khi thay đổi.
@@ -824,7 +804,6 @@ local SMART_COMBO_KEYS = {
     "EmergencyHealHp",
     "SkillEffectDelay",
     "SmartEffectAutoDetect",
-    "TicketBaitChoice",
 }
 
 local _smartComboSavePending = false
@@ -871,7 +850,7 @@ local function LoadSmartComboAndSyncUI()
             "SmartComboEnabled", "FishHpThreshold", "QuickCatchSkill",
             "OpenerSkill", "OpenerMaxCount", "LoopStrictOrder",
             "EmergencyHealSkill", "EmergencyHealHp", "SkillEffectDelay",
-            "SmartEffectAutoDetect", "TicketBaitChoice",
+            "SmartEffectAutoDetect",
         }
         for _, k in ipairs(syncKeys) do
             local ctrl = UIControllers[k]
@@ -6513,13 +6492,6 @@ local comboCard = createCardGroup(tabFishing)
 
 createToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo ngưỡng máu cá, chiêu mở màn và đảo chiêu luân phiên", Config.SmartComboEnabled, function(v)
     Config.SmartComboEnabled = v
-    -- Reset combo state để áp dụng ngay khi bật/tắt
-    comboState.loopTargetIndex = 1
-    comboState.loopIndex = 1
-    comboState.loopWaitStartTime = 0
-    comboState.lastActionTime = 0
-    comboState.openerUsedCount = 0
-    comboState.openerDone = false
     SaveSmartCombo()
 end)
 
@@ -6598,16 +6570,6 @@ do
         -- Lưu chuỗi combo mới vào local mỗi khi thay đổi
         if source ~= "__load_sync" then
             SaveSmartCombo()
-        end
-
-        -- Reset combo state để áp dụng thứ tự mới ngay lập tức
-        if source ~= "__load_sync" then
-            comboState.loopTargetIndex = 1
-            comboState.loopIndex = 1
-            comboState.loopWaitStartTime = 0
-            comboState.lastActionTime = 0
-            comboState.openerUsedCount = 0
-            comboState.openerDone = false
         end
 
         if source ~= "input" and customInput and customInput.Set then
@@ -9024,18 +8986,15 @@ local optionCard = createCardGroup(tabQuests)
 local ticketBaits = {"Basic Bait", "Crude Mash Bait", "Corrupted Essence Bait", "Elite Bait", "Ancestral Bait"}
 createDropdownRow(optionCard, "Mồi Cho Nhiệm Vụ 100 Mồi", "Loại mồi bot sẽ mua và dùng khi nhận nv 100 mồi", ticketBaits, Config.TicketBaitChoice, function(v)
     Config.TicketBaitChoice = v
-    SaveSmartCombo()
 end)
 
 local skillList = {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}
 createDropdownRow(optionCard, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Kỹ năng bot dùng sau 3s khóa chiêu rồi cất cần lặp lại", skillList, Config.TicketSkillKey, function(v)
     Config.TicketSkillKey = v
-    pcall(Config._saveEssential)
 end)
 
 createDropdownRow(optionCard, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu mạnh nhất dùng để kết liễu cá Map 1 trong 1 hit", skillList, Config.TicketQuickSkill, function(v)
     Config.TicketQuickSkill = v
-    pcall(Config._saveEssential)
 end)
 
 createToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự động bán sạch cá khi balo đạt giới hạn để câu tiếp", Config.TicketAutoSellFull, function(v)
@@ -9950,12 +9909,11 @@ end)
 
 local function ApplyFullbright(enabled)
     if enabled then
-        -- Sáng đều, không cháy: chỉ đẩy Ambient lên max + tắt bóng + xóa sương
-        Lighting.Brightness = 2
+        Lighting.Brightness = 10
         Lighting.Ambient = Color3.fromRGB(178, 178, 178)
         Lighting.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
         Lighting.GlobalShadows = false
-        Lighting.ExposureCompensation = 0
+        Lighting.ExposureCompensation = 1
         local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
         if atmo then
             atmo.Density = 0
@@ -10748,34 +10706,6 @@ function comboState.IsSkillOnCooldown(sk, fUI)
     return not comboState.IsSkillReady(sk, fUI)
 end
 
--- Check CD chỉ qua UI game (bỏ qua usedTimes) — dùng để detect server nhận skill trong routine skill_100
-function comboState.IsSkillOnCooldownUI(sk, fUI)
-    if not sk or sk == "" or sk == "Tắt" then return false end
-    local cleanKey = sk:match("([ZXCVzxcv])") or sk
-    cleanKey = cleanKey:upper()
-    if not fUI then return false end
-    for _, desc in ipairs(fUI:GetDescendants()) do
-        local nameUpper = desc.Name:upper()
-        if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
-            if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
-                return true
-            end
-            for _, child in ipairs(desc:GetDescendants()) do
-                if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
-                    local cName = child.Name:lower()
-                    local txt = child.Text
-                    local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
-                    if cdWithS then
-                        local num = tonumber(cdWithS)
-                        if num and num > 0 and num <= 999 then return true end
-                    end
-                end
-            end
-        end
-    end
-    return false
-end
-
 function comboState.CheckSkillReady(sk, fUI, minCooldown)
     if minCooldown and (tick() - (comboState.usedTimes[sk:upper()] or 0) < minCooldown) then
         return false
@@ -10970,7 +10900,7 @@ function comboState.CastSkill(sk)
     if cleanKey == "C" then
         local userChoseC = false
         if Config.TicketQuickSkill and (Config.TicketQuickSkill:find("C") or Config.TicketQuickSkill:find("c")) then userChoseC = true end
-        if Config.TicketSkillKey and (Config.TicketSkillKey:match("[Cc]%s*$")) then userChoseC = true end
+        if Config.TicketSkillKey and (Config.TicketSkillKey:find("C") or Config.TicketSkillKey:find("c")) then userChoseC = true end
         if Config.TrainSkill and (Config.TrainSkill:find("C") or Config.TrainSkill:find("c")) then userChoseC = true end
         if Config.QuickCatchSkill == "C" or Config.OpenerSkill == "C" or Config.EmergencyHealSkill == "C" then userChoseC = true end
         -- Cho phép C nếu người chơi cài đặt C trong LoopSkills và đang bật SmartCombo hoặc AutoSkills
@@ -10990,11 +10920,11 @@ function comboState.CastSkill(sk)
         end
 
         if curQ == "skill_100" then
-            local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+            local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
             allowedSkill = allowedSkill and allowedSkill:upper() or "Z"
             if cleanKey ~= allowedSkill then return false end
         elseif curQ == "fish_100" then
-            local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+            local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
             allowedQuick = allowedQuick and allowedQuick:upper() or "V"
             if cleanKey ~= allowedQuick then return false end
         end
@@ -11007,13 +10937,13 @@ function comboState.CastSkill(sk)
         end
 
         if curQ == "fish_100" then
-            local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+            local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
             allowed = allowed and allowed:upper() or "V"
             if cleanKey ~= allowed then
                 return false -- Chặn đứng 100% các chiêu Z, X, C
             end
         elseif curQ == "skill_100" then
-            local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+            local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
             allowed = allowed and allowed:upper() or "Z"
             if cleanKey ~= allowed then
                 return false -- Chặn đứng các chiêu khác
@@ -11530,7 +11460,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 pcall(function()
                                     -- 1. Ưu tiên số 1: Dùng đúng chiêu TicketSkillKey đã cài đặt cho nhiệm vụ 100 Skill (VD: "Chiêu Z")
                                     local comboList = {}
-                                    local skillKey = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+                                    local skillKey = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                                     if skillKey then
                                         table.insert(comboList, skillKey:upper())
                                     elseif Config.LoopSkills and Config.LoopSkills ~= "" then
@@ -11565,7 +11495,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         end
 
                                         comboState.CastSkill(sk)
-
                                         ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                         ticketQuestState.UpdateUI()
                                         if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
@@ -11615,7 +11544,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             task.spawn(function()
                                 pcall(function()
                                     -- 1. Chỉ dùng duy nhất chiêu TicketQuickSkill (Mặc định: Chiêu V) cho nhiệm vụ 100 Cá (Tuyệt đối không dùng LoopSkills)
-                                    local quickKey = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+                                    local quickKey = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                                     local comboList = {quickKey and quickKey:upper() or "V"}
 
                                     -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
@@ -11755,10 +11684,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 -- fish_100 và skill_100: chỉ dùng 1 chiêu cố định theo config vé
                                 -- Tất cả còn lại (fish_15m, bait_100, không có quest...): dùng LoopSkills đầy đủ
                                 if curQ == "fish_100" then
-                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, qk and qk:upper() or "V")
                                 elseif curQ == "skill_100" then
-                                    local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+                                    local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                                     table.insert(loopKeys, sk and sk:upper() or "Z")
                                 end
                                 -- fish_15m, bait_100, none, hoặc không quest -> loopKeys sẽ rỗng -> dùng LoopSkills bên dưới
@@ -11776,7 +11705,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                     local chosenIndex = nil
                                     if Config.LoopStrictOrder then
-                                        -- Strict Order: chờ đúng chiêu trong thứ tự, timeout 3s mới skip
                                         local targetKey = loopKeys[comboState.loopTargetIndex]
                                         if comboState.IsSkillReady(targetKey, fUI) then
                                             chosenIndex = comboState.loopTargetIndex
@@ -11787,27 +11715,12 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
                                         end
                                     else
-                                        -- Non-strict: ưu tiên giữ đúng thứ tự, chờ chiêu hiện tại sẵn sàng.
-                                        -- Chỉ nhảy sang chiêu tiếp theo nếu chiêu đang chờ bị CD quá 3s (tránh kẹt).
-                                        local targetKey = loopKeys[comboState.loopTargetIndex]
-                                        if comboState.IsSkillReady(targetKey, fUI) then
-                                            chosenIndex = comboState.loopTargetIndex
-                                            comboState.loopWaitStartTime = 0
-                                        else
-                                            -- Chiêu hiện tại chưa ready: bắt đầu hoặc tiếp tục đếm timeout
-                                            if comboState.loopWaitStartTime == 0 then
-                                                comboState.loopWaitStartTime = now
-                                            elseif (now - comboState.loopWaitStartTime >= 3.0) then
-                                                -- Timeout: cho phép nhảy sang chiêu tiếp theo sẵn sàng gần nhất
-                                                comboState.loopWaitStartTime = 0
-                                                for offset = 1, #loopKeys - 1 do
-                                                    local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
-                                                    local sk = loopKeys[idx]
-                                                    if comboState.IsSkillReady(sk, fUI) then
-                                                        chosenIndex = idx
-                                                        break
-                                                    end
-                                                end
+                                        for offset = 0, #loopKeys - 1 do
+                                            local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                            local sk = loopKeys[idx]
+                                            if comboState.IsSkillReady(sk, fUI) then
+                                                chosenIndex = idx
+                                                break
                                             end
                                         end
                                     end
@@ -11840,10 +11753,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                         -- fish_100/skill_100: 1 chiêu cố định. Tất cả còn lại: dùng LoopSkills đầy đủ
                         if curQ == "fish_100" then
-                            local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+                            local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])")
                             comboState.CastSkill(qk and qk:upper() or "V")
                         elseif curQ == "skill_100" then
-                            local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+                            local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
                             comboState.CastSkill(sk and sk:upper() or "Z")
                         else
                             -- fish_15m, bait_100, không quest, hoặc normal fishing -> dùng LoopSkills
