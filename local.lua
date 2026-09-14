@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-combo-target-order-v2"
+local SCRIPT_BUILD_COMMIT = "fix-combo-defaultcd-v3"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -10882,8 +10882,11 @@ function comboState.IsSkillReady(sk, fUI)
 
     local now = tick()
     local lastUsed = comboState.usedTimes[cleanKey] or 0
-    -- Chống spam cùng 1 phím nhanh hơn 0.8s
-    if (now - lastUsed < 0.8) then
+    -- [FIX#4] Dùng defaultCooldowns thay vì 0.8s flat
+    -- Lý do: Z CD=2.5s nhưng vòng 2 chiêu chỉ 2.4s → chênh 0.1s → Z bị skip
+    -- Với defaultCooldowns mỗi chiêu được track đúng CD thực: Z=2.5s, X=3s, C=5s, V=4s
+    local minCD = (comboState.defaultCooldowns and comboState.defaultCooldowns[cleanKey]) or 0.8
+    if (now - lastUsed < minCD) then
         return false
     end
 
