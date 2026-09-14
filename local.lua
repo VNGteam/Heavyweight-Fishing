@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-dialogue-press-timing"
+local SCRIPT_BUILD_COMMIT = "fix-combo-castskill-detectquest"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -11135,10 +11135,9 @@ function comboState.CastSkill(sk)
 
     -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Khi bật Auto Ticket Quest, CHỈ khóa 1 chiêu cho quest 100 cá & 100 skill!
     if Config.AutoTicketQuest then
-        local curQ = ticketQuestState and ticketQuestState.currentQuestType
-        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-            curQ = select(1, ticketQuestState.DetectActiveQuest())
-        end
+        -- [FIX#2b] Dùng cached currentQuestType, KHÔNG gọi DetectActiveQuest() bên trong CastSkill
+        -- Gọi DetectActiveQuest() mỗi lần cast là nguyên nhân gốc rễ khiến Z bị block ngẫu nhiên!
+        local curQ = (ticketQuestState and ticketQuestState.currentQuestType) or "none"
 
         if curQ == "skill_100" then
             local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
@@ -11152,10 +11151,8 @@ function comboState.CastSkill(sk)
         -- Đối với fish_15m hoặc nhiệm vụ khác: TUYỆT ĐỐI KHÔNG CHẶN, cho phép xả combo đầy đủ theo cài đặt người chơi!
     else
         -- KHÓA BẢO VỆ CHẶN CHIÊU SAI KHI KHÔNG BẬT AUTO TICKET QUEST NHƯNG ĐANG CÓ QUEST VÉ
-        local curQ = ticketQuestState and ticketQuestState.currentQuestType
-        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-            curQ = select(1, ticketQuestState.DetectActiveQuest())
-        end
+        -- [FIX#2b] Dùng cached currentQuestType, KHÔNG gọi DetectActiveQuest() bên trong CastSkill
+        local curQ = (ticketQuestState and ticketQuestState.currentQuestType) or "none"
 
         if curQ == "fish_100" then
             local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
