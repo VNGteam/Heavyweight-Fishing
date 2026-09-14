@@ -11543,6 +11543,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     end
 
                                     -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
+                                    -- [DEBUG] Báo routine đang chạy và dùng chiêu nào
+                                    ShowNotification("🎯 Skill 100", "Bắt đầu routine | Chiêu: " .. tostring(comboList[1] or "?") .. " | Key: " .. tostring(Config.TicketSkillKey), "INFO", 5)
+
                                     local startTime = tick()
                                     while isRunning and (fUI and fUI.Visible) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
@@ -11555,6 +11558,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         task.wait(0.05)
                                     end
 
+                                    -- [DEBUG] Báo trạng thái fUI sau 3s
+                                    local fVisible = fUI and fUI.Visible
+                                    ShowNotification("🎯 Skill 100", "Sau 3s: fUI.Visible=" .. tostring(fVisible) .. " | Sắp cast: " .. tostring(comboList[1] or "?"), fVisible and "SUCCESS" or "ERROR", 5)
+
                                     -- 3. Lần lượt tung TOÀN BỘ chuỗi combo đã cài (Z -> X -> V...)
                                     for _, sk in ipairs(comboList) do
                                         if not isRunning or not (fUI and fUI.Visible) then break end
@@ -11564,7 +11571,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
 
-                                        comboState.CastSkill(sk)
+                                        local castOk = comboState.CastSkill(sk)
+                                        -- [DEBUG] Báo kết quả cast
+                                        ShowNotification("⚔️ CastSkill", "sk=" .. sk .. " | ok=" .. tostring(castOk) .. " | progress=" .. tostring(ticketQuestState.currentProgress + 1), "INFO", 4)
+
                                         ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                         ticketQuestState.UpdateUI()
                                         if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
