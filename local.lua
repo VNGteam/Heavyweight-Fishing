@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-combo-castskill-detectquest"
+local SCRIPT_BUILD_COMMIT = "fix-combo-target-order-v2"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -11947,12 +11947,16 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         comboState.CastSkill(skillToCast)
                                         comboState.lastActionTime = now
                                         comboState.loopWaitStartTime = 0
-                                        -- [FIX#3] Non-strict: nếu bị buộc skip chiêu target gốc → advance từ target, không từ vị trí cast
-                                        -- Giữ đúng thứ tự Z→X→V dù frame đó phải cast chiêu khác vì CD
-                                        if Config.LoopStrictOrder or chosenIndex == prevTargetIndex then
+                                        -- [FIX#3 v2] Chỉ advance loopTargetIndex khi đã cast ĐÚNG target
+                                        -- Nếu cast filler (target đang on CD) → GIỮ NGUYÊN target, không advance
+                                        -- Đây là fix cho pattern bị shift: Z→X→V lần 1 đúng, lần 2 thành X→V→X→V
+                                        if chosenIndex == prevTargetIndex then
+                                            -- Đã cast đúng target → advance sang chiêu kế tiếp
                                             comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
                                         else
-                                            comboState.loopTargetIndex = (prevTargetIndex % #loopKeys) + 1
+                                            -- Cast filler vì target đang on CD → KHÔNG advance
+                                            -- Lần sau sẽ tiếp tục ưu tiên target gốc (Z) trước
+                                            comboState.loopTargetIndex = prevTargetIndex
                                         end
                                     end
                                 else
