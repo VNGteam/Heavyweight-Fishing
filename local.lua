@@ -9930,11 +9930,12 @@ end)
 
 local function ApplyFullbright(enabled)
     if enabled then
-        Lighting.Brightness = 10
+        -- Sáng đều, không cháy: chỉ đẩy Ambient lên max + tắt bóng + xóa sương
+        Lighting.Brightness = 2
         Lighting.Ambient = Color3.fromRGB(178, 178, 178)
         Lighting.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
         Lighting.GlobalShadows = false
-        Lighting.ExposureCompensation = 1
+        Lighting.ExposureCompensation = 0
         local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
         if atmo then
             atmo.Density = 0
