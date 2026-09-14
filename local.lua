@@ -360,6 +360,17 @@ local comboState = {
 
 function comboState.SkillExists(sk, fUI)
     if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = sk:match("([ZXCVzxcv])") or sk
+    cleanKey = cleanKey:upper()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    local mg = pg and pg:FindFirstChild("MainGui")
+    local f = fUI or (mg and mg:FindFirstChild("Fishing"))
+    if f then
+        local sFrame = f:FindFirstChild("SkillButton") and f.SkillButton:FindFirstChild("Frame")
+        if sFrame and sFrame:FindFirstChild(cleanKey) then
+            return true
+        end
+    end
     return true
 end
 
@@ -10887,8 +10898,40 @@ function comboState.IsSkillReady(sk, fUI)
         return false
     end
 
-    if fUI then
-        for _, desc in ipairs(fUI:GetDescendants()) do
+    local fishingGui = fUI
+    if not fishingGui then
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        fishingGui = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing")
+    end
+
+    if fishingGui then
+        -- Ưu tiên số 1: Kiểm tra trực tiếp nút chiêu trong SkillButton.Frame (chính xác 100%)
+        local sFrame = fishingGui:FindFirstChild("SkillButton") and fishingGui.SkillButton:FindFirstChild("Frame")
+        local btn = sFrame and sFrame:FindFirstChild(cleanKey)
+        if btn then
+            -- Nếu có Lock và đang hiện -> game đang khóa chiêu
+            local lock = btn:FindFirstChild("Lock")
+            if lock and lock:IsA("GuiObject") and lock.Visible then
+                return false
+            end
+            -- Kiểm tra thuộc tính
+            if btn:GetAttribute("OnCooldown") == true or btn:GetAttribute("CD") == true then
+                return false
+            end
+            -- Kiểm tra CD TextLabel
+            local cdLabel = btn:FindFirstChild("CD")
+            if cdLabel and cdLabel:IsA("TextLabel") and cdLabel.Visible and cdLabel.Text ~= "" then
+                local txt = cdLabel.Text
+                local num = tonumber(txt:match("(%d+%.?%d*)"))
+                if num and num > 0 then
+                    return false
+                end
+            end
+            return true
+        end
+
+        -- Quét fallback nếu cấu trúc GUI khác
+        for _, desc in ipairs(fishingGui:GetDescendants()) do
             local nameUpper = desc.Name:upper()
             if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
                 if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
@@ -11409,6 +11452,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             minigameDurationTracker = 0
             comboState.lastActionTime = 0
             comboState.loopWaitStartTime = 0
+            comboState.loopTargetIndex = 1
             secretBossState.webhookSentForCurrent = false
             secretBossState.isCatchingTarget = false
             secretBossState.minigameStartTime = 0
@@ -11927,13 +11971,23 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     local chosenIndex = nil
                                     if Config.LoopStrictOrder then
                                         local targetKey = loopKeys[comboState.loopTargetIndex]
+                                        local sFrame = fUI and fUI:FindFirstChild("SkillButton") and fUI.SkillButton:FindFirstChild("Frame")
+                                        local keyExistsOnRod = sFrame and sFrame:FindFirstChild(targetKey) ~= nil
+
                                         if comboState.IsSkillReady(targetKey, fUI) then
                                             chosenIndex = comboState.loopTargetIndex
-                                        elseif comboState.loopWaitStartTime == 0 then
-                                            comboState.loopWaitStartTime = now
-                                        elseif (now - comboState.loopWaitStartTime >= 3.0) then
+                                        elseif not keyExistsOnRod and sFrame then
+                                            -- Chiêu này thực sự không có trên cần câu của người chơi -> Bỏ qua sau 1.5s
+                                            if comboState.loopWaitStartTime == 0 then
+                                                comboState.loopWaitStartTime = now
+                                            elseif (now - comboState.loopWaitStartTime >= 1.5) then
+                                                comboState.loopWaitStartTime = 0
+                                                comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                            end
+                                        else
+                                            -- Chiêu CÓ trên cần câu nhưng đang trong thời gian hồi chiêu hoặc game đang khóa:
+                                            -- BẮT BUỘC CHỜ HỒI CHIÊU XONG! TUYỆT ĐỐI KHÔNG BỎ QUA ĐỂ ĐẢM BẢO 100% ĐÚNG THỨ TỰ!
                                             comboState.loopWaitStartTime = 0
-                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
                                         end
                                     else
                                         for offset = 0, #loopKeys - 1 do
@@ -11988,8 +12042,19 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
                             end
                             if #skillList == 0 then skillList = {"Z", "X", "V"} end
-                            for _, sk in ipairs(skillList) do
-                                comboState.CastSkill(sk)
+
+                            if Config.LoopStrictOrder then
+                                local targetIdx = comboState.loopTargetIndex or 1
+                                if targetIdx < 1 or targetIdx > #skillList then targetIdx = 1 end
+                                local sk = skillList[targetIdx]
+                                if sk and comboState.IsSkillReady(sk, fUI) then
+                                    comboState.CastSkill(sk)
+                                    comboState.loopTargetIndex = (targetIdx % #skillList) + 1
+                                end
+                            else
+                                for _, sk in ipairs(skillList) do
+                                    comboState.CastSkill(sk)
+                                end
                             end
                         end
                         lastSkillTime = now
