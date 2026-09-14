@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-dialogue-press-timing"
+local SCRIPT_BUILD_COMMIT = "v2.5"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -806,6 +806,7 @@ local SMART_COMBO_KEYS = {
     "SmartEffectAutoDetect",
     "TicketSkillKey",
     "TicketQuickSkill",
+    "TicketBaitChoice",
 }
 
 local _smartComboSavePending = false
@@ -852,7 +853,7 @@ local function LoadSmartComboAndSyncUI()
             "SmartComboEnabled", "FishHpThreshold", "QuickCatchSkill",
             "OpenerSkill", "OpenerMaxCount", "LoopStrictOrder",
             "EmergencyHealSkill", "EmergencyHealHp", "SkillEffectDelay",
-            "SmartEffectAutoDetect", "TicketSkillKey", "TicketQuickSkill",
+            "SmartEffectAutoDetect", "TicketSkillKey", "TicketQuickSkill", "TicketBaitChoice",
         }
         for _, k in ipairs(syncKeys) do
             local ctrl = UIControllers[k]
@@ -9005,6 +9006,7 @@ local optionCard = createCardGroup(tabQuests)
 local ticketBaits = {"Basic Bait", "Crude Mash Bait", "Corrupted Essence Bait", "Elite Bait", "Ancestral Bait"}
 createDropdownRow(optionCard, "Mồi Cho Nhiệm Vụ 100 Mồi", "Loại mồi bot sẽ mua và dùng khi nhận nv 100 mồi", ticketBaits, Config.TicketBaitChoice, function(v)
     Config.TicketBaitChoice = v
+    SaveSmartCombo()
 end)
 
 local skillList = {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}
