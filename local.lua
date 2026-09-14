@@ -8877,27 +8877,6 @@ createButtonRow(godCard, "Bay Đến Đền Thần Linh", "Dịch chuyển đế
     end
 end)
 
-createButtonRow(godCard, "Bay Đến Đạo Sĩ (Taoist)", "Dịch chuyển đến vị trí Đạo Sĩ (Taoist / Maoshan) nếu có trong server", "Bay Đến", function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local tInst, tName = secretBossState.ScanForTaoistNPC()
-    if not tInst then
-        tInst, tName = secretBossState.ScanForMaoshanNPC()
-    end
-    if tInst then
-        local pivot = (tInst:IsA("Model") and tInst:GetPivot()) or (tInst:IsA("BasePart") and tInst.CFrame)
-        if pivot then
-            root.CFrame = pivot + Vector3.new(0, 3, 4)
-            ShowNotification("Đạo Sĩ", "Đã dịch chuyển đến vị trí " .. tostring(tName) .. "!", "SUCCESS", 5)
-        else
-            ShowNotification("Đạo Sĩ", "Không lấy được tọa độ Đạo Sĩ.", "WARN")
-        end
-    else
-        ShowNotification("Đạo Sĩ", "Server này hiện chưa xuất hiện Đạo Sĩ (Taoist / Maoshan)!", "WARN", 6)
-    end
-end)
-
 createButtonRow(godCard, "Cầu Nguyện Ngay Lập Tức", "Tương tác với Bàn thờ Thần linh ngay bây giờ", "Cầu Nguyện", function()
     local sp = (Workspace:FindFirstChild("NPC") and Workspace.NPC:FindFirstChild("Spirit")) or (Workspace:FindFirstChild("NPC") and Workspace.NPC:FindFirstChild("God"))
     if sp then
@@ -9922,6 +9901,49 @@ for _, npc in ipairs(questNPCList) do
         end
     )
 end
+
+-- ============================================================
+-- SECTION: DỊCH CHUYỂN ĐẾN ĐẠO SĨ (TAOIST & MAOSHAN)
+-- ============================================================
+createCategoryHeader(tabTeleports, "📜 Dịch Chuyển Đến Đạo Sĩ (Taoist & Maoshan)")
+local taoistTeleCard = createCardGroup(tabTeleports)
+
+createButtonRow(taoistTeleCard, "📜 Bay Đến Đạo Sĩ (Taoist)", "Dịch chuyển tức thì đến NPC Đạo Sĩ (Taoist) nếu có trong server", "Bay Đến", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then ShowNotification("Lỗi", "Nhân vật chưa spawn!", "ERROR") return end
+    local tInst, tName = secretBossState.ScanForTaoistNPC()
+    if tInst then
+        local pivot = (tInst:IsA("Model") and tInst:GetPivot()) or (tInst:IsA("BasePart") and tInst.CFrame)
+        if pivot then
+            root.CFrame = pivot + Vector3.new(0, 3, 4)
+            ShowNotification("Đạo Sĩ (Taoist)", "Đã dịch chuyển đến vị trí " .. tostring(tName) .. "!", "SUCCESS", 5)
+        else
+            ShowNotification("Đạo Sĩ (Taoist)", "Không lấy được tọa độ Đạo Sĩ.", "WARN")
+        end
+    else
+        ShowNotification("Đạo Sĩ (Taoist)", "Server này hiện chưa có Đạo Sĩ (Taoist)! Hãy bật 'Đổi Server Tìm Taoist'.", "WARN", 6)
+    end
+end)
+
+createButtonRow(taoistTeleCard, "✨ Bay Đến Đạo Sĩ Maoshan", "Dịch chuyển tức thì đến NPC Đạo Sĩ Maoshan nếu có trong server", "Bay Đến", function()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then ShowNotification("Lỗi", "Nhân vật chưa spawn!", "ERROR") return end
+    local mInst, mName = secretBossState.ScanForMaoshanNPC()
+    if mInst then
+        local pivot = (mInst:IsA("Model") and mInst:GetPivot()) or (mInst:IsA("BasePart") and mInst.CFrame)
+        if pivot then
+            root.CFrame = pivot + Vector3.new(0, 3, 4)
+            ShowNotification("Đạo Sĩ Maoshan", "Đã dịch chuyển đến vị trí " .. tostring(mName) .. "!", "SUCCESS", 5)
+        else
+            ShowNotification("Đạo Sĩ Maoshan", "Không lấy được tọa độ Đạo Sĩ Maoshan.", "WARN")
+        end
+    else
+        ShowNotification("Đạo Sĩ Maoshan", "Server này hiện chưa có Đạo Sĩ Maoshan! Hãy bật 'Đổi Server Tìm Maoshan'.", "WARN", 6)
+    end
+end)
+
 end
 
 do
