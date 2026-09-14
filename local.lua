@@ -3036,42 +3036,93 @@ local function ServerHop(avoidServers)
     QueueScriptOnTeleport()
     task.spawn(function()
         local placeId = game.PlaceId
-        local url = "https://games.roblox.com/v1/games/" .. placeId .. "/servers/Public?sortOrder=Desc&limit=100"
-        local ok, res = pcall(function() return game:HttpGet(url) end)
-        if ok and res then
-            local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
-            if bOk and body and body.data then
-                local avoidMap = {}
-                if avoidServers and type(avoidServers) == "table" then
-                    for _, sid in ipairs(avoidServers) do avoidMap[sid] = true end
-                end
-                avoidMap[game.JobId] = true
+        local avoidMap = {}
+        if avoidServers and type(avoidServers) == "table" then
+            for _, sid in ipairs(avoidServers) do avoidMap[sid] = true end
+        end
+        avoidMap[game.JobId] = true
 
-                local candidates = {}
-                for _, s in ipairs(body.data) do
-                    if s.playing and s.maxPlayers and not avoidMap[s.id] then
-                        local free = s.maxPlayers - s.playing
-                        if free >= 2 then
-                            table.insert(candidates, s.id)
-                        end
-                    end
-                end
-                local chosen = (#candidates > 0 and candidates[math.random(1, #candidates)]) or nil
-                if not chosen then
+        local cursor = ""
+        local candidates = {}
+        for page = 1, 4 do
+            local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", placeId, cursor ~= "" and ("&cursor=" .. cursor) or "")
+            local ok, res = pcall(function() return game:HttpGet(url) end)
+            if ok and res then
+                local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
+                if bOk and body and body.data then
                     for _, s in ipairs(body.data) do
-                        if s.playing and s.maxPlayers and s.playing < s.maxPlayers and not avoidMap[s.id] then
-                            chosen = s.id
-                            break
+                        if s.playing and s.maxPlayers and s.id and not avoidMap[s.id] then
+                            local free = s.maxPlayers - s.playing
+                            if free >= 2 then
+                                table.insert(candidates, s.id)
+                            end
                         end
                     end
-                end
-                if chosen then
-                    pcall(function() TeleportService:TeleportToPlaceInstance(placeId, chosen, LocalPlayer) end)
-                    return
+                    if #candidates >= 5 then break end
+                    cursor = body.nextPageCursor or ""
+                    if not cursor or cursor == "" then break end
                 end
             end
+            task.wait(0.15)
         end
+
+        local chosen = (#candidates > 0 and candidates[math.random(1, #candidates)]) or nil
+        if chosen then
+            ShowNotification("Đổi Server", "Đã tìm thấy server mới! Đang chuyển...", "SUCCESS", 3)
+            task.wait(0.5)
+            local ok, err = pcall(function() TeleportService:TeleportToPlaceInstance(placeId, chosen, LocalPlayer) end)
+            if not ok then
+                warn("[ServerHop] TeleportToPlaceInstance lỗi, chuyển sang Teleport ngẫu nhiên:", tostring(err))
+                pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
+            end
+            return
+        end
+        ShowNotification("Đổi Server", "Đang chuyển sang server ngẫu nhiên...", "INFO", 3)
+        task.wait(0.5)
         pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
+    end)
+end
+
+function secretBossState.SaveNPCHopState(visitedList)
+    if not (writefile and isfile) then return end
+    local isAnyActive = Config.AutoServerHopTaoist or Config.AutoServerHopMaoshan or Config.AutoServerHopGod
+    if isAnyActive then
+        pcall(function()
+            writefile("HeavyweightFishing_NPCHop.json", HttpService:JSONEncode({
+                Active = true,
+                Taoist = Config.AutoServerHopTaoist == true,
+                Maoshan = Config.AutoServerHopMaoshan == true,
+                God = Config.AutoServerHopGod == true,
+                Visited = visitedList or secretBossState.npcHopVisited or {},
+                StartTime = tick()
+            }))
+        end)
+    else
+        pcall(function()
+            if isfile("HeavyweightFishing_NPCHop.json") and delfile then
+                delfile("HeavyweightFishing_NPCHop.json")
+            end
+        end)
+    end
+end
+
+function secretBossState.ClearNPCHopState()
+    Config.AutoServerHopTaoist = false
+    Config.AutoServerHopMaoshan = false
+    Config.AutoServerHopGod = false
+    if UIControllers["AutoServerHopTaoist"] and UIControllers["AutoServerHopTaoist"].Set then
+        pcall(function() UIControllers["AutoServerHopTaoist"].Set(false, true) end)
+    end
+    if UIControllers["AutoServerHopMaoshan"] and UIControllers["AutoServerHopMaoshan"].Set then
+        pcall(function() UIControllers["AutoServerHopMaoshan"].Set(false, true) end)
+    end
+    if UIControllers["AutoServerHopGod"] and UIControllers["AutoServerHopGod"].Set then
+        pcall(function() UIControllers["AutoServerHopGod"].Set(false, true) end)
+    end
+    pcall(function()
+        if isfile and isfile("HeavyweightFishing_NPCHop.json") and delfile then
+            delfile("HeavyweightFishing_NPCHop.json")
+        end
     end)
 end
 secretBossState.ServerHop = ServerHop
@@ -3104,9 +3155,9 @@ secretBossState.HandleTeleportError = function(reason)
             end
         end)
     elseif secretBossState.isNormalHopping then
-        ShowNotification("Đổi Server", "Server đầy. Đang tự động thử server khác...", "WARN", 4)
+        ShowNotification("Đổi Server", "Server đầy hoặc lỗi kết nối. Đang tự động thử server khác...", "WARN", 4)
         task.delay(1.5, function()
-            if secretBossState.ServerHop then secretBossState.ServerHop() end
+            if secretBossState.ServerHop then secretBossState.ServerHop(secretBossState.npcHopVisited) end
         end)
     end
 end
@@ -3405,6 +3456,38 @@ function secretBossState.CheckWeatherHopOnJoin()
             secretBossState.HopToNextWeatherServer(targetWeather, hopData.Visited or {})
         end
     end)
+end
+
+function secretBossState.CheckNPCHopOnJoin()
+    local hopData = pendingNPCHopData
+    if not hopData and isfile and isfile("HeavyweightFishing_NPCHop.json") and readfile then
+        local ok, data = pcall(function()
+            return HttpService:JSONDecode(readfile("HeavyweightFishing_NPCHop.json"))
+        end)
+        if ok and type(data) == "table" and data.Active then
+            hopData = data
+        end
+    end
+
+    if not hopData then return end
+
+    if hopData.Taoist then Config.AutoServerHopTaoist = true end
+    if hopData.Maoshan then Config.AutoServerHopMaoshan = true end
+    if hopData.God then Config.AutoServerHopGod = true end
+
+    task.delay(1.5, function()
+        if UIControllers["AutoServerHopTaoist"] and UIControllers["AutoServerHopTaoist"].Set then
+            pcall(function() UIControllers["AutoServerHopTaoist"].Set(Config.AutoServerHopTaoist, true) end)
+        end
+        if UIControllers["AutoServerHopMaoshan"] and UIControllers["AutoServerHopMaoshan"].Set then
+            pcall(function() UIControllers["AutoServerHopMaoshan"].Set(Config.AutoServerHopMaoshan, true) end)
+        end
+        if UIControllers["AutoServerHopGod"] and UIControllers["AutoServerHopGod"].Set then
+            pcall(function() UIControllers["AutoServerHopGod"].Set(Config.AutoServerHopGod, true) end)
+        end
+    end)
+
+    ShowNotification("Đổi Server", "Đang kiểm tra NPC / Thần Linh trong server mới...", "INFO", 5)
 end
 
 local ticketQuestState = {}
@@ -8929,56 +9012,19 @@ createButtonRow(godCard, "Cầu Nguyện Ngay Lập Tức", "Tương tác với 
     end
 end)
 
-local function SaveNPCHopState(visitedList)
-    if not (writefile and isfile) then return end
-    local isAnyActive = Config.AutoServerHopTaoist or Config.AutoServerHopMaoshan or Config.AutoServerHopGod
-    if isAnyActive then
-        pcall(function()
-            writefile("HeavyweightFishing_NPCHop.json", HttpService:JSONEncode({
-                Active = true,
-                Taoist = Config.AutoServerHopTaoist,
-                Maoshan = Config.AutoServerHopMaoshan,
-                God = Config.AutoServerHopGod,
-                Visited = visitedList or (secretBossState.npcHopVisited or {}),
-                StartTime = tick()
-            }))
-        end)
-    else
-        pcall(function()
-            if isfile("HeavyweightFishing_NPCHop.json") and delfile then
-                delfile("HeavyweightFishing_NPCHop.json")
-            end
-        end)
-    end
-end
-
-local function ClearNPCHopState()
-    Config.AutoServerHopTaoist = false
-    Config.AutoServerHopMaoshan = false
-    Config.AutoServerHopGod = false
-    if UIControllers["AutoServerHopTaoist"] then UIControllers["AutoServerHopTaoist"].Set(false, true) end
-    if UIControllers["AutoServerHopMaoshan"] then UIControllers["AutoServerHopMaoshan"].Set(false, true) end
-    if UIControllers["AutoServerHopGod"] then UIControllers["AutoServerHopGod"].Set(false, true) end
-    pcall(function()
-        if isfile and isfile("HeavyweightFishing_NPCHop.json") and delfile then
-            delfile("HeavyweightFishing_NPCHop.json")
-        end
-    end)
-end
-
 createCategoryHeader(tabGod, "Tự Động Đổi Server (Server Hop)")
 local hopCard = createCardGroup(tabGod)
 createToggleRow(hopCard, "Đổi Server Tìm Thần Linh", "Tự động nhảy server liên tục đến khi gặp God Spirit", Config.AutoServerHopGod, function(v)
     Config.AutoServerHopGod = v
-    SaveNPCHopState()
+    secretBossState.SaveNPCHopState()
 end)
 createToggleRow(hopCard, "Đổi Server Tìm Maoshan", "Tự động nhảy server liên tục đến khi gặp Maoshan", Config.AutoServerHopMaoshan, function(v)
     Config.AutoServerHopMaoshan = v
-    SaveNPCHopState()
+    secretBossState.SaveNPCHopState()
 end)
 createToggleRow(hopCard, "Đổi Server Tìm Taoist", "Tự động nhảy server liên tục đến khi gặp Đạo sĩ Taoist", Config.AutoServerHopTaoist, function(v)
     Config.AutoServerHopTaoist = v
-    SaveNPCHopState()
+    secretBossState.SaveNPCHopState()
 end)
 createButtonRow(hopCard, "Đổi Server Ngay", "Chuyển sang một server ngẫu nhiên khác ngay lập tức", "Đổi Server", function() ServerHop() end)
 end
@@ -12566,7 +12612,7 @@ task.spawn(function()
     while isRunning do
         task.wait(3.0)
         if isRunning and (Config.AutoServerHopTaoist or Config.AutoServerHopGod or Config.AutoServerHopMaoshan) then
-            pcall(function()
+            local hopOk, hopErr = pcall(function()
                 local now = tick()
                 if (now - lastHopAttempt) < 10 then return end
 
@@ -12604,7 +12650,7 @@ task.spawn(function()
                 if #foundTargets > 0 then
                     local foundStr = table.concat(foundTargets, ", ")
                     ShowNotification("ĐÃ TÌM THẤY!", "Đã phát hiện " .. foundStr .. " trong server này! Đã dừng đổi server.", "SUCCESS", 8)
-                    ClearNPCHopState()
+                    secretBossState.ClearNPCHopState()
                     return
                 end
 
@@ -12613,13 +12659,16 @@ task.spawn(function()
                 local targetListStr = table.concat(enabledTargets, " / ")
                 ShowNotification("Đổi Server Tìm NPC", "Server này không có " .. targetListStr .. ". Đang đổi server tiếp theo...", "WARN", 4)
 
-                SaveNPCHopState(secretBossState.npcHopVisited)
+                secretBossState.SaveNPCHopState(secretBossState.npcHopVisited)
                 QueueScriptOnTeleport()
                 task.wait(1.5)
                 if secretBossState.ServerHop then
                     secretBossState.ServerHop(secretBossState.npcHopVisited)
                 end
             end)
+            if not hopOk then
+                warn("[AutoServerHop] Lỗi trong vòng lặp tìm NPC:", tostring(hopErr))
+            end
         end
     end
 end)
@@ -13208,6 +13257,10 @@ end))
 
 if secretBossState.CheckWeatherHopOnJoin then
     task.spawn(secretBossState.CheckWeatherHopOnJoin)
+end
+
+if secretBossState.CheckNPCHopOnJoin then
+    task.spawn(secretBossState.CheckNPCHopOnJoin)
 end
 
 -- Nạp cài đặt Combo Kỹ Năng Thông Minh từ file local và đồng bộ UI
