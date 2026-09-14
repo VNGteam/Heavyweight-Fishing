@@ -102,7 +102,34 @@ local cleanUpInstances = {}
 
 --// THÔNG TIN PHIÊN BẢN SCRIPT //--
 local SCRIPT_VERSION = "v1.5"
-local SCRIPT_BUILD_COMMIT = "050f0ee"
+local SCRIPT_BUILD_COMMIT = "f01172b"
+
+--// HỆ THỐNG DEBUG & NHẬT KÝ HOẠT ĐỘNG (REAL-TIME LOGGING) //--
+local debugLogs = {}
+local debugLogListeners = {}
+
+local function DebugLog(tag, message, source)
+    local timestamp = os.date("%H:%M:%S")
+    local tagStr = tostring(tag or "INFO"):upper()
+    local msgStr = tostring(message or "")
+    local srcStr = tostring(source or "Hệ Thống")
+    local entry = {
+        time = timestamp,
+        tag = tagStr,
+        msg = msgStr,
+        source = srcStr
+    }
+    table.insert(debugLogs, entry)
+    if #debugLogs > 80 then
+        table.remove(debugLogs, 1)
+    end
+    pcall(function()
+        print(string.format("[DEBUG][%s][%s] %s | Nguồn: %s", timestamp, tagStr, msgStr, srcStr))
+    end)
+    for _, cb in ipairs(debugLogListeners) do
+        pcall(cb, entry)
+    end
+end
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -112,6 +139,7 @@ if not Events then
 end
 
 local Config = {
+    DebugLogEnabled = true,
     AutoCast = false,
     CastDelay = 1.0,
     CastPower = 100,
@@ -6597,6 +6625,7 @@ local tabVisuals   = CreateTab("ESP & Đồ Hoạ")
 local tabPlayer    = CreateTab("Nhân Vật")
 local tabProfiles  = CreateTab("Cài Đặt")
 local tabExperimental = CreateTab("Thử Nghiệm")
+local tabDebug        = CreateTab("Debug")
 
 SwitchTab("Câu Cá")
 
@@ -10870,6 +10899,323 @@ local function initExperimentalTab()
 end
 initExperimentalTab()
 
+local function initDebugTab()
+    -- 1. GIÁM SÁT CẤU HÌNH & TRẠNG THÁI COMBO (CONFIG INSPECTOR)
+    createCategoryHeader(tabDebug, "📊 GIÁM SÁT CẤU HÌNH & TRẠNG THÁI COMBO (CONFIG INSPECTOR)")
+    local inspectorCard = createCardGroup(tabDebug)
+
+    local infoContainer = Instance.new("Frame")
+    infoContainer.Size = UDim2.new(1, 0, 0, 0)
+    infoContainer.AutomaticSize = Enum.AutomaticSize.Y
+    infoContainer.BackgroundColor3 = Colors.RowNormal
+    infoContainer.BorderSizePixel = 0
+    infoContainer.Parent = inspectorCard
+    do
+        local p = Instance.new("UIPadding")
+        p.PaddingTop = UDim.new(0, 10)
+        p.PaddingBottom = UDim.new(0, 10)
+        p.PaddingLeft = UDim.new(0, 12)
+        p.PaddingRight = UDim.new(0, 12)
+        p.Parent = infoContainer
+        local l = Instance.new("UIListLayout")
+        l.SortOrder = Enum.SortOrder.LayoutOrder
+        l.Padding = UDim.new(0, 6)
+        l.Parent = infoContainer
+    end
+
+    local function createInfoLine(parent, titleText, defaultVal)
+        local line = Instance.new("Frame")
+        line.Size = UDim2.new(1, 0, 0, 20)
+        line.BackgroundTransparency = 1
+        line.Parent = parent
+
+        local tLbl = Instance.new("TextLabel")
+        tLbl.Size = UDim2.new(0.48, 0, 1, 0)
+        tLbl.BackgroundTransparency = 1
+        tLbl.Font = Enum.Font.GothamBold
+        tLbl.Text = titleText
+        tLbl.TextColor3 = Colors.TextSubtle
+        tLbl.TextSize = 11
+        tLbl.TextXAlignment = Enum.TextXAlignment.Left
+        tLbl.Parent = line
+
+        local vLbl = Instance.new("TextLabel")
+        vLbl.Size = UDim2.new(0.52, 0, 1, 0)
+        vLbl.Position = UDim2.new(0.48, 0, 0, 0)
+        vLbl.BackgroundTransparency = 1
+        vLbl.Font = Enum.Font.Gotham
+        vLbl.Text = defaultVal or "---"
+        vLbl.TextColor3 = Colors.TextWhite
+        vLbl.TextSize = 11
+        vLbl.TextXAlignment = Enum.TextXAlignment.Right
+        vLbl.Parent = line
+
+        return vLbl
+    end
+
+    local lblSmartCombo = createInfoLine(infoContainer, "• Combo Thông Minh (SmartCombo):", "---")
+    local lblLoopSkills = createInfoLine(infoContainer, "• Chuỗi Phím Tuần Hoàn (LoopSkills):", "---")
+    local lblStrictOrder = createInfoLine(infoContainer, "• Thứ Tự Nghiêm Ngặt (StrictOrder):", "---")
+    local lblTicketQuest = createInfoLine(infoContainer, "• Làm Vé Nhiệm Vụ (AutoTicketQuest):", "---")
+    local lblOldAutoSkills = createInfoLine(infoContainer, "• Tự Động Chiêu Cũ (AutoSkills):", "---")
+    local lblNextTarget = createInfoLine(infoContainer, "• Chiêu Mục Tiêu Tiếp Theo:", "---")
+    local lblDelay = createInfoLine(infoContainer, "• Độ Trễ Đợi Ra Chiêu (Delay):", "---")
+
+    local function refreshStateDisplay()
+        pcall(function()
+            lblSmartCombo.Text = Config.SmartComboEnabled and "🟢 ĐANG BẬT" or "🔴 ĐÃ TẮT"
+            lblSmartCombo.TextColor3 = Config.SmartComboEnabled and Colors.AccentGreen or Colors.AccentRed
+
+            local loopStr = tostring(Config.LoopSkills or "Z, X, V")
+            lblLoopSkills.Text = string.format("Phím: [%s]", loopStr)
+            lblLoopSkills.TextColor3 = Colors.PurplePrimary
+
+            if Config.LoopStrictOrder then
+                lblStrictOrder.Text = "🔒 BẬT (Chờ đúng thứ tự, KHÔNG nhảy cóc)"
+                lblStrictOrder.TextColor3 = Colors.AccentYellow
+            else
+                lblStrictOrder.Text = "⚡ TẮT (Tự do nhảy chiêu nếu chiêu trước CD)"
+                lblStrictOrder.TextColor3 = Colors.AccentOrange
+            end
+
+            local curQ = "Không có"
+            if ticketQuestState and ticketQuestState.DetectActiveQuest then
+                local dtQ = ticketQuestState.DetectActiveQuest()
+                if dtQ and dtQ ~= "none" then curQ = tostring(dtQ) end
+            end
+            if Config.AutoTicketQuest then
+                lblTicketQuest.Text = string.format("🟢 BẬT (Quest: %s)", curQ)
+                lblTicketQuest.TextColor3 = Colors.AccentGreen
+            else
+                lblTicketQuest.Text = string.format("🔴 TẮT (Game quest: %s)", curQ)
+                lblTicketQuest.TextColor3 = Colors.TextMuted
+            end
+
+            lblOldAutoSkills.Text = Config.AutoSkills and "🟢 ĐANG BẬT" or "⚪ TẮT"
+            lblOldAutoSkills.TextColor3 = Config.AutoSkills and Colors.AccentGreen or Colors.TextMuted
+
+            local loopKeys = {}
+            for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
+                table.insert(loopKeys, k:upper())
+            end
+            local tIdx = comboState.loopTargetIndex or 1
+            if #loopKeys > 0 then
+                local tKey = loopKeys[tIdx] or "?"
+                lblNextTarget.Text = string.format("Vị trí %d/%d ➔ Phím '%s'", tIdx, #loopKeys, tKey)
+                lblNextTarget.TextColor3 = Colors.PurpleGlow
+            else
+                lblNextTarget.Text = "Không có chuỗi phím"
+                lblNextTarget.TextColor3 = Colors.AccentRed
+            end
+
+            lblDelay.Text = string.format("%.2f giây (Tự nhận diện anim: %s)", tonumber(Config.SkillEffectDelay) or 1.2, Config.SmartEffectAutoDetect and "BẬT" or "TẮT")
+            lblDelay.TextColor3 = Colors.TextSubtle
+        end)
+    end
+
+    refreshStateDisplay()
+
+    createButtonRow(inspectorCard, "Làm Mới Thông Số State", "Cập nhật dữ liệu từ cấu hình và bộ nhớ game ngay lập tức", "Làm Mới", function()
+        refreshStateDisplay()
+        ShowNotification("Debug", "Đã làm mới thông số giám sát!", "SUCCESS", 2)
+    end)
+
+    -- 2. BỘ CÔNG CỤ DEBUG CHIÊU THỨC
+    createCategoryHeader(tabDebug, "🛠️ BỘ CÔNG CỤ KIỂM TRA & ĐIỀU KHIỂN LOG")
+    local toolsCard = createCardGroup(tabDebug)
+
+    createToggleRow(toolsCard, "Bật Ghi Nhật Ký (Debug Log)", "Ghi lại mọi lệnh tung chiêu, lý do chặn chiêu và nguồn cấu hình", Config.DebugLogEnabled, function(v)
+        Config.DebugLogEnabled = v
+        DebugLog("HỆ_THỐNG", string.format("Người dùng chuyển Debug Log sang: %s", v and "BẬT" or "TẮT"), "DebugTab")
+    end)
+
+    createButtonRow(toolsCard, "Quét Nút Kỹ Năng Màn Hình (Skill UI)", "Kiểm tra chiêu Z, X, C, V trên màn hình có tồn tại, bị khóa, hoặc đang CD", "Quét Kỹ Năng", function()
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        local fUI = pGui and pGui:FindFirstChild("FishingUI")
+        local sFrame = fUI and fUI:FindFirstChild("SkillButton") and fUI.SkillButton:FindFirstChild("Frame")
+        if not sFrame then
+            DebugLog("QUÉT_KỸ_NĂNG", "Không tìm thấy giao diện phím chiêu (SkillButton.Frame) trên màn hình!", "DebugTab")
+            ShowNotification("Quét Kỹ Năng", "Chưa vào trạng thái câu cá hoặc game chưa nạp SkillButton!", "WARN", 3)
+            return
+        end
+
+        local report = {}
+        for _, key in ipairs({"Z", "X", "C", "V", "T", "R"}) do
+            local btn = sFrame:FindFirstChild(key)
+            if btn then
+                local cdLabel = btn:FindFirstChild("CD")
+                local cdText = (cdLabel and cdLabel:IsA("TextLabel") and cdLabel.Text ~= "") and cdLabel.Text or "0 (Sẵn Sàng)"
+                local lockIcon = btn:FindFirstChild("Lock")
+                local isLocked = (lockIcon and lockIcon:IsA("ImageLabel") and lockIcon.Visible) and "BỊ KHÓA" or "MỞ"
+                local ready = comboState.IsSkillReady(key, fUI)
+                local st = string.format("[%s: CD=%s | Khóa=%s | SẵnSàng=%s]", key, cdText, isLocked, ready and "CÓ" or "KHÔNG")
+                table.insert(report, st)
+                DebugLog("QUÉT_CHIÊU_" .. key, st, "SkillScanner")
+            else
+                table.insert(report, string.format("[%s: KHÔNG CÓ TRÊN CẦN]", key))
+            end
+        end
+        ShowNotification("Quét Kỹ Năng", table.concat(report, "\n"), "INFO", 5)
+    end)
+
+    createButtonRow(toolsCard, "In Toàn Bộ Log Ra Console F9", "Xuất 80 dòng nhật ký gần nhất ra cửa sổ Developer Console (F9)", "Xuất Log F9", function()
+        print("==================== [HEAVYWEIGHT FISHING DEBUG LOG DUMP] ====================")
+        for idx, entry in ipairs(debugLogs) do
+            print(string.format("[%02d][%s][%s] %s | Nguồn: %s", idx, entry.time or "??", entry.tag or "INFO", entry.msg or "", entry.source or ""))
+        end
+        print("==============================================================================")
+        ShowNotification("Debug Console", string.format("Đã xuất %d dòng log ra Console F9! Hãy nhấn F9 để xem.", #debugLogs), "SUCCESS", 3)
+    end)
+
+    -- 3. NHẬT KÝ HOẠT ĐỘNG THỜI GIAN THỰC (LIVE DEBUG CONSOLE)
+    createCategoryHeader(tabDebug, "🖥️ NHẬT KÝ HOẠT ĐỘNG THỜI GIAN THỰC (LIVE CONSOLE)")
+    local consoleCard = createCardGroup(tabDebug)
+
+    local consoleHeader = Instance.new("Frame")
+    consoleHeader.Size = UDim2.new(1, 0, 0, 26)
+    consoleHeader.BackgroundColor3 = Color3.fromRGB(18, 14, 26)
+    consoleHeader.BorderSizePixel = 0
+    consoleHeader.Parent = consoleCard
+    do
+        local p = Instance.new("UIPadding")
+        p.PaddingLeft = UDim.new(0, 10)
+        p.PaddingRight = UDim.new(0, 10)
+        p.Parent = consoleHeader
+    end
+
+    local consoleTitle = Instance.new("TextLabel")
+    consoleTitle.Size = UDim2.new(0.65, 0, 1, 0)
+    consoleTitle.BackgroundTransparency = 1
+    consoleTitle.Font = Enum.Font.GothamBold
+    consoleTitle.Text = "BẢNG GHI THỜI GIAN THỰC (TỐI ĐA 80 DÒNG)"
+    consoleTitle.TextColor3 = Colors.PurplePrimary
+    consoleTitle.TextSize = 10
+    consoleTitle.TextXAlignment = Enum.TextXAlignment.Left
+    consoleTitle.Parent = consoleHeader
+
+    local clearBtn = Instance.new("TextButton")
+    clearBtn.Size = UDim2.new(0, 75, 0, 18)
+    clearBtn.Position = UDim2.new(1, -75, 0.5, -9)
+    clearBtn.BackgroundColor3 = Colors.ControlBg
+    clearBtn.Font = Enum.Font.GothamBold
+    clearBtn.Text = "Xóa Nhật Ký"
+    clearBtn.TextColor3 = Colors.AccentRed
+    clearBtn.TextSize = 9
+    clearBtn.BorderSizePixel = 0
+    clearBtn.Parent = consoleHeader
+    Instance.new("UICorner", clearBtn).CornerRadius = UDim.new(0, 3)
+
+    local logScroll = Instance.new("ScrollingFrame")
+    logScroll.Size = UDim2.new(1, 0, 0, 240)
+    logScroll.BackgroundColor3 = Color3.fromRGB(11, 9, 17)
+    logScroll.BorderSizePixel = 0
+    logScroll.ScrollBarThickness = 3
+    logScroll.ScrollBarImageColor3 = Colors.BorderPurple
+    logScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    logScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+    logScroll.Parent = consoleCard
+    do
+        local p = Instance.new("UIPadding")
+        p.PaddingTop = UDim.new(0, 6)
+        p.PaddingBottom = UDim.new(0, 6)
+        p.PaddingLeft = UDim.new(0, 8)
+        p.PaddingRight = UDim.new(0, 8)
+        p.Parent = logScroll
+        local l = Instance.new("UIListLayout")
+        l.SortOrder = Enum.SortOrder.LayoutOrder
+        l.Padding = UDim.new(0, 3)
+        l.Parent = logScroll
+    end
+
+    local function getTagColor(tag)
+        tag = tostring(tag or ""):upper()
+        if tag:find("TUNG_CHIÊU") then return Colors.AccentGreen end
+        if tag:find("CHẶN") then return Colors.AccentRed end
+        if tag:find("CHỌN") then return Colors.AccentBlue end
+        if tag:find("CHỜ") then return Colors.AccentYellow end
+        if tag:find("NHẢY") then return Colors.AccentOrange end
+        if tag:find("BỎ_QUA") or tag:find("SKIP") then return Colors.TextMuted end
+        return Colors.PurplePrimary
+    end
+
+    local logItemCount = 0
+    local function renderLogEntry(entry)
+        logItemCount = logItemCount + 1
+        local row = Instance.new("Frame")
+        row.Name = "LogEntry_" .. logItemCount
+        row.Size = UDim2.new(1, 0, 0, 0)
+        row.AutomaticSize = Enum.AutomaticSize.Y
+        row.BackgroundTransparency = 1
+        row.LayoutOrder = logItemCount
+        row.Parent = logScroll
+
+        local lbl = Instance.new("TextLabel")
+        lbl.Size = UDim2.new(1, 0, 0, 0)
+        lbl.AutomaticSize = Enum.AutomaticSize.Y
+        lbl.BackgroundTransparency = 1
+        lbl.Font = Enum.Font.Code
+        lbl.TextSize = 10
+        lbl.TextXAlignment = Enum.TextXAlignment.Left
+        lbl.TextWrapped = true
+        lbl.RichText = true
+
+        local tagColor = getTagColor(entry.tag)
+        local hexColor = string.format("#%02X%02X%02X", math.floor(tagColor.R * 255), math.floor(tagColor.G * 255), math.floor(tagColor.B * 255))
+        local timeStr = string.format("<font color=\"#6E5F8A\">[%s]</font>", entry.time or "??:??:??")
+        local tagStr = string.format("<font color=\"%s\"><b>[%s]</b></font>", hexColor, tostring(entry.tag or "INFO"))
+        local msgStr = string.format("<font color=\"#F5F3FF\">%s</font>", tostring(entry.msg or ""))
+        local srcStr = string.format("<font color=\"#9370C4\">(Nguồn: %s)</font>", tostring(entry.source or "Unknown"))
+
+        lbl.Text = string.format("%s %s %s %s", timeStr, tagStr, msgStr, srcStr)
+        lbl.Parent = row
+
+        local children = logScroll:GetChildren()
+        local count = 0
+        for _, c in ipairs(children) do
+            if c:IsA("Frame") then count = count + 1 end
+        end
+        if count > 80 then
+            for _, c in ipairs(children) do
+                if c:IsA("Frame") then
+                    c:Destroy()
+                    break
+                end
+            end
+        end
+
+        pcall(function()
+            logScroll.CanvasPosition = Vector2.new(0, 99999)
+        end)
+    end
+
+    for _, pastEntry in ipairs(debugLogs) do
+        renderLogEntry(pastEntry)
+    end
+
+    table.insert(debugLogListeners, function(entry)
+        renderLogEntry(entry)
+    end)
+
+    clearBtn.MouseButton1Click:Connect(function()
+        for _, c in ipairs(logScroll:GetChildren()) do
+            if c:IsA("Frame") then c:Destroy() end
+        end
+        table.clear(debugLogs)
+        ShowNotification("Nhật Ký", "Đã xóa toàn bộ nhật ký debug!", "INFO", 2)
+    end)
+
+    -- Cập nhật tự động thông số khi đang mở tab Debug
+    task.spawn(function()
+        while true do
+            task.wait(1.5)
+            if tabDebug and tabDebug.Visible then
+                refreshStateDisplay()
+            end
+        end
+    end)
+end
+initDebugTab()
+
 -- ĐỒNG BỘ TOÀN BỘ GIÁ TRỊ TỪ CONFIG VÀO GIAO DIỆN GUI (ĐẢM BẢO CONFIG = GIAO DIỆN 100%)
 task.spawn(function()
     task.wait(0.2)
@@ -11156,7 +11502,8 @@ function comboState.IsCharacterCastingSkill()
     return false
 end
 
-function comboState.CastSkill(sk)
+function comboState.CastSkill(sk, callerSource)
+    callerSource = callerSource or "Không rõ nguồn"
     if not sk or sk == "" or sk == "Tắt" then return false end
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
@@ -11168,17 +11515,17 @@ function comboState.CastSkill(sk)
         if Config.TicketSkillKey and (Config.TicketSkillKey:match("[Cc]%s*$")) then userChoseC = true end
         if Config.TrainSkill and (Config.TrainSkill:find("C") or Config.TrainSkill:find("c")) then userChoseC = true end
         if Config.QuickCatchSkill == "C" or Config.OpenerSkill == "C" or Config.EmergencyHealSkill == "C" then userChoseC = true end
-        -- Cho phép C nếu người chơi cài đặt C trong LoopSkills và đang bật SmartCombo hoặc AutoSkills
         if (Config.SmartComboEnabled or Config.AutoSkills) and Config.LoopSkills and (Config.LoopSkills:find("C") or Config.LoopSkills:find("c")) then
             userChoseC = true
         end
         if not userChoseC then
-            return false -- Chặn đứng 100% việc cast C
+            DebugLog("CHẶN_C", "Chiêu 'C' BỊ CHẶN! Bạn chưa kích hoạt phím C ở bất kỳ mục nào.", callerSource)
+            return false
         end
     end
 
-    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Khi bật Auto Ticket Quest, CHỈ khóa 1 chiêu cho quest 100 cá & 100 skill!
-    if Config.AutoTicketQuest then
+    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST (CHỈ KHI ĐANG BẬT AutoTicketQuest VÀ KHÔNG BẬT SmartComboEnabled):
+    if Config.AutoTicketQuest and not Config.SmartComboEnabled then
         local curQ = ticketQuestState and ticketQuestState.currentQuestType
         if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
             curQ = select(1, ticketQuestState.DetectActiveQuest())
@@ -11187,34 +11534,21 @@ function comboState.CastSkill(sk)
         if curQ == "skill_100" then
             local allowedSkill = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
             allowedSkill = allowedSkill and allowedSkill:upper() or "Z"
-            if cleanKey ~= allowedSkill then return false end
+            if cleanKey ~= allowedSkill then
+                DebugLog("CHẶN_CHIÊU", string.format("Chiêu '%s' BỊ CHẶN bởi AutoTicketQuest (Đang farm quest 100 Skill -> chỉ cho phép: '%s')", cleanKey, allowedSkill), "AutoTicketQuest")
+                return false
+            end
         elseif curQ == "fish_100" then
             local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
             allowedQuick = allowedQuick and allowedQuick:upper() or "V"
-            if cleanKey ~= allowedQuick then return false end
-        end
-        -- Đối với fish_15m hoặc nhiệm vụ khác: TUYỆT ĐỐI KHÔNG CHẶN, cho phép xả combo đầy đủ theo cài đặt người chơi!
-    else
-        -- KHÓA BẢO VỆ CHẶN CHIÊU SAI KHI KHÔNG BẬT AUTO TICKET QUEST NHƯNG ĐANG CÓ QUEST VÉ
-        local curQ = ticketQuestState and ticketQuestState.currentQuestType
-        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-            curQ = select(1, ticketQuestState.DetectActiveQuest())
-        end
-
-        if curQ == "fish_100" then
-            local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
-            allowed = allowed and allowed:upper() or "V"
-            if cleanKey ~= allowed then
-                return false -- Chặn đứng 100% các chiêu Z, X, C
-            end
-        elseif curQ == "skill_100" then
-            local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
-            allowed = allowed and allowed:upper() or "Z"
-            if cleanKey ~= allowed then
-                return false -- Chặn đứng các chiêu khác
+            if cleanKey ~= allowedQuick then
+                DebugLog("CHẶN_CHIÊU", string.format("Chiêu '%s' BỊ CHẶN bởi AutoTicketQuest (Đang farm quest 100 Cá -> chỉ cho phép: '%s')", cleanKey, allowedQuick), "AutoTicketQuest")
+                return false
             end
         end
     end
+
+    DebugLog("TUNG_CHIÊU", string.format("Phát lệnh tung chiêu '%s'", cleanKey), callerSource)
 
     -- 1. Gửi RemoteEvent tới Server
     pcall(function()
@@ -11590,7 +11924,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 end
 
                                 -- Bắn skill liên tục để kích hoạt ngay khoảnh khắc game mở khóa
-                                comboState.CastSkill(cleanKey)
+                                comboState.CastSkill(cleanKey, "TrainSkill (Luyện Kỹ Năng)")
 
                                 task.wait(0.08)
 
@@ -11760,7 +12094,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
 
-                                        comboState.CastSkill(sk)
+                                        comboState.CastSkill(sk, "AutoTicketQuest (Quest Routine)")
                                         ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                         ticketQuestState.UpdateUI()
                                         if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
@@ -11835,7 +12169,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
 
-                                        comboState.CastSkill(sk)
+                                        comboState.CastSkill(sk, "AutoTicketQuest (100 Cá Quick)")
 
                                         local waitFinish = tick()
                                         while isRunning and (fUI and fUI.Visible) and (tick() - waitFinish < 0.35) do
@@ -11933,7 +12267,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                             if healKey and playerHp <= (Config.EmergencyHealHp or 40) then
                                 if comboState.IsSkillReady(healKey, fUI) then
-                                    comboState.CastSkill(healKey)
+                                    comboState.CastSkill(healKey, "Hồi Máu Khẩn Cấp (EmergencyHeal)")
                                     comboState.lastActionTime = now
                                     didHeal = true
                                 end
@@ -11942,26 +12276,31 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             if not didHeal then
                                 -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU COMBO (VD: Z -> X -> V...)
                                 local loopKeys = {}
-                                local curQ = ticketQuestState and ticketQuestState.currentQuestType
-                                if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-                                    curQ = select(1, ticketQuestState.DetectActiveQuest())
+                                local comboSource = "SmartCombo"
+
+                                -- Chỉ ghi đè chiêu theo vé nhiệm vụ nếu BẬT AutoTicketQuest VÀ TẮT SmartComboEnabled
+                                if Config.AutoTicketQuest and not Config.SmartComboEnabled then
+                                    local curQ = ticketQuestState and ticketQuestState.currentQuestType
+                                    if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+                                        curQ = select(1, ticketQuestState.DetectActiveQuest())
+                                    end
+                                    if curQ == "fish_100" then
+                                        local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+                                        table.insert(loopKeys, qk and qk:upper() or "V")
+                                        comboSource = "AutoTicketQuest (100 Cá -> " .. (qk or "V") .. ")"
+                                    elseif curQ == "skill_100" then
+                                        local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+                                        table.insert(loopKeys, sk and sk:upper() or "Z")
+                                        comboSource = "AutoTicketQuest (100 Skill -> " .. (sk or "Z") .. ")"
+                                    end
                                 end
 
-                                -- fish_100 và skill_100: chỉ dùng 1 chiêu cố định theo config vé
-                                -- Tất cả còn lại (fish_15m, bait_100, không có quest...): dùng LoopSkills đầy đủ
-                                if curQ == "fish_100" then
-                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
-                                    table.insert(loopKeys, qk and qk:upper() or "V")
-                                elseif curQ == "skill_100" then
-                                    local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
-                                    table.insert(loopKeys, sk and sk:upper() or "Z")
-                                end
-                                -- fish_15m, bait_100, none, hoặc không quest -> loopKeys sẽ rỗng -> dùng LoopSkills bên dưới
-
+                                -- Mặc định: Ưu tiên 100% danh sách LoopSkills đã cài trong Smart Combo
                                 if #loopKeys == 0 then
                                     for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
                                         table.insert(loopKeys, k:upper())
                                     end
+                                    comboSource = string.format("Config.LoopSkills ('%s')", tostring(Config.LoopSkills))
                                 end
 
                                 if #loopKeys > 0 then
@@ -11977,18 +12316,22 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                         if comboState.IsSkillReady(targetKey, fUI) then
                                             chosenIndex = comboState.loopTargetIndex
+                                            DebugLog("COMBO_CHỌN", string.format("Chiêu '%s' (vị trí %d/%d) đã sẵn sàng! Chuẩn bị tung chiêu.", targetKey, chosenIndex, #loopKeys), comboSource)
                                         elseif not keyExistsOnRod and sFrame then
                                             -- Chiêu này thực sự không có trên cần câu của người chơi -> Bỏ qua sau 1.5s
                                             if comboState.loopWaitStartTime == 0 then
                                                 comboState.loopWaitStartTime = now
+                                                DebugLog("COMBO_SKIP_START", string.format("Chiêu '%s' không có trên cần -> Đếm 1.5s để bỏ qua...", targetKey), comboSource)
                                             elseif (now - comboState.loopWaitStartTime >= 1.5) then
                                                 comboState.loopWaitStartTime = 0
                                                 comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                                DebugLog("COMBO_BỎ_QUA", string.format("Đã bỏ qua chiêu '%s' do cần không có. Chuyển sang vị trí %d ('%s')", targetKey, comboState.loopTargetIndex, tostring(loopKeys[comboState.loopTargetIndex])), comboSource)
                                             end
                                         else
                                             -- Chiêu CÓ trên cần câu nhưng đang trong thời gian hồi chiêu hoặc game đang khóa:
                                             -- BẮT BUỘC CHỜ HỒI CHIÊU XONG! TUYỆT ĐỐI KHÔNG BỎ QUA ĐỂ ĐẢM BẢO 100% ĐÚNG THỨ TỰ!
                                             comboState.loopWaitStartTime = 0
+                                            DebugLog("COMBO_CHỜ", string.format("Strict Order: Chiêu '%s' (vị trí %d/%d) đang hồi chiêu/khóa -> Kiên quyết chờ đúng nhịp, KHÔNG nhảy cóc.", targetKey, comboState.loopTargetIndex, #loopKeys), comboSource)
                                         end
                                     else
                                         for offset = 0, #loopKeys - 1 do
@@ -11996,6 +12339,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                             local sk = loopKeys[idx]
                                             if comboState.IsSkillReady(sk, fUI) then
                                                 chosenIndex = idx
+                                                if offset > 0 then
+                                                    DebugLog("COMBO_NHẢY_CÓC", string.format("Strict Order TẮT: Chiêu trước chưa hồi, tự động nhảy sang chiêu '%s' (vị trí %d)", sk, idx), comboSource)
+                                                end
                                                 break
                                             end
                                         end
@@ -12003,7 +12349,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                     if chosenIndex then
                                         local skillToCast = loopKeys[chosenIndex]
-                                        comboState.CastSkill(skillToCast)
+                                        comboState.CastSkill(skillToCast, string.format("%s [Vị trí %d/%d]", comboSource, chosenIndex, #loopKeys))
                                         comboState.lastActionTime = now
                                         comboState.loopWaitStartTime = 0
                                         comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
@@ -12014,7 +12360,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         or "Z"
                                     fallbackKey = fallbackKey:upper()
                                     if comboState.IsSkillReady(fallbackKey, fUI) then
-                                        comboState.CastSkill(fallbackKey)
+                                        DebugLog("COMBO_DỰ_PHÒNG", string.format("Không có LoopSkills -> Dùng chiêu dự phòng '%s'", fallbackKey), "Fallback")
+                                        comboState.CastSkill(fallbackKey, "Fallback (QuickCatch/Opener)")
                                         comboState.lastActionTime = now
                                     end
                                 end
@@ -12022,20 +12369,23 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                         lastSkillTime = now
                     elseif (Config.AutoSkills or is15mQuest) and (now - lastSkillTime >= 0.15) then
-                        local curQ = ticketQuestState and ticketQuestState.currentQuestType
-                        if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
-                            curQ = select(1, ticketQuestState.DetectActiveQuest())
+                        local curQ = nil
+                        if Config.AutoTicketQuest then
+                            curQ = ticketQuestState and ticketQuestState.currentQuestType
+                            if (not curQ or curQ == "none") and ticketQuestState and ticketQuestState.DetectActiveQuest then
+                                curQ = select(1, ticketQuestState.DetectActiveQuest())
+                            end
                         end
 
-                        -- fish_100/skill_100: 1 chiêu cố định. Tất cả còn lại: dùng LoopSkills đầy đủ
-                        if curQ == "fish_100" then
+                        -- Chỉ khi bật AutoTicketQuest thì mới ép 1 chiêu cố định cho fish_100 hoặc skill_100
+                        if Config.AutoTicketQuest and curQ == "fish_100" then
                             local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
-                            comboState.CastSkill(qk and qk:upper() or "V")
-                        elseif curQ == "skill_100" then
+                            comboState.CastSkill(qk and qk:upper() or "V", "AutoTicketQuest (100 Cá)")
+                        elseif Config.AutoTicketQuest and curQ == "skill_100" then
                             local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
-                            comboState.CastSkill(sk and sk:upper() or "Z")
+                            comboState.CastSkill(sk and sk:upper() or "Z", "AutoTicketQuest (100 Skill)")
                         else
-                            -- fish_15m, bait_100, không quest, hoặc normal fishing -> dùng LoopSkills
+                            -- Dùng LoopSkills theo cài đặt của người dùng
                             local skillList = {}
                             if Config.LoopSkills and Config.LoopSkills ~= "" then
                                 for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
@@ -12049,12 +12399,12 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                 if targetIdx < 1 or targetIdx > #skillList then targetIdx = 1 end
                                 local sk = skillList[targetIdx]
                                 if sk and comboState.IsSkillReady(sk, fUI) then
-                                    comboState.CastSkill(sk)
+                                    comboState.CastSkill(sk, string.format("AutoSkills Strict [%d/%d]", targetIdx, #skillList))
                                     comboState.loopTargetIndex = (targetIdx % #skillList) + 1
                                 end
                             else
                                 for _, sk in ipairs(skillList) do
-                                    comboState.CastSkill(sk)
+                                    comboState.CastSkill(sk, "AutoSkills (Tự do)")
                                 end
                             end
                         end
