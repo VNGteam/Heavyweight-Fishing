@@ -13,7 +13,6 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 V2_DIR = os.path.join(BASE_DIR, "v2")
 OUTPUT_FILE = os.path.join(BASE_DIR, "local.lua")
 
-# Module resolution mapping
 def get_module_id(filepath):
     rel = os.path.relpath(filepath, V2_DIR)
     if rel == "main.lua":
@@ -23,30 +22,28 @@ def get_module_id(filepath):
         mod_id = mod_id[:-4]
     return mod_id
 
-def resolve_require(match, current_mod_id):
+def resolve_require(match, mod_id):
     raw = match.group(1).strip()
-    # e.g. script.Parent.Parent.core.services or script.core.services or script.Parent.tracker
-    # Split by '.'
     parts = raw.split(".")
     
-    # Calculate current directory parts
-    if current_mod_id == "main":
-        cur_parts = []
+    if mod_id == "main":
+        cur = []
     else:
-        cur_parts = current_mod_id.split(".")[:-1] # directory of current file
-    
-    # Process each token
-    target_parts = list(cur_parts)
+        cur = mod_id.split(".")
+        
     for p in parts:
         if p == "script":
-            continue
+            if mod_id == "main":
+                cur = []
+            else:
+                cur = mod_id.split(".")
         elif p == "Parent":
-            if target_parts:
-                target_parts.pop()
+            if cur:
+                cur.pop()
         else:
-            target_parts.append(p)
+            cur.append(p)
             
-    target_mod_id = ".".join(target_parts)
+    target_mod_id = ".".join(cur)
     return f'__require("{target_mod_id}")'
 
 def build():
@@ -79,6 +76,22 @@ def build():
         transformed_modules[mod_id] = transformed
         
     transformed_main = require_pattern.sub(lambda m: resolve_require(m, "main"), main_code)
+    
+    # Validate that every __require target exists in modules
+    all_requires = re.findall(r'__require\s*\(\s*"([^"]+)"\s*\)', transformed_main)
+    for mod_id, code in transformed_modules.items():
+        all_requires.extend(re.findall(r'__require\s*\(\s*"([^"]+)"\s*\)', code))
+        
+    missing_modules = set()
+    for req in all_requires:
+        if req not in modules:
+            missing_modules.add(req)
+            
+    if missing_modules:
+        print(f"❌ ERROR: Unresolved modules found in bundle: {missing_modules}")
+        sys.exit(1)
+    else:
+        print(f"✅ Module Integrity Check Passed: All {len(all_requires)} requires correctly resolved!")
     
     # Generate bundle
     bundle_lines = [

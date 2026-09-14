@@ -31,7 +31,7 @@ local Services = __require("core.services")
 local Events = Services.Events
 local LocalPlayer = Services.LocalPlayer
 local VirtualInputManager = Services.VirtualInputManager
-local Tracker = __require("tracker")
+local Tracker = __require("combo.tracker")
 
 local Executor = {}
 
@@ -139,8 +139,8 @@ __modules["combo.state_machine"] = function()
     Guarantees strict sequential execution: Z -> X -> V -> Z -> X -> V without skipping.
 --]]
 
-local Tracker = __require("tracker")
-local Executor = __require("executor")
+local Tracker = __require("combo.tracker")
+local Executor = __require("combo.executor")
 
 local StateMachine = {}
 
@@ -396,7 +396,7 @@ __modules["core.config"] = function()
     Configuration Table, Defaults & Account-Based Persistence
 --]]
 
-local Services = __require("services")
+local Services = __require("core.services")
 local HttpService = Services.HttpService
 local LocalPlayer = Services.LocalPlayer
 
@@ -837,7 +837,7 @@ __modules["core.utils"] = function()
     Notification System, Health Calculation & Number Formatting Utilities
 --]]
 
-local Services = __require("services")
+local Services = __require("core.services")
 local Workspace = Services.Workspace
 local LocalPlayer = Services.LocalPlayer
 local HttpService = Services.HttpService
@@ -1939,7 +1939,7 @@ __modules["ui.components"] = function()
 
 local Services = __require("core.services")
 local TweenService = Services.TweenService
-local Theme = __require("theme")
+local Theme = __require("ui.theme")
 local State = __require("core.state")
 
 local Components = {}
@@ -2369,7 +2369,7 @@ __modules["ui.tabs.tab_cai_dat"] = function()
     Tab 10: Cài Đặt (Profiles, Config Management & Script Unload)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 local ConfigModule = __require("core.config")
 local Utils = __require("core.utils")
@@ -2409,7 +2409,7 @@ __modules["ui.tabs.tab_cau_ca"] = function()
     Tab 1: Câu Cá (Auto Cast, Hook, Perfect Slam, Max Charge, Mồi & Cần)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 
 local TabCauCa = {}
@@ -2466,10 +2466,10 @@ __modules["ui.tabs.tab_combo"] = function()
     Tab 2: Combo Chiêu (Smart Combo Engine V2 - Dedicated Tab)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 local StateMachine = __require("combo.state_machine")
-local Theme = __require("theme")
+local Theme = __require("ui.theme")
 
 local TabCombo = {}
 
@@ -2608,7 +2608,7 @@ __modules["ui.tabs.tab_dich_chuyen"] = function()
     Tab 7: Dịch Chuyển (Islands, Players, Server Hop)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local Teleport = __require("features.teleport")
 
 local TabDichChuyen = {}
@@ -2641,7 +2641,7 @@ __modules["ui.tabs.tab_nhan_vat"] = function()
     Tab 9: Nhân Vật & Tiện Ích (Speed, Fly, Noclip, Walk on Water, Anti-AFK)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 local Character = __require("features.character")
 
@@ -2688,7 +2688,7 @@ __modules["ui.tabs.tab_nhiem_vu"] = function()
     Tab 4: Nhiệm Vụ (Daily Ticket Quests)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 local Quest = __require("features.quest")
 
@@ -2734,7 +2734,7 @@ __modules["ui.tabs.tab_san_boss"] = function()
     Tab 3: Săn Boss (Secret Boss Targets, Fast Skip & Chat Sniper)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 local Boss = __require("features.boss")
 
@@ -2779,7 +2779,7 @@ __modules["ui.tabs.tab_shop"] = function()
     Tab 6: Cửa Hàng & Chế Mồi (Auto Sell, Buy Bait, Craft Bait, Daily Claim)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 
 local TabShop = {}
@@ -2825,7 +2825,7 @@ __modules["ui.tabs.tab_than_linh"] = function()
     Tab 5: Thần Linh & NPC (God Spirit & Taoist / Maoshan)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 
 local TabThanLinh = {}
@@ -2857,7 +2857,7 @@ __modules["ui.tabs.tab_thu_nghiem"] = function()
     Tab 11: Thử Nghiệm (Experimental Features)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 
 local TabThuNghiem = {}
 
@@ -2879,7 +2879,7 @@ __modules["ui.tabs.tab_visuals"] = function()
     Tab 8: ESP & Đồ Họa (Fish ESP, Player ESP, Fullbright)
 --]]
 
-local Components = __require("components")
+local Components = __require("ui.components")
 local State = __require("core.state")
 local Visuals = __require("features.visuals")
 
