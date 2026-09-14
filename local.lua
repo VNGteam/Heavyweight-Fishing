@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5+0.2"
+local SCRIPT_BUILD_COMMIT = "v2.5+0.4"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -11510,57 +11510,63 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             ticketQuestState.isBusyRoutine = true
                             task.spawn(function()
                                 pcall(function()
-                                    -- 1. Lấy chiêu cần dùng từ config
+                                    -- 1. Ưu tiên số 1: Dùng đúng chiêu TicketSkillKey đã cài đặt cho nhiệm vụ 100 Skill (VD: "Chiêu Z")
+                                    local comboList = {}
                                     local skillKey = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])")
-                                    local sk = skillKey and skillKey:upper() or "Z"
+                                    if skillKey then
+                                        table.insert(comboList, skillKey:upper())
+                                    elseif Config.LoopSkills and Config.LoopSkills ~= "" then
+                                        for k in string.gmatch(Config.LoopSkills, "([ZXCVzxcv])") do
+                                            table.insert(comboList, k:upper())
+                                        end
+                                    end
+                                    if #comboList == 0 then
+                                        comboList = {"Z"}
+                                    end
 
-                                    local initialFishHp = GetFishHealth(fUI)
+                                    -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
                                     local startTime = tick()
-
-                                    -- 2. Bắn chiêu LIÊN TỤC (giống AutoTrain) cho đến khi server nhận
                                     while isRunning and (fUI and fUI.Visible) do
+                                        local barFrame = fUI:FindFirstChild("BarFrame")
+                                        if barFrame and barFrame:FindFirstChild("Bar") then
+                                            barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
+                                        end
+                                        if (tick() - startTime) >= 3.05 then
+                                            break
+                                        end
+                                        task.wait(0.05)
+                                    end
+
+                                    -- 3. Lần lượt tung TOÀN BỘ chuỗi combo đã cài (Z -> X -> V...)
+                                    for _, sk in ipairs(comboList) do
+                                        if not isRunning or not (fUI and fUI.Visible) then break end
+
                                         local barFrame = fUI:FindFirstChild("BarFrame")
                                         if barFrame and barFrame:FindFirstChild("Bar") then
                                             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                         end
 
                                         comboState.CastSkill(sk)
-                                        task.wait(0.08)
+                                        ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
+                                        ticketQuestState.UpdateUI()
+                                        if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
+                                            ticketQuestState.isCompleted = true
+                                        elseif ticketQuestState.currentProgress >= 100 then
+                                            ticketQuestState.isCompleted = true
+                                        end
 
-                                        local elapsed = tick() - startTime
-                                        if elapsed >= 3.05 then
-                                            local curHp = GetFishHealth(fUI)
-                                            local hpDropped = (initialFishHp and curHp and curHp < initialFishHp)
-                                            local nowOnCd = comboState.IsSkillOnCooldown(sk, fUI)
-                                            -- Thoát khi chiêu vào CD hoặc HP cá giảm (server nhận) hoặc timeout 3.8s
-                                            if nowOnCd or hpDropped or (elapsed >= 3.8) then
-                                                break
+                                        -- Đợi nhịp giữa các chiêu để server nhận diện và animation nhân vật chạy (0.35s)
+                                        local waitFinish = tick()
+                                        while isRunning and (fUI and fUI.Visible) and (tick() - waitFinish < 0.35) do
+                                            local bf = fUI:FindFirstChild("BarFrame")
+                                            if bf and bf:FindFirstChild("Bar") then
+                                                bf.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
                                             end
+                                            task.wait(0.05)
                                         end
                                     end
 
-                                    -- 3. Đợi nhịp nhân vật chém xong
-                                    local waitFinish = tick()
-                                    while isRunning and (tick() - waitFinish < 0.35) do
-                                        if fUI and fUI.Visible then
-                                            local barFrame = fUI:FindFirstChild("BarFrame")
-                                            if barFrame and barFrame:FindFirstChild("Bar") then
-                                                barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
-                                            end
-                                        end
-                                        task.wait(0.05)
-                                    end
-
-                                    -- 4. Cập nhật tiến độ
-                                    ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
-                                    ticketQuestState.UpdateUI()
-                                    if ticketQuestState.targetProgress and ticketQuestState.currentProgress >= ticketQuestState.targetProgress then
-                                        ticketQuestState.isCompleted = true
-                                    elseif ticketQuestState.currentProgress >= 100 then
-                                        ticketQuestState.isCompleted = true
-                                    end
-
-                                    -- 5. Kéo cá lên (Charge + Slam + UpdateFishProgression)
+                                    -- 4. Kéo cá lên (Charge 100 + Slam Perfect + UpdateFishProgression)
                                     local pullStartTime = tick()
                                     while isRunning and (fUI and fUI.Visible) and (tick() - pullStartTime < 25.0) do
                                         local barFrame = fUI:FindFirstChild("BarFrame")
