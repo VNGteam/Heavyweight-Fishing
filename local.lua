@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5+0.4"
+local SCRIPT_BUILD_COMMIT = "v2.5+0.5"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -787,6 +787,26 @@ end
 --     end
 -- end)
 
+-- Load riêng TicketSkillKey và TicketQuickSkill từ essential_config.json khi script khởi động
+pcall(function()
+    local TICKET_SKILL_KEYS = {"TicketSkillKey", "TicketQuickSkill"}
+    local accDir = GetAccountConfigDir and GetAccountConfigDir() or ""
+    local filePath = accDir .. "/essential_config.json"
+    if isfile and isfile(filePath) and readfile then
+        local ok, content = pcall(function() return readfile(filePath) end)
+        if ok and content and #content > 0 then
+            local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
+            if decOk and type(decoded) == "table" then
+                for _, k in ipairs(TICKET_SKILL_KEYS) do
+                    if decoded[k] ~= nil and Config[k] ~= nil then
+                        Config[k] = decoded[k]
+                    end
+                end
+            end
+        end
+    end
+end)
+
 -- ============================================================
 -- SMART COMBO PERSISTENCE (HeavyweightFishing_SmartCombo.json)
 -- Lưu/nạp trạng thái Combo Kỹ Năng Thông Minh tự động mỗi khi thay đổi.
@@ -804,8 +824,6 @@ local SMART_COMBO_KEYS = {
     "EmergencyHealHp",
     "SkillEffectDelay",
     "SmartEffectAutoDetect",
-    "TicketSkillKey",
-    "TicketQuickSkill",
     "TicketBaitChoice",
 }
 
@@ -853,7 +871,7 @@ local function LoadSmartComboAndSyncUI()
             "SmartComboEnabled", "FishHpThreshold", "QuickCatchSkill",
             "OpenerSkill", "OpenerMaxCount", "LoopStrictOrder",
             "EmergencyHealSkill", "EmergencyHealHp", "SkillEffectDelay",
-            "SmartEffectAutoDetect", "TicketSkillKey", "TicketQuickSkill", "TicketBaitChoice",
+            "SmartEffectAutoDetect", "TicketBaitChoice",
         }
         for _, k in ipairs(syncKeys) do
             local ctrl = UIControllers[k]
@@ -9012,12 +9030,12 @@ end)
 local skillList = {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}
 createDropdownRow(optionCard, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Kỹ năng bot dùng sau 3s khóa chiêu rồi cất cần lặp lại", skillList, Config.TicketSkillKey, function(v)
     Config.TicketSkillKey = v
-    SaveSmartCombo()
+    pcall(Config._saveEssential)
 end)
 
 createDropdownRow(optionCard, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu mạnh nhất dùng để kết liễu cá Map 1 trong 1 hit", skillList, Config.TicketQuickSkill, function(v)
     Config.TicketQuickSkill = v
-    SaveSmartCombo()
+    pcall(Config._saveEssential)
 end)
 
 createToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự động bán sạch cá khi balo đạt giới hạn để câu tiếp", Config.TicketAutoSellFull, function(v)
