@@ -11544,7 +11544,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                     -- 2. Giữ thăng bằng thanh bar và chờ qua 3 giây khóa chiêu đầu trận của game
                                     -- [DEBUG] Báo routine đang chạy và dùng chiêu nào
-                                    ShowNotification("🎯 Skill 100", "Bắt đầu routine | Chiêu: " .. tostring(comboList[1] or "?") .. " | Key: " .. tostring(Config.TicketSkillKey), "INFO", 5)
+                                    local _dbgKey = tostring(Config.TicketSkillKey)
+                                    local _dbgSkill = tostring(comboList[1] or "?")
+                                    warn("[SKILL100] Bắt đầu | TicketSkillKey=" .. _dbgKey .. " | Chiêu sẽ dùng=" .. _dbgSkill)
+                                    ShowNotification("🎯 Skill 100 DEBUG", "Chiêu=" .. _dbgSkill .. " | Key=" .. _dbgKey, "INFO", 30)
 
                                     local startTime = tick()
                                     while isRunning and (fUI and fUI.Visible) do
@@ -11560,7 +11563,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                     -- [DEBUG] Báo trạng thái fUI sau 3s
                                     local fVisible = fUI and fUI.Visible
-                                    ShowNotification("🎯 Skill 100", "Sau 3s: fUI.Visible=" .. tostring(fVisible) .. " | Sắp cast: " .. tostring(comboList[1] or "?"), fVisible and "SUCCESS" or "ERROR", 5)
+                                    warn("[SKILL100] Sau 3s | fUI.Visible=" .. tostring(fVisible) .. " | Sắp cast=" .. _dbgSkill)
+                                    ShowNotification("🎯 Sau 3s", "fUI.Visible=" .. tostring(fVisible) .. " | cast=" .. _dbgSkill, fVisible and "SUCCESS" or "ERROR", 30)
 
                                     -- 3. Lần lượt tung TOÀN BỘ chuỗi combo đã cài (Z -> X -> V...)
                                     for _, sk in ipairs(comboList) do
@@ -11573,7 +11577,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                                         local castOk = comboState.CastSkill(sk)
                                         -- [DEBUG] Báo kết quả cast
-                                        ShowNotification("⚔️ CastSkill", "sk=" .. sk .. " | ok=" .. tostring(castOk) .. " | progress=" .. tostring(ticketQuestState.currentProgress + 1), "INFO", 4)
+                                        warn("[SKILL100] CastSkill(" .. sk .. ") = " .. tostring(castOk))
+                                        ShowNotification("⚔️ Cast " .. sk, "ok=" .. tostring(castOk) .. " | progress=" .. tostring(ticketQuestState.currentProgress + 1), "INFO", 30)
 
                                         ticketQuestState.currentProgress = ticketQuestState.currentProgress + 1
                                         ticketQuestState.UpdateUI()
