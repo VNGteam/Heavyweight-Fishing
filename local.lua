@@ -10730,6 +10730,34 @@ function comboState.IsSkillOnCooldown(sk, fUI)
     return not comboState.IsSkillReady(sk, fUI)
 end
 
+-- Check CD chỉ qua UI game (bỏ qua usedTimes) — dùng để detect server nhận skill trong routine skill_100
+function comboState.IsSkillOnCooldownUI(sk, fUI)
+    if not sk or sk == "" or sk == "Tắt" then return false end
+    local cleanKey = sk:match("([ZXCVzxcv])") or sk
+    cleanKey = cleanKey:upper()
+    if not fUI then return false end
+    for _, desc in ipairs(fUI:GetDescendants()) do
+        local nameUpper = desc.Name:upper()
+        if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
+            if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
+                return true
+            end
+            for _, child in ipairs(desc:GetDescendants()) do
+                if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
+                    local cName = child.Name:lower()
+                    local txt = child.Text
+                    local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
+                    if cdWithS then
+                        local num = tonumber(cdWithS)
+                        if num and num > 0 and num <= 999 then return true end
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 function comboState.CheckSkillReady(sk, fUI, minCooldown)
     if minCooldown and (tick() - (comboState.usedTimes[sk:upper()] or 0) < minCooldown) then
         return false
@@ -11512,14 +11540,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         task.wait(0.08)
 
                                         local elapsed = tick() - startTime
-                                        -- Sau 3s: kiểm tra xem chiêu đã vào CD chưa (server đã nhận)
+                                        -- Sau 3s: kiểm tra CD thực tế trên UI game (không dùng usedTimes)
                                         if elapsed >= 3.05 then
-                                            if comboState.IsSkillOnCooldown(sk, fUI) then
-                                                -- Server xác nhận đã nhận chiêu → thoát vòng lặp
+                                            if comboState.IsSkillOnCooldownUI(sk, fUI) then
+                                                -- Server xác nhận đã nhận chiêu (CD xuất hiện trên UI) → thoát
                                                 skillCast = true
                                                 break
-                                            elseif elapsed >= 5.0 then
-                                                -- Timeout an toàn: sau 5s vẫn không vào CD thì thoát
+                                            elseif elapsed >= 6.0 then
+                                                -- Timeout an toàn: sau 6s vẫn không vào CD thì thoát
                                                 skillCast = true
                                                 break
                                             end
