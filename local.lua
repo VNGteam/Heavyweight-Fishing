@@ -4138,116 +4138,188 @@ end
 
 secretBossState.cachedTaoist = nil
 secretBossState.lastTaoistScan = 0
+secretBossState.cachedMaoshan = nil
+secretBossState.lastMaoshanScan = 0
 secretBossState.cachedGod = nil
 secretBossState.lastGodScan = 0
 
-function secretBossState.ScanForTaoistNPC()
-    local taoistPatterns = {"taoist", "maoshan", "mao shan", "grand angler", "grandangler", "đạo sĩ", "dao si", "daoshi", "priest"}
-
-    local function matchesTaoist(str)
-        if not str or typeof(str) ~= "string" or str == "" then return nil end
-        local s = str:lower()
-        for _, pat in ipairs(taoistPatterns) do
-            if s:find(pat, 1, true) then return pat end
-        end
-        return nil
-    end
-
+local function getCandidateNPCFolders()
     local candidateFolders = {}
-    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters"}) do
+    for _, fName in ipairs({"NPC", "NPCs", "Merchant", "Merchants", "Entities", "Characters"}) do
         local f = Workspace:FindFirstChild(fName)
         if f then
             table.insert(candidateFolders, f)
-            for _, subName in ipairs({"Function", "Merchant", "Taoist", "SellFish", "SetSpawn"}) do
+            for _, subName in ipairs({"Function", "Merchant", "Merchants", "Taoist", "SellFish", "SetSpawn", "BuyBait", "BuyFishingRod"}) do
                 local sf = f:FindFirstChild(subName)
                 if sf then table.insert(candidateFolders, sf) end
             end
         end
     end
+    return candidateFolders
+end
 
-    -- Đợt 1: Quét nhanh tên Model / BasePart trực tiếp trong các folder NPC
+local function isTaoistText(str)
+    if not str or typeof(str) ~= "string" or str == "" then return false end
+    local s = str:lower()
+    -- Tuyệt đối loại bỏ Blind Grand Angler, Grand Angler, hoặc Maoshan
+    if s:find("angler") or s:find("blind") or s:find("maoshan") or s:find("mao shan") then
+        return false
+    end
+    return (s:find("taoist") or s:find("đạo sĩ") or s:find("dao si") or s:find("daoshi")) ~= nil
+end
+
+local function isMaoshanText(str)
+    if not str or typeof(str) ~= "string" or str == "" then return false end
+    local s = str:lower()
+    if s:find("angler") or s:find("blind") then
+        return false
+    end
+    return (s:find("maoshan") or s:find("mao shan") or s:find("mao_shan")) ~= nil
+end
+
+local function isNPCModel(inst)
+    if not inst or not inst:IsA("Model") then return false end
+    return inst:FindFirstChildOfClass("Humanoid") ~= nil
+        or inst:FindFirstChild("HumanoidRootPart") ~= nil
+        or inst:FindFirstChild("Head") ~= nil
+end
+
+function secretBossState.ScanForTaoistNPC()
+    local candidateFolders = getCandidateNPCFolders()
+
+    -- Đợt 1: Quét Model NPC trực tiếp trong các folder
     for _, folder in ipairs(candidateFolders) do
         for _, n in ipairs(folder:GetChildren()) do
-            if n:IsA("Model") or n:IsA("BasePart") then
-                local pat = matchesTaoist(n.Name)
-                if pat then
-                    local isMaoshan = pat:find("maoshan") or pat:find("mao shan")
-                    local category = isMaoshan and "Maoshan" or "Taoist"
-                    local displayName = isMaoshan and "Đạo Sĩ Maoshan" or "Đạo Sĩ (Taoist)"
-                    local icon = isMaoshan and "✨" or "📜"
-                    local col = isMaoshan and Colors.PurplePrimary or Colors.AccentOrange
-                    return n, displayName, category, col, icon
-                end
+            if isNPCModel(n) and isTaoistText(n.Name) then
+                return n, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange, "📜"
             end
         end
     end
 
-    -- Đợt 2: Quét qua ProximityPrompt và TextLabel trong thư mục NPC
+    -- Đợt 2: Quét ProximityPrompt và TextLabel trong các thư mục NPC
     for _, folder in ipairs(candidateFolders) do
         for _, d in ipairs(folder:GetDescendants()) do
             if d:IsA("ProximityPrompt") then
                 local act = tostring(d.ActionText or "")
                 local obj = tostring(d.ObjectText or "")
                 local pName = d.Parent and d.Parent.Name or ""
-                local ppName = d.Parent and d.Parent.Parent and d.Parent.Parent.Name or ""
-                local pat = matchesTaoist(act) or matchesTaoist(obj) or matchesTaoist(pName) or matchesTaoist(ppName)
-                if pat then
+                if isTaoistText(act) or isTaoistText(obj) or isTaoistText(pName) then
                     local model = d:FindFirstAncestorOfClass("Model") or d.Parent
-                    local isMaoshan = pat:find("maoshan") or pat:find("mao shan")
-                    local category = isMaoshan and "Maoshan" or "Taoist"
-                    local displayName = isMaoshan and "Đạo Sĩ Maoshan" or "Đạo Sĩ (Taoist)"
-                    local icon = isMaoshan and "✨" or "📜"
-                    local col = isMaoshan and Colors.PurplePrimary or Colors.AccentOrange
-                    return model, displayName, category, col, icon
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange, "📜"
+                    end
                 end
             elseif d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then
-                local pat = matchesTaoist(d.Text)
-                if pat then
+                if isTaoistText(d.Text) then
                     local model = d:FindFirstAncestorOfClass("Model") or d.Parent
-                    local isMaoshan = pat:find("maoshan") or pat:find("mao shan")
-                    local category = isMaoshan and "Maoshan" or "Taoist"
-                    local displayName = isMaoshan and "Đạo Sĩ Maoshan" or "Đạo Sĩ (Taoist)"
-                    local icon = isMaoshan and "✨" or "📜"
-                    local col = isMaoshan and Colors.PurplePrimary or Colors.AccentOrange
-                    return model, displayName, category, col, icon
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange, "📜"
+                    end
                 end
             end
         end
     end
 
-    -- Đợt 3: Chỉ kiểm tra các Model con cấp 1 của Workspace (KHÔNG dùng GetDescendants trên Workspace)
+    -- Đợt 3: Quét trực tiếp các Model cấp 1 của Workspace
     for _, n in ipairs(Workspace:GetChildren()) do
-        if n:IsA("Model") and matchesTaoist(n.Name) then
-            local isMaoshan = n.Name:lower():find("maoshan")
-            return n, isMaoshan and "Đạo Sĩ Maoshan" or "Đạo Sĩ (Taoist)", isMaoshan and "Maoshan" or "Taoist", isMaoshan and Colors.PurplePrimary or Colors.AccentOrange, isMaoshan and "✨" or "📜"
+        if isNPCModel(n) and isTaoistText(n.Name) then
+            return n, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange, "📜"
         end
     end
+
+    return nil
+end
+
+function secretBossState.ScanForMaoshanNPC()
+    local candidateFolders = getCandidateNPCFolders()
+
+    -- Đợt 1: Quét Model NPC trực tiếp trong các folder
+    for _, folder in ipairs(candidateFolders) do
+        for _, n in ipairs(folder:GetChildren()) do
+            if isNPCModel(n) and isMaoshanText(n.Name) then
+                return n, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary, "✨"
+            end
+        end
+    end
+
+    -- Đợt 2: Quét ProximityPrompt và TextLabel trong các thư mục NPC
+    for _, folder in ipairs(candidateFolders) do
+        for _, d in ipairs(folder:GetDescendants()) do
+            if d:IsA("ProximityPrompt") then
+                local act = tostring(d.ActionText or "")
+                local obj = tostring(d.ObjectText or "")
+                local pName = d.Parent and d.Parent.Name or ""
+                if isMaoshanText(act) or isMaoshanText(obj) or isMaoshanText(pName) then
+                    local model = d:FindFirstAncestorOfClass("Model") or d.Parent
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary, "✨"
+                    end
+                end
+            elseif d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then
+                if isMaoshanText(d.Text) then
+                    local model = d:FindFirstAncestorOfClass("Model") or d.Parent
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary, "✨"
+                    end
+                end
+            end
+        end
+    end
+
+    -- Đợt 3: Quét trực tiếp các Model cấp 1 của Workspace
+    for _, n in ipairs(Workspace:GetChildren()) do
+        if isNPCModel(n) and isMaoshanText(n.Name) then
+            return n, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary, "✨"
+        end
+    end
+
     return nil
 end
 
 function secretBossState.GetTaoist()
     if secretBossState.cachedTaoist and secretBossState.cachedTaoist.inst and secretBossState.cachedTaoist.inst.Parent then
-        return secretBossState.cachedTaoist.inst, secretBossState.cachedTaoist.displayName, secretBossState.cachedTaoist.category, secretBossState.cachedTaoist.col, secretBossState.cachedTaoist.icon
+        return secretBossState.cachedTaoist.inst, secretBossState.cachedTaoist.displayName, "Taoist", Colors.AccentOrange, "📜"
     end
     local now = tick()
-    if (now - (secretBossState.lastTaoistScan or 0)) >= 5.0 then
+    if (now - (secretBossState.lastTaoistScan or 0)) >= 3.0 then
         secretBossState.lastTaoistScan = now
         local inst, displayName, category, col, icon = secretBossState.ScanForTaoistNPC()
         if inst then
             secretBossState.cachedTaoist = {
                 inst = inst,
-                displayName = displayName,
-                category = category,
-                col = col,
-                icon = icon
+                displayName = displayName or "Đạo Sĩ (Taoist)"
             }
-            return inst, displayName, category, col, icon
+            return inst, displayName or "Đạo Sĩ (Taoist)", "Taoist", col or Colors.AccentOrange, icon or "📜"
         else
             secretBossState.cachedTaoist = nil
         end
     end
     if secretBossState.cachedTaoist and secretBossState.cachedTaoist.inst and secretBossState.cachedTaoist.inst.Parent then
-        return secretBossState.cachedTaoist.inst, secretBossState.cachedTaoist.displayName, secretBossState.cachedTaoist.category, secretBossState.cachedTaoist.col, secretBossState.cachedTaoist.icon
+        return secretBossState.cachedTaoist.inst, secretBossState.cachedTaoist.displayName, "Taoist", Colors.AccentOrange, "📜"
+    end
+    return nil
+end
+
+function secretBossState.GetMaoshan()
+    if secretBossState.cachedMaoshan and secretBossState.cachedMaoshan.inst and secretBossState.cachedMaoshan.inst.Parent then
+        return secretBossState.cachedMaoshan.inst, secretBossState.cachedMaoshan.displayName, "Maoshan", Colors.PurplePrimary, "✨"
+    end
+    local now = tick()
+    if (now - (secretBossState.lastMaoshanScan or 0)) >= 3.0 then
+        secretBossState.lastMaoshanScan = now
+        local inst, displayName, category, col, icon = secretBossState.ScanForMaoshanNPC()
+        if inst then
+            secretBossState.cachedMaoshan = {
+                inst = inst,
+                displayName = displayName or "Đạo Sĩ Maoshan"
+            }
+            return inst, displayName or "Đạo Sĩ Maoshan", "Maoshan", col or Colors.PurplePrimary, icon or "✨"
+        else
+            secretBossState.cachedMaoshan = nil
+        end
+    end
+    if secretBossState.cachedMaoshan and secretBossState.cachedMaoshan.inst and secretBossState.cachedMaoshan.inst.Parent then
+        return secretBossState.cachedMaoshan.inst, secretBossState.cachedMaoshan.displayName, "Maoshan", Colors.PurplePrimary, "✨"
     end
     return nil
 end
@@ -8810,16 +8882,19 @@ createButtonRow(godCard, "Bay Đến Đạo Sĩ (Taoist)", "Dịch chuyển đ�
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local tInst, tName = secretBossState.ScanForTaoistNPC()
+    if not tInst then
+        tInst, tName = secretBossState.ScanForMaoshanNPC()
+    end
     if tInst then
         local pivot = (tInst:IsA("Model") and tInst:GetPivot()) or (tInst:IsA("BasePart") and tInst.CFrame)
         if pivot then
             root.CFrame = pivot + Vector3.new(0, 3, 4)
-            ShowNotification("Đạo Sĩ (Taoist)", "Đã dịch chuyển đến vị trí " .. tostring(tName) .. "!", "SUCCESS", 5)
+            ShowNotification("Đạo Sĩ", "Đã dịch chuyển đến vị trí " .. tostring(tName) .. "!", "SUCCESS", 5)
         else
-            ShowNotification("Đạo Sĩ (Taoist)", "Không lấy được tọa độ Đạo Sĩ.", "WARN")
+            ShowNotification("Đạo Sĩ", "Không lấy được tọa độ Đạo Sĩ.", "WARN")
         end
     else
-        ShowNotification("Đạo Sĩ (Taoist)", "Server này hiện chưa xuất hiện Đạo Sĩ! Hãy bật 'Đổi Server Tìm Taoist'.", "WARN", 6)
+        ShowNotification("Đạo Sĩ", "Server này hiện chưa xuất hiện Đạo Sĩ (Taoist / Maoshan)!", "WARN", 6)
     end
 end)
 
@@ -12402,8 +12477,8 @@ task.spawn(function()
                         hopReason = "Không tìm thấy Đạo Sĩ (Taoist) trong server này. Đang đổi server khác..."
                     end
                 elseif Config.AutoServerHopMaoshan then
-                    local tInst, tName, tCat = secretBossState.ScanForTaoistNPC()
-                    if tInst and tCat == "Maoshan" then
+                    local tInst, tName = secretBossState.ScanForMaoshanNPC()
+                    if tInst then
                         ShowNotification("Đạo Sĩ Maoshan", "Đã tìm thấy " .. tostring(tName) .. " trong server này! Đang dừng đổi server.", "SUCCESS", 6)
                     else
                         shouldHop = true
@@ -12680,10 +12755,17 @@ task.spawn(function()
                     end
                 end
 
-                if Config.ESP_Taoist or Config.ESP_Maoshan then
+                if Config.ESP_Taoist then
                     local tInst, tName, tCat, tCol, tIcon = secretBossState.GetTaoist()
                     if tInst then
-                        AddESP(tInst, tName, tCat or "Taoist", tCol or Colors.AccentOrange, tIcon or "📜")
+                        AddESP(tInst, tName or "Đạo Sĩ (Taoist)", "Taoist", tCol or Colors.AccentOrange, tIcon or "📜")
+                    end
+                end
+
+                if Config.ESP_Maoshan then
+                    local mInst, mName, mCat, mCol, mIcon = secretBossState.GetMaoshan()
+                    if mInst then
+                        AddESP(mInst, mName or "Đạo Sĩ Maoshan", "Maoshan", mCol or Colors.PurplePrimary, mIcon or "✨")
                     end
                 end
             end)
