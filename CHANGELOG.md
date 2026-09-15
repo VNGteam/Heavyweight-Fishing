@@ -2,6 +2,23 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.9] - 2026-09-15
+### 🎭 Tính Năng Mới: Ảo Hoá Vé Nhiệm Vụ & Gems (Visual Spoof) Lưu Vĩnh Viễn Vào Máy (New Feature & Update gì):
+1. **Thêm nhóm tính năng "🎭 Ảo Hoá Tài Sản (Visual Spoof)" vào Tab Nhân Vật**:
+   - **Ảo Hoá Vé Nhiệm Vụ (Tickets)**: Cho phép người chơi gõ bất kỳ con số nào mong muốn (ví dụ: `99,999`, `1,000,000`, v.v.), sau đó nhấn **Enter**.
+   - **Ảo Hoá Gems / Đá Quý**: Cho phép người chơi gõ bất kỳ số lượng Gems mong muốn (ví dụ: `500,000`, `999,999`, v.v.), sau đó nhấn **Enter**.
+   - **Nút "🔄 Khôi Phục Thật"**: Xóa số ảo ngay lập tức và đưa cả Vé lẫn Gems trở về số lượng thực tế từ máy chủ.
+2. **Cơ Chế Lưu Trữ Vĩnh Viễn Tự Động (Auto Persistence)**:
+   - Ngay khi người dùng nhấn Enter, số lượng ảo được tự động mã hóa và ghi vào tệp máy riêng theo từng tài khoản (`heavyweight_visual_spoof_<Username>.json`).
+   - Lần sau khi mở lại script hoặc đổi server, script sẽ tự động đọc lại tệp này và tiếp tục hiển thị chính xác số ảo đó mà người dùng không cần phải nhập lại!
+3. **Đồng Bộ Hoá Toàn Diện (Full Sync)**:
+   - **Dữ liệu Game Client (`pData.Ticket` & `pData.Gems`)**: Ghi đè trực tiếp giá trị ảo lên đối tượng dữ liệu client và tự động hook sự kiện `.Changed` (nếu server gửi bản tin cập nhật thật thì client lập tức ép lại số ảo ngay lập tức).
+   - **Giao Diện Game (`PlayerGui`)**: Tự động quét và cập nhật số hiển thị trên thanh HUD / TopBar / GUI tiền tệ của game để quay video, chụp ảnh màn hình hoặc xem trực tiếp cực kỳ chân thực.
+   - **Lưới Thống Kê Script (`StatTiles`)**: Ô `🎫 Vé Nhiệm Vụ` và `💎 Gems Đã Kiếm` lập tức phản ánh con số ảo vừa nhập.
+   - **Báo Cáo Discord Webhook**: Đồng bộ hiển thị số ảo trong báo cáo định kỳ gửi về Discord.
+
+---
+
 ## [v2.1.8] - 2026-09-15
 ### 🎫 Kiểm Tra & Tối Ưu Triệt Để Chu Trình Vé: Hết Vé Hôm Nay, Auto Home Spot & Tự Động Sang Ngày Mới (Audit & Upgrade gì):
 1. **Kiểm tra và xác nhận 100% cơ chế tự động hoạt động chính xác theo yêu cầu**:

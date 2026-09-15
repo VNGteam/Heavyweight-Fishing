@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.8"
+local SCRIPT_BUILD_COMMIT = "v2.1.9"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2756,6 +2756,177 @@ local weatherTotems = {
     {name = "Totem Nắng Gắt (Amber Isle)", island = "Đảo Hổ Phách (Amber Isle)", weather = "Blazing Sun (Nắng Gắt)", pos = Vector3.new(1275.0, 9.5, 1450.0)},
 }
 
+local visualSpoofState = {
+    fakeTicket = 0,
+    fakeGems = 0,
+}
+
+local function GetVisualSpoofFileName()
+    local accName = (LocalPlayer and LocalPlayer.Name) or "Default"
+    local safeAcc = accName:gsub("[^%w_]", "")
+    if #safeAcc == 0 then safeAcc = "Default" end
+    return "heavyweight_visual_spoof_" .. safeAcc .. ".json"
+end
+
+local function SaveVisualSpoof()
+    if not writefile then return end
+    pcall(function()
+        local data = {
+            fakeTicket = visualSpoofState.fakeTicket or 0,
+            fakeGems = visualSpoofState.fakeGems or 0,
+        }
+        writefile(GetVisualSpoofFileName(), HttpService:JSONEncode(data))
+    end)
+end
+
+local function LoadVisualSpoof()
+    local fileName = GetVisualSpoofFileName()
+    if not readfile or not isfile or not isfile(fileName) then return end
+    pcall(function()
+        local raw = readfile(fileName)
+        if raw and #raw > 0 then
+            local dec = HttpService:JSONDecode(raw)
+            if type(dec) == "table" then
+                if dec.fakeTicket and tonumber(dec.fakeTicket) then
+                    visualSpoofState.fakeTicket = tonumber(dec.fakeTicket)
+                end
+                if dec.fakeGems and tonumber(dec.fakeGems) then
+                    visualSpoofState.fakeGems = tonumber(dec.fakeGems)
+                end
+            end
+        end
+    end)
+end
+
+local function ApplyVisualSpoof(isReset)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+
+    -- 1. Ảo hoá Vé Nhiệm Vụ (Tickets)
+    if visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0 and not isReset then
+        local num = visualSpoofState.fakeTicket
+        if pData then
+            local tObj = pData:FindFirstChild("Ticket") or pData:FindFirstChild("Tickets")
+            if tObj and tObj:IsA("ValueBase") then
+                pcall(function() tObj.Value = num end)
+            end
+        end
+        if ls then
+            local lsT = ls:FindFirstChild("Ticket") or ls:FindFirstChild("Tickets")
+            if lsT and lsT:IsA("ValueBase") then
+                pcall(function() lsT.Value = num end)
+            end
+        end
+        if StatTiles.Tickets and StatTiles.Tickets.Set then
+            StatTiles.Tickets.Set(FormatWithSpaces(num) .. " Vé")
+        end
+        -- Cập nhật PlayerGui các nhãn vé
+        if pg then
+            for _, d in ipairs(pg:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Visible then
+                    local sLow = d.Name:lower()
+                    local pLow = d.Parent and d.Parent.Name:lower() or ""
+                    if sLow:find("ticket") or pLow:find("ticket") then
+                        if d.Text:match("^[%d%s,%.]+$") or d.Text:find("Vé") or d.Text:find("Ticket") then
+                            d.Text = FormatWithSpaces(num)
+                        end
+                    end
+                end
+            end
+        end
+    elseif isReset and pData then
+        -- Khôi phục số vé thật
+        local tReal = pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
+        if StatTiles.Tickets and StatTiles.Tickets.Set then
+            StatTiles.Tickets.Set(FormatWithSpaces(tReal) .. " Vé")
+        end
+    end
+
+    -- 2. Ảo hoá Gems (Đá Quý)
+    if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 and not isReset then
+        local gNum = visualSpoofState.fakeGems
+        if pData then
+            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+                local gObj = pData:FindFirstChild(gName)
+                if gObj and gObj:IsA("ValueBase") then
+                    pcall(function() gObj.Value = gNum end)
+                end
+            end
+        end
+        if ls then
+            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+                local lsG = ls:FindFirstChild(gName)
+                if lsG and lsG:IsA("ValueBase") then
+                    pcall(function() lsG.Value = gNum end)
+                end
+            end
+        end
+        if StatTiles.GemsGained and StatTiles.GemsGained.Set then
+            StatTiles.GemsGained.Set("+" .. FormatWithSpaces(gNum) .. " Gems")
+        end
+        -- Cập nhật PlayerGui các nhãn gem
+        if pg then
+            for _, d in ipairs(pg:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Visible then
+                    local sLow = d.Name:lower()
+                    local pLow = d.Parent and d.Parent.Name:lower() or ""
+                    if sLow:find("gem") or pLow:find("gem") or sLow:find("diamond") or pLow:find("diamond") then
+                        if d.Text:match("^[%d%s,%.]+$") or d.Text:find("Gems?") or d.Text:find("Diamond") then
+                            d.Text = FormatWithSpaces(gNum)
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
+local function HookVisualSpoof()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then return end
+
+    local tObj = pData:FindFirstChild("Ticket") or pData:FindFirstChild("Tickets")
+    if tObj and tObj:IsA("ValueBase") then
+        pcall(function()
+            tObj.Changed:Connect(function(newVal)
+                if visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0 then
+                    if newVal ~= visualSpoofState.fakeTicket then
+                        task.defer(function()
+                            if visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0 then
+                                tObj.Value = visualSpoofState.fakeTicket
+                            end
+                        end)
+                    end
+                end
+            end)
+        end)
+    end
+
+    for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+        local gObj = pData:FindFirstChild(gName)
+        if gObj and gObj:IsA("ValueBase") then
+            pcall(function()
+                gObj.Changed:Connect(function(newVal)
+                    if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                        if newVal ~= visualSpoofState.fakeGems then
+                            task.defer(function()
+                                if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                                    gObj.Value = visualSpoofState.fakeGems
+                                end
+                            end)
+                        end
+                    end
+                end)
+            end)
+        end
+    end
+end
+
+-- Tải ngay cài đặt ảo hoá từ máy và hook lắng nghe server
+pcall(LoadVisualSpoof)
+pcall(HookVisualSpoof)
+
 local StatTiles = {}
 local WorldData = {
     islands = {
@@ -2894,6 +3065,9 @@ local function GetFishGemReward(fishName)
 end
 
 local function GetPlayerCurrentGems()
+    if visualSpoofState and visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+        return visualSpoofState.fakeGems
+    end
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if pData then
         for _, name in ipairs({"Gems", "Gem", "Diamonds", "Diamond", "Ruby", "Rubies", "Shards", "Crystal"}) do
@@ -9919,6 +10093,48 @@ createCategoryHeader(tabPlayer, "Chống Văng Game & Ổn Định")
 local stabCard = createCardGroup(tabPlayer)
 createToggleRow(stabCard, "Chống Văng Game (Anti-AFK)", "Chống bị Roblox kick sau 20 phút treo máy", Config.AntiAFK, function(v) Config.AntiAFK = v end)
 createToggleRow(stabCard, "Tự Động Kết Nối Lại", "Tự động vào lại server nếu bị mất kết nối", Config.AutoRejoin, function(v) Config.AutoRejoin = v end)
+
+createCategoryHeader(tabPlayer, "🎭 Ảo Hoá Tài Sản (Visual Spoof)")
+local spoofCard = createCardGroup(tabPlayer)
+
+local ticketInputRow
+local gemsInputRow
+
+ticketInputRow = createInputRow(spoofCard, "Ảo Hoá Vé Nhiệm Vụ", "Nhập số vé ảo mong muốn và ấn Enter (Tự lưu vĩnh viễn vào máy)", (visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0) and tostring(visualSpoofState.fakeTicket) or "", function(txt)
+    local cleanDigits = txt:gsub("[^%d]", "")
+    local num = tonumber(cleanDigits) or 0
+    visualSpoofState.fakeTicket = num
+    SaveVisualSpoof()
+    ApplyVisualSpoof()
+    if num > 0 then
+        ShowNotification("Ảo Hoá Vé", "Đã ảo hoá thành công: " .. FormatWithSpaces(num) .. " Vé (Đã lưu máy)!", "SUCCESS", 5)
+    else
+        ShowNotification("Ảo Hoá Vé", "Đã hủy ảo hoá vé! Trở về số lượng thực tế.", "INFO", 5)
+    end
+end, "ao hoa ve nhiem vu", "Nhập số vé... (VD: 99999)")
+
+gemsInputRow = createInputRow(spoofCard, "Ảo Hoá Gems / Đá Quý", "Nhập số Gems ảo mong muốn và ấn Enter (Tự lưu vĩnh viễn vào máy)", (visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0) and tostring(visualSpoofState.fakeGems) or "", function(txt)
+    local cleanDigits = txt:gsub("[^%d]", "")
+    local num = tonumber(cleanDigits) or 0
+    visualSpoofState.fakeGems = num
+    SaveVisualSpoof()
+    ApplyVisualSpoof()
+    if num > 0 then
+        ShowNotification("Ảo Hoá Gems", "Đã ảo hoá thành công: " .. FormatWithSpaces(num) .. " Gems (Đã lưu máy)!", "SUCCESS", 5)
+    else
+        ShowNotification("Ảo Hoá Gems", "Đã hủy ảo hoá Gems! Trở về số lượng thực tế.", "INFO", 5)
+    end
+end, "ao hoa gems da quy", "Nhập số Gems... (VD: 999999)")
+
+createButtonRow(spoofCard, "Khôi Phục Số Thật (Reset)", "Tắt toàn bộ ảo hoá và khôi phục hiển thị số lượng thực tế", "🔄 Khôi Phục Thật", function()
+    visualSpoofState.fakeTicket = 0
+    visualSpoofState.fakeGems = 0
+    SaveVisualSpoof()
+    ApplyVisualSpoof(true)
+    if ticketInputRow and ticketInputRow.Set then ticketInputRow.Set("") end
+    if gemsInputRow and gemsInputRow.Set then gemsInputRow.Set("") end
+    ShowNotification("Ảo Hoá", "Đã xóa toàn bộ số ảo và khôi phục số lượng thật!", "SUCCESS", 5)
+end)
 end
 
 do
@@ -11869,13 +12085,22 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 StatTiles.CashPerHour.Set("$" .. FormatWithSpaces(cashRate) .. " /h")
             end
             if StatTiles.GemsGained and StatTiles.GemsGained.Set then
-                StatTiles.GemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
+                if visualSpoofState and visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                    StatTiles.GemsGained.Set("+" .. FormatWithSpaces(visualSpoofState.fakeGems) .. " Gems")
+                else
+                    StatTiles.GemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
+                end
             end
 
             -- Cập nhật chỉ số tài nguyên, balo và vé nhiệm vụ
             if StatTiles.Tickets and StatTiles.Tickets.Set then
-                local tVal = pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
+                local tVal = (visualSpoofState and visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0)
+                    and visualSpoofState.fakeTicket
+                    or (pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0)
                 StatTiles.Tickets.Set(FormatWithSpaces(tVal) .. " Vé")
+            end
+            if visualSpoofState and ((visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0) or (visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0)) then
+                ApplyVisualSpoof()
             end
             if StatTiles.EssenceOrbs and StatTiles.EssenceOrbs.Set then
                 local orbVal = pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
@@ -11922,7 +12147,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         { name = "📈 Tốc Độ Kiếm Tiền", value = "$" .. FormatWithSpaces(cashRate) .. " /giờ", inline = true },
                         { name = "💎 Gems Thu Được", value = "+" .. FormatWithSpaces(gainedGems) .. " Gems", inline = true },
                         { name = "📍 Map Đang Đứng", value = tostring(GetCurrentLocationName and GetCurrentLocationName() or "Chưa rõ"), inline = true },
-                        { name = "🎫 Vé Nhiệm Vụ", value = FormatWithSpaces(pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0) .. " Vé", inline = true },
+                        { name = "🎫 Vé Nhiệm Vụ", value = FormatWithSpaces((visualSpoofState and visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0) and visualSpoofState.fakeTicket or (pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0)) .. " Vé", inline = true },
                         { name = "🔮 Essence Orb", value = FormatWithSpaces(pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0) .. " Viên", inline = true },
                         { name = "🎲 Trait Rerolls", value = FormatWithSpaces(pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0) .. " Vé", inline = true },
                         { name = "📜 Vé Xong Hôm Nay", value = string.format("%d NV", pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0), inline = true }
