@@ -1,37 +1,36 @@
 --[[
     v2/ui/theme.lua
-    Premium Visual Theme, Color Palette & Styles for Identical Hub V2
+    Exact Color Palette & Design Tokens from backup.lua
 --]]
 
 local Theme = {
-    -- Backgrounds & Panels
-    MainBg = Color3.fromRGB(15, 17, 23),
-    SidebarBg = Color3.fromRGB(11, 13, 18),
-    CardBg = Color3.fromRGB(22, 25, 35),
-    CardBgHover = Color3.fromRGB(28, 32, 45),
-    RowBg = Color3.fromRGB(18, 21, 29),
-    RowBgHover = Color3.fromRGB(24, 28, 38),
+    Background       = Color3.fromRGB(15, 12, 22),
+    SidebarBg        = Color3.fromRGB(11, 9, 17),
+    BorderPurple     = Color3.fromRGB(168, 85, 247),
+    BorderSubtle     = Color3.fromRGB(45, 33, 66),
+    Divider          = Color3.fromRGB(36, 26, 54),
 
-    -- Accents & Highlights
-    Accent = Color3.fromRGB(0, 168, 255),
-    AccentGlow = Color3.fromRGB(0, 140, 220),
-    Success = Color3.fromRGB(46, 204, 113),
-    Warning = Color3.fromRGB(241, 196, 15),
-    Danger = Color3.fromRGB(231, 76, 60),
+    PurplePrimary    = Color3.fromRGB(216, 160, 255),
+    PurpleAccent     = Color3.fromRGB(168, 85, 247),
+    PurpleMuted      = Color3.fromRGB(147, 112, 196),
+    PurpleDark       = Color3.fromRGB(72, 45, 107),
+    PurpleGlow       = Color3.fromRGB(192, 132, 252),
 
-    -- Text & Typography
-    TextPrimary = Color3.fromRGB(245, 247, 250),
-    TextSecondary = Color3.fromRGB(160, 168, 185),
-    TextMuted = Color3.fromRGB(105, 115, 134),
+    RowNormal        = Color3.fromRGB(20, 16, 30),
+    RowHover         = Color3.fromRGB(30, 22, 46),
+    ControlBg        = Color3.fromRGB(28, 20, 44),
+    InputBg          = Color3.fromRGB(18, 14, 26),
 
-    -- Borders & Separators
-    Border = Color3.fromRGB(35, 40, 55),
-    BorderFocus = Color3.fromRGB(0, 168, 255),
+    TextWhite        = Color3.fromRGB(245, 243, 255),
+    TextSubtle       = Color3.fromRGB(168, 150, 200),
+    TextMuted        = Color3.fromRGB(110, 95, 138),
 
-    -- Fonts
-    FontBold = Enum.Font.GothamBold,
-    FontMedium = Enum.Font.GothamMedium,
-    FontRegular = Enum.Font.Gotham
+    AccentGreen      = Color3.fromRGB(52, 211, 153),
+    AccentRed        = Color3.fromRGB(248, 113, 113),
+    AccentOrange     = Color3.fromRGB(251, 146, 60),
+    AccentYellow     = Color3.fromRGB(250, 204, 21),
+    AccentBlue       = Color3.fromRGB(96, 165, 250),
+    DropdownSelected = Color3.fromRGB(36, 26, 56)
 }
 
 return Theme

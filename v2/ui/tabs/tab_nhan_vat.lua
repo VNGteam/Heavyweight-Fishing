@@ -1,42 +1,53 @@
 --[[
     v2/ui/tabs/tab_nhan_vat.lua
-    Tab 9: Nhân Vật & Tiện Ích (Speed, Fly, Noclip, Walk on Water, Anti-AFK)
+    Exact Tab Nhân Vật from backup.lua (Speed, Fly, Noclip, Walk on water, Anti-AFK)
 --]]
 
 local Components = require(script.Parent.Parent.components)
-local State = require(script.Parent.Parent.Parent.core.state)
+local ConfigModule = require(script.Parent.Parent.Parent.core.config)
+local Config = ConfigModule.Config
 local Character = require(script.Parent.Parent.Parent.features.character)
 
 local TabNhanVat = {}
 
-function TabNhanVat.Render(parent, config)
+function TabNhanVat.Render(parent)
     Components.CreateCategoryHeader(parent, "Di Chuyển & Thể Chất")
     local cardMove = Components.CreateCardGroup(parent)
 
-    State.UIControllers["CustomSpeedEnabled"] = Components.CreateToggleRow(cardMove, "Bật Tốc Độ Tùy Chỉnh", "Tăng tốc độ chạy của nhân vật", config.CustomSpeedEnabled, function(v)
-        config.CustomSpeedEnabled = v
-        Character.ApplySpeed(config)
+    Components.CreateToggleRow(cardMove, "Tăng Tốc Độ Chạy (Speed)", "Tăng tốc độ di chuyển của nhân vật", Config.WalkSpeedEnabled, function(v)
+        Config.WalkSpeedEnabled = v
+        Character.ApplySpeed(Config)
+    end)
+    Components.CreateSliderRow(cardMove, "Chỉnh Tốc Độ", "Tốc độ chạy mong muốn", 16, 120, Config.WalkSpeedValue or 16, false, "", function(v)
+        Config.WalkSpeedValue = v
+        Character.ApplySpeed(Config)
     end)
 
-    State.UIControllers["WalkSpeed"] = Components.CreateSliderRow(cardMove, "Tốc Độ Chạy (WalkSpeed)", "Tốc độ chạy mong muốn", 16, 120, config.WalkSpeed, false, "", function(v)
-        config.WalkSpeed = v
-        Character.ApplySpeed(config)
+    Components.CreateToggleRow(cardMove, "Bay Lượn Tự Do (Fly)", "Bay lượn tự do phím WASD + Space/Shift", Config.FlyEnabled, function(v)
+        Config.FlyEnabled = v
+    end)
+    Components.CreateSliderRow(cardMove, "Tốc Độ Bay", "Tốc độ bay trên không trung", 20, 150, Config.FlySpeed or 50, false, "", function(v)
+        Config.FlySpeed = v
     end)
 
-    State.UIControllers["NoclipEnabled"] = Components.CreateToggleRow(cardMove, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua mọi vật thể và địa hình", config.NoclipEnabled, function(v)
-        config.NoclipEnabled = v
+    Components.CreateToggleRow(cardMove, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua mọi vật cản và địa hình", Config.Noclip, function(v)
+        Config.Noclip = v
     end)
-
-    State.UIControllers["WalkOnWater"] = Components.CreateToggleRow(cardMove, "Đi Trên Mặt Nước (Walk On Water)", "Tạo bệ đỡ vô hình để đứng trên mặt biển câu cá", config.WalkOnWater, function(v)
-        config.WalkOnWater = v
-        Character.ApplyWalkOnWater(config)
+    Components.CreateToggleRow(cardMove, "Đi Trên Mặt Nước", "Tạo bệ vô hình để đứng trên mặt biển", Config.WalkOnWater, function(v)
+        Config.WalkOnWater = v
+        Character.ApplyWalkOnWater(Config)
+    end)
+    Components.CreateToggleRow(cardMove, "Nhảy Vô Hạn (Infinite Jump)", "Nhảy liên tục trên không", Config.InfiniteJump, function(v)
+        Config.InfiniteJump = v
     end)
 
     Components.CreateCategoryHeader(parent, "Hệ Thống & Chống Treo")
     local cardSystem = Components.CreateCardGroup(parent)
-
-    State.UIControllers["AntiAFK"] = Components.CreateToggleRow(cardSystem, "Chống Treo Game (Anti-AFK)", "Ngăn chặn bị Roblox kick khi treo máy quá 20 phút", config.AntiAFK, function(v)
-        config.AntiAFK = v
+    Components.CreateToggleRow(cardSystem, "Chống Văng Game (Anti-AFK)", "Ngăn chặn bị kick khi treo máy qua đêm", Config.AntiAFK, function(v)
+        Config.AntiAFK = v
+    end)
+    Components.CreateToggleRow(cardSystem, "Tự Động Kết Nối Lại", "Tự động rejoin nếu bị ngắt kết nối mạng", Config.AutoRejoin, function(v)
+        Config.AutoRejoin = v
     end)
 end
 

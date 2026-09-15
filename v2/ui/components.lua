@@ -1,428 +1,578 @@
 --[[
     v2/ui/components.lua
-    Modular UI Toolkit: Cards, Toggles, Sliders, Dropdowns, Buttons, Inputs
+    Exact UI Toolkit from backup.lua (Category headers, cards, base rows, toggles, sliders, dropdowns, buttons, inputs)
 --]]
 
 local Services = require(script.Parent.Parent.core.services)
 local TweenService = Services.TweenService
+local UserInputService = Services.UserInputService
 local Theme = require(script.Parent.theme)
 local State = require(script.Parent.Parent.core.state)
 
 local Components = {}
+Components.rowSearchIndex = {}
 
--- 1. Category Header
 function Components.CreateCategoryHeader(parent, text)
-    local header = Instance.new("TextLabel")
-    header.Size = UDim2.new(1, 0, 0, 24)
-    header.BackgroundTransparency = 1
-    header.Text = string.upper(text or "")
-    header.TextColor3 = Theme.Accent
-    header.Font = Theme.FontBold
-    header.TextSize = 11
-    header.TextXAlignment = Enum.TextXAlignment.Left
-    header.Parent = parent
-    return header
+    local hdr = Instance.new("Frame")
+    hdr.Size = UDim2.new(1, 0, 0, 22)
+    hdr.BackgroundTransparency = 1
+    hdr.Parent = parent
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Text = string.upper(text)
+    lbl.TextColor3 = Theme.PurplePrimary
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = hdr
+
+    return hdr
 end
 
--- 2. Card Group
 function Components.CreateCardGroup(parent)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 0)
-    card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = Theme.CardBg
-    card.BorderSizePixel = 0
+    local group = Instance.new("Frame")
+    group.Size = UDim2.new(1, 0, 0, 0)
+    group.AutomaticSize = Enum.AutomaticSize.Y
+    group.BackgroundColor3 = Theme.RowNormal
+    group.BorderSizePixel = 0
+    group.Parent = parent
 
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 8)
-    uic.Parent = card
+    local s = Instance.new("UIStroke")
+    s.Color = Theme.BorderSubtle
+    s.Thickness = 1
+    s.Parent = group
 
-    local uis = Instance.new("UIStroke")
-    uis.Color = Theme.Border
-    uis.Thickness = 1
-    uis.Parent = card
+    Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
 
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 4)
-    layout.Parent = card
+    local l = Instance.new("UIListLayout")
+    l.SortOrder = Enum.SortOrder.LayoutOrder
+    l.Padding = UDim.new(0, 0)
+    l.Parent = group
 
-    local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 8)
-    pad.PaddingBottom = UDim.new(0, 8)
-    pad.PaddingLeft = UDim.new(0, 10)
-    pad.PaddingRight = UDim.new(0, 10)
-    pad.Parent = card
-
-    card.Parent = parent
-    return card
+    return group
 end
 
--- 3. Collapsible Card Group
 function Components.CreateCollapsibleCardGroup(parent, text, defaultOpen)
-    local isOpen = defaultOpen ~= false
-
-    local outer = Instance.new("Frame")
-    outer.Size = UDim2.new(1, 0, 0, 0)
-    outer.AutomaticSize = Enum.AutomaticSize.Y
-    outer.BackgroundColor3 = Theme.CardBg
-    outer.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 8)
-    uic.Parent = outer
-
-    local uis = Instance.new("UIStroke")
-    uis.Color = Theme.Border
-    uis.Thickness = 1
-    uis.Parent = outer
-
-    local headerBtn = Instance.new("TextButton")
-    headerBtn.Size = UDim2.new(1, 0, 0, 36)
-    headerBtn.BackgroundTransparency = 1
-    headerBtn.Text = ""
-    headerBtn.Parent = outer
-
-    local titleLbl = Instance.new("TextLabel")
-    titleLbl.Size = UDim2.new(1, -40, 1, 0)
-    titleLbl.Position = UDim2.new(0, 10, 0, 0)
-    titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = text or ""
-    titleLbl.TextColor3 = Theme.TextPrimary
-    titleLbl.Font = Theme.FontBold
-    titleLbl.TextSize = 13
-    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    titleLbl.Parent = headerBtn
-
-    local arrowLbl = Instance.new("TextLabel")
-    arrowLbl.Size = UDim2.new(0, 24, 1, 0)
-    arrowLbl.Position = UDim2.new(1, -30, 0, 0)
-    arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Text = isOpen and "▼" or "▶"
-    arrowLbl.TextColor3 = Theme.Accent
-    arrowLbl.Font = Theme.FontBold
-    arrowLbl.TextSize = 12
-    arrowLbl.Parent = headerBtn
-
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, 0, 0, 0)
-    contentFrame.Position = UDim2.new(0, 0, 0, 36)
-    contentFrame.AutomaticSize = Enum.AutomaticSize.Y
-    contentFrame.BackgroundTransparency = 1
-    contentFrame.Visible = isOpen
-
-    local contentLayout = Instance.new("UIListLayout")
-    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    contentLayout.Padding = UDim.new(0, 4)
-    contentLayout.Parent = contentFrame
-
-    local contentPad = Instance.new("UIPadding")
-    contentPad.PaddingTop = UDim.new(0, 4)
-    contentPad.PaddingBottom = UDim.new(0, 8)
-    contentPad.PaddingLeft = UDim.new(0, 10)
-    contentPad.PaddingRight = UDim.new(0, 10)
-    contentPad.Parent = contentFrame
-
-    contentFrame.Parent = outer
-
-    headerBtn.MouseButton1Click:Connect(function()
-        isOpen = not isOpen
-        contentFrame.Visible = isOpen
-        arrowLbl.Text = isOpen and "▼" or "▶"
-    end)
-
-    outer.Parent = parent
-    return contentFrame
-end
-
--- 4. Toggle Row
-function Components.CreateToggleRow(parent, labelText, descText, initialVal, callback)
-    local stateVal = initialVal == true
-
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, descText and 44 or 34)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
-
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -60, 0, 20)
-    tLabel.Position = UDim2.new(0, 8, 0, descText and 4 or 7)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextPrimary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 13
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
-
-    if descText then
-        local tDesc = Instance.new("TextLabel")
-        tDesc.Size = UDim2.new(1, -60, 0, 16)
-        tDesc.Position = UDim2.new(0, 8, 0, 24)
-        tDesc.BackgroundTransparency = 1
-        tDesc.Text = descText
-        tDesc.TextColor3 = Theme.TextMuted
-        tDesc.Font = Theme.FontRegular
-        tDesc.TextSize = 11
-        tDesc.TextXAlignment = Enum.TextXAlignment.Left
-        tDesc.Parent = row
-    end
-
-    local switchBox = Instance.new("TextButton")
-    switchBox.Size = UDim2.new(0, 42, 0, 22)
-    switchBox.Position = UDim2.new(1, -50, 0.5, -11)
-    switchBox.BackgroundColor3 = stateVal and Theme.Accent or Theme.CardBg
-    switchBox.Text = ""
-    switchBox.Parent = row
-
-    local sCorner = Instance.new("UICorner")
-    sCorner.CornerRadius = UDim.new(1, 0)
-    sCorner.Parent = switchBox
-
-    local sKnob = Instance.new("Frame")
-    sKnob.Size = UDim2.new(0, 16, 0, 16)
-    sKnob.Position = stateVal and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-    sKnob.BackgroundColor3 = Theme.TextPrimary
-    sKnob.BorderSizePixel = 0
-    sKnob.Parent = switchBox
-
-    local kCorner = Instance.new("UICorner")
-    kCorner.CornerRadius = UDim.new(1, 0)
-    kCorner.Parent = sKnob
-
-    local function updateVisual(val)
-        stateVal = val
-        switchBox.BackgroundColor3 = stateVal and Theme.Accent or Theme.CardBg
-        sKnob.Position = stateVal and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-    end
-
-    switchBox.MouseButton1Click:Connect(function()
-        stateVal = not stateVal
-        updateVisual(stateVal)
-        if callback then callback(stateVal) end
-    end)
-
-    row.Parent = parent
-
-    local controller = {
-        frame = row,
-        Set = function(val, skipCallback)
-            updateVisual(val == true)
-            if not skipCallback and callback then callback(stateVal) end
-        end,
-        Get = function()
-            return stateVal
-        end
-    }
-
-    return controller
-end
-
--- 5. Button Row
-function Components.CreateButtonRow(parent, labelText, descText, btnText, callback)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, descText and 44 or 34)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
-
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -110, 0, 20)
-    tLabel.Position = UDim2.new(0, 8, 0, descText and 4 or 7)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextPrimary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 13
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
-
-    if descText then
-        local tDesc = Instance.new("TextLabel")
-        tDesc.Size = UDim2.new(1, -110, 0, 16)
-        tDesc.Position = UDim2.new(0, 8, 0, 24)
-        tDesc.BackgroundTransparency = 1
-        tDesc.Text = descText
-        tDesc.TextColor3 = Theme.TextMuted
-        tDesc.Font = Theme.FontRegular
-        tDesc.TextSize = 11
-        tDesc.TextXAlignment = Enum.TextXAlignment.Left
-        tDesc.Parent = row
-    end
+    local isOpen = (defaultOpen == true)
+    local hdr = Instance.new("Frame")
+    hdr.Size = UDim2.new(1, 0, 0, 26)
+    hdr.BackgroundTransparency = 1
+    hdr.Parent = parent
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 95, 0, 24)
-    btn.Position = UDim2.new(1, -103, 0.5, -12)
-    btn.BackgroundColor3 = Theme.Accent
-    btn.Text = btnText or "Thực Hiện"
-    btn.TextColor3 = Theme.TextPrimary
-    btn.Font = Theme.FontBold
-    btn.TextSize = 12
-    btn.Parent = row
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = hdr
 
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -95, 1, 0)
+    lbl.Position = UDim2.new(0, 0, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Text = string.upper(text)
+    lbl.TextColor3 = Theme.PurplePrimary
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = hdr
 
-    btn.MouseButton1Click:Connect(function()
-        if callback then callback() end
+    local badge = Instance.new("TextButton")
+    badge.Size = UDim2.new(0, 85, 0, 20)
+    badge.Position = UDim2.new(1, -85, 0.5, -10)
+    badge.BackgroundColor3 = Theme.ControlBg
+    badge.BorderSizePixel = 0
+    badge.Font = Enum.Font.GothamBold
+    badge.Text = isOpen and "▼ Thu Gọn" or "▶ Mở Rộng"
+    badge.TextColor3 = isOpen and Theme.TextMuted or Theme.PurpleAccent
+    badge.TextSize = 10
+    badge.Parent = hdr
+    Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+
+    local group = Components.CreateCardGroup(parent)
+    group.Visible = isOpen
+
+    local function toggle()
+        isOpen = not isOpen
+        group.Visible = isOpen
+        badge.Text = isOpen and "▼ Thu Gọn" or "▶ Mở Rộng"
+        badge.TextColor3 = isOpen and Theme.TextMuted or Theme.PurpleAccent
+    end
+
+    btn.MouseButton1Click:Connect(toggle)
+    badge.MouseButton1Click:Connect(toggle)
+
+    return group, toggle
+end
+
+function Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.BackgroundColor3 = Theme.RowNormal
+    row.BorderSizePixel = 0
+    row.Parent = parent
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = row
+
+    local tf = Instance.new("Frame")
+    tf.Size = UDim2.new(1, -190, 1, 0)
+    tf.BackgroundTransparency = 1
+    tf.Parent = row
+
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, 0, 0, 18)
+    tl.Position = UDim2.new(0, 0, 0, 4)
+    tl.BackgroundTransparency = 1
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = labelText
+    tl.TextColor3 = Theme.TextWhite
+    tl.TextSize = 12
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.Parent = tf
+
+    local dl = Instance.new("TextLabel")
+    dl.Size = UDim2.new(1, 0, 0, 14)
+    dl.Position = UDim2.new(0, 0, 0, 22)
+    dl.BackgroundTransparency = 1
+    dl.Font = Enum.Font.Gotham
+    dl.Text = descText or ""
+    dl.TextColor3 = Theme.TextMuted
+    dl.TextSize = 10
+    dl.TextXAlignment = Enum.TextXAlignment.Left
+    dl.Parent = tf
+
+    row.MouseEnter:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+    end)
+    row.MouseLeave:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowNormal}):Play()
     end)
 
-    row.Parent = parent
-    return { frame = row, button = btn }
+    if indexSearch ~= false then
+        table.insert(Components.rowSearchIndex, {frame = row, query = (labelText .. " " .. (descText or "")):lower()})
+    end
+    return row
 end
 
--- 6. Info Row
-function Components.CreateInfoRow(parent, labelText, valueText)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 32)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
+function Components.CreateToggleRow(parent, labelText, descText, initialVal, callback, indexSearch)
+    if type(initialVal) == "function" then
+        indexSearch = callback
+        callback = initialVal
+        initialVal = false
+    end
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local state = initialVal or false
 
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 40, 0, 20)
+    btn.Position = UDim2.new(1, -40, 0.5, -10)
+    btn.BackgroundColor3 = state and Theme.PurpleAccent or Theme.ControlBg
+    btn.Text = ""
+    btn.BorderSizePixel = 0
+    btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(0.5, -8, 1, 0)
-    tLabel.Position = UDim2.new(0, 8, 0, 0)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextSecondary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 12
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 14, 0, 14)
+    knob.Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+    knob.BackgroundColor3 = Theme.TextWhite
+    knob.BorderSizePixel = 0
+    knob.Parent = btn
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
-    local vLabel = Instance.new("TextLabel")
-    vLabel.Size = UDim2.new(0.5, -8, 1, 0)
-    vLabel.Position = UDim2.new(0.5, 0, 0, 0)
-    vLabel.BackgroundTransparency = 1
-    vLabel.Text = valueText or ""
-    vLabel.TextColor3 = Theme.Accent
-    vLabel.Font = Theme.FontBold
-    vLabel.TextSize = 12
-    vLabel.TextXAlignment = Enum.TextXAlignment.Right
-    vLabel.Parent = row
+    local function updateVisuals()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = state and Theme.PurpleAccent or Theme.ControlBg}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)}):Play()
+    end
 
-    row.Parent = parent
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        updateVisuals()
+        if type(callback) == "function" then callback(state) end
+    end)
 
-    return {
+    local ret = {
         frame = row,
-        Set = function(newVal)
-            vLabel.Text = tostring(newVal or "")
-        end
+        Set = function(val, skipCallback)
+            state = val == true
+            updateVisuals()
+            if not skipCallback and type(callback) == "function" then
+                callback(state)
+            end
+        end,
+        Get = function() return state end
     }
+
+    local key = State.ConfigLabelMap[labelText]
+    if key then State.UIControllers[key] = ret end
+    return ret
 end
 
--- 7. Slider Row
-function Components.CreateSliderRow(parent, labelText, descText, minVal, maxVal, initialVal, isFloat, suffix, callback)
+function Components.CreateSliderRow(parent, labelText, descText, minVal, maxVal, initialVal, isFloat, suffix, callback, indexSearch)
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
     local currentVal = initialVal or minVal
     suffix = suffix or ""
 
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 52)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
-
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(0.7, 0, 0, 18)
-    tLabel.Position = UDim2.new(0, 8, 0, 4)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextPrimary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 12
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0, 180, 0, 24)
+    container.Position = UDim2.new(1, -180, 0.5, -12)
+    container.BackgroundTransparency = 1
+    container.Parent = row
 
     local valLabel = Instance.new("TextLabel")
-    valLabel.Size = UDim2.new(0.3, -16, 0, 18)
-    valLabel.Position = UDim2.new(0.7, 0, 0, 4)
+    valLabel.Size = UDim2.new(0, 68, 1, 0)
+    valLabel.Position = UDim2.new(1, -68, 0, 0)
     valLabel.BackgroundTransparency = 1
-    valLabel.Text = tostring(currentVal) .. suffix
-    valLabel.TextColor3 = Theme.Accent
-    valLabel.Font = Theme.FontBold
-    valLabel.TextSize = 12
+    valLabel.Font = Enum.Font.GothamBold
+    valLabel.TextColor3 = Theme.PurplePrimary
+    valLabel.TextSize = 11
     valLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valLabel.Parent = row
+    valLabel.Parent = container
+    valLabel.Text = isFloat and string.format("%.2f", currentVal)..suffix or tostring(math.floor(currentVal))..suffix
 
-    local track = Instance.new("TextButton")
-    track.Size = UDim2.new(1, -16, 0, 8)
-    track.Position = UDim2.new(0, 8, 0, 32)
-    track.BackgroundColor3 = Theme.CardBg
-    track.Text = ""
-    track.Parent = row
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(1, -74, 0, 6)
+    track.Position = UDim2.new(0, 0, 0.5, -3)
+    track.BackgroundColor3 = Theme.ControlBg
+    track.BorderSizePixel = 0
+    track.Parent = container
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-    local tCorner = Instance.new("UICorner")
-    tCorner.CornerRadius = UDim.new(1, 0)
-    tCorner.Parent = track
-
+    local pct = math.clamp((currentVal - minVal) / (maxVal - minVal), 0, 1)
     local fill = Instance.new("Frame")
-    local ratio = math.clamp((currentVal - minVal) / (maxVal - minVal), 0, 1)
-    fill.Size = UDim2.new(ratio, 0, 1, 0)
-    fill.BackgroundColor3 = Theme.Accent
+    fill.Size = UDim2.new(pct, 0, 1, 0)
+    fill.BackgroundColor3 = Theme.PurpleAccent
     fill.BorderSizePixel = 0
     fill.Parent = track
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
-    local fCorner = Instance.new("UICorner")
-    fCorner.CornerRadius = UDim.new(1, 0)
-    fCorner.Parent = fill
-
-    local function updateValueFromInput(input)
-        local relX = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-        fill.Size = UDim2.new(relX, 0, 1, 0)
-        local raw = minVal + (maxVal - minVal) * relX
-        currentVal = isFloat and math.floor(raw * 10) / 10 or math.floor(raw)
-        valLabel.Text = tostring(currentVal) .. suffix
-        if callback then callback(currentVal) end
+    local sliding = false
+    local function updateFromX(x)
+        local rel = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+        local val = minVal + (maxVal - minVal) * rel
+        if not isFloat then val = math.floor(val + 0.5) end
+        currentVal = val
+        fill.Size = UDim2.new(rel, 0, 1, 0)
+        valLabel.Text = isFloat and string.format("%.2f", val)..suffix or tostring(val)..suffix
+        if type(callback) == "function" then callback(val) end
     end
 
-    local isDragging = false
     track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            updateValueFromInput(input)
+            sliding = true
+            updateFromX(input.Position.X)
         end
     end)
-
-    Services.UserInputService.InputEnded:Connect(function(input)
+    UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
+            sliding = false
         end
     end)
-
-    Services.UserInputService.InputChanged:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateValueFromInput(input)
+    State.AddConnection(UserInputService.InputChanged:Connect(function(input)
+        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateFromX(input.Position.X)
         end
-    end)
+    end))
 
-    row.Parent = parent
-
-    return {
+    local ret = {
         frame = row,
         Set = function(val, skipCallback)
             currentVal = math.clamp(tonumber(val) or minVal, minVal, maxVal)
-            local r = (currentVal - minVal) / (maxVal - minVal)
-            fill.Size = UDim2.new(r, 0, 1, 0)
-            valLabel.Text = tostring(currentVal) .. suffix
-            if not skipCallback and callback then callback(currentVal) end
+            local p2 = (currentVal - minVal) / (maxVal - minVal)
+            fill.Size = UDim2.new(p2, 0, 1, 0)
+            valLabel.Text = isFloat and string.format("%.2f", currentVal)..suffix or tostring(math.floor(currentVal))..suffix
+            if not skipCallback and type(callback) == "function" then callback(currentVal) end
         end,
-        Get = function()
-            return currentVal
+        Get = function() return currentVal end
+    }
+
+    local key = State.ConfigLabelMap[labelText]
+    if key then State.UIControllers[key] = ret end
+    return ret
+end
+
+function Components.CreateDropdownRow(parent, labelText, descText, options, initialVal, callback, indexSearch)
+    if type(options) == "table" and type(initialVal) == "function" then
+        indexSearch = callback
+        callback = initialVal
+        initialVal = options[1]
+    end
+    local selected = initialVal or options[1]
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.AutomaticSize = Enum.AutomaticSize.Y
+    row.BackgroundColor3 = Theme.RowNormal
+    row.BorderSizePixel = 0
+    row.ClipsDescendants = true
+    row.Parent = parent
+
+    local rl = Instance.new("UIListLayout")
+    rl.SortOrder = Enum.SortOrder.LayoutOrder
+    rl.Padding = UDim.new(0, 4)
+    rl.Parent = row
+
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 42)
+    header.BackgroundTransparency = 1
+    header.Parent = row
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = header
+
+    local tf = Instance.new("Frame")
+    tf.Size = UDim2.new(1, -145, 1, 0)
+    tf.BackgroundTransparency = 1
+    tf.Parent = header
+
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, 0, 0, 18)
+    tl.Position = UDim2.new(0, 0, 0, 4)
+    tl.BackgroundTransparency = 1
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = labelText
+    tl.TextColor3 = Theme.TextWhite
+    tl.TextSize = 12
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.Parent = tf
+
+    local dl = Instance.new("TextLabel")
+    dl.Size = UDim2.new(1, 0, 0, 14)
+    dl.Position = UDim2.new(0, 0, 0, 22)
+    dl.BackgroundTransparency = 1
+    dl.Font = Enum.Font.Gotham
+    dl.Text = descText or ""
+    dl.TextColor3 = Theme.TextMuted
+    dl.TextSize = 10
+    dl.TextXAlignment = Enum.TextXAlignment.Left
+    dl.Parent = tf
+
+    local ddBtn = Instance.new("TextButton")
+    ddBtn.Size = UDim2.new(0, 130, 0, 24)
+    ddBtn.Position = UDim2.new(1, -130, 0.5, -12)
+    ddBtn.BackgroundColor3 = Theme.ControlBg
+    ddBtn.Font = Enum.Font.GothamBold
+    ddBtn.Text = tostring(selected) .. "  v"
+    ddBtn.TextColor3 = Theme.PurplePrimary
+    ddBtn.TextSize = 11
+    ddBtn.BorderSizePixel = 0
+    ddBtn.Parent = header
+    Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0, 4)
+
+    local optC = Instance.new("Frame")
+    optC.Size = UDim2.new(1, 0, 0, 0)
+    optC.AutomaticSize = Enum.AutomaticSize.Y
+    optC.BackgroundTransparency = 1
+    optC.Visible = false
+    optC.Parent = row
+
+    do
+        local p = Instance.new("UIPadding")
+        p.PaddingLeft = UDim.new(0, 10)
+        p.PaddingRight = UDim.new(0, 10)
+        p.PaddingBottom = UDim.new(0, 8)
+        p.Parent = optC
+    end
+    Instance.new("UIListLayout", optC).SortOrder = Enum.SortOrder.LayoutOrder
+
+    local optButtons = {}
+    local function populate(opts)
+        for _, c in ipairs(optC:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        table.clear(optButtons)
+        for _, opt in ipairs(opts) do
+            local ob = Instance.new("TextButton")
+            ob.Size = UDim2.new(1, 0, 0, 26)
+            ob.BackgroundColor3 = (opt == selected) and Theme.DropdownSelected or Theme.InputBg
+            ob.Font = Enum.Font.Gotham
+            ob.Text = (opt == selected and "> " or "   ") .. tostring(opt)
+            ob.TextColor3 = (opt == selected) and Theme.PurplePrimary or Theme.TextWhite
+            ob.TextSize = 11
+            ob.TextXAlignment = Enum.TextXAlignment.Left
+            ob.BorderSizePixel = 0
+            ob.Parent = optC
+            Instance.new("UICorner", ob).CornerRadius = UDim.new(0, 4)
+
+            do
+                local p = Instance.new("UIPadding")
+                p.PaddingLeft = UDim.new(0, 10)
+                p.Parent = ob
+            end
+            optButtons[opt] = ob
+
+            ob.MouseEnter:Connect(function()
+                if opt ~= selected then
+                    TweenService:Create(ob, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+                end
+            end)
+            ob.MouseLeave:Connect(function()
+                if opt ~= selected then
+                    TweenService:Create(ob, TweenInfo.new(0.15), {BackgroundColor3 = Theme.InputBg}):Play()
+                end
+            end)
+            ob.MouseButton1Click:Connect(function()
+                selected = opt
+                ddBtn.Text = tostring(opt) .. "  v"
+                optC.Visible = false
+                for oN, b in pairs(optButtons) do
+                    b.BackgroundColor3 = (oN == opt) and Theme.DropdownSelected or Theme.InputBg
+                    b.TextColor3 = (oN == opt) and Theme.PurplePrimary or Theme.TextWhite
+                    b.Text = (oN == opt and "> " or "   ") .. tostring(oN)
+                end
+                if type(callback) == "function" then callback(opt) end
+            end)
+        end
+    end
+    populate(options)
+
+    ddBtn.MouseButton1Click:Connect(function()
+        optC.Visible = not optC.Visible
+        ddBtn.Text = tostring(selected) .. (optC.Visible and "  ^" or "  v")
+    end)
+    header.MouseEnter:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+    end)
+    header.MouseLeave:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowNormal}):Play()
+    end)
+
+    if indexSearch ~= false then
+        table.insert(Components.rowSearchIndex, {frame = row, query = (labelText .. " " .. (descText or "")):lower()})
+    end
+
+    local ret = {
+        frame = row,
+        Set = function(opt, skipCallback)
+            selected = opt
+            ddBtn.Text = tostring(opt) .. "  v"
+            for oN, b in pairs(optButtons) do
+                b.BackgroundColor3 = (oN == opt) and Theme.DropdownSelected or Theme.InputBg
+                b.TextColor3 = (oN == opt) and Theme.PurplePrimary or Theme.TextWhite
+                b.Text = (oN == opt and "> " or "   ") .. tostring(oN)
+            end
+            if not skipCallback and type(callback) == "function" then pcall(callback, opt) end
+        end,
+        Get = function() return selected end,
+        Refresh = function(newOpts, keepCurrent)
+            options = newOpts or {}
+            populate(options)
+            local found = false
+            if keepCurrent and selected then
+                for _, opt in ipairs(options) do
+                    if opt == selected then found = true; break end
+                end
+            end
+            if not found then
+                selected = options[1] or ""
+            end
+            ddBtn.Text = (selected ~= "" and tostring(selected) or "Không có") .. "  v"
         end
     }
+
+    local mappedKey = State.ConfigLabelMap[labelText]
+    if mappedKey then
+        State.UIControllers[mappedKey] = ret
+    end
+    return ret
+end
+
+function Components.CreateButtonRow(parent, labelText, descText, btnText, callback, indexSearch)
+    if type(descText) == "function" then
+        indexSearch = btnText
+        callback = descText
+        btnText = "Execute"
+        descText = ""
+    elseif type(btnText) == "function" then
+        indexSearch = callback
+        callback = btnText
+        btnText = descText
+        descText = ""
+    end
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 90, 0, 24)
+    btn.Position = UDim2.new(1, -90, 0.5, -12)
+    btn.BackgroundColor3 = Theme.ControlBg
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = btnText or "Execute"
+    btn.TextColor3 = Theme.PurplePrimary
+    btn.TextSize = 11
+    btn.BorderSizePixel = 0
+    btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.PurpleDark, TextColor3 = Theme.TextWhite}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ControlBg, TextColor3 = Theme.PurplePrimary}):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        if type(callback) == "function" then pcall(callback) end
+    end)
+    return btn
+end
+
+function Components.CreateInfoRow(parent, labelText, valueText, indexSearch)
+    local row = Components.CreateBaseRow(parent, labelText, "", indexSearch)
+    local vl = Instance.new("TextLabel")
+    vl.Size = UDim2.new(0, 180, 1, 0)
+    vl.Position = UDim2.new(1, -180, 0, 0)
+    vl.BackgroundTransparency = 1
+    vl.Font = Enum.Font.GothamBold
+    vl.Text = valueText or ""
+    vl.TextColor3 = Theme.PurplePrimary
+    vl.TextSize = 11
+    vl.TextXAlignment = Enum.TextXAlignment.Right
+    vl.Parent = row
+    return {frame = row, Set = function(nv) vl.Text = tostring(nv or "") end}
+end
+
+function Components.CreateInputRow(parent, labelText, descText, initialVal, callback, indexSearch, placeholder)
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local tb = Instance.new("TextBox")
+    tb.Size = UDim2.new(0, 160, 0, 24)
+    tb.Position = UDim2.new(1, -160, 0.5, -12)
+    tb.BackgroundColor3 = Theme.InputBg
+    tb.Font = Enum.Font.Gotham
+    tb.Text = initialVal or ""
+    tb.PlaceholderText = placeholder or "Nhập tại đây..."
+    tb.PlaceholderColor3 = Theme.TextMuted
+    tb.TextColor3 = Theme.TextWhite
+    tb.TextSize = 11
+    tb.ClearTextOnFocus = false
+    tb.BorderSizePixel = 0
+    tb.Parent = row
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
+
+    local s = Instance.new("UIStroke", tb)
+    s.Color = Theme.BorderSubtle
+    s.Thickness = 1
+
+    tb.FocusLost:Connect(function(enterPressed)
+        if type(callback) == "function" then callback(tb.Text) end
+    end)
+
+    local ret = {
+        frame = row,
+        Set = function(val)
+            tb.Text = tostring(val or "")
+            if type(callback) == "function" then pcall(callback, tb.Text) end
+        end,
+        Get = function() return tb.Text end
+    }
+
+    local mappedKey = State.ConfigLabelMap[labelText]
+    if mappedKey then
+        State.UIControllers[mappedKey] = ret
+    end
+    return ret
 end
 
 return Components

@@ -1,7 +1,7 @@
 --[[
     v2/main.lua
     Identical Hub V2 - Heavyweight Fishing
-    Modular Architecture • Strict Sequential Combo • Clean Optimized Core
+    Rebuilt from backup.lua • 100% Original UI • Modular Architecture • Strict Sequential Combo
 --]]
 
 local Services = require(script.core.services)
@@ -10,8 +10,9 @@ local Config = ConfigModule.Config
 local State = require(script.core.state)
 local Utils = require(script.core.utils)
 local Theme = require(script.ui.theme)
+local Window = require(script.ui.window)
 
--- Features & Combo Modules
+-- Features & Combo
 local StateMachine = require(script.combo.state_machine)
 local Fishing = require(script.features.fishing)
 local Boss = require(script.features.boss)
@@ -22,12 +23,11 @@ local Teleport = require(script.features.teleport)
 local Visuals = require(script.features.visuals)
 local Character = require(script.features.character)
 
--- UI Tabs (No Wiki Tab!)
+-- UI Tabs (Exact tabs from backup.lua - Wiki Tab Omitted!)
 local TabCauCa = require(script.ui.tabs.tab_cau_ca)
-local TabCombo = require(script.ui.tabs.tab_combo)
 local TabSanBoss = require(script.ui.tabs.tab_san_boss)
-local TabNhiemVu = require(script.ui.tabs.tab_nhiem_vu)
 local TabThanLinh = require(script.ui.tabs.tab_than_linh)
+local TabNhiemVu = require(script.ui.tabs.tab_nhiem_vu)
 local TabShop = require(script.ui.tabs.tab_shop)
 local TabDichChuyen = require(script.ui.tabs.tab_dich_chuyen)
 local TabVisuals = require(script.ui.tabs.tab_visuals)
@@ -38,199 +38,45 @@ local TabThuNghiem = require(script.ui.tabs.tab_thu_nghiem)
 -- 1. Dọn dẹp bản cũ
 Services.CleanOldInstances()
 
--- 2. Tạo GUI Gốc
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "IdenticalHeavyweightFishing"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = Services.GetGuiParent()
-State.AddInstance(screenGui)
-
--- Notification Container
-local notifFrame = Instance.new("Frame")
-notifFrame.Name = "Notifications"
-notifFrame.Size = UDim2.new(0, 260, 1, -40)
-notifFrame.Position = UDim2.new(1, -270, 0, 20)
-notifFrame.BackgroundTransparency = 1
-notifFrame.Parent = screenGui
-
-local nLayout = Instance.new("UIListLayout")
-nLayout.SortOrder = Enum.SortOrder.LayoutOrder
-nLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-nLayout.Padding = UDim.new(0, 6)
-nLayout.Parent = notifFrame
-
-Utils.SetNotifContainer(notifFrame)
-
--- Khung Chính (Main Window)
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 720, 0, 460)
-mainFrame.Position = UDim2.new(0.5, -360, 0.5, -230)
-mainFrame.BackgroundColor3 = Theme.MainBg
-mainFrame.BorderSizePixel = 0
-mainFrame.ClipsDescendants = true
-mainFrame.Parent = screenGui
-
-local mCorner = Instance.new("UICorner")
-mCorner.CornerRadius = UDim.new(0, 10)
-mCorner.Parent = mainFrame
-
-local mStroke = Instance.new("UIStroke")
-mStroke.Color = Theme.Border
-mStroke.Thickness = 1.2
-mStroke.Parent = mainFrame
-
--- Topbar
-local topbar = Instance.new("Frame")
-topbar.Size = UDim2.new(1, 0, 0, 38)
-topbar.BackgroundColor3 = Theme.SidebarBg
-topbar.BorderSizePixel = 0
-topbar.Parent = mainFrame
-
-local titleLbl = Instance.new("TextLabel")
-titleLbl.Size = UDim2.new(1, -60, 1, 0)
-titleLbl.Position = UDim2.new(0, 14, 0, 0)
-titleLbl.BackgroundTransparency = 1
-titleLbl.Text = "IDENTICAL HUB • HEAVYWEIGHT FISHING V2"
-titleLbl.TextColor3 = Theme.Accent
-titleLbl.Font = Theme.FontBold
-titleLbl.TextSize = 13
-titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-titleLbl.Parent = topbar
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 28, 0, 28)
-closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
-closeBtn.BackgroundColor3 = Theme.CardBg
-closeBtn.Text = "✕"
-closeBtn.TextColor3 = Theme.TextSecondary
-closeBtn.Font = Theme.FontBold
-closeBtn.TextSize = 12
-closeBtn.Parent = topbar
-
-local cbCorner = Instance.new("UICorner")
-cbCorner.CornerRadius = UDim.new(0, 6)
-cbCorner.Parent = closeBtn
-
-closeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
+-- 2. Khởi tạo Giao diện chính (Exact Floating Avatar, TitleBar, Sidebar from backup.lua)
+Window.Init(ConfigModule.SCRIPT_BUILD_COMMIT, function()
+    Utils.ShowNotification("Diệt Script", "Đang đóng script hoàn toàn...", "WARN", 2)
+    task.wait(0.2)
+    State.UnloadScript()
 end)
 
--- Sidebar Tabs
-local sidebar = Instance.new("ScrollingFrame")
-sidebar.Size = UDim2.new(0, 170, 1, -38)
-sidebar.Position = UDim2.new(0, 0, 0, 38)
-sidebar.BackgroundColor3 = Theme.SidebarBg
-sidebar.BorderSizePixel = 0
-sidebar.ScrollBarThickness = 2
-sidebar.CanvasSize = UDim2.new(0, 0, 0, 480)
-sidebar.Parent = mainFrame
+-- 3. Tạo các Tab chức năng (Không có Tab Wiki!)
+local tabFishing      = Window.CreateTab("Câu Cá")
+local tabBoss         = Window.CreateTab("Săn Boss")
+local tabGod          = Window.CreateTab("Thần Linh")
+local tabQuests       = Window.CreateTab("Nhiệm Vụ")
+local tabShop         = Window.CreateTab("Shop & Chế Mồi")
+local tabTeleports    = Window.CreateTab("Dịch Chuyển")
+local tabVisuals      = Window.CreateTab("ESP & Đồ Hoạ")
+local tabPlayer       = Window.CreateTab("Nhân Vật")
+local tabProfiles     = Window.CreateTab("Cài Đặt")
+local tabExperimental = Window.CreateTab("Thử Nghiệm")
 
-local sbLayout = Instance.new("UIListLayout")
-sbLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sbLayout.Padding = UDim.new(0, 3)
-sbLayout.Parent = sidebar
+-- 4. Render nội dung từng Tab
+TabCauCa.Render(tabFishing)
+TabSanBoss.Render(tabBoss)
+TabThanLinh.Render(tabGod)
+TabNhiemVu.Render(tabQuests)
+TabShop.Render(tabShop)
+TabDichChuyen.Render(tabTeleports)
+TabVisuals.Render(tabVisuals)
+TabNhanVat.Render(tabPlayer)
+TabCaiDat.Render(tabProfiles)
+TabThuNghiem.Render(tabExperimental)
 
-local sbPad = Instance.new("UIPadding")
-sbPad.PaddingTop = UDim.new(0, 6)
-sbPad.PaddingBottom = UDim.new(0, 6)
-sbPad.PaddingLeft = UDim.new(0, 8)
-sbPad.PaddingRight = UDim.new(0, 8)
-sbPad.Parent = sidebar
+-- Mặc định hiển thị Tab Câu Cá
+Window.SwitchTab("Câu Cá")
 
--- Content Area
-local contentContainer = Instance.new("Frame")
-contentContainer.Size = UDim2.new(1, -170, 1, -38)
-contentContainer.Position = UDim2.new(0, 170, 0, 38)
-contentContainer.BackgroundTransparency = 1
-contentContainer.Parent = mainFrame
+-- 5. Nạp cấu hình đã lưu (SmartCombo & Boss Targets)
+ConfigModule.LoadSmartComboAndSyncUI(State.UIControllers)
+ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
 
-local tabs = {
-    { id = "cau_ca", label = "🎣 Câu Cá", module = TabCauCa },
-    { id = "combo", label = "⚡ Combo Chiêu", module = TabCombo },
-    { id = "san_boss", label = "🐉 Săn Boss", module = TabSanBoss },
-    { id = "nhiem_vu", label = "📜 Nhiệm Vụ", module = TabNhiemVu },
-    { id = "than_linh", label = "✨ Thần Linh", module = TabThanLinh },
-    { id = "shop", label = "🛒 Cửa Hàng", module = TabShop },
-    { id = "dich_chuyen", label = "🌀 Dịch Chuyển", module = TabDichChuyen },
-    { id = "visuals", label = "👁️ ESP & Đồ Họa", module = TabVisuals },
-    { id = "nhan_vat", label = "🏃 Nhân Vật", module = TabNhanVat },
-    { id = "cai_dat", label = "⚙️ Cài Đặt", module = TabCaiDat },
-    { id = "thu_nghiem", label = "🧪 Thử Nghiệm", module = TabThuNghiem }
-}
-
-local tabFrames = {}
-local tabButtons = {}
-
-local function switchTab(targetId)
-    for id, frame in pairs(tabFrames) do
-        frame.Visible = (id == targetId)
-    end
-    for id, btn in pairs(tabButtons) do
-        if id == targetId then
-            btn.BackgroundColor3 = Theme.Accent
-            btn.TextColor3 = Theme.TextPrimary
-        else
-            btn.BackgroundColor3 = Theme.SidebarBg
-            btn.TextColor3 = Theme.TextSecondary
-        end
-    end
-end
-
-for _, tabInfo in ipairs(tabs) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 34)
-    btn.BackgroundColor3 = Theme.SidebarBg
-    btn.Text = "  " .. tabInfo.label
-    btn.TextColor3 = Theme.TextSecondary
-    btn.Font = Theme.FontMedium
-    btn.TextSize = 12
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.Parent = sidebar
-
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
-
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.Visible = false
-    page.Parent = contentContainer
-
-    local pLayout = Instance.new("UIListLayout")
-    pLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    pLayout.Padding = UDim.new(0, 8)
-    pLayout.Parent = page
-
-    local pPad = Instance.new("UIPadding")
-    pPad.PaddingTop = UDim.new(0, 10)
-    pPad.PaddingBottom = UDim.new(0, 14)
-    pPad.PaddingLeft = UDim.new(0, 14)
-    pPad.PaddingRight = UDim.new(0, 14)
-    pPad.Parent = page
-
-    -- Render nội dung của tab
-    pcall(function()
-        tabInfo.module.Render(page, Config)
-    end)
-
-    tabFrames[tabInfo.id] = page
-    tabButtons[tabInfo.id] = btn
-
-    btn.MouseButton1Click:Connect(function()
-        switchTab(tabInfo.id)
-    end)
-end
-
--- Mặc định hiển thị tab Câu Cá
-switchTab("cau_ca")
-
--- 3. Core Runtime Heartbeat Loop
+-- 6. Core Heartbeat Runtime Loop
 local wasMinigame = false
 local wasFishing = false
 
@@ -261,7 +107,7 @@ local heartbeatConn = Services.RunService.Heartbeat:Connect(function()
     if isMinigame then
         Fishing.HandleMinigame(Config, fUI)
         local playerHp = Utils.GetPlayerHealth(fUI)
-        StateMachine.Step(Config, fUI, playerHp, Quest.state)
+        StateMachine.Step(Config, fUI, playerHp, State.ticketQuestState)
         Boss.HandleFastSkip(Config, fUI, isMinigame)
     else
         -- Mechanics Ngoài Minigame
@@ -277,31 +123,31 @@ local heartbeatConn = Services.RunService.Heartbeat:Connect(function()
         Quest.Tick(Config)
     end
 
-    -- Character Cheats
+    -- Nhân Vật
     Character.ApplyNoclip(Config)
     Character.ApplyWalkOnWater(Config)
 end)
 
 State.AddConnection(heartbeatConn)
 
--- 4. Keybinds & Anti-AFK
+-- 7. Keybinds & Anti-AFK
 Character.SetupAntiAFK()
 
 local inputConn = Services.UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Config.UIKeybind then
-        mainFrame.Visible = not mainFrame.Visible
+        if Window.ToggleUiVisibility then Window.ToggleUiVisibility() end
     elseif input.KeyCode == Config.StopKeybind then
         State.UnloadScript()
     end
 end)
 State.AddConnection(inputConn)
 
--- 5. Đăng ký Global Unload hooks
+-- 8. Global Unload Hooks
 local gEnv = (getgenv and getgenv()) or _G or shared
 if gEnv then
     gEnv.HeavyweightFishingKill = function() State.UnloadScript() end
     gEnv.IdenticalHeavyweightFishingUnload = function() State.UnloadScript() end
 end
 
-Utils.ShowNotification("Identical Hub V2", "Khởi động thành công! Nhấn [RightControl] để ẩn/hiện menu.", "SUCCESS", 4)
+Utils.ShowNotification("CÂU CÁ PRO", "Khởi động thành công! Nhấn [Right-Control] hoặc Avatar để ẩn/hiện menu.", "SUCCESS", 4)

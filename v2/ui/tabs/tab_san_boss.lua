@@ -1,40 +1,61 @@
 --[[
     v2/ui/tabs/tab_san_boss.lua
-    Tab 3: Săn Boss (Secret Boss Targets, Fast Skip & Chat Sniper)
+    Exact Tab Săn Boss from backup.lua (Chat Hunter, Fast Skip, Power Check, Custom Spots & Full Boss Target List)
 --]]
 
 local Components = require(script.Parent.Parent.components)
 local State = require(script.Parent.Parent.Parent.core.state)
-local Boss = require(script.Parent.Parent.Parent.features.boss)
+local ConfigModule = require(script.Parent.Parent.Parent.core.config)
+local Config = ConfigModule.Config
 
 local TabSanBoss = {}
 
-function TabSanBoss.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Cơ Chế Săn Boss Nhanh")
-    local cardFast = Components.CreateCardGroup(parent)
+function TabSanBoss.Render(parent)
+    Components.CreateCategoryHeader(parent, "Tự Động Săn Boss & Đổi Server")
+    local bossCoreCard = Components.CreateCardGroup(parent)
 
-    State.UIControllers["FastSkipNonTarget"] = Components.CreateToggleRow(cardFast, "Fast-Skip (Hủy Cá Rác)", "Tự hủy cần ngay lập tức nếu cá cắn câu không phải Boss được chọn", config.FastSkipNonTarget, function(v)
-        config.FastSkipNonTarget = v
-    end)
+    Components.CreateToggleRow(bossCoreCard, "Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)", "Tự động thả cần câu và săn boss tại chỗ", Config.AutoHuntBoss, function(v) Config.AutoHuntBoss = v end)
+    Components.CreateToggleRow(bossCoreCard, "Bật Săn Secret Boss (Chat Sniper)", "Tự động dịch chuyển đến đảo ngay khi có thông báo chat xuất hiện Boss", Config.AutoChatSecretBoss, function(v) Config.AutoChatSecretBoss = v end)
+    Components.CreateToggleRow(bossCoreCard, "Giật Cần Thả Lại (Fast Skip Cá Thường)", "Tự động giật lại cần ngay lập tức nếu cá cắn câu không phải Boss được chọn", Config.FastSkipNonBoss, function(v) Config.FastSkipNonBoss = v end)
+    Components.CreateToggleRow(bossCoreCard, "Kiểm Tra Lực Cần (Power Check)", "Chỉ săn khi đủ lực cần yêu cầu của từng hòn đảo", Config.SecretBossCheckPower, function(v) Config.SecretBossCheckPower = v end)
+    Components.CreateToggleRow(bossCoreCard, "Tự Đổi Server Khi Hết Boss (Auto-Hop)", "Tự chuyển server mới khi boss biến mất", Config.AutoServerHopOnDespawn, function(v) Config.AutoServerHopOnDespawn = v end)
+    Components.CreateToggleRow(bossCoreCard, "Tự Về Vị Trí Farm Khi Hết Boss / Clear", "Quay lại điểm câu farm chính sau khi săn boss xong", Config.ReturnToHomeWhenClear, function(v) Config.ReturnToHomeWhenClear = v end)
 
-    State.UIControllers["AutoChatSecretBoss"] = Components.CreateToggleRow(cardFast, "Sniper Kênh Chat", "Tự động dịch chuyển đến đảo ngay khi có thông báo Boss xuất hiện trong chat", config.AutoChatSecretBoss, function(v)
-        config.AutoChatSecretBoss = v
-    end)
+    Components.CreateCategoryHeader(parent, "🎯 Mục Tiêu Secret Boss (Bật / Tắt Từng Con)")
+    local targetsGroup = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Boss Mục Tiêu (" .. tostring(22) .. " Loại)", true)
 
-    State.UIControllers["SecretBossAlertWebhook"] = Components.CreateToggleRow(cardFast, "Gửi Thông Báo Webhook Discord", "Gửi cảnh báo đến Discord khi móc câu thành công Secret Boss", config.SecretBossAlertWebhook, function(v)
-        config.SecretBossAlertWebhook = v
-    end)
+    local bossList = {
+        "Verdant Alligator Gar",
+        "Verdant Grouper",
+        "Verdant Bonefang",
+        "Crimson Bonefang",
+        "Scarlet Fish",
+        "Elder Scarlet Fish",
+        "Crimson Electric Eel",
+        "Golden Dragonfish",
+        "Rainbow Dragonfish",
+        "Flying Fish Emperor",
+        "Flying Fish Empress",
+        "Draconic Koi",
+        "Sanguine Fish",
+        "Tigerfang Whale",
+        "Heavenpiercer Turtle",
+        "Heaven Piercer Turtle",
+        "Reborn Puffer Beast",
+        "Frost Kingfish",
+        "Frost Queenfish",
+        "Mountain Dragonwhale",
+        "Mirage Lanternfish",
+        "Nameless Octoparasite"
+    }
 
-    -- Danh sách Boss bí mật để chọn mục tiêu
-    Components.CreateCategoryHeader(parent, "Danh Sách Mục Tiêu Secret Boss")
-    local bossListCard = Components.CreateCollapsibleCardGroup(parent, "Chọn Boss Cần Săn (" .. tostring(15) .. "+ Loại)", true)
-
-    for bossName in pairs(Boss.lookup) do
-        local isTarget = config.SecretBossTargets and config.SecretBossTargets[bossName] == true
-        Components.CreateToggleRow(bossListCard, bossName, "Khu vực: " .. (Boss.lookup[bossName].islandName or "Đại dương"), isTarget, function(v)
-            if not config.SecretBossTargets then config.SecretBossTargets = {} end
-            config.SecretBossTargets[bossName] = v
+    for _, bossName in ipairs(bossList) do
+        local initVal = (Config.SecretBossTargets[bossName] ~= false)
+        local ctrl = Components.CreateToggleRow(targetsGroup, bossName, "Săn " .. bossName, initVal, function(v)
+            Config.SecretBossTargets[bossName] = v
+            ConfigModule.SaveBossTargets()
         end)
+        State.bossTogglesMap[bossName] = ctrl
     end
 end
 

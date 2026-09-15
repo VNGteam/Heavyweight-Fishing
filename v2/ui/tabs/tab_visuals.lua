@@ -1,37 +1,37 @@
 --[[
     v2/ui/tabs/tab_visuals.lua
-    Tab 8: ESP & Đồ Họa (Fish ESP, Player ESP, Fullbright)
+    Exact Tab ESP & Đồ Hoạ from backup.lua (Fish Rings, ESP Entities & Lighting)
 --]]
 
 local Components = require(script.Parent.Parent.components)
-local State = require(script.Parent.Parent.Parent.core.state)
+local ConfigModule = require(script.Parent.Parent.Parent.core.config)
+local Config = ConfigModule.Config
 local Visuals = require(script.Parent.Parent.Parent.features.visuals)
 
 local TabVisuals = {}
 
-function TabVisuals.Render(parent, config)
+function TabVisuals.Render(parent)
     Components.CreateCategoryHeader(parent, "ESP Định Vị Mục Tiêu")
     local cardEsp = Components.CreateCardGroup(parent)
 
-    State.UIControllers["ESP_Fish"] = Components.CreateToggleRow(cardEsp, "ESP Vòng Cá (Fish Ring ESP)", "Hiển thị vòng tròn dưới nước quanh vị trí cá", config.ESP_Fish, function(v)
-        config.ESP_Fish = v
-    end)
+    Components.CreateToggleRow(cardEsp, "Vòng Tròn Định Vị Cá", "Vẽ vòng định vị cá dưới nước theo độ hiếm", Config.FishRedRing, function(v) Config.FishRedRing = v end)
+    Components.CreateToggleRow(cardEsp, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ", "Hiển thị chi tiết cân nặng kg và dạng đột biến", Config.ShowFishWeightRing, function(v) Config.ShowFishWeightRing = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Người Chơi", "Định vị người chơi khác trong server", Config.ESP_Players, function(v) Config.ESP_Players = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Trùm Boss", "Định vị vị trí xuất hiện Boss", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Thần Linh (God Spirit)", "Định vị Thần Linh", Config.ESP_GodSpirit, function(v) Config.ESP_GodSpirit = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Đạo Sĩ (Taoist)", "Định vị NPC Đạo Sĩ", Config.ESP_Taoist, function(v) Config.ESP_Taoist = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Maoshan", "Định vị NPC Mao Sơn", Config.ESP_Maoshan, function(v) Config.ESP_Maoshan = v end)
 
-    State.UIControllers["ESP_Players"] = Components.CreateToggleRow(cardEsp, "ESP Người Chơi (Player ESP)", "Hiển thị tên và khoảng cách người chơi khác", config.ESP_Players, function(v)
-        config.ESP_Players = v
-    end)
-
-    State.UIControllers["ESP_Bosses"] = Components.CreateToggleRow(cardEsp, "ESP Boss Bí Mật (Boss ESP)", "Đánh dấu nổi bật Boss trên màn hình", config.ESP_Bosses, function(v)
-        config.ESP_Bosses = v
-    end)
-
-    Components.CreateCategoryHeader(parent, "Ánh Sáng & Tối Ưu Màn Hình")
+    Components.CreateCategoryHeader(parent, "Hiệu Ứng Ánh Sáng & Tối Ưu")
     local cardLighting = Components.CreateCardGroup(parent)
 
-    State.UIControllers["Fullbright"] = Components.CreateToggleRow(cardLighting, "Làm Sáng Toàn Bản Đồ (Fullbright)", "Tối đa độ sáng, nhìn rõ dưới đáy biển sâu", config.Fullbright, function(v)
-        config.Fullbright = v
+    Components.CreateToggleRow(cardLighting, "Sáng Màn Hình (Fullbright)", "Làm sáng toàn bản đồ, nhìn rõ dưới nước sâu", Config.Fullbright, function(v)
+        Config.Fullbright = v
         Visuals.ApplyFullbright(v)
     end)
+    Components.CreateToggleRow(cardLighting, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương mù và mưa bão che khuất tầm nhìn", Config.NoFog, function(v) Config.NoFog = v end)
+    Components.CreateToggleRow(cardLighting, "Chế Độ Giảm Lag (Low GFX)", "Giảm đồ họa giúp máy yếu chạy mượt", Config.PerformanceMode, function(v) Config.PerformanceMode = v end)
+    Components.CreateToggleRow(cardLighting, "Ẩn Giao Diện Gốc Của Game", "Ẩn các thanh UI mặc định của game để thoáng màn hình", Config.HideGameUI, function(v) Config.HideGameUI = v end)
 end
 
 return TabVisuals

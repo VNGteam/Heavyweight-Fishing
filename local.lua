@@ -393,7 +393,7 @@ end
 __modules["core.config"] = function()
 --[[
     v2/core/config.lua
-    Configuration Table, Defaults & Account-Based Persistence
+    Full Configuration Table, Defaults & Account Persistence from backup.lua
 --]]
 
 local Services = __require("core.services")
@@ -402,139 +402,326 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
--- 1. Default Configuration Table
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.0-modular"
+
+-- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
-    -- Fishing & Minigame
+    -- Câu Cá Cốt Lõi
     AutoCast = false,
+    CastDelay = 1.0,
+    CastPower = 100,
     AnchorBar = true,
     AutoSlam = true,
     AutoCharge = true,
-    AutoSkills = false,
-    AntiStuck = true,
-    AutoRhythmHit = true,
-    InventoryLimit = 150,
+    AntiStuckEnabled = false,
 
-    -- Smart Combo (Rebuilt V2)
+    -- Smart Combo V2
     SmartComboEnabled = false,
-    LoopSkills = "Z, X, V",
-    LoopStrictOrder = true,           -- [MẶC ĐỊNH BẬT]: Luôn giữ đúng thứ tự chiêu Z -> X -> V
-    SkillEffectDelay = 1.2,           -- Khoảng cách an toàn giữa 2 lần ra chiêu (giây)
-    SmartEffectAutoDetect = true,     -- Tự động phát hiện animation chiêu
-    EmergencyHealSkill = "Tắt",       -- Chiêu cứu nguy (Z/X/C/V hoặc Tắt)
-    EmergencyHealHp = 40,             -- Ngưỡng máu kích hoạt hồi máu khẩn cấp (%)
-    OpenerSkill = "Tắt",              -- Chiêu mở màn
+    FishHpThreshold = 500,
+    QuickCatchSkill = "Z",
+    OpenerSkill = "Z",
     OpenerMaxCount = 1,
-    QuickCatchSkill = "Tắt",
+    LoopSkills = "Z, X, V",
+    LoopStrictOrder = true,           -- [MẶC ĐỊNH BẬT V2]: Luôn giữ đúng thứ tự chiêu
+    EmergencyHealSkill = "V",
+    EmergencyHealHp = 40,
+    SkillEffectDelay = 1.2,
+    SmartEffectAutoDetect = true,
+    AutoSkills = false,
+    SelectedSkill = "One-Strike Heaven Gate",
 
-    -- Train Skills
+    -- Auto Luyện Chiêu (Fast Cancel)
     AutoTrainSkill = false,
     TrainSkill = "Z",
-    TrainDelay = 0.5,
+    TrainCancelDelay = 0.45,
+    Train_Z = false,
+    Train_X = false,
+    Train_C = true,
+    Train_V = true,
     TrainTargetCount = 100,
     TrainCurrentCount = 0,
+    TrainSkillCooldown = 6.0,
+    TrainDelayCatch = true,
 
-    -- Auto Bait & Rod & Sell
+    -- Trang Bị Mồi & Cần
     AutoEquipBestBait = false,
-    SelectedBait = "None",
+    BaitChoiceNormal = "Mồi Tốt Nhất (Cao Nhất)",
+    AutoEquipBossBait = true,
+    BaitChoiceBoss = "Mồi Tốt Nhất (Cao Nhất)",
     AutoEquipBestRod = false,
-    AutoEquipOrb = false,
-    AutoSellFish = false,
-    AutoSellRarity = "All",           -- All / Normal / Rare
-    SellInterval = 30,
+    AutoEquipBestOrb = false,
+    Loadout1_Rod = "Wooden Rod",
+    Loadout1_Bait = "Basic Bait",
+    Loadout2_Rod = "Wooden Rod",
+    Loadout2_Bait = "Basic Bait",
 
-    -- Secret Boss & Hunting
-    AutoChatSecretBoss = false,
+    -- Bán Cá & Bảo Vệ
+    AutoSell = false,
+    SellInterval = 30,
+    AutoFavouriteFish = false,
+    FavouriteFishName = "Colossal Tigerfish",
+    MaterialFarming = false,
+
+    -- Minigame Khác & Săn Boss Thường
+    OctoAutoMinigame = false,
+    AutoFarmBoss = false,
+    AutoFarmSecretBoss = false,
+    SelectedBoss = "Enzo",
+
+    -- Săn Secret Boss Theo Chat & Tại Đảo
     AutoHuntBoss = false,
-    FastSkipNonTarget = true,
-    TargetBossName = "All",
-    WebhookUrl = "",
-    SecretBossAlertWebhook = true,
+    AutoChatSecretBoss = false,
+    AutoServerHopOnDespawn = false,
+    FastSkipNonBoss = true,
+    SecretBossCheckPower = true,
+    SecretBossTargets = {
+        ["Verdant Alligator Gar"] = true,
+        ["Verdant Grouper"] = true,
+        ["Verdant Bonefang"] = true,
+        ["Crimson Bonefang"] = true,
+        ["Scarlet Fish"] = true,
+        ["Elder Scarlet Fish"] = true,
+        ["Crimson Electric Eel"] = true,
+        ["Golden Dragonfish"] = true,
+        ["Rainbow Dragonfish"] = true,
+        ["Flying Fish Emperor"] = true,
+        ["Flying Fish Empress"] = true,
+        ["Draconic Koi"] = true,
+        ["Sanguine Fish"] = true,
+        ["Tigerfang Whale"] = true,
+        ["Heavenpiercer Turtle"] = true,
+        ["Heaven Piercer Turtle"] = true,
+        ["Reborn Puffer Beast"] = true,
+        ["Frost Kingfish"] = true,
+        ["Frost Queenfish"] = true,
+        ["Mountain Dragonwhale"] = true,
+        ["Mirage Lanternfish"] = true,
+        ["Nameless Octoparasite"] = true,
+    },
     CustomBossSpots = {},
+    SelectedCustomSpotIsland = "Đảo Tre (Bamboo Isle)",
+    SelectedCustomSpotSlot = 1,
+    BossSpotAllocationMode = "Tự Động (Theo Acc)",
+    BossTeleportJitter = true,
+    BossTeleportJitterDist = 1.0,
+    ReturnToHomeWhenClear = true,
     HomeFarmSpot = nil,
 
-    -- Ticket Quest
-    AutoTicketQuest = false,
-    TicketAutoCastAtHome = true,
-    TicketQuickSkill = "V",
-    TicketSkillKey = "Z",
-
-    -- Spirits & God
-    AutoGodPray = false,
-    AutoServerHopTaoist = false,
-    AutoServerHopMaoshan = false,
+    -- Thần Linh & NPC
+    AutoGodSpiritCheck = false,
+    AutoPrayGodSpirit = false,
     AutoServerHopGod = false,
+    AutoServerHopMaoshan = false,
+    AutoServerHopTaoist = false,
 
-    -- Shop & Rewards
-    AutoClaimDaily = true,
-    AutoRedeemCodes = false,
-    AutoBuyBait = false,
-    AutoBuyBaitType = "Basic Bait",
-    AutoCraftBait = false,
-    AutoCraftBaitType = "Secret Bait",
-
-    -- Teleport & Server Hop
+    -- Tìm Server Thời Tiết
     AutoWeatherHop = false,
-    TargetWeather = "Rain",
+    TargetWeather = "Bất Kỳ Thời Tiết Nào (Trừ Clear)",
+    WeatherHopAutoFish = true,
+    WeatherHopAlertWebhook = true,
 
-    -- Visuals & ESP
-    ESP_Fish = false,
-    ESP_FishRing = true,
-    ESP_FishDetails = true,
+    -- Nhiệm Vụ Vé Hàng Ngày
+    AutoTicketQuest = false,
+    TicketDifficulty = "Hard",
+    TicketQuestMode = "Tự Động (Auto Detect)",
+    TicketBaitChoice = "Basic Bait",
+    TicketSkillKey = "Chiêu Z",
+    TicketQuickSkill = "Chiêu V",
+    TicketCooldownMinutes = 20,
+    TicketAutoSellFull = true,
+    TicketReturnHomeWhenDone = true,
+    TicketAutoCastAtHome = true,
+    TicketRemoteClaim = true,
+
+    -- Quản Lý Độ Ưu Tiên (Priority Manager)
+    PrioritySystemEnabled = true,
+    PriorityPreset = "Mặc Định: Săn Boss > Vé NV > Thần Linh > Luyện Chiêu > Farm Thường",
+    Priority_SecretBoss = 1,
+    Priority_TicketQuest = 2,
+    Priority_GodSpirit = 3,
+    Priority_TrainSkill = 4,
+    Priority_NormalFarm = 5,
+
+    -- Phần Thưởng & Gacha & Chế Mồi
+    AutoClaimDaily = false,
+    DailyClaimDelay = 0.5,
+    AutoCraftBait = false,
+    CraftBaitName = "Nameless Bait",
+    CraftAmount = 1,
+    AutoBuyBait = false,
+    BuyBaitName = "Ancestral Bait",
+    BuyBaitAmount = 5,
+    BuyBaitThreshold = 10,
+    BuyBaitDelay = 1.0,
+
+    -- ESP & Thị Giác
+    ESP_GodSpirit = false,
+    ESP_SecretRod = false,
+    ESP_Boats = false,
+    ESP_Maoshan = false,
+    ESP_Taoist = false,
+    ESP_Boss = false,
     ESP_Players = false,
-    ESP_Bosses = true,
-    ESP_NPCs = false,
+    FishRedRing = true,
+    ShowFishWeightRing = true,
+    NoFog = false,
     Fullbright = false,
-    RemoveFog = false,
-    FPSBoost = false,
-    HideUI = false,
+    PerformanceMode = false,
+    HideGameUI = false,
+    HideOverheadNames = false,
 
-    -- Character & Misc
-    WalkSpeed = 16,
-    CustomSpeedEnabled = false,
+    -- Nhân Vật
+    WalkSpeedEnabled = false,
+    WalkSpeedValue = 16,
     FlyEnabled = false,
     FlySpeed = 50,
-    NoclipEnabled = false,
-    WalkOnWater = false,
     InfiniteJump = false,
+    WalkOnWater = false,
+    AcidWaterShield = false,
+    Noclip = false,
     AntiAFK = true,
+    AutoRejoin = true,
 
-    -- System
+    -- Discord Webhook
+    WebhookUrl = "",
+    WebhookEnabled = false,
+    WebhookNotifyBoss = true,
+    WebhookHourlyStats = false,
+    WebhookStatsInterval = 60,
+
+    -- Keybinds
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End
 }
 
--- Danh sách Boss bí mật theo dõi mặc định
-ConfigModule.SecretBossTargets = {
-    ["Abyssal Behemoth"] = true,
-    ["Ancient Depth Serpent"] = true,
-    ["Ancient Megalodon"] = true,
-    ["Armored Shark"] = true,
-    ["Colossal Blue Whale"] = true,
-    ["Coral Guardian"] = true,
-    ["Corrupted Kraken"] = true,
-    ["Crystal Shark"] = true,
-    ["Deep Sea Leviathan"] = true,
-    ["Deepwater Guardian"] = true,
-    ["Glacier Leviathan"] = true,
-    ["Golden Shark"] = true,
-    ["Golden Whale"] = true,
-    ["Infernal Whale"] = true,
-    ["Kraken"] = true,
-    ["Lava Serpent"] = true,
-    ["Magma Behemoth"] = true,
-    ["Megalodon"] = true,
-    ["Ocean Leviathan"] = true,
-    ["Phantom Kraken"] = true,
-    ["Radiant Sunfish"] = true,
-    ["Shadow Leviathan"] = true,
-    ["Spectral Serpent"] = true,
-    ["Storm Whale"] = true,
-    ["Volcanic Shark"] = true,
-    ["Void Serpent"] = true,
-    ["Abyss Dweller"] = true
+-- 2. Config Label Map from backup.lua
+ConfigModule.ConfigLabelMap = {
+    ["Tự Động Quăng Cần (Auto Cast)"] = "AutoCast",
+    ["Độ Trễ Quăng Cần"] = "CastDelay",
+    ["Giữ Thanh Minigame (Anchor Bar)"] = "AnchorBar",
+    ["Tự Dùng Kỹ Năng Cần"] = "AutoSkills",
+    ["Tự Động Đập Cần (Auto Slam)"] = "AutoSlam",
+    ["Tự Động Sạc Dây (Auto Charge)"] = "AutoCharge",
+    ["Tự Động Chống Kẹt Cần (Anti-Stuck)"] = "AntiStuckEnabled",
+
+    ["Bật Combo Kỹ Năng Tự Động"] = "SmartComboEnabled",
+    ["Ngưỡng Máu Cá Phân Loại"] = "FishHpThreshold",
+    ["Chiêu Bắt Nhanh (<= Ngưỡng HP)"] = "QuickCatchSkill",
+    ["Chiêu Mở Màn (> Ngưỡng HP)"] = "OpenerSkill",
+    ["Số Lần Dùng Chiêu Mở Màn"] = "OpenerMaxCount",
+    ["Chuỗi Đảo Chiêu Luân Phiên"] = "LoopSkills",
+    ["Tùy Biến Chuỗi Đảo Chiêu"] = "LoopSkills",
+    ["Mẫu Chuỗi Chiêu (Preset)"] = "LoopSkills",
+    ["Giữ Đúng Thứ Tự Combo (Strict Order)"] = "LoopStrictOrder",
+    ["Chiêu Hồi Máu / Cứu Nguy"] = "EmergencyHealSkill",
+    ["Kích Hoạt Hồi Máu Khi HP Dưới"] = "EmergencyHealHp",
+    ["Thời Gian Chờ Ra Chiêu"] = "SkillEffectDelay",
+    ["Tự Động Nhận Diện Hết Hiệu Ứng"] = "SmartEffectAutoDetect",
+
+    ["Bật Auto Luyện Chiêu"] = "AutoTrainSkill",
+    ["Chọn Chiêu Cần Luyện"] = "TrainSkill",
+    ["Nhịp Chờ Xuất Chiêu (Cancel Delay)"] = "TrainCancelDelay",
+    ["Mục Tiêu Số Lần Dùng"] = "TrainTargetCount",
+
+    ["Tự Động Bán Cá Khi Đầy Túi"] = "AutoSell",
+    ["Giãn Cách Bán Cá Tự Động"] = "SellInterval",
+    ["Tự Động Khóa Cá Đột Biến (Mutations)"] = "AutoProtectMutations",
+    ["Tự Động Gom Cá Nguyên Liệu (Crafting)"] = "MaterialFarming",
+    ["Tự Động Khóa Cá Yêu Thích"] = "AutoFavouriteFish",
+    ["Tên Loài Cá Cần Khóa"] = "FavouriteFishName",
+
+    ["Tự Động Trang Bị Cần Tốt Nhất"] = "AutoEquipBestRod",
+    ["Tự Dùng Cần Tốt Nhất"] = "AutoEquipBestRod",
+    ["Tự Động Trang Bị Mồi"] = "AutoEquipBestBait",
+    ["Tự Dùng Mồi (Auto Bait)"] = "AutoEquipBestBait",
+    ["Tự Dùng Mồi Tốt Nhất"] = "AutoEquipBestBait",
+    ["Chọn Mồi Khi Câu Thường"] = "BaitChoiceNormal",
+    ["Tự Đổi Mồi Khi Săn Boss"] = "AutoEquipBossBait",
+    ["Chọn Mồi Săn Boss"] = "BaitChoiceBoss",
+    ["Tự Động Trang Bị Pháp Bảo Tốt Nhất"] = "AutoEquipBestOrb",
+    ["Tự Dùng Ngọc Tốt Nhất"] = "AutoEquipBestOrb",
+
+    ["Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)"] = "AutoHuntBoss",
+    ["Bật Săn Secret Boss (Chat Sniper)"] = "AutoChatSecretBoss",
+    ["Tự Động Săn Secret Boss Theo Chat"] = "AutoChatSecretBoss",
+    ["Giật Cần Thả Lại (Fast Skip Cá Thường)"] = "FastSkipNonBoss",
+    ["Bỏ Qua Cá Thường (Fast Skip)"] = "FastSkipNonBoss",
+    ["Kiểm Tra Lực Cần (Power Check)"] = "SecretBossCheckPower",
+    ["Chỉ Săn Khi Đủ Lực Cần (Power Check)"] = "SecretBossCheckPower",
+    ["Tự Đổi Server Khi Hết Boss (Auto-Hop)"] = "AutoServerHopOnDespawn",
+    ["Đổi Server Khi Hết Secret Boss"] = "AutoServerHopOnDespawn",
+    ["Tự Về Vị Trí Farm Khi Hết Boss / Clear"] = "ReturnToHomeWhenClear",
+
+    ["Tự Động Tìm Server Thời Tiết"] = "AutoWeatherHop",
+    ["Chọn Thời Tiết Cần Tìm"] = "TargetWeather",
+    ["Tự Động Câu / Săn Boss Khi Tìm Thấy"] = "WeatherHopAutoFish",
+    ["Gửi Webhook Khi Tìm Thấy Server"] = "WeatherHopAlertWebhook",
+
+    ["Tự Động Quét Trạng Thái Thần Linh"] = "AutoGodSpiritCheck",
+    ["Tự Động Cầu Nguyện Thần Linh"] = "AutoPrayGodSpirit",
+    ["Đổi Server Tìm Thần Linh"] = "AutoServerHopGod",
+    ["Đổi Server Tìm Maoshan"] = "AutoServerHopMaoshan",
+    ["Đổi Server Tìm Đạo Sĩ (Taoist)"] = "AutoServerHopTaoist",
+    ["Đổi Server Tìm Taoist"] = "AutoServerHopTaoist",
+
+    ["Tự Động Nộp Vé Nhiệm Vụ (Tickets)"] = "AutoTicketQuest",
+    ["Chọn Độ Khó Vé Nhiệm Vụ"] = "TicketDifficulty",
+    ["Chế Độ Nhiệm Vụ"] = "TicketQuestMode",
+    ["Loại Mồi Làm Nhiệm Vụ 100 Mồi"] = "TicketBaitChoice",
+    ["Chiêu Dùng Cho Nhiệm Vụ 100 Skill"] = "TicketSkillKey",
+    ["Chiêu Giật Nhanh Cho 100 Con Cá"] = "TicketQuickSkill",
+    ["Thời Gian Hồi Chiêu (Phút)"] = "TicketCooldownMinutes",
+    ["Tự Bán Cá Khi Đầy Balo (Vé NV)"] = "TicketAutoSellFull",
+    ["Tự Về Home Spot Khi Xong Nhiệm Vụ"] = "TicketReturnHomeWhenDone",
+    ["Tự Động Quăng Cần Tại Home Spot"] = "TicketAutoCastAtHome",
+    ["Nhận & Nộp Vé Từ Xa (Remote)"] = "TicketRemoteClaim",
+    ["Tự Động Nhận Thưởng Hàng Ngày (Daily)"] = "AutoClaimDaily",
+    ["Vòng Quay May Mắn (Auto Gacha)"] = "AutoGacha",
+    ["Chọn Vòng Quay Gacha"] = "GachaBanner",
+    ["Số Vé Mỗi Lần Quay"] = "GachaPullsPerAction",
+
+    ["Bật Quản Lý Độ Ưu Tiên"] = "PrioritySystemEnabled",
+    ["Mẫu Phân Cấp (Preset)"] = "PriorityPreset",
+    ["Ưu Tiên: 🎯 Săn Secret Boss"] = "Priority_SecretBoss",
+    ["Ưu Tiên: 📜 Làm Vé Nhiệm Vụ"] = "Priority_TicketQuest",
+    ["Ưu Tiên: ⛩️ Cúng Thần Linh"] = "Priority_GodSpirit",
+    ["Ưu Tiên: ⚔️ Auto Luyện Chiêu"] = "Priority_TrainSkill",
+    ["Ưu Tiên: 🎣 Treo Farm Thường"] = "Priority_NormalFarm",
+
+    ["ESP Thần Linh (God Spirit)"] = "ESP_GodSpirit",
+    ["ESP Cần Câu Bí Mật"] = "ESP_SecretRod",
+    ["ESP Thuyền Bè"] = "ESP_Boats",
+    ["ESP Maoshan"] = "ESP_Maoshan",
+    ["ESP Đạo Sĩ (Taoist)"] = "ESP_Taoist",
+    ["ESP Trùm Boss"] = "ESP_Boss",
+    ["ESP Người Chơi"] = "ESP_Players",
+    ["Vòng Tròn Định Vị Cá"] = "FishRedRing",
+    ["Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ"] = "ShowFishWeightRing",
+    ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
+    ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
+    ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
+    ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
+    ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",
+
+    ["Tăng Tốc Độ Chạy (Speed)"] = "WalkSpeedEnabled",
+    ["Chỉnh Tốc Độ"] = "WalkSpeedValue",
+    ["Bay Lượn Tự Do (Fly)"] = "FlyEnabled",
+    ["Tốc Độ Bay"] = "FlySpeed",
+    ["Nhảy Vô Hạn (Infinite Jump)"] = "InfiniteJump",
+    ["Đi Trên Mặt Nước"] = "WalkOnWater",
+    ["Khiên Nước Axit (Acid Shield)"] = "AcidWaterShield",
+    ["Đi Xuyên Tường (Noclip)"] = "Noclip",
+    ["Chống Văng Game (Anti-AFK)"] = "AntiAFK",
+    ["Tự Động Kết Nối Lại"] = "AutoRejoin",
+
+    ["Webhook URL"] = "WebhookUrl",
+    ["Bật Webhook"] = "WebhookEnabled",
+    ["Thông Báo Bắt Được Boss"] = "WebhookNotifyBoss",
+    ["Báo Cáo Tiến Độ Mỗi Giờ"] = "WebhookHourlyStats",
+    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval"
 }
 
--- 2. Account Directory Helpers
+-- 3. Account Persistence Helpers
 local function sanitizeFilename(name)
     return name:gsub("[%c%p%s]", "_")
 end
@@ -563,20 +750,15 @@ function ConfigModule.GetSavedConfigList()
     if success and type(files) == "table" then
         for _, f in ipairs(files) do
             local name = f:match("([^/\\]+)%.json$")
-            if name then
-                table.insert(list, name)
-            end
+            if name then table.insert(list, name) end
         end
     end
     table.sort(list)
     return list
 end
 
--- 3. Save / Load / Delete Account Config
 function ConfigModule.SaveAccountConfig(cfgName, uiControllers)
-    if not writefile or not cfgName or cfgName == "" then
-        return false, "Không hỗ trợ ghi file hoặc tên cấu hình rỗng"
-    end
+    if not writefile or not cfgName or cfgName == "" then return false, "Không hỗ trợ ghi file" end
     ConfigModule.EnsureAccountConfigDir()
     local path = ConfigModule.GetAccountConfigDir() .. "/" .. sanitizeFilename(cfgName) .. ".json"
 
@@ -592,40 +774,25 @@ function ConfigModule.SaveAccountConfig(cfgName, uiControllers)
             serialize[k] = v
         end
     end
-    serialize._SecretBossTargets = ConfigModule.SecretBossTargets
 
     local encoded = HttpService:JSONEncode(serialize)
     local ok, err = pcall(writefile, path, encoded)
-    if ok then
-        return true, "Đã lưu cấu hình [" .. cfgName .. "] thành công!"
-    else
-        return false, "Lỗi khi ghi file: " .. tostring(err)
-    end
+    return ok, ok and ("Đã lưu cấu hình [" .. cfgName .. "]") or tostring(err)
 end
 
 function ConfigModule.LoadAccountConfig(cfgName, uiControllers)
-    if not readfile or not cfgName or cfgName == "" then
-        return false, "Không hỗ trợ đọc file"
-    end
+    if not readfile or not cfgName or cfgName == "" then return false, "Không hỗ trợ đọc file" end
     local path = ConfigModule.GetAccountConfigDir() .. "/" .. sanitizeFilename(cfgName) .. ".json"
-    if not (isfile and isfile(path)) then
-        return false, "Không tìm thấy file cấu hình: " .. cfgName
-    end
+    if not (isfile and isfile(path)) then return false, "Không tìm thấy file" end
 
     local ok, content = pcall(readfile, path)
-    if not ok or not content then
-        return false, "Không thể đọc nội dung file"
-    end
+    if not ok or not content then return false, "Không thể đọc nội dung file" end
 
     local decOk, decoded = pcall(function() return HttpService:JSONDecode(content) end)
-    if not decOk or type(decoded) ~= "table" then
-        return false, "File cấu hình bị hỏng hoặc sai định dạng JSON"
-    end
+    if not decOk or type(decoded) ~= "table" then return false, "JSON lỗi" end
 
     for k, v in pairs(decoded) do
-        if k == "_SecretBossTargets" and type(v) == "table" then
-            ConfigModule.SecretBossTargets = v
-        elseif type(v) == "table" and v.__enum then
+        if type(v) == "table" and v.__enum then
             local str = v.__enum
             local enumType, enumItem = str:match("Enum%.([^%.]+)%.([^%.]+)")
             if enumType and enumItem and Enum[enumType] and Enum[enumType][enumItem] then
@@ -639,25 +806,116 @@ function ConfigModule.LoadAccountConfig(cfgName, uiControllers)
             ConfigModule.Config[k] = v
         end
 
-        -- Đồng bộ lên UI nếu có UIControllers
         if uiControllers and uiControllers[k] and uiControllers[k].Set then
-            pcall(function()
-                uiControllers[k].Set(ConfigModule.Config[k], true)
-            end)
+            pcall(function() uiControllers[k].Set(ConfigModule.Config[k], true) end)
         end
     end
-
-    return true, "Đã tải cấu hình [" .. cfgName .. "] thành công!"
+    return true, "Đã tải cấu hình thành công!"
 end
 
 function ConfigModule.DeleteAccountConfig(cfgName)
     if not delfile or not cfgName or cfgName == "" then return false end
     local path = ConfigModule.GetAccountConfigDir() .. "/" .. sanitizeFilename(cfgName) .. ".json"
     if isfile and isfile(path) then
-        local ok = pcall(delfile, path)
-        return ok
+        return pcall(delfile, path)
     end
     return false
+end
+
+-- 4. Smart Combo Persistence (HeavyweightFishing_SmartCombo.json)
+local SMART_COMBO_FILE = "HeavyweightFishing_SmartCombo.json"
+local SMART_COMBO_KEYS = {
+    "SmartComboEnabled", "FishHpThreshold", "QuickCatchSkill", "OpenerSkill",
+    "OpenerMaxCount", "LoopSkills", "LoopStrictOrder", "EmergencyHealSkill",
+    "EmergencyHealHp", "SkillEffectDelay", "SmartEffectAutoDetect"
+}
+
+local _smartComboSavePending = false
+function ConfigModule.SaveSmartCombo()
+    if not writefile or _smartComboSavePending then return end
+    _smartComboSavePending = true
+    task.delay(0.3, function()
+        _smartComboSavePending = false
+        local data = {}
+        for _, k in ipairs(SMART_COMBO_KEYS) do
+            data[k] = ConfigModule.Config[k]
+        end
+        local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+        if ok and encoded then
+            pcall(writefile, SMART_COMBO_FILE, encoded)
+        end
+    end)
+end
+
+function ConfigModule.LoadSmartComboAndSyncUI(uiControllers, onSyncLoopSkills)
+    if not (isfile and isfile(SMART_COMBO_FILE) and readfile) then return end
+    local ok, content = pcall(readfile, SMART_COMBO_FILE)
+    if not ok or not content or #content == 0 then return end
+    local decOk, data = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(data) ~= "table" then return end
+
+    for _, k in ipairs(SMART_COMBO_KEYS) do
+        if data[k] ~= nil then
+            ConfigModule.Config[k] = data[k]
+        end
+    end
+
+    task.spawn(function()
+        task.wait(0.1)
+        for _, k in ipairs(SMART_COMBO_KEYS) do
+            if uiControllers and uiControllers[k] and uiControllers[k].Set and ConfigModule.Config[k] ~= nil then
+                pcall(function() uiControllers[k].Set(ConfigModule.Config[k], true) end)
+            end
+        end
+        if onSyncLoopSkills and ConfigModule.Config.LoopSkills then
+            pcall(onSyncLoopSkills, ConfigModule.Config.LoopSkills)
+        end
+    end)
+end
+
+-- 5. Boss Targets Persistence (HeavyweightFishing_BossTargets.json)
+local BOSS_TARGETS_FILE = "HeavyweightFishing_BossTargets.json"
+local _bossTargetsSavePending = false
+
+function ConfigModule.SaveBossTargets()
+    if not writefile or _bossTargetsSavePending then return end
+    _bossTargetsSavePending = true
+    task.delay(0.3, function()
+        _bossTargetsSavePending = false
+        local data = {}
+        for k, v in pairs(ConfigModule.Config.SecretBossTargets) do
+            data[k] = v
+        end
+        local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+        if ok and encoded then
+            pcall(writefile, BOSS_TARGETS_FILE, encoded)
+        end
+    end)
+end
+
+function ConfigModule.LoadBossTargetsAndSyncUI(bossTogglesMap)
+    if not (isfile and isfile(BOSS_TARGETS_FILE) and readfile) then return end
+    local ok, content = pcall(readfile, BOSS_TARGETS_FILE)
+    if not ok or not content or #content == 0 then return end
+    local decOk, data = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(data) ~= "table" then return end
+
+    for k, v in pairs(data) do
+        if ConfigModule.Config.SecretBossTargets[k] ~= nil then
+            ConfigModule.Config.SecretBossTargets[k] = v
+        end
+    end
+
+    task.spawn(function()
+        task.wait(0.1)
+        if bossTogglesMap then
+            for bName, val in pairs(ConfigModule.Config.SecretBossTargets) do
+                if bossTogglesMap[bName] and bossTogglesMap[bName].Set then
+                    pcall(function() bossTogglesMap[bName].Set(val, true) end)
+                end
+            end
+        end
+    end)
 end
 
 return ConfigModule
@@ -761,40 +1019,90 @@ end
 __modules["core.state"] = function()
 --[[
     v2/core/state.lua
-    Shared Runtime State, Connection Tracking & UI Controllers Map
+    Shared Runtime State, Active Connections, Mutexes & Priority Manager
 --]]
 
 local State = {}
 
--- 1. Lifecycle Flags
+-- 1. Lifecycle Flags & Tracking
 State.isRunning = true
 State.activeConnections = {}
 State.cleanUpInstances = {}
 State.UIControllers = {}
 State.ConfigLabelMap = {}
+State.bossTogglesMap = {}
 
--- 2. Helper to register connections for automatic cleanup
+-- 2. Secret Boss Runtime State
+State.secretBossState = {
+    active = false,
+    activeBoss = nil,
+    currentIsland = nil,
+    teleportedToBoss = false,
+    isCatchingTarget = false,
+    webhookSentForCurrent = false,
+    lastHookedCheckTime = 0,
+    lastHomeReturnTime = 0
+}
+
+-- 3. Ticket Quest Runtime State
+State.ticketQuestState = {
+    active = false,
+    currentQuestType = "none",
+    isCooldown = false,
+    isBusyRoutine = false,
+    isAtHomeSpot = false,
+    lastScanTime = 0
+}
+
+-- 4. Gem Tracker
+State.gemTracker = {
+    baseline = 0,
+    gained = 0,
+    fishCount = 0
+}
+
+-- 5. Combo State
+State.comboState = {
+    openerUsedCount = 0,
+    openerDone = false,
+    loopTargetIndex = 1,
+    loopIndex = 1,
+    lastCastTime = 0,
+    lastActionTime = 0,
+    minigameStartTime = 0,
+    usedTimes = { Z = 0, X = 0, C = 0, V = 0 },
+    defaultCooldowns = { Z = 2.5, X = 3.0, C = 5.0, V = 4.0 },
+    loopWaitStartTime = 0
+}
+
+-- 6. Priority Manager
+State.PriorityManager = {
+    cachedTask = "NormalFarm",
+    lastTaskScan = 0
+}
+
+function State.PriorityManager.GetTaskDisplayName(taskKey)
+    if taskKey == "SecretBoss" then return "🎯 Săn Secret Boss"
+    elseif taskKey == "TicketQuest" then return "📜 Làm Vé Nhiệm Vụ"
+    elseif taskKey == "GodSpirit" then return "⛩️ Cúng Thần Linh"
+    elseif taskKey == "TrainSkill" then return "⚔️ Auto Luyện Chiêu"
+    else return "🎣 Treo Farm Thường" end
+end
+
 function State.AddConnection(conn)
-    if conn then
-        table.insert(State.activeConnections, conn)
-    end
+    if conn then table.insert(State.activeConnections, conn) end
     return conn
 end
 
--- 3. Helper to register instances for cleanup
 function State.AddInstance(inst)
-    if inst then
-        table.insert(State.cleanUpInstances, inst)
-    end
+    if inst then table.insert(State.cleanUpInstances, inst) end
     return inst
 end
 
--- 4. Full Unload Execution
 function State.UnloadScript(onCustomUnload)
     if not State.isRunning then return end
     State.isRunning = false
 
-    -- Disconnect all RBXScriptConnections
     for _, conn in ipairs(State.activeConnections) do
         pcall(function()
             if typeof(conn) == "RBXScriptConnection" and conn.Connected then
@@ -804,22 +1112,17 @@ function State.UnloadScript(onCustomUnload)
     end
     table.clear(State.activeConnections)
 
-    -- Invoke custom callbacks (e.g. restoring walkspeed, lighting)
-    if onCustomUnload then
-        pcall(onCustomUnload)
-    end
+    if onCustomUnload then pcall(onCustomUnload) end
 
-    -- Destroy registered instances
     for _, inst in ipairs(State.cleanUpInstances) do
         pcall(function()
-            if typeof(inst) == "Instance" then
+            if typeof(inst) == "Instance" and inst.Parent then
                 inst:Destroy()
             end
         end)
     end
     table.clear(State.cleanUpInstances)
 
-    -- Clear global environment references
     local gEnv = (getgenv and getgenv()) or _G or shared
     if gEnv then
         gEnv.HeavyweightFishingKill = nil
@@ -1934,429 +2237,579 @@ end
 __modules["ui.components"] = function()
 --[[
     v2/ui/components.lua
-    Modular UI Toolkit: Cards, Toggles, Sliders, Dropdowns, Buttons, Inputs
+    Exact UI Toolkit from backup.lua (Category headers, cards, base rows, toggles, sliders, dropdowns, buttons, inputs)
 --]]
 
 local Services = __require("core.services")
 local TweenService = Services.TweenService
+local UserInputService = Services.UserInputService
 local Theme = __require("ui.theme")
 local State = __require("core.state")
 
 local Components = {}
+Components.rowSearchIndex = {}
 
--- 1. Category Header
 function Components.CreateCategoryHeader(parent, text)
-    local header = Instance.new("TextLabel")
-    header.Size = UDim2.new(1, 0, 0, 24)
-    header.BackgroundTransparency = 1
-    header.Text = string.upper(text or "")
-    header.TextColor3 = Theme.Accent
-    header.Font = Theme.FontBold
-    header.TextSize = 11
-    header.TextXAlignment = Enum.TextXAlignment.Left
-    header.Parent = parent
-    return header
+    local hdr = Instance.new("Frame")
+    hdr.Size = UDim2.new(1, 0, 0, 22)
+    hdr.BackgroundTransparency = 1
+    hdr.Parent = parent
+
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, 0, 1, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Text = string.upper(text)
+    lbl.TextColor3 = Theme.PurplePrimary
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = hdr
+
+    return hdr
 end
 
--- 2. Card Group
 function Components.CreateCardGroup(parent)
-    local card = Instance.new("Frame")
-    card.Size = UDim2.new(1, 0, 0, 0)
-    card.AutomaticSize = Enum.AutomaticSize.Y
-    card.BackgroundColor3 = Theme.CardBg
-    card.BorderSizePixel = 0
+    local group = Instance.new("Frame")
+    group.Size = UDim2.new(1, 0, 0, 0)
+    group.AutomaticSize = Enum.AutomaticSize.Y
+    group.BackgroundColor3 = Theme.RowNormal
+    group.BorderSizePixel = 0
+    group.Parent = parent
 
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 8)
-    uic.Parent = card
+    local s = Instance.new("UIStroke")
+    s.Color = Theme.BorderSubtle
+    s.Thickness = 1
+    s.Parent = group
 
-    local uis = Instance.new("UIStroke")
-    uis.Color = Theme.Border
-    uis.Thickness = 1
-    uis.Parent = card
+    Instance.new("UICorner", group).CornerRadius = UDim.new(0, 6)
 
-    local layout = Instance.new("UIListLayout")
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 4)
-    layout.Parent = card
+    local l = Instance.new("UIListLayout")
+    l.SortOrder = Enum.SortOrder.LayoutOrder
+    l.Padding = UDim.new(0, 0)
+    l.Parent = group
 
-    local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0, 8)
-    pad.PaddingBottom = UDim.new(0, 8)
-    pad.PaddingLeft = UDim.new(0, 10)
-    pad.PaddingRight = UDim.new(0, 10)
-    pad.Parent = card
-
-    card.Parent = parent
-    return card
+    return group
 end
 
--- 3. Collapsible Card Group
 function Components.CreateCollapsibleCardGroup(parent, text, defaultOpen)
-    local isOpen = defaultOpen ~= false
-
-    local outer = Instance.new("Frame")
-    outer.Size = UDim2.new(1, 0, 0, 0)
-    outer.AutomaticSize = Enum.AutomaticSize.Y
-    outer.BackgroundColor3 = Theme.CardBg
-    outer.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 8)
-    uic.Parent = outer
-
-    local uis = Instance.new("UIStroke")
-    uis.Color = Theme.Border
-    uis.Thickness = 1
-    uis.Parent = outer
-
-    local headerBtn = Instance.new("TextButton")
-    headerBtn.Size = UDim2.new(1, 0, 0, 36)
-    headerBtn.BackgroundTransparency = 1
-    headerBtn.Text = ""
-    headerBtn.Parent = outer
-
-    local titleLbl = Instance.new("TextLabel")
-    titleLbl.Size = UDim2.new(1, -40, 1, 0)
-    titleLbl.Position = UDim2.new(0, 10, 0, 0)
-    titleLbl.BackgroundTransparency = 1
-    titleLbl.Text = text or ""
-    titleLbl.TextColor3 = Theme.TextPrimary
-    titleLbl.Font = Theme.FontBold
-    titleLbl.TextSize = 13
-    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-    titleLbl.Parent = headerBtn
-
-    local arrowLbl = Instance.new("TextLabel")
-    arrowLbl.Size = UDim2.new(0, 24, 1, 0)
-    arrowLbl.Position = UDim2.new(1, -30, 0, 0)
-    arrowLbl.BackgroundTransparency = 1
-    arrowLbl.Text = isOpen and "▼" or "▶"
-    arrowLbl.TextColor3 = Theme.Accent
-    arrowLbl.Font = Theme.FontBold
-    arrowLbl.TextSize = 12
-    arrowLbl.Parent = headerBtn
-
-    local contentFrame = Instance.new("Frame")
-    contentFrame.Size = UDim2.new(1, 0, 0, 0)
-    contentFrame.Position = UDim2.new(0, 0, 0, 36)
-    contentFrame.AutomaticSize = Enum.AutomaticSize.Y
-    contentFrame.BackgroundTransparency = 1
-    contentFrame.Visible = isOpen
-
-    local contentLayout = Instance.new("UIListLayout")
-    contentLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    contentLayout.Padding = UDim.new(0, 4)
-    contentLayout.Parent = contentFrame
-
-    local contentPad = Instance.new("UIPadding")
-    contentPad.PaddingTop = UDim.new(0, 4)
-    contentPad.PaddingBottom = UDim.new(0, 8)
-    contentPad.PaddingLeft = UDim.new(0, 10)
-    contentPad.PaddingRight = UDim.new(0, 10)
-    contentPad.Parent = contentFrame
-
-    contentFrame.Parent = outer
-
-    headerBtn.MouseButton1Click:Connect(function()
-        isOpen = not isOpen
-        contentFrame.Visible = isOpen
-        arrowLbl.Text = isOpen and "▼" or "▶"
-    end)
-
-    outer.Parent = parent
-    return contentFrame
-end
-
--- 4. Toggle Row
-function Components.CreateToggleRow(parent, labelText, descText, initialVal, callback)
-    local stateVal = initialVal == true
-
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, descText and 44 or 34)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
-
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -60, 0, 20)
-    tLabel.Position = UDim2.new(0, 8, 0, descText and 4 or 7)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextPrimary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 13
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
-
-    if descText then
-        local tDesc = Instance.new("TextLabel")
-        tDesc.Size = UDim2.new(1, -60, 0, 16)
-        tDesc.Position = UDim2.new(0, 8, 0, 24)
-        tDesc.BackgroundTransparency = 1
-        tDesc.Text = descText
-        tDesc.TextColor3 = Theme.TextMuted
-        tDesc.Font = Theme.FontRegular
-        tDesc.TextSize = 11
-        tDesc.TextXAlignment = Enum.TextXAlignment.Left
-        tDesc.Parent = row
-    end
-
-    local switchBox = Instance.new("TextButton")
-    switchBox.Size = UDim2.new(0, 42, 0, 22)
-    switchBox.Position = UDim2.new(1, -50, 0.5, -11)
-    switchBox.BackgroundColor3 = stateVal and Theme.Accent or Theme.CardBg
-    switchBox.Text = ""
-    switchBox.Parent = row
-
-    local sCorner = Instance.new("UICorner")
-    sCorner.CornerRadius = UDim.new(1, 0)
-    sCorner.Parent = switchBox
-
-    local sKnob = Instance.new("Frame")
-    sKnob.Size = UDim2.new(0, 16, 0, 16)
-    sKnob.Position = stateVal and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-    sKnob.BackgroundColor3 = Theme.TextPrimary
-    sKnob.BorderSizePixel = 0
-    sKnob.Parent = switchBox
-
-    local kCorner = Instance.new("UICorner")
-    kCorner.CornerRadius = UDim.new(1, 0)
-    kCorner.Parent = sKnob
-
-    local function updateVisual(val)
-        stateVal = val
-        switchBox.BackgroundColor3 = stateVal and Theme.Accent or Theme.CardBg
-        sKnob.Position = stateVal and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
-    end
-
-    switchBox.MouseButton1Click:Connect(function()
-        stateVal = not stateVal
-        updateVisual(stateVal)
-        if callback then callback(stateVal) end
-    end)
-
-    row.Parent = parent
-
-    local controller = {
-        frame = row,
-        Set = function(val, skipCallback)
-            updateVisual(val == true)
-            if not skipCallback and callback then callback(stateVal) end
-        end,
-        Get = function()
-            return stateVal
-        end
-    }
-
-    return controller
-end
-
--- 5. Button Row
-function Components.CreateButtonRow(parent, labelText, descText, btnText, callback)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, descText and 44 or 34)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
-
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -110, 0, 20)
-    tLabel.Position = UDim2.new(0, 8, 0, descText and 4 or 7)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextPrimary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 13
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
-
-    if descText then
-        local tDesc = Instance.new("TextLabel")
-        tDesc.Size = UDim2.new(1, -110, 0, 16)
-        tDesc.Position = UDim2.new(0, 8, 0, 24)
-        tDesc.BackgroundTransparency = 1
-        tDesc.Text = descText
-        tDesc.TextColor3 = Theme.TextMuted
-        tDesc.Font = Theme.FontRegular
-        tDesc.TextSize = 11
-        tDesc.TextXAlignment = Enum.TextXAlignment.Left
-        tDesc.Parent = row
-    end
+    local isOpen = (defaultOpen == true)
+    local hdr = Instance.new("Frame")
+    hdr.Size = UDim2.new(1, 0, 0, 26)
+    hdr.BackgroundTransparency = 1
+    hdr.Parent = parent
 
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(0, 95, 0, 24)
-    btn.Position = UDim2.new(1, -103, 0.5, -12)
-    btn.BackgroundColor3 = Theme.Accent
-    btn.Text = btnText or "Thực Hiện"
-    btn.TextColor3 = Theme.TextPrimary
-    btn.Font = Theme.FontBold
-    btn.TextSize = 12
-    btn.Parent = row
+    btn.Size = UDim2.new(1, 0, 1, 0)
+    btn.BackgroundTransparency = 1
+    btn.Text = ""
+    btn.Parent = hdr
 
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
+    local lbl = Instance.new("TextLabel")
+    lbl.Size = UDim2.new(1, -95, 1, 0)
+    lbl.Position = UDim2.new(0, 0, 0, 0)
+    lbl.BackgroundTransparency = 1
+    lbl.Font = Enum.Font.GothamBold
+    lbl.Text = string.upper(text)
+    lbl.TextColor3 = Theme.PurplePrimary
+    lbl.TextSize = 11
+    lbl.TextXAlignment = Enum.TextXAlignment.Left
+    lbl.Parent = hdr
 
-    btn.MouseButton1Click:Connect(function()
-        if callback then callback() end
+    local badge = Instance.new("TextButton")
+    badge.Size = UDim2.new(0, 85, 0, 20)
+    badge.Position = UDim2.new(1, -85, 0.5, -10)
+    badge.BackgroundColor3 = Theme.ControlBg
+    badge.BorderSizePixel = 0
+    badge.Font = Enum.Font.GothamBold
+    badge.Text = isOpen and "▼ Thu Gọn" or "▶ Mở Rộng"
+    badge.TextColor3 = isOpen and Theme.TextMuted or Theme.PurpleAccent
+    badge.TextSize = 10
+    badge.Parent = hdr
+    Instance.new("UICorner", badge).CornerRadius = UDim.new(0, 4)
+
+    local group = Components.CreateCardGroup(parent)
+    group.Visible = isOpen
+
+    local function toggle()
+        isOpen = not isOpen
+        group.Visible = isOpen
+        badge.Text = isOpen and "▼ Thu Gọn" or "▶ Mở Rộng"
+        badge.TextColor3 = isOpen and Theme.TextMuted or Theme.PurpleAccent
+    end
+
+    btn.MouseButton1Click:Connect(toggle)
+    badge.MouseButton1Click:Connect(toggle)
+
+    return group, toggle
+end
+
+function Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.BackgroundColor3 = Theme.RowNormal
+    row.BorderSizePixel = 0
+    row.Parent = parent
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = row
+
+    local tf = Instance.new("Frame")
+    tf.Size = UDim2.new(1, -190, 1, 0)
+    tf.BackgroundTransparency = 1
+    tf.Parent = row
+
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, 0, 0, 18)
+    tl.Position = UDim2.new(0, 0, 0, 4)
+    tl.BackgroundTransparency = 1
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = labelText
+    tl.TextColor3 = Theme.TextWhite
+    tl.TextSize = 12
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.Parent = tf
+
+    local dl = Instance.new("TextLabel")
+    dl.Size = UDim2.new(1, 0, 0, 14)
+    dl.Position = UDim2.new(0, 0, 0, 22)
+    dl.BackgroundTransparency = 1
+    dl.Font = Enum.Font.Gotham
+    dl.Text = descText or ""
+    dl.TextColor3 = Theme.TextMuted
+    dl.TextSize = 10
+    dl.TextXAlignment = Enum.TextXAlignment.Left
+    dl.Parent = tf
+
+    row.MouseEnter:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+    end)
+    row.MouseLeave:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowNormal}):Play()
     end)
 
-    row.Parent = parent
-    return { frame = row, button = btn }
+    if indexSearch ~= false then
+        table.insert(Components.rowSearchIndex, {frame = row, query = (labelText .. " " .. (descText or "")):lower()})
+    end
+    return row
 end
 
--- 6. Info Row
-function Components.CreateInfoRow(parent, labelText, valueText)
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 32)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
+function Components.CreateToggleRow(parent, labelText, descText, initialVal, callback, indexSearch)
+    if type(initialVal) == "function" then
+        indexSearch = callback
+        callback = initialVal
+        initialVal = false
+    end
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local state = initialVal or false
 
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 40, 0, 20)
+    btn.Position = UDim2.new(1, -40, 0.5, -10)
+    btn.BackgroundColor3 = state and Theme.PurpleAccent or Theme.ControlBg
+    btn.Text = ""
+    btn.BorderSizePixel = 0
+    btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
 
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(0.5, -8, 1, 0)
-    tLabel.Position = UDim2.new(0, 8, 0, 0)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextSecondary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 12
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
+    local knob = Instance.new("Frame")
+    knob.Size = UDim2.new(0, 14, 0, 14)
+    knob.Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)
+    knob.BackgroundColor3 = Theme.TextWhite
+    knob.BorderSizePixel = 0
+    knob.Parent = btn
+    Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
 
-    local vLabel = Instance.new("TextLabel")
-    vLabel.Size = UDim2.new(0.5, -8, 1, 0)
-    vLabel.Position = UDim2.new(0.5, 0, 0, 0)
-    vLabel.BackgroundTransparency = 1
-    vLabel.Text = valueText or ""
-    vLabel.TextColor3 = Theme.Accent
-    vLabel.Font = Theme.FontBold
-    vLabel.TextSize = 12
-    vLabel.TextXAlignment = Enum.TextXAlignment.Right
-    vLabel.Parent = row
+    local function updateVisuals()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = state and Theme.PurpleAccent or Theme.ControlBg}):Play()
+        TweenService:Create(knob, TweenInfo.new(0.15), {Position = state and UDim2.new(1, -17, 0.5, -7) or UDim2.new(0, 3, 0.5, -7)}):Play()
+    end
 
-    row.Parent = parent
+    btn.MouseButton1Click:Connect(function()
+        state = not state
+        updateVisuals()
+        if type(callback) == "function" then callback(state) end
+    end)
 
-    return {
+    local ret = {
         frame = row,
-        Set = function(newVal)
-            vLabel.Text = tostring(newVal or "")
-        end
+        Set = function(val, skipCallback)
+            state = val == true
+            updateVisuals()
+            if not skipCallback and type(callback) == "function" then
+                callback(state)
+            end
+        end,
+        Get = function() return state end
     }
+
+    local key = State.ConfigLabelMap[labelText]
+    if key then State.UIControllers[key] = ret end
+    return ret
 end
 
--- 7. Slider Row
-function Components.CreateSliderRow(parent, labelText, descText, minVal, maxVal, initialVal, isFloat, suffix, callback)
+function Components.CreateSliderRow(parent, labelText, descText, minVal, maxVal, initialVal, isFloat, suffix, callback, indexSearch)
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
     local currentVal = initialVal or minVal
     suffix = suffix or ""
 
-    local row = Instance.new("Frame")
-    row.Size = UDim2.new(1, 0, 0, 52)
-    row.BackgroundColor3 = Theme.RowBg
-    row.BorderSizePixel = 0
-
-    local uic = Instance.new("UICorner")
-    uic.CornerRadius = UDim.new(0, 6)
-    uic.Parent = row
-
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(0.7, 0, 0, 18)
-    tLabel.Position = UDim2.new(0, 8, 0, 4)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = labelText or ""
-    tLabel.TextColor3 = Theme.TextPrimary
-    tLabel.Font = Theme.FontMedium
-    tLabel.TextSize = 12
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.Parent = row
+    local container = Instance.new("Frame")
+    container.Size = UDim2.new(0, 180, 0, 24)
+    container.Position = UDim2.new(1, -180, 0.5, -12)
+    container.BackgroundTransparency = 1
+    container.Parent = row
 
     local valLabel = Instance.new("TextLabel")
-    valLabel.Size = UDim2.new(0.3, -16, 0, 18)
-    valLabel.Position = UDim2.new(0.7, 0, 0, 4)
+    valLabel.Size = UDim2.new(0, 68, 1, 0)
+    valLabel.Position = UDim2.new(1, -68, 0, 0)
     valLabel.BackgroundTransparency = 1
-    valLabel.Text = tostring(currentVal) .. suffix
-    valLabel.TextColor3 = Theme.Accent
-    valLabel.Font = Theme.FontBold
-    valLabel.TextSize = 12
+    valLabel.Font = Enum.Font.GothamBold
+    valLabel.TextColor3 = Theme.PurplePrimary
+    valLabel.TextSize = 11
     valLabel.TextXAlignment = Enum.TextXAlignment.Right
-    valLabel.Parent = row
+    valLabel.Parent = container
+    valLabel.Text = isFloat and string.format("%.2f", currentVal)..suffix or tostring(math.floor(currentVal))..suffix
 
-    local track = Instance.new("TextButton")
-    track.Size = UDim2.new(1, -16, 0, 8)
-    track.Position = UDim2.new(0, 8, 0, 32)
-    track.BackgroundColor3 = Theme.CardBg
-    track.Text = ""
-    track.Parent = row
+    local track = Instance.new("Frame")
+    track.Size = UDim2.new(1, -74, 0, 6)
+    track.Position = UDim2.new(0, 0, 0.5, -3)
+    track.BackgroundColor3 = Theme.ControlBg
+    track.BorderSizePixel = 0
+    track.Parent = container
+    Instance.new("UICorner", track).CornerRadius = UDim.new(1, 0)
 
-    local tCorner = Instance.new("UICorner")
-    tCorner.CornerRadius = UDim.new(1, 0)
-    tCorner.Parent = track
-
+    local pct = math.clamp((currentVal - minVal) / (maxVal - minVal), 0, 1)
     local fill = Instance.new("Frame")
-    local ratio = math.clamp((currentVal - minVal) / (maxVal - minVal), 0, 1)
-    fill.Size = UDim2.new(ratio, 0, 1, 0)
-    fill.BackgroundColor3 = Theme.Accent
+    fill.Size = UDim2.new(pct, 0, 1, 0)
+    fill.BackgroundColor3 = Theme.PurpleAccent
     fill.BorderSizePixel = 0
     fill.Parent = track
+    Instance.new("UICorner", fill).CornerRadius = UDim.new(1, 0)
 
-    local fCorner = Instance.new("UICorner")
-    fCorner.CornerRadius = UDim.new(1, 0)
-    fCorner.Parent = fill
-
-    local function updateValueFromInput(input)
-        local relX = math.clamp((input.Position.X - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
-        fill.Size = UDim2.new(relX, 0, 1, 0)
-        local raw = minVal + (maxVal - minVal) * relX
-        currentVal = isFloat and math.floor(raw * 10) / 10 or math.floor(raw)
-        valLabel.Text = tostring(currentVal) .. suffix
-        if callback then callback(currentVal) end
+    local sliding = false
+    local function updateFromX(x)
+        local rel = math.clamp((x - track.AbsolutePosition.X) / track.AbsoluteSize.X, 0, 1)
+        local val = minVal + (maxVal - minVal) * rel
+        if not isFloat then val = math.floor(val + 0.5) end
+        currentVal = val
+        fill.Size = UDim2.new(rel, 0, 1, 0)
+        valLabel.Text = isFloat and string.format("%.2f", val)..suffix or tostring(val)..suffix
+        if type(callback) == "function" then callback(val) end
     end
 
-    local isDragging = false
     track.InputBegan:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = true
-            updateValueFromInput(input)
+            sliding = true
+            updateFromX(input.Position.X)
         end
     end)
-
-    Services.UserInputService.InputEnded:Connect(function(input)
+    UserInputService.InputEnded:Connect(function(input)
         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-            isDragging = false
+            sliding = false
         end
     end)
-
-    Services.UserInputService.InputChanged:Connect(function(input)
-        if isDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
-            updateValueFromInput(input)
+    State.AddConnection(UserInputService.InputChanged:Connect(function(input)
+        if sliding and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+            updateFromX(input.Position.X)
         end
-    end)
+    end))
 
-    row.Parent = parent
-
-    return {
+    local ret = {
         frame = row,
         Set = function(val, skipCallback)
             currentVal = math.clamp(tonumber(val) or minVal, minVal, maxVal)
-            local r = (currentVal - minVal) / (maxVal - minVal)
-            fill.Size = UDim2.new(r, 0, 1, 0)
-            valLabel.Text = tostring(currentVal) .. suffix
-            if not skipCallback and callback then callback(currentVal) end
+            local p2 = (currentVal - minVal) / (maxVal - minVal)
+            fill.Size = UDim2.new(p2, 0, 1, 0)
+            valLabel.Text = isFloat and string.format("%.2f", currentVal)..suffix or tostring(math.floor(currentVal))..suffix
+            if not skipCallback and type(callback) == "function" then callback(currentVal) end
         end,
-        Get = function()
-            return currentVal
+        Get = function() return currentVal end
+    }
+
+    local key = State.ConfigLabelMap[labelText]
+    if key then State.UIControllers[key] = ret end
+    return ret
+end
+
+function Components.CreateDropdownRow(parent, labelText, descText, options, initialVal, callback, indexSearch)
+    if type(options) == "table" and type(initialVal) == "function" then
+        indexSearch = callback
+        callback = initialVal
+        initialVal = options[1]
+    end
+    local selected = initialVal or options[1]
+    local row = Instance.new("Frame")
+    row.Size = UDim2.new(1, 0, 0, 42)
+    row.AutomaticSize = Enum.AutomaticSize.Y
+    row.BackgroundColor3 = Theme.RowNormal
+    row.BorderSizePixel = 0
+    row.ClipsDescendants = true
+    row.Parent = parent
+
+    local rl = Instance.new("UIListLayout")
+    rl.SortOrder = Enum.SortOrder.LayoutOrder
+    rl.Padding = UDim.new(0, 4)
+    rl.Parent = row
+
+    local header = Instance.new("Frame")
+    header.Size = UDim2.new(1, 0, 0, 42)
+    header.BackgroundTransparency = 1
+    header.Parent = row
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 10)
+    pad.PaddingRight = UDim.new(0, 10)
+    pad.Parent = header
+
+    local tf = Instance.new("Frame")
+    tf.Size = UDim2.new(1, -145, 1, 0)
+    tf.BackgroundTransparency = 1
+    tf.Parent = header
+
+    local tl = Instance.new("TextLabel")
+    tl.Size = UDim2.new(1, 0, 0, 18)
+    tl.Position = UDim2.new(0, 0, 0, 4)
+    tl.BackgroundTransparency = 1
+    tl.Font = Enum.Font.GothamBold
+    tl.Text = labelText
+    tl.TextColor3 = Theme.TextWhite
+    tl.TextSize = 12
+    tl.TextXAlignment = Enum.TextXAlignment.Left
+    tl.Parent = tf
+
+    local dl = Instance.new("TextLabel")
+    dl.Size = UDim2.new(1, 0, 0, 14)
+    dl.Position = UDim2.new(0, 0, 0, 22)
+    dl.BackgroundTransparency = 1
+    dl.Font = Enum.Font.Gotham
+    dl.Text = descText or ""
+    dl.TextColor3 = Theme.TextMuted
+    dl.TextSize = 10
+    dl.TextXAlignment = Enum.TextXAlignment.Left
+    dl.Parent = tf
+
+    local ddBtn = Instance.new("TextButton")
+    ddBtn.Size = UDim2.new(0, 130, 0, 24)
+    ddBtn.Position = UDim2.new(1, -130, 0.5, -12)
+    ddBtn.BackgroundColor3 = Theme.ControlBg
+    ddBtn.Font = Enum.Font.GothamBold
+    ddBtn.Text = tostring(selected) .. "  v"
+    ddBtn.TextColor3 = Theme.PurplePrimary
+    ddBtn.TextSize = 11
+    ddBtn.BorderSizePixel = 0
+    ddBtn.Parent = header
+    Instance.new("UICorner", ddBtn).CornerRadius = UDim.new(0, 4)
+
+    local optC = Instance.new("Frame")
+    optC.Size = UDim2.new(1, 0, 0, 0)
+    optC.AutomaticSize = Enum.AutomaticSize.Y
+    optC.BackgroundTransparency = 1
+    optC.Visible = false
+    optC.Parent = row
+
+    do
+        local p = Instance.new("UIPadding")
+        p.PaddingLeft = UDim.new(0, 10)
+        p.PaddingRight = UDim.new(0, 10)
+        p.PaddingBottom = UDim.new(0, 8)
+        p.Parent = optC
+    end
+    Instance.new("UIListLayout", optC).SortOrder = Enum.SortOrder.LayoutOrder
+
+    local optButtons = {}
+    local function populate(opts)
+        for _, c in ipairs(optC:GetChildren()) do
+            if c:IsA("TextButton") then c:Destroy() end
+        end
+        table.clear(optButtons)
+        for _, opt in ipairs(opts) do
+            local ob = Instance.new("TextButton")
+            ob.Size = UDim2.new(1, 0, 0, 26)
+            ob.BackgroundColor3 = (opt == selected) and Theme.DropdownSelected or Theme.InputBg
+            ob.Font = Enum.Font.Gotham
+            ob.Text = (opt == selected and "> " or "   ") .. tostring(opt)
+            ob.TextColor3 = (opt == selected) and Theme.PurplePrimary or Theme.TextWhite
+            ob.TextSize = 11
+            ob.TextXAlignment = Enum.TextXAlignment.Left
+            ob.BorderSizePixel = 0
+            ob.Parent = optC
+            Instance.new("UICorner", ob).CornerRadius = UDim.new(0, 4)
+
+            do
+                local p = Instance.new("UIPadding")
+                p.PaddingLeft = UDim.new(0, 10)
+                p.Parent = ob
+            end
+            optButtons[opt] = ob
+
+            ob.MouseEnter:Connect(function()
+                if opt ~= selected then
+                    TweenService:Create(ob, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+                end
+            end)
+            ob.MouseLeave:Connect(function()
+                if opt ~= selected then
+                    TweenService:Create(ob, TweenInfo.new(0.15), {BackgroundColor3 = Theme.InputBg}):Play()
+                end
+            end)
+            ob.MouseButton1Click:Connect(function()
+                selected = opt
+                ddBtn.Text = tostring(opt) .. "  v"
+                optC.Visible = false
+                for oN, b in pairs(optButtons) do
+                    b.BackgroundColor3 = (oN == opt) and Theme.DropdownSelected or Theme.InputBg
+                    b.TextColor3 = (oN == opt) and Theme.PurplePrimary or Theme.TextWhite
+                    b.Text = (oN == opt and "> " or "   ") .. tostring(oN)
+                end
+                if type(callback) == "function" then callback(opt) end
+            end)
+        end
+    end
+    populate(options)
+
+    ddBtn.MouseButton1Click:Connect(function()
+        optC.Visible = not optC.Visible
+        ddBtn.Text = tostring(selected) .. (optC.Visible and "  ^" or "  v")
+    end)
+    header.MouseEnter:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+    end)
+    header.MouseLeave:Connect(function()
+        TweenService:Create(row, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowNormal}):Play()
+    end)
+
+    if indexSearch ~= false then
+        table.insert(Components.rowSearchIndex, {frame = row, query = (labelText .. " " .. (descText or "")):lower()})
+    end
+
+    local ret = {
+        frame = row,
+        Set = function(opt, skipCallback)
+            selected = opt
+            ddBtn.Text = tostring(opt) .. "  v"
+            for oN, b in pairs(optButtons) do
+                b.BackgroundColor3 = (oN == opt) and Theme.DropdownSelected or Theme.InputBg
+                b.TextColor3 = (oN == opt) and Theme.PurplePrimary or Theme.TextWhite
+                b.Text = (oN == opt and "> " or "   ") .. tostring(oN)
+            end
+            if not skipCallback and type(callback) == "function" then pcall(callback, opt) end
+        end,
+        Get = function() return selected end,
+        Refresh = function(newOpts, keepCurrent)
+            options = newOpts or {}
+            populate(options)
+            local found = false
+            if keepCurrent and selected then
+                for _, opt in ipairs(options) do
+                    if opt == selected then found = true; break end
+                end
+            end
+            if not found then
+                selected = options[1] or ""
+            end
+            ddBtn.Text = (selected ~= "" and tostring(selected) or "Không có") .. "  v"
         end
     }
+
+    local mappedKey = State.ConfigLabelMap[labelText]
+    if mappedKey then
+        State.UIControllers[mappedKey] = ret
+    end
+    return ret
+end
+
+function Components.CreateButtonRow(parent, labelText, descText, btnText, callback, indexSearch)
+    if type(descText) == "function" then
+        indexSearch = btnText
+        callback = descText
+        btnText = "Execute"
+        descText = ""
+    elseif type(btnText) == "function" then
+        indexSearch = callback
+        callback = btnText
+        btnText = descText
+        descText = ""
+    end
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local btn = Instance.new("TextButton")
+    btn.Size = UDim2.new(0, 90, 0, 24)
+    btn.Position = UDim2.new(1, -90, 0.5, -12)
+    btn.BackgroundColor3 = Theme.ControlBg
+    btn.Font = Enum.Font.GothamBold
+    btn.Text = btnText or "Execute"
+    btn.TextColor3 = Theme.PurplePrimary
+    btn.TextSize = 11
+    btn.BorderSizePixel = 0
+    btn.Parent = row
+    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.PurpleDark, TextColor3 = Theme.TextWhite}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ControlBg, TextColor3 = Theme.PurplePrimary}):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        if type(callback) == "function" then pcall(callback) end
+    end)
+    return btn
+end
+
+function Components.CreateInfoRow(parent, labelText, valueText, indexSearch)
+    local row = Components.CreateBaseRow(parent, labelText, "", indexSearch)
+    local vl = Instance.new("TextLabel")
+    vl.Size = UDim2.new(0, 180, 1, 0)
+    vl.Position = UDim2.new(1, -180, 0, 0)
+    vl.BackgroundTransparency = 1
+    vl.Font = Enum.Font.GothamBold
+    vl.Text = valueText or ""
+    vl.TextColor3 = Theme.PurplePrimary
+    vl.TextSize = 11
+    vl.TextXAlignment = Enum.TextXAlignment.Right
+    vl.Parent = row
+    return {frame = row, Set = function(nv) vl.Text = tostring(nv or "") end}
+end
+
+function Components.CreateInputRow(parent, labelText, descText, initialVal, callback, indexSearch, placeholder)
+    local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
+    local tb = Instance.new("TextBox")
+    tb.Size = UDim2.new(0, 160, 0, 24)
+    tb.Position = UDim2.new(1, -160, 0.5, -12)
+    tb.BackgroundColor3 = Theme.InputBg
+    tb.Font = Enum.Font.Gotham
+    tb.Text = initialVal or ""
+    tb.PlaceholderText = placeholder or "Nhập tại đây..."
+    tb.PlaceholderColor3 = Theme.TextMuted
+    tb.TextColor3 = Theme.TextWhite
+    tb.TextSize = 11
+    tb.ClearTextOnFocus = false
+    tb.BorderSizePixel = 0
+    tb.Parent = row
+    Instance.new("UICorner", tb).CornerRadius = UDim.new(0, 4)
+
+    local s = Instance.new("UIStroke", tb)
+    s.Color = Theme.BorderSubtle
+    s.Thickness = 1
+
+    tb.FocusLost:Connect(function(enterPressed)
+        if type(callback) == "function" then callback(tb.Text) end
+    end)
+
+    local ret = {
+        frame = row,
+        Set = function(val)
+            tb.Text = tostring(val or "")
+            if type(callback) == "function" then pcall(callback, tb.Text) end
+        end,
+        Get = function() return tb.Text end
+    }
+
+    local mappedKey = State.ConfigLabelMap[labelText]
+    if mappedKey then
+        State.UIControllers[mappedKey] = ret
+    end
+    return ret
 end
 
 return Components
@@ -2366,36 +2819,72 @@ end
 __modules["ui.tabs.tab_cai_dat"] = function()
 --[[
     v2/ui/tabs/tab_cai_dat.lua
-    Tab 10: Cài Đặt (Profiles, Config Management & Script Unload)
+    Exact Tab Cài Đặt from backup.lua (Profiles, Priority Manager, Webhooks & Unload)
 --]]
 
 local Components = __require("ui.components")
 local State = __require("core.state")
 local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
 local Utils = __require("core.utils")
 
 local TabCaiDat = {}
 
-function TabCaiDat.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Quản Lý Cấu Hình (Profiles)")
-    local cardConfig = Components.CreateCardGroup(parent)
+function TabCaiDat.Render(parent)
+    Components.CreateCategoryHeader(parent, "Quản Lý Cấu Hình Tài Khoản (Profiles)")
+    local cardProfile = Components.CreateCardGroup(parent)
 
-    Components.CreateButtonRow(cardConfig, "Lưu Cấu Hình Mặc Định", "Ghi nhớ toàn bộ thiết lập vào bộ nhớ máy", "Lưu Cấu Hình", function()
-        local ok, msg = ConfigModule.SaveAccountConfig("Default", State.UIControllers)
-        Utils.ShowNotification("Cài Đặt", msg, ok and "SUCCESS" or "ERROR", 3)
+    local savedList = ConfigModule.GetSavedConfigList()
+    if #savedList == 0 then table.insert(savedList, "Default") end
+    local selectedCfg = savedList[1]
+    local newCfgName = ""
+
+    local cfgDropdown = Components.CreateDropdownRow(cardProfile, "Chọn Cấu Hình Đã Lưu", "Danh sách các file cấu hình đã tạo", savedList, selectedCfg, function(v)
+        selectedCfg = v
     end)
 
-    Components.CreateButtonRow(cardConfig, "Tải Cấu Hình Mặc Định", "Nạp lại thiết lập đã lưu", "Tải Cấu Hình", function()
-        local ok, msg = ConfigModule.LoadAccountConfig("Default", State.UIControllers)
+    Components.CreateInputRow(cardProfile, "Tên Cấu Hình Mới", "Nhập tên nếu muốn lưu thành profile riêng", "", function(v)
+        newCfgName = v
+    end, nil, "VD: AfkNight, FarmBoss...")
+
+    Components.CreateButtonRow(cardProfile, "Lưu Cấu Hình", "Lưu toàn bộ thiết lập hiện tại", "Lưu Ngay", function()
+        local nameToSave = (newCfgName ~= "" and newCfgName) or selectedCfg or "Default"
+        local ok, msg = ConfigModule.SaveAccountConfig(nameToSave, State.UIControllers)
         Utils.ShowNotification("Cài Đặt", msg, ok and "SUCCESS" or "ERROR", 3)
+        cfgDropdown.Refresh(ConfigModule.GetSavedConfigList(), true)
+    end)
+
+    Components.CreateButtonRow(cardProfile, "Nạp Cấu Hình", "Áp dụng cấu hình đã chọn", "Nạp Ngay", function()
+        if selectedCfg then
+            local ok, msg = ConfigModule.LoadAccountConfig(selectedCfg, State.UIControllers)
+            Utils.ShowNotification("Cài Đặt", msg, ok and "SUCCESS" or "ERROR", 3)
+        end
+    end)
+
+    Components.CreateCategoryHeader(parent, "Hệ Thống Quản Lý Độ Ưu Tiên (Priority Manager)")
+    local cardPriority = Components.CreateCardGroup(parent)
+    Components.CreateToggleRow(cardPriority, "Bật Quản Lý Độ Ưu Tiên", "Tự động phân xử khi có nhiều sự kiện trùng lặp", Config.PrioritySystemEnabled, function(v)
+        Config.PrioritySystemEnabled = v
+    end)
+
+    Components.CreateCategoryHeader(parent, "Cảnh Báo Discord Webhook")
+    local cardWebhook = Components.CreateCardGroup(parent)
+    Components.CreateInputRow(cardWebhook, "Webhook URL", "Dán đường dẫn Webhook Discord tại đây", Config.WebhookUrl or "", function(v)
+        Config.WebhookUrl = v
+    end, nil, "https://discord.com/api/webhooks/...")
+    Components.CreateToggleRow(cardWebhook, "Bật Webhook", "Kích hoạt gửi tin nhắn về Discord", Config.WebhookEnabled, function(v)
+        Config.WebhookEnabled = v
+    end)
+    Components.CreateToggleRow(cardWebhook, "Thông Báo Bắt Được Boss", "Gửi tin nhắn khi câu trúng Secret Boss", Config.WebhookNotifyBoss, function(v)
+        Config.WebhookNotifyBoss = v
     end)
 
     Components.CreateCategoryHeader(parent, "Hệ Thống & Thoát")
     local cardExit = Components.CreateCardGroup(parent)
-
-    Components.CreateButtonRow(cardExit, "Hủy Script An Toàn (Unload)", "Xóa toàn bộ giao diện, ngắt kết nối an toàn", "Hủy Script", function()
+    Components.CreateButtonRow(cardExit, "Hủy Script Hoàn Toàn (Unload)", "Xóa toàn bộ giao diện và ngắt kết nối an toàn", "Hủy Script", function()
+        Utils.ShowNotification("Identical Hub", "Đang đóng script an toàn...", "WARN", 2)
+        task.wait(0.2)
         State.UnloadScript()
-        Utils.ShowNotification("Identical Hub", "Đã hủy script thành công!", "SUCCESS", 3)
     end)
 end
 
@@ -2406,226 +2895,314 @@ end
 __modules["ui.tabs.tab_cau_ca"] = function()
 --[[
     v2/ui/tabs/tab_cau_ca.lua
-    Tab 1: Câu Cá (Auto Cast, Hook, Perfect Slam, Max Charge, Mồi & Cần)
+    Exact Tab Câu Cá from backup.lua (Stats, Core AutoCast, Home Spot, Smart Combo, Train Skill, Bait/Rod, Sell, Octo)
 --]]
 
 local Components = __require("ui.components")
 local State = __require("core.state")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
+local StateMachine = __require("combo.state_machine")
+local Theme = __require("ui.theme")
+local Utils = __require("core.utils")
 
 local TabCauCa = {}
 
-function TabCauCa.Render(parent, config)
-    -- Section 1: Tự Động Câu & Giật Cần
-    Components.CreateCategoryHeader(parent, "Tự Động Câu & Minigame")
-    local cardFishing = Components.CreateCardGroup(parent)
+function TabCauCa.Render(parent)
+    -- Section 1: Thống Kê Tài Khoản
+    Components.CreateCategoryHeader(parent, "Thông Tin Tài Khoản & Thống Kê")
+    local statsCard = Components.CreateCardGroup(parent)
+    local infoEquippedRod = Components.CreateInfoRow(statsCard, "Cần Đang Dùng", "Chưa có")
+    local infoEquippedBait = Components.CreateInfoRow(statsCard, "Mồi Đang Dùng", "Chưa có")
+    local infoFishCaught = Components.CreateInfoRow(statsCard, "Tổng Cá Đã Câu", "0 con")
+    local infoCash = Components.CreateInfoRow(statsCard, "Tiền Hiện Tại", "$0")
+    local infoUptime = Components.CreateInfoRow(statsCard, "Thời Gian Treo Máy", "00:00:00")
+    local infoFishPerHour = Components.CreateInfoRow(statsCard, "Tốc Độ Câu (Fish/h)", "0 con/h")
+    local infoCashPerHour = Components.CreateInfoRow(statsCard, "Tốc Độ Kiếm Tiền", "$0 /h")
+    local infoGemsGained = Components.CreateInfoRow(statsCard, "Gems Thu Được", "+0 Gems")
 
-    State.UIControllers["AutoCast"] = Components.CreateToggleRow(cardFishing, "Tự Động Quăng Cần (Auto Cast)", "Tự động thả cần câu khi đứng yên hoặc sau khi bắt cá", config.AutoCast, function(v)
-        config.AutoCast = v
+    -- Section 2: Tự Động Câu Cá Cốt Lõi
+    Components.CreateCategoryHeader(parent, "Tự Động Câu Cá Cốt Lõi")
+    local fishCard = Components.CreateCardGroup(parent)
+
+    Components.CreateToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
+    Components.CreateSliderRow(fishCard, "Độ Trễ Quăng Cần", "Thời gian giãn cách giữa các lần quăng", 0.0, 5.0, Config.CastDelay, true, "s", function(v) Config.CastDelay = v end)
+    Components.CreateToggleRow(fishCard, "Giữ Thanh Minigame (Anchor Bar)", "Tự động giữ thanh kéo ở giữa để bắt cá 100%", Config.AnchorBar, function(v) Config.AnchorBar = v end)
+    Components.CreateToggleRow(fishCard, "Tự Dùng Kỹ Năng Cần", "Tự kích hoạt kỹ năng cần câu để kéo cá siêu nhanh", Config.AutoSkills, function(v) Config.AutoSkills = v end)
+    Components.CreateToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động nhấn Slam mức Perfect khi xuất hiện", Config.AutoSlam, function(v) Config.AutoSlam = v end)
+    Components.CreateToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
+    Components.CreateToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
+
+    -- Section 3: Vị Trí Trở Về (Home Spot)
+    Components.CreateCategoryHeader(parent, "🏠 Vị Trí Trở Về Nếu Săn Boss (Home Spot)")
+    local returnSpotCard = Components.CreateCardGroup(parent)
+    local infoHomeSpot = Components.CreateInfoRow(returnSpotCard, "Vị Trí Đã Lưu", "Chưa lưu vị trí nào")
+
+    Components.CreateButtonRow(returnSpotCard, "Lưu Vị Trí Đang Đứng", "Lưu tọa độ hiện tại làm điểm quay về", "Lưu Vị Trí", function()
+        local char = Services.LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Config.HomeFarmSpot = {
+                x = root.Position.X,
+                y = root.Position.Y,
+                z = root.Position.Z,
+                cframe = { root.CFrame:GetComponents() },
+                savedAt = os.date("%H:%M:%S")
+            }
+            infoHomeSpot.Set(string.format("Đã lưu: X:%.1f, Y:%.1f, Z:%.1f (%s)", root.Position.X, root.Position.Y, root.Position.Z, Config.HomeFarmSpot.savedAt))
+            Utils.ShowNotification("Vị Trí Trở Về", "Đã lưu vị trí trở về thành công!", "SUCCESS", 4)
+        end
     end)
 
-    State.UIControllers["AnchorBar"] = Components.CreateToggleRow(cardFishing, "Giữ Cân Bằng Minigame (Anchor Bar)", "Tự động khóa thanh kéo ở vị trí chuẩn xác nhất", config.AnchorBar, function(v)
-        config.AnchorBar = v
+    Components.CreateButtonRow(returnSpotCard, "Bay Về Điểm Trở Về Ngay", "Dịch chuyển tức thì về vị trí đã lưu", "Bay Về", function()
+        if Config.HomeFarmSpot and Config.HomeFarmSpot.cframe then
+            local char = Services.LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if root then
+                root.CFrame = CFrame.new(table.unpack(Config.HomeFarmSpot.cframe))
+                Utils.ShowNotification("Vị Trí Trở Về", "Đã bay về vị trí trở về!", "SUCCESS", 3)
+            end
+        else
+            Utils.ShowNotification("Chưa Lưu Vị Trí", "Vui lòng bấm [Lưu Vị Trí] trước!", "WARN", 4)
+        end
     end)
 
-    State.UIControllers["AutoSlam"] = Components.CreateToggleRow(cardFishing, "Tự Động Slam (Perfect Slam)", "Tự động giật Perfect ngay khi nút kích hoạt xuất hiện", config.AutoSlam, function(v)
-        config.AutoSlam = v
+    -- Section 4: Smart Combos V2 (Rebuilt from Scratch)
+    Components.CreateCategoryHeader(parent, "⚔️ Combo Kỹ Năng Thông Minh (Smart Combos V2)")
+    local comboCard = Components.CreateCardGroup(parent)
+
+    Components.CreateToggleRow(comboCard, "Bật Combo Kỹ Năng Tự Động", "Tự động kích hoạt chiêu theo đúng thứ tự khi câu cá", Config.SmartComboEnabled, function(v)
+        Config.SmartComboEnabled = v
+        ConfigModule.SaveSmartCombo()
     end)
 
-    State.UIControllers["AutoCharge"] = Components.CreateToggleRow(cardFishing, "Tự Động Max Charge (Gồng 100%)", "Tự động nạp tối đa thanh lực khi cá kéo mạnh", config.AutoCharge, function(v)
-        config.AutoCharge = v
+    Components.CreateSliderRow(comboCard, "Ngưỡng Máu Cá Phân Loại", "Máu cá <= mức này sẽ kết liễu nhanh; > mức này bật combo", 100, 3000, Config.FishHpThreshold, false, " HP", function(v)
+        Config.FishHpThreshold = v
+        ConfigModule.SaveSmartCombo()
     end)
 
-    State.UIControllers["AntiStuck"] = Components.CreateToggleRow(cardFishing, "Chống Kẹt Cần (Anti-Stuck)", "Tự động giật lại cần nếu thả quá 15s không có cá cắn", config.AntiStuck, function(v)
-        config.AntiStuck = v
+    Components.CreateDropdownRow(comboCard, "Chiêu Bắt Nhanh (<= Ngưỡng HP)", "Tung 1 hit kết liễu khi cá yếu / cá thường", {"Tắt", "Z", "X", "C", "V"}, Config.QuickCatchSkill, function(v)
+        Config.QuickCatchSkill = v
+        ConfigModule.SaveSmartCombo()
     end)
 
-    State.UIControllers["AutoRhythmHit"] = Components.CreateToggleRow(cardFishing, "Tự Đánh Nhịp Octo (Rhythm Hit)", "Tự động hoàn thành minigame nhịp điệu của cá mực", config.AutoRhythmHit, function(v)
-        config.AutoRhythmHit = v
+    Components.CreateDropdownRow(comboCard, "Chiêu Mở Màn (> Ngưỡng HP)", "Chiêu tung đầu trận khi gặp cá to / boss", {"Tắt", "Z", "X", "C", "V"}, Config.OpenerSkill, function(v)
+        Config.OpenerSkill = v
+        ConfigModule.SaveSmartCombo()
     end)
 
-    -- Section 2: Tự Đổi Mồi & Cần
+    local loopPresets = {
+        "Tùy Biến (Tự Do)",
+        "Z, X, V (Chuẩn)",
+        "Z, X (2 Chiêu Nhanh)",
+        "X, C, Z (Đảo Chiêu)",
+        "Z, X, C, V (Chuỗi Đầy Đủ)",
+        "X, C, V (Dồn Sát Thương)",
+        "C, V (Bộ Chiêu Cuối)"
+    }
+
+    local customInput = nil
+    local presetDropdown = nil
+    local infoPreview = nil
+
+    local function applyComboChange(newVal, source)
+        local keys = {}
+        for k in string.gmatch(newVal or "", "([ZXCVzxcv])") do
+            table.insert(keys, k:upper())
+        end
+        local cleanStr = table.concat(keys, ", ")
+        Config.LoopSkills = cleanStr
+        ConfigModule.SaveSmartCombo()
+
+        if source ~= "input" and customInput and customInput.Set then
+            customInput.Set(cleanStr)
+        end
+        if infoPreview and infoPreview.Set then
+            infoPreview.Set(StateMachine.GetComboPreview(cleanStr))
+        end
+    end
+
+    presetDropdown = Components.CreateDropdownRow(comboCard, "Mẫu Chuỗi Chiêu (Preset)", "Chọn nhanh chuỗi phổ biến hoặc tùy biến ở dưới", loopPresets, "Z, X, V (Chuẩn)", function(v)
+        local raw = v:match("^([ZXCVzxcv,%s]+)")
+        if raw and raw ~= "Tùy Biến (Tự Do)" then
+            applyComboChange(raw, "dropdown")
+        end
+    end)
+
+    customInput = Components.CreateInputRow(comboCard, "Tùy Biến Chuỗi Đảo Chiêu", "Gõ bất kỳ chiêu nào (VD: Z, X, V hoặc X, C, Z...)", Config.LoopSkills or "Z, X, V", function(v)
+        applyComboChange(v, "input")
+    end, nil, "VD: Z, X, V")
+
+    -- Bàn phím tạo combo nhanh 1 chạm (+Z, +X, +C, +V, ⌫, 🗑)
+    local quickRow = Components.CreateBaseRow(comboCard, "Bộ Phím Ghép Combo Nhanh", "Chạm các nút để thêm hoặc xóa nhanh chiêu vào chuỗi combo")
+    local btnContainer = Instance.new("Frame")
+    btnContainer.Size = UDim2.new(0, 190, 0, 24)
+    btnContainer.Position = UDim2.new(1, -190, 0.5, -12)
+    btnContainer.BackgroundTransparency = 1
+    btnContainer.Parent = quickRow
+
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.FillDirection = Enum.FillDirection.Horizontal
+    listLayout.HorizontalAlignment = Enum.HorizontalAlignment.Right
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 3)
+    listLayout.Parent = btnContainer
+
+    local function makeQuickBtn(text, bgColor, textColor, onClick)
+        local btn = Instance.new("TextButton")
+        btn.Size = UDim2.new(0, 28, 0, 24)
+        btn.BackgroundColor3 = bgColor
+        btn.Font = Enum.Font.GothamBold
+        btn.Text = text
+        btn.TextColor3 = textColor
+        btn.TextSize = 11
+        btn.BorderSizePixel = 0
+        btn.Parent = btnContainer
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        btn.MouseButton1Click:Connect(function() pcall(onClick) end)
+        return btn
+    end
+
+    local function appendKey(k)
+        local current = Config.LoopSkills or ""
+        local keys = {}
+        for char in string.gmatch(current, "([ZXCVzxcv])") do table.insert(keys, char:upper()) end
+        table.insert(keys, k:upper())
+        applyComboChange(table.concat(keys, ", "), "quickbtn")
+    end
+
+    makeQuickBtn("+Z", Theme.ControlBg, Theme.PurplePrimary, function() appendKey("Z") end)
+    makeQuickBtn("+X", Theme.ControlBg, Theme.PurplePrimary, function() appendKey("X") end)
+    makeQuickBtn("+C", Theme.ControlBg, Theme.PurplePrimary, function() appendKey("C") end)
+    makeQuickBtn("+V", Theme.ControlBg, Theme.PurplePrimary, function() appendKey("V") end)
+    makeQuickBtn("⌫", Color3.fromRGB(45, 25, 30), Color3.fromRGB(255, 120, 120), function()
+        local current = Config.LoopSkills or ""
+        local keys = {}
+        for char in string.gmatch(current, "([ZXCVzxcv])") do table.insert(keys, char:upper()) end
+        if #keys > 0 then table.remove(keys, #keys) end
+        applyComboChange(table.concat(keys, ", "), "quickbtn")
+    end)
+    makeQuickBtn("🗑", Color3.fromRGB(35, 35, 40), Theme.TextMuted, function()
+        applyComboChange("", "quickbtn")
+    end)
+
+    infoPreview = Components.CreateInfoRow(comboCard, "Thứ Tự Thi Triển Thực Tế", StateMachine.GetComboPreview(Config.LoopSkills))
+
+    Components.CreateToggleRow(comboCard, "Giữ Đúng Thứ Tự Combo (Strict Order)", "Chờ chiêu hồi theo đúng nhịp thứ tự, không nhảy cóc qua chiêu khác", Config.LoopStrictOrder, function(v)
+        Config.LoopStrictOrder = v
+        ConfigModule.SaveSmartCombo()
+    end)
+
+    Components.CreateDropdownRow(comboCard, "Chiêu Hồi Máu / Cứu Nguy", "Ưu tiên tung chiêu này khi máu người chơi xuống thấp", {"Tắt", "Z", "X", "C", "V"}, Config.EmergencyHealSkill, function(v)
+        Config.EmergencyHealSkill = v
+        ConfigModule.SaveSmartCombo()
+    end)
+
+    Components.CreateSliderRow(comboCard, "Kích Hoạt Hồi Máu Khi HP Dưới", "Ngưỡng máu người chơi cần cứu nguy", 10, 80, Config.EmergencyHealHp, false, "%", function(v)
+        Config.EmergencyHealHp = v
+        ConfigModule.SaveSmartCombo()
+    end)
+
+    Components.CreateSliderRow(comboCard, "Thời Gian Chờ Ra Chiêu", "Thời gian tối thiểu chờ hết hiệu ứng trước khi tung chiêu tiếp theo", 0.5, 3.5, Config.SkillEffectDelay, true, "s", function(v)
+        Config.SkillEffectDelay = v
+        ConfigModule.SaveSmartCombo()
+    end)
+
+    Components.CreateToggleRow(comboCard, "Tự Động Nhận Diện Hết Hiệu Ứng", "Quan sát hoạt ảnh đòn đánh trên nhân vật để chống nuốt chiêu", Config.SmartEffectAutoDetect, function(v)
+        Config.SmartEffectAutoDetect = v
+        ConfigModule.SaveSmartCombo()
+    end)
+
+    -- Section 5: Auto Luyện Chiêu
+    Components.CreateCategoryHeader(parent, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
+    local trainCard = Components.CreateCardGroup(parent)
+    local infoTrainProgress = Components.CreateInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+
+    Components.CreateToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
+    Components.CreateDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy nhất muốn luyện", {"Z", "X", "C", "V"}, Config.TrainSkill or "Z", function(v) Config.TrainSkill = v end)
+    Components.CreateSliderRow(trainCard, "Nhịp Chờ Xuất Chiêu (Cancel Delay)", "Thời gian chờ nhân vật bắt đầu xuất chiêu trước khi cất cần", 0.2, 1.2, Config.TrainCancelDelay or 0.45, true, "s", function(v) Config.TrainCancelDelay = v end)
+    Components.CreateSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
+        Config.TrainTargetCount = v
+        if infoTrainProgress and infoTrainProgress.Set then
+            infoTrainProgress.Set(string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+        end
+    end)
+
+    -- Section 6: Trang Bị Mồi & Cần
     Components.CreateCategoryHeader(parent, "Trang Bị Mồi & Cần Câu")
-    local cardLoadout = Components.CreateCardGroup(parent)
+    local loadoutCard = Components.CreateCardGroup(parent)
 
-    State.UIControllers["AutoEquipBestBait"] = Components.CreateToggleRow(cardLoadout, "Tự Trang Bị Mồi Tốt Nhất", "Tự động kiểm tra túi và lắp mồi có bậc phẩm cao nhất", config.AutoEquipBestBait, function(v)
-        config.AutoEquipBestBait = v
-    end)
+    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Cần Tốt Nhất", "Tự động cầm cần câu có lực kéo lớn nhất trong túi", Config.AutoEquipBestRod, function(v) Config.AutoEquipBestRod = v end)
+    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Mồi", "Tự động lắp mồi khi câu", Config.AutoEquipBestBait, function(v) Config.AutoEquipBestBait = v end)
+    Components.CreateToggleRow(loadoutCard, "Tự Đổi Mồi Khi Săn Boss", "Tự động đổi mồi đặc biệt khi phát hiện Boss", Config.AutoEquipBossBait, function(v) Config.AutoEquipBossBait = v end)
+    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Pháp Bảo Tốt Nhất", "Tự động trang bị ngọc/pháp bảo tốt nhất", Config.AutoEquipBestOrb, function(v) Config.AutoEquipBestOrb = v end)
 
-    State.UIControllers["AutoEquipBestRod"] = Components.CreateToggleRow(cardLoadout, "Tự Trang Bị Cần Mạnh Nhất", "Tự động cầm cần câu có lực kéo lớn nhất trong túi", config.AutoEquipBestRod, function(v)
-        config.AutoEquipBestRod = v
-    end)
+    -- Section 7: Bán Cá & Minigame
+    Components.CreateCategoryHeader(parent, "Bán Cá & Minigame Phụ")
+    local miscCard = Components.CreateCardGroup(parent)
+
+    Components.CreateToggleRow(miscCard, "Tự Động Bán Cá Khi Đầy Túi", "Tự động bán cá theo chu kỳ", Config.AutoSell, function(v) Config.AutoSell = v end)
+    Components.CreateSliderRow(miscCard, "Giãn Cách Bán Cá Tự Động", "Khoảng thời gian giữa 2 lần bán", 10, 120, Config.SellInterval, false, "s", function(v) Config.SellInterval = v end)
+    Components.CreateToggleRow(miscCard, "Tự Đánh Nhịp Octo (Rhythm Hit)", "Tự hoàn thành minigame nhịp điệu của bạch tuộc", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
 end
 
 return TabCauCa
 
 end
 
-__modules["ui.tabs.tab_combo"] = function()
---[[
-    v2/ui/tabs/tab_combo.lua
-    Tab 2: Combo Chiêu (Smart Combo Engine V2 - Dedicated Tab)
---]]
-
-local Components = __require("ui.components")
-local State = __require("core.state")
-local StateMachine = __require("combo.state_machine")
-local Theme = __require("ui.theme")
-
-local TabCombo = {}
-
-function TabCombo.Render(parent, config)
-    -- Section 1: Kích Hoạt & Cài Đặt Chuỗi Chiêu
-    Components.CreateCategoryHeader(parent, "Chuỗi Combo Tuần Tự Nghiêm Ngặt (Strict Rotation)")
-    local cardCombo = Components.CreateCardGroup(parent)
-
-    State.UIControllers["SmartComboEnabled"] = Components.CreateToggleRow(cardCombo, "Kích Hoạt Smart Combo V2", "Tự động xả chiêu theo đúng 100% thứ tự đã cài đặt khi minigame bắt đầu", config.SmartComboEnabled, function(v)
-        config.SmartComboEnabled = v
-    end)
-
-    -- Hiển thị xem trước chuỗi chiêu
-    local previewInfo = Components.CreateInfoRow(cardCombo, "Chuỗi Chiêu Hiện Tại", StateMachine.GetComboPreview(config.LoopSkills))
-    local statusInfo = Components.CreateInfoRow(cardCombo, "Trạng Thái Ra Chiêu", StateMachine.GetCurrentStatus(config))
-
-    local function updatePreview()
-        previewInfo.Set(StateMachine.GetComboPreview(config.LoopSkills))
-        statusInfo.Set(StateMachine.GetCurrentStatus(config))
-    end
-
-    -- Section 2: Chọn Nhanh Các Preset Combo Phổ Biến
-    Components.CreateCategoryHeader(parent, "Cài Đặt Nhanh Chuỗi Chiêu (Preset)")
-    local cardPresets = Components.CreateCardGroup(parent)
-
-    Components.CreateButtonRow(cardPresets, "Combo Chuẩn [Z, X, V]", "Đánh Z ➔ X ➔ V lặp lại", "Chọn [Z, X, V]", function()
-        config.LoopSkills = "Z, X, V"
-        updatePreview()
-    end)
-
-    Components.CreateButtonRow(cardPresets, "Combo 2 Chiêu [Z, X]", "Đánh Z ➔ X lặp lại", "Chọn [Z, X]", function()
-        config.LoopSkills = "Z, X"
-        updatePreview()
-    end)
-
-    Components.CreateButtonRow(cardPresets, "Combo Đảo Chiêu [X, C, Z]", "Đánh X ➔ C ➔ Z lặp lại", "Chọn [X, C, Z]", function()
-        config.LoopSkills = "X, C, Z"
-        updatePreview()
-    end)
-
-    Components.CreateButtonRow(cardPresets, "Combo Toàn Diện [Z, X, C, V]", "Đánh đủ 4 chiêu Z ➔ X ➔ C ➔ V", "Chọn [Z, X, C, V]", function()
-        config.LoopSkills = "Z, X, C, V"
-        updatePreview()
-    end)
-
-    -- Phím ghép chiêu thủ công
-    local quickBox = Instance.new("Frame")
-    quickBox.Size = UDim2.new(1, 0, 0, 36)
-    quickBox.BackgroundColor3 = Theme.RowBg
-    quickBox.BorderSizePixel = 0
-
-    local qCorner = Instance.new("UICorner")
-    qCorner.CornerRadius = UDim.new(0, 6)
-    qCorner.Parent = quickBox
-
-    local qLayout = Instance.new("UIListLayout")
-    qLayout.FillDirection = Enum.FillDirection.Horizontal
-    qLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
-    qLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-    qLayout.Padding = UDim.new(0, 8)
-    qLayout.Parent = quickBox
-
-    local function makeKeyBtn(txt, key)
-        local btn = Instance.new("TextButton")
-        btn.Size = UDim2.new(0, 52, 0, 26)
-        btn.BackgroundColor3 = Theme.CardBg
-        btn.Text = txt
-        btn.TextColor3 = Theme.Accent
-        btn.Font = Theme.FontBold
-        btn.TextSize = 12
-        btn.Parent = quickBox
-
-        local bc = Instance.new("UICorner")
-        bc.CornerRadius = UDim.new(0, 4)
-        bc.Parent = btn
-
-        btn.MouseButton1Click:Connect(function()
-            if key == "CLEAR" then
-                config.LoopSkills = ""
-            else
-                local current = config.LoopSkills or ""
-                if current == "" then
-                    config.LoopSkills = key
-                else
-                    config.LoopSkills = current .. ", " .. key
-                end
-            end
-            updatePreview()
-        end)
-    end
-
-    makeKeyBtn("+ Z", "Z")
-    makeKeyBtn("+ X", "X")
-    makeKeyBtn("+ C", "C")
-    makeKeyBtn("+ V", "V")
-    makeKeyBtn("XÓA", "CLEAR")
-
-    quickBox.Parent = cardPresets
-
-    -- Section 3: Tinh Chỉnh Nhịp Trễ & Cứu Nguy
-    Components.CreateCategoryHeader(parent, "Tinh Chỉnh Nhịp Trễ & Cứu Nguy")
-    local cardTiming = Components.CreateCardGroup(parent)
-
-    State.UIControllers["SkillEffectDelay"] = Components.CreateSliderRow(cardTiming, "Khoảng Cách Ra Chiêu (Delay)", "Thời gian chờ giữa 2 chiêu liên tiếp (tránh nuốt chiêu)", 0.5, 3.0, config.SkillEffectDelay, true, "s", function(v)
-        config.SkillEffectDelay = v
-    end)
-
-    State.UIControllers["SmartEffectAutoDetect"] = Components.CreateToggleRow(cardTiming, "Chờ Hoạt Ảnh Nhân Vật Hoàn Tất", "Tự động phát hiện chiêu đang thi triển và chờ xong mới ra chiêu tiếp", config.SmartEffectAutoDetect, function(v)
-        config.SmartEffectAutoDetect = v
-    end)
-
-    State.UIControllers["EmergencyHealHp"] = Components.CreateSliderRow(cardTiming, "Ngưỡng Máu Cứu Nguy Khẩn Cấp", "Máu tụt dưới mức này sẽ ưu tiên tung chiêu hồi máu", 10, 90, config.EmergencyHealHp, false, "%", function(v)
-        config.EmergencyHealHp = v
-    end)
-
-    -- Section 4: Luyện Chiêu (Train Skill)
-    Components.CreateCategoryHeader(parent, "Luyện Chiêu Độc Lập (Train Skill)")
-    local cardTrain = Components.CreateCardGroup(parent)
-
-    State.UIControllers["AutoTrainSkill"] = Components.CreateToggleRow(cardTrain, "Tự Động Luyện Chiêu", "Spam chiêu chọn sẵn và tự hủy cần để cày điểm chiêu thức", config.AutoTrainSkill, function(v)
-        config.AutoTrainSkill = v
-    end)
-
-    State.UIControllers["TrainTargetCount"] = Components.CreateSliderRow(cardTrain, "Mục Tiêu Số Lần Dùng", "Tự động tắt khi đạt đủ số lần", 10, 500, config.TrainTargetCount, false, " lần", function(v)
-        config.TrainTargetCount = v
-    end)
-end
-
-return TabCombo
-
-end
-
 __modules["ui.tabs.tab_dich_chuyen"] = function()
 --[[
     v2/ui/tabs/tab_dich_chuyen.lua
-    Tab 7: Dịch Chuyển (Islands, Players, Server Hop)
+    Exact Tab Dịch Chuyển from backup.lua (Islands, Boss Realms, Players, NPCs, Server Hop)
 --]]
 
 local Components = __require("ui.components")
 local Teleport = __require("features.teleport")
+local Services = __require("core.services")
 
 local TabDichChuyen = {}
 
-function TabDichChuyen.Render(parent, config)
+function TabDichChuyen.Render(parent)
     Components.CreateCategoryHeader(parent, "Dịch Chuyển Đến Các Đảo")
     local cardIslands = Components.CreateCardGroup(parent)
 
-    for islandName, pos in pairs(Teleport.islands) do
-        Components.CreateButtonRow(cardIslands, islandName, "Bay đến đảo ngay lập tức", "Bay Tới", function()
-            Teleport.To(pos)
+    local islandList = {
+        { name = "Đảo Khởi Đầu (Starter Isle)", pos = Vector3.new(0, 15, 0) },
+        { name = "Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1187.8, 7.5, -22.5) },
+        { name = "Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(12.0, 19.0, 1413.0) },
+        { name = "Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-85.3, 9.3, -1340.8) },
+        { name = "Đảo Băng Tuyết (Glacier Isle)", pos = Vector3.new(650, 20, -1200) },
+        { name = "Đảo Núi Lửa (Volcano Isle)", pos = Vector3.new(-1400, 25, 800) },
+        { name = "Đại Dương Sâu (Deep Ocean)", pos = Vector3.new(2000, 10, 2000) },
+        { name = "Vực Thẳm (Abyssal Trench)", pos = Vector3.new(-2500, 5, -3000) }
+    }
+
+    for _, isl in ipairs(islandList) do
+        Components.CreateButtonRow(cardIslands, isl.name, "Bay đến đảo ngay lập tức", "Bay Tới", function()
+            Teleport.To(isl.pos)
         end)
     end
 
+    Components.CreateCategoryHeader(parent, "Dịch Chuyển Tới Người Chơi")
+    local cardPlr = Components.CreateCardGroup(parent)
+    local plrNames = {}
+    for _, p in ipairs(Services.Players:GetPlayers()) do
+        if p ~= Services.LocalPlayer then table.insert(plrNames, p.Name) end
+    end
+    if #plrNames == 0 then table.insert(plrNames, "Không có ai khác") end
+
+    local selectedPlr = plrNames[1]
+    Components.CreateDropdownRow(cardPlr, "Chọn Người Chơi", "Danh sách người chơi trong phòng", plrNames, selectedPlr, function(v)
+        selectedPlr = v
+    end)
+    Components.CreateButtonRow(cardPlr, "Bay Tới Người Chơi Đã Chọn", "Dịch chuyển tức thời đến tọa độ người chơi", "Bay Tới", function()
+        if selectedPlr and selectedPlr ~= "Không có ai khác" then
+            Teleport.ToPlayer(selectedPlr)
+        end
+    end)
+
     Components.CreateCategoryHeader(parent, "Chuyển Server (Server Hop)")
     local cardHop = Components.CreateCardGroup(parent)
-
     Components.CreateButtonRow(cardHop, "Chuyển Server Khác (Hop Server)", "Tìm server ngẫu nhiên còn chỗ và chuyển vào", "Đổi Server", function()
         Teleport.ServerHop()
     end)
@@ -2638,43 +3215,54 @@ end
 __modules["ui.tabs.tab_nhan_vat"] = function()
 --[[
     v2/ui/tabs/tab_nhan_vat.lua
-    Tab 9: Nhân Vật & Tiện Ích (Speed, Fly, Noclip, Walk on Water, Anti-AFK)
+    Exact Tab Nhân Vật from backup.lua (Speed, Fly, Noclip, Walk on water, Anti-AFK)
 --]]
 
 local Components = __require("ui.components")
-local State = __require("core.state")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
 local Character = __require("features.character")
 
 local TabNhanVat = {}
 
-function TabNhanVat.Render(parent, config)
+function TabNhanVat.Render(parent)
     Components.CreateCategoryHeader(parent, "Di Chuyển & Thể Chất")
     local cardMove = Components.CreateCardGroup(parent)
 
-    State.UIControllers["CustomSpeedEnabled"] = Components.CreateToggleRow(cardMove, "Bật Tốc Độ Tùy Chỉnh", "Tăng tốc độ chạy của nhân vật", config.CustomSpeedEnabled, function(v)
-        config.CustomSpeedEnabled = v
-        Character.ApplySpeed(config)
+    Components.CreateToggleRow(cardMove, "Tăng Tốc Độ Chạy (Speed)", "Tăng tốc độ di chuyển của nhân vật", Config.WalkSpeedEnabled, function(v)
+        Config.WalkSpeedEnabled = v
+        Character.ApplySpeed(Config)
+    end)
+    Components.CreateSliderRow(cardMove, "Chỉnh Tốc Độ", "Tốc độ chạy mong muốn", 16, 120, Config.WalkSpeedValue or 16, false, "", function(v)
+        Config.WalkSpeedValue = v
+        Character.ApplySpeed(Config)
     end)
 
-    State.UIControllers["WalkSpeed"] = Components.CreateSliderRow(cardMove, "Tốc Độ Chạy (WalkSpeed)", "Tốc độ chạy mong muốn", 16, 120, config.WalkSpeed, false, "", function(v)
-        config.WalkSpeed = v
-        Character.ApplySpeed(config)
+    Components.CreateToggleRow(cardMove, "Bay Lượn Tự Do (Fly)", "Bay lượn tự do phím WASD + Space/Shift", Config.FlyEnabled, function(v)
+        Config.FlyEnabled = v
+    end)
+    Components.CreateSliderRow(cardMove, "Tốc Độ Bay", "Tốc độ bay trên không trung", 20, 150, Config.FlySpeed or 50, false, "", function(v)
+        Config.FlySpeed = v
     end)
 
-    State.UIControllers["NoclipEnabled"] = Components.CreateToggleRow(cardMove, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua mọi vật thể và địa hình", config.NoclipEnabled, function(v)
-        config.NoclipEnabled = v
+    Components.CreateToggleRow(cardMove, "Đi Xuyên Tường (Noclip)", "Đi xuyên qua mọi vật cản và địa hình", Config.Noclip, function(v)
+        Config.Noclip = v
     end)
-
-    State.UIControllers["WalkOnWater"] = Components.CreateToggleRow(cardMove, "Đi Trên Mặt Nước (Walk On Water)", "Tạo bệ đỡ vô hình để đứng trên mặt biển câu cá", config.WalkOnWater, function(v)
-        config.WalkOnWater = v
-        Character.ApplyWalkOnWater(config)
+    Components.CreateToggleRow(cardMove, "Đi Trên Mặt Nước", "Tạo bệ vô hình để đứng trên mặt biển", Config.WalkOnWater, function(v)
+        Config.WalkOnWater = v
+        Character.ApplyWalkOnWater(Config)
+    end)
+    Components.CreateToggleRow(cardMove, "Nhảy Vô Hạn (Infinite Jump)", "Nhảy liên tục trên không", Config.InfiniteJump, function(v)
+        Config.InfiniteJump = v
     end)
 
     Components.CreateCategoryHeader(parent, "Hệ Thống & Chống Treo")
     local cardSystem = Components.CreateCardGroup(parent)
-
-    State.UIControllers["AntiAFK"] = Components.CreateToggleRow(cardSystem, "Chống Treo Game (Anti-AFK)", "Ngăn chặn bị Roblox kick khi treo máy quá 20 phút", config.AntiAFK, function(v)
-        config.AntiAFK = v
+    Components.CreateToggleRow(cardSystem, "Chống Văng Game (Anti-AFK)", "Ngăn chặn bị kick khi treo máy qua đêm", Config.AntiAFK, function(v)
+        Config.AntiAFK = v
+    end)
+    Components.CreateToggleRow(cardSystem, "Tự Động Kết Nối Lại", "Tự động rejoin nếu bị ngắt kết nối mạng", Config.AutoRejoin, function(v)
+        Config.AutoRejoin = v
     end)
 end
 
@@ -2685,43 +3273,29 @@ end
 __modules["ui.tabs.tab_nhiem_vu"] = function()
 --[[
     v2/ui/tabs/tab_nhiem_vu.lua
-    Tab 4: Nhiệm Vụ (Daily Ticket Quests)
+    Exact Tab Nhiệm Vụ from backup.lua (Daily Tickets Engine & Settings)
 --]]
 
 local Components = __require("ui.components")
-local State = __require("core.state")
-local Quest = __require("features.quest")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
 
 local TabNhiemVu = {}
 
-function TabNhiemVu.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Tự Động Làm Nhiệm Vụ Vé Hàng Ngày")
-    local cardQuest = Components.CreateCardGroup(parent)
+function TabNhiemVu.Render(parent)
+    Components.CreateCategoryHeader(parent, "Tự Động Nộp & Làm Vé Nhiệm Vụ (Tickets)")
+    local cardTicket = Components.CreateCardGroup(parent)
 
-    State.UIControllers["AutoTicketQuest"] = Components.CreateToggleRow(cardQuest, "Kích Hoạt Auto Nhiệm Vụ Vé", "Tự động nhận quest, làm quest, trả quest và chuyển đổi thông minh", config.AutoTicketQuest, function(v)
-        config.AutoTicketQuest = v
-    end)
-
-    State.UIControllers["TicketAutoCastAtHome"] = Components.CreateToggleRow(cardQuest, "Tự Về Điểm Farm Khi Hết Vé", "Khi hoàn thành hết vé trong ngày, tự bay về điểm câu chính để farm tiếp", config.TicketAutoCastAtHome, function(v)
-        config.TicketAutoCastAtHome = v
-    end)
-
-    -- Hiển thị trạng thái nhiệm vụ hiện tại
-    Components.CreateCategoryHeader(parent, "Trạng Thái Nhiệm Vụ")
-    local cardStatus = Components.CreateCardGroup(parent)
-
-    local qTypeRow = Components.CreateInfoRow(cardStatus, "Nhiệm Vụ Đang Làm", Quest.state.currentQuestType or "Không có")
-    local qCdRow = Components.CreateInfoRow(cardStatus, "Trạng Thái Cooldown", Quest.state.isCooldown and "Đang chờ ngày mới" or "Sẵn sàng")
-
-    task.spawn(function()
-        while State.isRunning do
-            task.wait(1.5)
-            pcall(function()
-                qTypeRow.Set(Quest.state.currentQuestType or "Không có")
-                qCdRow.Set(Quest.state.isCooldown and "Đang chờ ngày mới" or "Sẵn sàng")
-            end)
-        end
-    end)
+    Components.CreateToggleRow(cardTicket, "Tự Động Nộp Vé Nhiệm Vụ (Tickets)", "Tự động nhận, thực hiện và trả nhiệm vụ vé hàng ngày", Config.AutoTicketQuest, function(v) Config.AutoTicketQuest = v end)
+    Components.CreateDropdownRow(cardTicket, "Chọn Độ Khó Vé Nhiệm Vụ", "Độ khó nhiệm vụ muốn ưu tiên nhận", {"Easy", "Medium", "Hard"}, Config.TicketDifficulty, function(v) Config.TicketDifficulty = v end)
+    Components.CreateDropdownRow(cardTicket, "Chế Độ Nhiệm Vụ", "Chế độ lọc loại nhiệm vụ ưu tiên", {"Tự Động (Auto Detect)", "100 Cá (Fish 100)", "100 Chiêu (Skill 100)", "15m Cá (Size 15m)", "100 Mồi (Bait 100)"}, Config.TicketQuestMode, function(v) Config.TicketQuestMode = v end)
+    Components.CreateDropdownRow(cardTicket, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Chiêu spam cho nhiệm vụ 100 skill", {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}, Config.TicketSkillKey, function(v) Config.TicketSkillKey = v end)
+    Components.CreateDropdownRow(cardTicket, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu kết liễu nhanh cho nhiệm vụ 100 cá", {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}, Config.TicketQuickSkill, function(v) Config.TicketQuickSkill = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự bán cá giải phóng chỗ trống khi đang làm vé", Config.TicketAutoSellFull, function(v) Config.TicketAutoSellFull = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Về Home Spot Khi Xong Nhiệm Vụ", "Tự bay về điểm farm chính khi hết vé", Config.TicketReturnHomeWhenDone, function(v) Config.TicketReturnHomeWhenDone = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Động Quăng Cần Tại Home Spot", "Tiếp tục farm cá tại Home Spot khi hoàn thành vé", Config.TicketAutoCastAtHome, function(v) Config.TicketAutoCastAtHome = v end)
+    Components.CreateToggleRow(cardTicket, "Nhận & Nộp Vé Từ Xa (Remote)", "Thực hiện nhận và trả nhiệm vụ từ xa", Config.TicketRemoteClaim, function(v) Config.TicketRemoteClaim = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Động Nhận Thưởng Hàng Ngày (Daily)", "Tự động nhận quà đăng nhập mỗi ngày", Config.AutoClaimDaily, function(v) Config.AutoClaimDaily = v end)
 end
 
 return TabNhiemVu
@@ -2731,41 +3305,62 @@ end
 __modules["ui.tabs.tab_san_boss"] = function()
 --[[
     v2/ui/tabs/tab_san_boss.lua
-    Tab 3: Săn Boss (Secret Boss Targets, Fast Skip & Chat Sniper)
+    Exact Tab Săn Boss from backup.lua (Chat Hunter, Fast Skip, Power Check, Custom Spots & Full Boss Target List)
 --]]
 
 local Components = __require("ui.components")
 local State = __require("core.state")
-local Boss = __require("features.boss")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
 
 local TabSanBoss = {}
 
-function TabSanBoss.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Cơ Chế Săn Boss Nhanh")
-    local cardFast = Components.CreateCardGroup(parent)
+function TabSanBoss.Render(parent)
+    Components.CreateCategoryHeader(parent, "Tự Động Săn Boss & Đổi Server")
+    local bossCoreCard = Components.CreateCardGroup(parent)
 
-    State.UIControllers["FastSkipNonTarget"] = Components.CreateToggleRow(cardFast, "Fast-Skip (Hủy Cá Rác)", "Tự hủy cần ngay lập tức nếu cá cắn câu không phải Boss được chọn", config.FastSkipNonTarget, function(v)
-        config.FastSkipNonTarget = v
-    end)
+    Components.CreateToggleRow(bossCoreCard, "Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)", "Tự động thả cần câu và săn boss tại chỗ", Config.AutoHuntBoss, function(v) Config.AutoHuntBoss = v end)
+    Components.CreateToggleRow(bossCoreCard, "Bật Săn Secret Boss (Chat Sniper)", "Tự động dịch chuyển đến đảo ngay khi có thông báo chat xuất hiện Boss", Config.AutoChatSecretBoss, function(v) Config.AutoChatSecretBoss = v end)
+    Components.CreateToggleRow(bossCoreCard, "Giật Cần Thả Lại (Fast Skip Cá Thường)", "Tự động giật lại cần ngay lập tức nếu cá cắn câu không phải Boss được chọn", Config.FastSkipNonBoss, function(v) Config.FastSkipNonBoss = v end)
+    Components.CreateToggleRow(bossCoreCard, "Kiểm Tra Lực Cần (Power Check)", "Chỉ săn khi đủ lực cần yêu cầu của từng hòn đảo", Config.SecretBossCheckPower, function(v) Config.SecretBossCheckPower = v end)
+    Components.CreateToggleRow(bossCoreCard, "Tự Đổi Server Khi Hết Boss (Auto-Hop)", "Tự chuyển server mới khi boss biến mất", Config.AutoServerHopOnDespawn, function(v) Config.AutoServerHopOnDespawn = v end)
+    Components.CreateToggleRow(bossCoreCard, "Tự Về Vị Trí Farm Khi Hết Boss / Clear", "Quay lại điểm câu farm chính sau khi săn boss xong", Config.ReturnToHomeWhenClear, function(v) Config.ReturnToHomeWhenClear = v end)
 
-    State.UIControllers["AutoChatSecretBoss"] = Components.CreateToggleRow(cardFast, "Sniper Kênh Chat", "Tự động dịch chuyển đến đảo ngay khi có thông báo Boss xuất hiện trong chat", config.AutoChatSecretBoss, function(v)
-        config.AutoChatSecretBoss = v
-    end)
+    Components.CreateCategoryHeader(parent, "🎯 Mục Tiêu Secret Boss (Bật / Tắt Từng Con)")
+    local targetsGroup = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Boss Mục Tiêu (" .. tostring(22) .. " Loại)", true)
 
-    State.UIControllers["SecretBossAlertWebhook"] = Components.CreateToggleRow(cardFast, "Gửi Thông Báo Webhook Discord", "Gửi cảnh báo đến Discord khi móc câu thành công Secret Boss", config.SecretBossAlertWebhook, function(v)
-        config.SecretBossAlertWebhook = v
-    end)
+    local bossList = {
+        "Verdant Alligator Gar",
+        "Verdant Grouper",
+        "Verdant Bonefang",
+        "Crimson Bonefang",
+        "Scarlet Fish",
+        "Elder Scarlet Fish",
+        "Crimson Electric Eel",
+        "Golden Dragonfish",
+        "Rainbow Dragonfish",
+        "Flying Fish Emperor",
+        "Flying Fish Empress",
+        "Draconic Koi",
+        "Sanguine Fish",
+        "Tigerfang Whale",
+        "Heavenpiercer Turtle",
+        "Heaven Piercer Turtle",
+        "Reborn Puffer Beast",
+        "Frost Kingfish",
+        "Frost Queenfish",
+        "Mountain Dragonwhale",
+        "Mirage Lanternfish",
+        "Nameless Octoparasite"
+    }
 
-    -- Danh sách Boss bí mật để chọn mục tiêu
-    Components.CreateCategoryHeader(parent, "Danh Sách Mục Tiêu Secret Boss")
-    local bossListCard = Components.CreateCollapsibleCardGroup(parent, "Chọn Boss Cần Săn (" .. tostring(15) .. "+ Loại)", true)
-
-    for bossName in pairs(Boss.lookup) do
-        local isTarget = config.SecretBossTargets and config.SecretBossTargets[bossName] == true
-        Components.CreateToggleRow(bossListCard, bossName, "Khu vực: " .. (Boss.lookup[bossName].islandName or "Đại dương"), isTarget, function(v)
-            if not config.SecretBossTargets then config.SecretBossTargets = {} end
-            config.SecretBossTargets[bossName] = v
+    for _, bossName in ipairs(bossList) do
+        local initVal = (Config.SecretBossTargets[bossName] ~= false)
+        local ctrl = Components.CreateToggleRow(targetsGroup, bossName, "Săn " .. bossName, initVal, function(v)
+            Config.SecretBossTargets[bossName] = v
+            ConfigModule.SaveBossTargets()
         end)
+        State.bossTogglesMap[bossName] = ctrl
     end
 end
 
@@ -2776,43 +3371,65 @@ end
 __modules["ui.tabs.tab_shop"] = function()
 --[[
     v2/ui/tabs/tab_shop.lua
-    Tab 6: Cửa Hàng & Chế Mồi (Auto Sell, Buy Bait, Craft Bait, Daily Claim)
+    Exact Tab Shop & Chế Mồi from backup.lua (Bait crafting/buying & Rod Shop)
 --]]
 
 local Components = __require("ui.components")
-local State = __require("core.state")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
+local Shop = __require("features.shop")
 
 local TabShop = {}
 
-function TabShop.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Bán Cá Tự Động")
-    local cardSell = Components.CreateCardGroup(parent)
-
-    State.UIControllers["AutoSellFish"] = Components.CreateToggleRow(cardSell, "Tự Động Bán Cá (Auto Sell)", "Tự động bán cá theo chu kỳ định sẵn", config.AutoSellFish, function(v)
-        config.AutoSellFish = v
-    end)
-
-    State.UIControllers["SellInterval"] = Components.CreateSliderRow(cardSell, "Chu Kỳ Bán (Giây)", "Khoảng thời gian giữa 2 lần bán cá", 10, 120, config.SellInterval, false, "s", function(v)
-        config.SellInterval = v
-    end)
-
-    Components.CreateCategoryHeader(parent, "Mua & Chế Mồi Câu")
+function TabShop.Render(parent)
+    Components.CreateCategoryHeader(parent, "Tự Động Chế Mồi & Mua Mồi")
     local cardBait = Components.CreateCardGroup(parent)
 
-    State.UIControllers["AutoBuyBait"] = Components.CreateToggleRow(cardBait, "Tự Động Mua Mồi Thường", "Tự động mua mồi cơ bản khi trong túi sắp hết", config.AutoBuyBait, function(v)
-        config.AutoBuyBait = v
-    end)
+    Components.CreateToggleRow(cardBait, "Tự Động Chế Mồi", "Tự động chế mồi khi đủ nguyên liệu", Config.AutoCraftBait, function(v) Config.AutoCraftBait = v end)
+    Components.CreateDropdownRow(cardBait, "Chọn Mồi Cần Chế", "Loại mồi muốn tự động chế", {"Nameless Bait", "Abyssal Bait", "Kraken Bait", "Secret Bait"}, Config.CraftBaitName or "Nameless Bait", function(v) Config.CraftBaitName = v end)
+    Components.CreateSliderRow(cardBait, "Số Lượng Chế Mỗi Lần", "Số lượng mồi chế mỗi lượt", 1, 10, Config.CraftAmount or 1, false, " cái", function(v) Config.CraftAmount = v end)
 
-    State.UIControllers["AutoCraftBait"] = Components.CreateToggleRow(cardBait, "Tự Động Chế Mồi Nâng Cao", "Tự động chế mồi khi có đủ nguyên liệu", config.AutoCraftBait, function(v)
-        config.AutoCraftBait = v
-    end)
+    Components.CreateToggleRow(cardBait, "Tự Động Mua Mồi", "Tự động mua mồi khi số lượng dưới ngưỡng", Config.AutoBuyBait, function(v) Config.AutoBuyBait = v end)
+    Components.CreateDropdownRow(cardBait, "Chọn Mồi Cần Mua", "Loại mồi muốn tự động mua tại cửa hàng", {"Ancestral Bait", "Midnight Bait", "Basic Bait"}, Config.BuyBaitName or "Ancestral Bait", function(v) Config.BuyBaitName = v end)
+    Components.CreateSliderRow(cardBait, "Số Lượng Mua Mỗi Lần", "Số lượng mua mỗi lần gửi yêu cầu", 1, 20, Config.BuyBaitAmount or 5, false, " cái", function(v) Config.BuyBaitAmount = v end)
+    Components.CreateSliderRow(cardBait, "Ngưỡng Tự Mua (Khi Dưới)", "Khi số mồi trong túi ít hơn mức này sẽ mua thêm", 5, 50, Config.BuyBaitThreshold or 10, false, " cái", function(v) Config.BuyBaitThreshold = v end)
 
-    Components.CreateCategoryHeader(parent, "Phần Thưởng Hàng Ngày")
-    local cardDaily = Components.CreateCardGroup(parent)
+    Components.CreateCategoryHeader(parent, "🎣 Cửa Hàng Cần Câu (Rod Shop)")
+    local rodShopCard = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Cần Câu Có Thể Mua / Trang Bị", true)
 
-    State.UIControllers["AutoClaimDaily"] = Components.CreateToggleRow(cardDaily, "Tự Nhận Thưởng Hàng Ngày", "Tự động nhận quà đăng nhập mỗi ngày", config.AutoClaimDaily, function(v)
-        config.AutoClaimDaily = v
-    end)
+    local rods = {
+        { name = "Wooden Rod", price = "$0", power = 8 },
+        { name = "Bamboo Rod", price = "$100", power = 11 },
+        { name = "Iron Hook Rod", price = "$500", power = 13 },
+        { name = "Steel Rod", price = "$1,000", power = 17 },
+        { name = "Enchanted Steel Rod", price = "$2,000", power = 19 },
+        { name = "Alloy Rod", price = "$5,000", power = 22 },
+        { name = "Emerald Rod", price = "$10,000", power = 25 },
+        { name = "Bloodfire Rod", price = "$20,000", power = 27 },
+        { name = "Shadow Rod", price = "$60,000", power = 29 },
+        { name = "Triple Steel Rod", price = "$100,000", power = 32 },
+        { name = "Golden Rod", price = "$200,000", power = 35 },
+        { name = "Grandmaster Steel Rod", price = "$250,000", power = 37 },
+        { name = "Grandmaster Golden Rod", price = "$1,000,000", power = 45 },
+        { name = "Steel Spine Rod", price = "$1,500,000", power = 48 },
+        { name = "Inferno Rod", price = "$1,500,000", power = 48 },
+        { name = "Golden Spine Rod", price = "$2,000,000", power = 51 },
+        { name = "Platinum Spine Rod", price = "$3,000,000", power = 54 },
+        { name = "Diamond Spine Rod", price = "$4,000,000", power = 56 },
+        { name = "Gravisteel Rod", price = "$5,000,000", power = 58 },
+        { name = "Auric Gravity Rod", price = "$6,000,000", power = 60 },
+        { name = "Inferno Gravity Rod", price = "$7,000,000", power = 62 },
+        { name = "Cryo Gravity Rod", price = "$8,000,000", power = 65 },
+        { name = "Thunder Thorn Rod", price = "$10,000,000", power = 67 },
+        { name = "Starlight Rod", price = "$60,000,000", power = 83 },
+    }
+
+    for _, r in ipairs(rods) do
+        local desc = string.format("Giá: %s | Sức kéo: %d", r.price, r.power)
+        Components.CreateButtonRow(rodShopCard, r.name, desc, "Trang Bị", function()
+            Shop.EquipRod(r.name)
+        end)
+    end
 end
 
 return TabShop
@@ -2822,29 +3439,24 @@ end
 __modules["ui.tabs.tab_than_linh"] = function()
 --[[
     v2/ui/tabs/tab_than_linh.lua
-    Tab 5: Thần Linh & NPC (God Spirit & Taoist / Maoshan)
+    Exact Tab Thần Linh from backup.lua (God Spirit, Taoist, Maoshan Pray & Server Hop)
 --]]
 
 local Components = __require("ui.components")
-local State = __require("core.state")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
 
 local TabThanLinh = {}
 
-function TabThanLinh.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Bái Thần & NPC Đạo Sĩ")
+function TabThanLinh.Render(parent)
+    Components.CreateCategoryHeader(parent, "Cúng Bái & Đổi Server Thần Linh")
     local cardGod = Components.CreateCardGroup(parent)
 
-    State.UIControllers["AutoGodPray"] = Components.CreateToggleRow(cardGod, "Tự Động Bái Thần (Auto Pray)", "Tự động gửi yêu cầu bái Thần Linh mỗi khi hồi cooldown", config.AutoGodPray, function(v)
-        config.AutoGodPray = v
-    end)
-
-    State.UIControllers["AutoServerHopTaoist"] = Components.CreateToggleRow(cardGod, "Tự Hop Server Tìm Đạo Sĩ", "Tự động đổi server nếu server hiện tại không có Đạo Sĩ", config.AutoServerHopTaoist, function(v)
-        config.AutoServerHopTaoist = v
-    end)
-
-    State.UIControllers["AutoServerHopMaoshan"] = Components.CreateToggleRow(cardGod, "Tự Hop Server Tìm Mao Sơn", "Tự động đổi server tìm NPC Mao Sơn", config.AutoServerHopMaoshan, function(v)
-        config.AutoServerHopMaoshan = v
-    end)
+    Components.CreateToggleRow(cardGod, "Tự Động Quét Trạng Thái Thần Linh", "Liên tục kiểm tra Thần Linh xuất hiện trong game", Config.AutoGodSpiritCheck, function(v) Config.AutoGodSpiritCheck = v end)
+    Components.CreateToggleRow(cardGod, "Tự Động Cầu Nguyện Thần Linh", "Tự động gửi yêu cầu cầu nguyện khi đứng gần", Config.AutoPrayGodSpirit, function(v) Config.AutoPrayGodSpirit = v end)
+    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Thần Linh", "Tự động đổi máy chủ nếu chưa có Thần Linh", Config.AutoServerHopGod, function(v) Config.AutoServerHopGod = v end)
+    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Maoshan", "Tự đổi máy chủ săn NPC Mao Sơn", Config.AutoServerHopMaoshan, function(v) Config.AutoServerHopMaoshan = v end)
+    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Đạo Sĩ (Taoist)", "Tự đổi máy chủ săn NPC Đạo Sĩ", Config.AutoServerHopTaoist, function(v) Config.AutoServerHopTaoist = v end)
 end
 
 return TabThanLinh
@@ -2854,19 +3466,20 @@ end
 __modules["ui.tabs.tab_thu_nghiem"] = function()
 --[[
     v2/ui/tabs/tab_thu_nghiem.lua
-    Tab 11: Thử Nghiệm (Experimental Features)
+    Exact Tab Thử Nghiệm from backup.lua
 --]]
 
 local Components = __require("ui.components")
 
 local TabThuNghiem = {}
 
-function TabThuNghiem.Render(parent, config)
-    Components.CreateCategoryHeader(parent, "Tính Năng Đang Phát Triển")
+function TabThuNghiem.Render(parent)
+    Components.CreateCategoryHeader(parent, "Tính Năng Thử Nghiệm & Đang Phát Triển")
     local cardExp = Components.CreateCardGroup(parent)
 
-    Components.CreateInfoRow(cardExp, "Trạng Thái Module", "Hoạt động ổn định trên V2")
-    Components.CreateInfoRow(cardExp, "Phiên Bản Engine", "Modular V2.0.0 (Strict Sequential)")
+    Components.CreateInfoRow(cardExp, "Trạng Thái Engine", "Modular V2 (Strict Sequential Combo)")
+    Components.CreateInfoRow(cardExp, "Giao Diện Hoạt Động", "Identical Theme (Full Original Layout)")
+    Components.CreateInfoRow(cardExp, "Tab Wiki", "Đã gỡ bỏ theo yêu cầu để tối ưu hiệu năng")
 end
 
 return TabThuNghiem
@@ -2876,38 +3489,38 @@ end
 __modules["ui.tabs.tab_visuals"] = function()
 --[[
     v2/ui/tabs/tab_visuals.lua
-    Tab 8: ESP & Đồ Họa (Fish ESP, Player ESP, Fullbright)
+    Exact Tab ESP & Đồ Hoạ from backup.lua (Fish Rings, ESP Entities & Lighting)
 --]]
 
 local Components = __require("ui.components")
-local State = __require("core.state")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
 local Visuals = __require("features.visuals")
 
 local TabVisuals = {}
 
-function TabVisuals.Render(parent, config)
+function TabVisuals.Render(parent)
     Components.CreateCategoryHeader(parent, "ESP Định Vị Mục Tiêu")
     local cardEsp = Components.CreateCardGroup(parent)
 
-    State.UIControllers["ESP_Fish"] = Components.CreateToggleRow(cardEsp, "ESP Vòng Cá (Fish Ring ESP)", "Hiển thị vòng tròn dưới nước quanh vị trí cá", config.ESP_Fish, function(v)
-        config.ESP_Fish = v
-    end)
+    Components.CreateToggleRow(cardEsp, "Vòng Tròn Định Vị Cá", "Vẽ vòng định vị cá dưới nước theo độ hiếm", Config.FishRedRing, function(v) Config.FishRedRing = v end)
+    Components.CreateToggleRow(cardEsp, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ", "Hiển thị chi tiết cân nặng kg và dạng đột biến", Config.ShowFishWeightRing, function(v) Config.ShowFishWeightRing = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Người Chơi", "Định vị người chơi khác trong server", Config.ESP_Players, function(v) Config.ESP_Players = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Trùm Boss", "Định vị vị trí xuất hiện Boss", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Thần Linh (God Spirit)", "Định vị Thần Linh", Config.ESP_GodSpirit, function(v) Config.ESP_GodSpirit = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Đạo Sĩ (Taoist)", "Định vị NPC Đạo Sĩ", Config.ESP_Taoist, function(v) Config.ESP_Taoist = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Maoshan", "Định vị NPC Mao Sơn", Config.ESP_Maoshan, function(v) Config.ESP_Maoshan = v end)
 
-    State.UIControllers["ESP_Players"] = Components.CreateToggleRow(cardEsp, "ESP Người Chơi (Player ESP)", "Hiển thị tên và khoảng cách người chơi khác", config.ESP_Players, function(v)
-        config.ESP_Players = v
-    end)
-
-    State.UIControllers["ESP_Bosses"] = Components.CreateToggleRow(cardEsp, "ESP Boss Bí Mật (Boss ESP)", "Đánh dấu nổi bật Boss trên màn hình", config.ESP_Bosses, function(v)
-        config.ESP_Bosses = v
-    end)
-
-    Components.CreateCategoryHeader(parent, "Ánh Sáng & Tối Ưu Màn Hình")
+    Components.CreateCategoryHeader(parent, "Hiệu Ứng Ánh Sáng & Tối Ưu")
     local cardLighting = Components.CreateCardGroup(parent)
 
-    State.UIControllers["Fullbright"] = Components.CreateToggleRow(cardLighting, "Làm Sáng Toàn Bản Đồ (Fullbright)", "Tối đa độ sáng, nhìn rõ dưới đáy biển sâu", config.Fullbright, function(v)
-        config.Fullbright = v
+    Components.CreateToggleRow(cardLighting, "Sáng Màn Hình (Fullbright)", "Làm sáng toàn bản đồ, nhìn rõ dưới nước sâu", Config.Fullbright, function(v)
+        Config.Fullbright = v
         Visuals.ApplyFullbright(v)
     end)
+    Components.CreateToggleRow(cardLighting, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương mù và mưa bão che khuất tầm nhìn", Config.NoFog, function(v) Config.NoFog = v end)
+    Components.CreateToggleRow(cardLighting, "Chế Độ Giảm Lag (Low GFX)", "Giảm đồ họa giúp máy yếu chạy mượt", Config.PerformanceMode, function(v) Config.PerformanceMode = v end)
+    Components.CreateToggleRow(cardLighting, "Ẩn Giao Diện Gốc Của Game", "Ẩn các thanh UI mặc định của game để thoáng màn hình", Config.HideGameUI, function(v) Config.HideGameUI = v end)
 end
 
 return TabVisuals
@@ -2917,41 +3530,363 @@ end
 __modules["ui.theme"] = function()
 --[[
     v2/ui/theme.lua
-    Premium Visual Theme, Color Palette & Styles for Identical Hub V2
+    Exact Color Palette & Design Tokens from backup.lua
 --]]
 
 local Theme = {
-    -- Backgrounds & Panels
-    MainBg = Color3.fromRGB(15, 17, 23),
-    SidebarBg = Color3.fromRGB(11, 13, 18),
-    CardBg = Color3.fromRGB(22, 25, 35),
-    CardBgHover = Color3.fromRGB(28, 32, 45),
-    RowBg = Color3.fromRGB(18, 21, 29),
-    RowBgHover = Color3.fromRGB(24, 28, 38),
+    Background       = Color3.fromRGB(15, 12, 22),
+    SidebarBg        = Color3.fromRGB(11, 9, 17),
+    BorderPurple     = Color3.fromRGB(168, 85, 247),
+    BorderSubtle     = Color3.fromRGB(45, 33, 66),
+    Divider          = Color3.fromRGB(36, 26, 54),
 
-    -- Accents & Highlights
-    Accent = Color3.fromRGB(0, 168, 255),
-    AccentGlow = Color3.fromRGB(0, 140, 220),
-    Success = Color3.fromRGB(46, 204, 113),
-    Warning = Color3.fromRGB(241, 196, 15),
-    Danger = Color3.fromRGB(231, 76, 60),
+    PurplePrimary    = Color3.fromRGB(216, 160, 255),
+    PurpleAccent     = Color3.fromRGB(168, 85, 247),
+    PurpleMuted      = Color3.fromRGB(147, 112, 196),
+    PurpleDark       = Color3.fromRGB(72, 45, 107),
+    PurpleGlow       = Color3.fromRGB(192, 132, 252),
 
-    -- Text & Typography
-    TextPrimary = Color3.fromRGB(245, 247, 250),
-    TextSecondary = Color3.fromRGB(160, 168, 185),
-    TextMuted = Color3.fromRGB(105, 115, 134),
+    RowNormal        = Color3.fromRGB(20, 16, 30),
+    RowHover         = Color3.fromRGB(30, 22, 46),
+    ControlBg        = Color3.fromRGB(28, 20, 44),
+    InputBg          = Color3.fromRGB(18, 14, 26),
 
-    -- Borders & Separators
-    Border = Color3.fromRGB(35, 40, 55),
-    BorderFocus = Color3.fromRGB(0, 168, 255),
+    TextWhite        = Color3.fromRGB(245, 243, 255),
+    TextSubtle       = Color3.fromRGB(168, 150, 200),
+    TextMuted        = Color3.fromRGB(110, 95, 138),
 
-    -- Fonts
-    FontBold = Enum.Font.GothamBold,
-    FontMedium = Enum.Font.GothamMedium,
-    FontRegular = Enum.Font.Gotham
+    AccentGreen      = Color3.fromRGB(52, 211, 153),
+    AccentRed        = Color3.fromRGB(248, 113, 113),
+    AccentOrange     = Color3.fromRGB(251, 146, 60),
+    AccentYellow     = Color3.fromRGB(250, 204, 21),
+    AccentBlue       = Color3.fromRGB(96, 165, 250),
+    DropdownSelected = Color3.fromRGB(36, 26, 56)
 }
 
 return Theme
+
+end
+
+__modules["ui.window"] = function()
+--[[
+    v2/ui/window.lua
+    Exact Main Window, Floating Avatar, Floating Crescent, TitleBar & Sidebar from backup.lua
+--]]
+
+local Services = __require("core.services")
+local LocalPlayer = Services.LocalPlayer
+local UserInputService = Services.UserInputService
+local TweenService = Services.TweenService
+local Theme = __require("ui.theme")
+local State = __require("core.state")
+local Components = __require("ui.components")
+
+local Window = {}
+
+Window.tabFrames = {}
+Window.tabButtons = {}
+Window.screenGui = nil
+Window.mainFrame = nil
+Window.floatingAvatar = nil
+Window.ToggleUiVisibility = nil
+
+function Window.Init(scriptBuildCommit, onKill)
+    -- 1. ScreenGui
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name = "IdenticalHeavyweightFishing"
+    screenGui.ResetOnSpawn = false
+    screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+
+    pcall(function()
+        if syn and syn.protect_gui then
+            syn.protect_gui(screenGui)
+        end
+    end)
+
+    screenGui.Parent = Services.GetGuiParent()
+    State.AddInstance(screenGui)
+    Window.screenGui = screenGui
+
+    -- 2. Floating Avatar (Draggable headshot with status dot)
+    local floatingAvatar = Instance.new("ImageButton")
+    floatingAvatar.Name = "FloatingAvatar"
+    floatingAvatar.Size = UDim2.new(0, 48, 0, 48)
+    floatingAvatar.Position = UDim2.new(0, 20, 0.4, 0)
+    floatingAvatar.BackgroundColor3 = Theme.Background
+    floatingAvatar.BorderSizePixel = 0
+    floatingAvatar.Visible = false
+    floatingAvatar.ZIndex = 2000
+    floatingAvatar.Active = true
+    floatingAvatar.AutoButtonColor = false
+    floatingAvatar.Parent = screenGui
+    State.AddInstance(floatingAvatar)
+    Window.floatingAvatar = floatingAvatar
+
+    do
+        local faCorner = Instance.new("UICorner"); faCorner.CornerRadius = UDim.new(1, 0); faCorner.Parent = floatingAvatar
+        local faStroke = Instance.new("UIStroke"); faStroke.Color = Theme.PurpleAccent; faStroke.Thickness = 2.2; faStroke.Parent = floatingAvatar
+
+        local avatarImg = Instance.new("ImageLabel")
+        avatarImg.Name = "AvatarImage"
+        avatarImg.Size = UDim2.new(1, -6, 1, -6)
+        avatarImg.Position = UDim2.new(0.5, 0, 0.5, 0)
+        avatarImg.AnchorPoint = Vector2.new(0.5, 0.5)
+        avatarImg.BackgroundTransparency = 1
+        avatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. tostring(LocalPlayer.UserId) .. "&w=150&h=150"
+        avatarImg.Parent = floatingAvatar
+        Instance.new("UICorner", avatarImg).CornerRadius = UDim.new(1, 0)
+
+        local dot = Instance.new("Frame")
+        dot.Size = UDim2.new(0, 11, 0, 11)
+        dot.Position = UDim2.new(1, -11, 1, -11)
+        dot.BackgroundColor3 = Theme.AccentGreen
+        dot.BorderSizePixel = 0
+        dot.Parent = floatingAvatar
+        Instance.new("UICorner", dot).CornerRadius = UDim.new(1, 0)
+        local dotStroke = Instance.new("UIStroke"); dotStroke.Color = Theme.Background; dotStroke.Thickness = 1.5; dotStroke.Parent = dot
+
+        local faDragging, faDragInput, faDragStart, faStartPos = false, nil, nil, nil
+        local dragMoved = false
+
+        floatingAvatar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                faDragging = true
+                dragMoved = false
+                faDragStart = input.Position
+                faStartPos = floatingAvatar.Position
+                input.Changed:Connect(function()
+                    if input.UserInputState == Enum.UserInputState.End then
+                        faDragging = false
+                    end
+                end)
+            end
+        end)
+
+        floatingAvatar.InputChanged:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+                faDragInput = input
+            end
+        end)
+
+        State.AddConnection(UserInputService.InputChanged:Connect(function(input)
+            if input == faDragInput and faDragging then
+                local delta = input.Position - faDragStart
+                if delta.Magnitude > 4 then
+                    dragMoved = true
+                end
+                floatingAvatar.Position = UDim2.new(faStartPos.X.Scale, faStartPos.X.Offset + delta.X, faStartPos.Y.Scale, faStartPos.Y.Offset + delta.Y)
+            end
+        end))
+
+        floatingAvatar.MouseEnter:Connect(function()
+            TweenService:Create(floatingAvatar, TweenInfo.new(0.15), {Size = UDim2.new(0, 52, 0, 52)}):Play()
+            TweenService:Create(faStroke, TweenInfo.new(0.15), {Color = Theme.PurpleGlow, Thickness = 2.8}):Play()
+        end)
+        floatingAvatar.MouseLeave:Connect(function()
+            TweenService:Create(floatingAvatar, TweenInfo.new(0.15), {Size = UDim2.new(0, 48, 0, 48)}):Play()
+            TweenService:Create(faStroke, TweenInfo.new(0.15), {Color = Theme.PurpleAccent, Thickness = 2.2}):Play()
+        end)
+
+        floatingAvatar.MouseButton1Click:Connect(function()
+            if not dragMoved and Window.ToggleUiVisibility then
+                Window.ToggleUiVisibility()
+            end
+        end)
+    end
+
+    -- 3. Main Window
+    local mainFrame = Instance.new("Frame")
+    mainFrame.Name = "MainFrame"
+    mainFrame.Size = UDim2.new(0, 700, 0, 480)
+    mainFrame.Position = UDim2.new(0.5, -350, 0.5, -240)
+    mainFrame.BackgroundColor3 = Theme.Background
+    mainFrame.BorderSizePixel = 0
+    mainFrame.ClipsDescendants = true
+    mainFrame.Parent = screenGui
+    State.AddInstance(mainFrame)
+    Window.mainFrame = mainFrame
+
+    do
+        local mc = Instance.new("UICorner"); mc.CornerRadius = UDim.new(0, 8); mc.Parent = mainFrame
+        local ms = Instance.new("UIStroke"); ms.Color = Theme.BorderPurple; ms.Thickness = 1.5; ms.Parent = mainFrame
+    end
+
+    -- Title Bar
+    local titleBar = Instance.new("Frame")
+    titleBar.Name = "TitleBar"
+    titleBar.Size = UDim2.new(1, 0, 0, 38)
+    titleBar.BackgroundColor3 = Theme.SidebarBg
+    titleBar.BorderSizePixel = 0
+    titleBar.Parent = mainFrame
+
+    do
+        local tc = Instance.new("UICorner"); tc.CornerRadius = UDim.new(0, 8); tc.Parent = titleBar
+        local tbf = Instance.new("Frame"); tbf.Size = UDim2.new(1, 0, 0, 10); tbf.Position = UDim2.new(0, 0, 1, -10); tbf.BackgroundColor3 = Theme.SidebarBg; tbf.BorderSizePixel = 0; tbf.Parent = titleBar
+        local tdiv = Instance.new("Frame"); tdiv.Size = UDim2.new(1, 0, 0, 1); tdiv.Position = UDim2.new(0, 0, 1, -1); tdiv.BackgroundColor3 = Theme.Divider; tdiv.BorderSizePixel = 0; tdiv.Parent = titleBar
+    end
+
+    -- Crescent Icon
+    do
+        local cc = Instance.new("Frame"); cc.Size = UDim2.new(0, 16, 0, 16); cc.Position = UDim2.new(0, 14, 0.5, -8); cc.BackgroundTransparency = 1; cc.ClipsDescendants = true; cc.Parent = titleBar
+        local co = Instance.new("Frame"); co.Size = UDim2.new(0, 16, 0, 16); co.BackgroundColor3 = Theme.PurpleAccent; co.BorderSizePixel = 0; co.Parent = cc
+        Instance.new("UICorner", co).CornerRadius = UDim.new(1, 0)
+        local cut = Instance.new("Frame"); cut.Size = UDim2.new(0, 13, 0, 13); cut.Position = UDim2.new(0, 4, 0, -2); cut.BackgroundColor3 = Theme.SidebarBg; cut.BorderSizePixel = 0; cut.Parent = co
+        Instance.new("UICorner", cut).CornerRadius = UDim.new(1, 0)
+    end
+
+    local brandTitle = Instance.new("TextLabel")
+    brandTitle.Size = UDim2.new(0, 92, 1, 0); brandTitle.Position = UDim2.new(0, 36, 0, 0)
+    brandTitle.BackgroundTransparency = 1; brandTitle.Font = Enum.Font.GothamBold
+    brandTitle.Text = "CÂU CÁ PRO"; brandTitle.TextColor3 = Theme.PurplePrimary
+    brandTitle.TextSize = 14; brandTitle.TextXAlignment = Enum.TextXAlignment.Left
+    brandTitle.Parent = titleBar
+
+    local commitBadge = Instance.new("TextLabel")
+    commitBadge.Size = UDim2.new(0, 68, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
+    commitBadge.BackgroundColor3 = Color3.fromRGB(30, 22, 48)
+    commitBadge.Font = Enum.Font.Code
+    commitBadge.Text = "#" .. tostring(scriptBuildCommit or "v2.0")
+    commitBadge.TextColor3 = Color3.fromRGB(190, 150, 255)
+    commitBadge.TextSize = 10
+    commitBadge.Parent = titleBar
+    Instance.new("UICorner", commitBadge).CornerRadius = UDim.new(0, 4)
+    local cStroke = Instance.new("UIStroke", commitBadge)
+    cStroke.Color = Theme.PurpleAccent
+    cStroke.Thickness = 1
+
+    local gameSubtitle = Instance.new("TextLabel")
+    gameSubtitle.Size = UDim2.new(0, 220, 1, 0); gameSubtitle.Position = UDim2.new(0, 208, 0, 0)
+    gameSubtitle.BackgroundTransparency = 1; gameSubtitle.Font = Enum.Font.Gotham
+    gameSubtitle.Text = "HEAVYWEIGHT FISHING | BẢN VIỆT HOÁ"; gameSubtitle.TextColor3 = Theme.PurpleMuted
+    gameSubtitle.TextSize = 10; gameSubtitle.TextXAlignment = Enum.TextXAlignment.Left
+    gameSubtitle.Parent = titleBar
+
+    local winControls = Instance.new("Frame"); winControls.Size = UDim2.new(0, 95, 1, 0); winControls.Position = UDim2.new(1, -100, 0, 0); winControls.BackgroundTransparency = 1; winControls.Parent = titleBar
+    local minBtn = Instance.new("TextButton"); minBtn.Size = UDim2.new(0, 24, 0, 24); minBtn.Position = UDim2.new(0, 4, 0.5, -12); minBtn.BackgroundColor3 = Theme.ControlBg; minBtn.Font = Enum.Font.GothamBold; minBtn.Text = "[-]"; minBtn.TextColor3 = Theme.PurplePrimary; minBtn.TextSize = 11; minBtn.BorderSizePixel = 0; minBtn.Parent = winControls
+    Instance.new("UICorner", minBtn).CornerRadius = UDim.new(0, 4)
+    local closeBtn = Instance.new("TextButton"); closeBtn.Size = UDim2.new(0, 24, 0, 24); closeBtn.Position = UDim2.new(0, 32, 0.5, -12); closeBtn.BackgroundColor3 = Theme.ControlBg; closeBtn.Font = Enum.Font.GothamBold; closeBtn.Text = "[X]"; closeBtn.TextColor3 = Theme.TextWhite; closeBtn.TextSize = 11; closeBtn.BorderSizePixel = 0; closeBtn.Parent = winControls
+    Instance.new("UICorner", closeBtn).CornerRadius = UDim.new(0, 4)
+    local killBtn = Instance.new("TextButton"); killBtn.Size = UDim2.new(0, 32, 0, 24); killBtn.Position = UDim2.new(0, 60, 0.5, -12); killBtn.BackgroundColor3 = Color3.fromRGB(45, 20, 25); killBtn.Font = Enum.Font.GothamBold; killBtn.Text = "KILL"; killBtn.TextColor3 = Theme.AccentRed; killBtn.TextSize = 9; killBtn.BorderSizePixel = 0; killBtn.Parent = winControls
+    Instance.new("UICorner", killBtn).CornerRadius = UDim.new(0, 4)
+    local killStroke = Instance.new("UIStroke"); killStroke.Color = Theme.AccentRed; killStroke.Thickness = 1; killStroke.Parent = killBtn
+
+    -- Window Dragging
+    do
+        local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
+        titleBar.InputBegan:Connect(function(input)
+            if input.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = true; dragStart = input.Position; startPos = mainFrame.Position
+                input.Changed:Connect(function() if input.UserInputState == Enum.UserInputState.End then dragging = false end end)
+            end
+        end)
+        titleBar.InputChanged:Connect(function(input) if input.UserInputType == Enum.UserInputType.MouseMovement then dragInput = input end end)
+        State.AddConnection(UserInputService.InputChanged:Connect(function(input)
+            if input == dragInput and dragging then
+                local delta = input.Position - dragStart
+                mainFrame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+            end
+        end))
+    end
+
+    local bodyFrame = Instance.new("Frame"); bodyFrame.Name = "Body"; bodyFrame.Size = UDim2.new(1, 0, 1, -62); bodyFrame.Position = UDim2.new(0, 0, 0, 38); bodyFrame.BackgroundTransparency = 1; bodyFrame.Parent = mainFrame
+
+    -- Sidebar
+    local sidebar = Instance.new("Frame"); sidebar.Name = "Sidebar"; sidebar.Size = UDim2.new(0, 140, 1, 0); sidebar.BackgroundColor3 = Theme.SidebarBg; sidebar.BorderSizePixel = 0; sidebar.Parent = bodyFrame
+    do
+        local d = Instance.new("Frame"); d.Size = UDim2.new(0, 1, 1, 0); d.Position = UDim2.new(1, -1, 0, 0); d.BackgroundColor3 = Theme.Divider; d.BorderSizePixel = 0; d.Parent = sidebar
+    end
+
+    local searchBox = Instance.new("TextBox")
+    searchBox.Name = "SearchBar"; searchBox.Size = UDim2.new(1, -16, 0, 26); searchBox.Position = UDim2.new(0, 8, 0, 8)
+    searchBox.BackgroundColor3 = Theme.InputBg; searchBox.Font = Enum.Font.Gotham; searchBox.PlaceholderText = "Tìm kiếm tính năng..."
+    searchBox.PlaceholderColor3 = Theme.TextMuted; searchBox.Text = ""; searchBox.TextColor3 = Theme.TextWhite
+    searchBox.TextSize = 11; searchBox.TextXAlignment = Enum.TextXAlignment.Left; searchBox.BorderSizePixel = 0; searchBox.ClearTextOnFocus = false; searchBox.Parent = sidebar
+    do local p = Instance.new("UIPadding"); p.PaddingLeft = UDim.new(0, 8); p.Parent = searchBox end
+    Instance.new("UICorner", searchBox).CornerRadius = UDim.new(0, 4)
+
+    searchBox:GetPropertyChangedSignal("Text"):Connect(function()
+        local q = searchBox.Text:lower()
+        for _, item in ipairs(Components.rowSearchIndex) do
+            if q == "" or item.query:find(q, 1, true) then
+                item.frame.Visible = true
+            else
+                item.frame.Visible = false
+            end
+        end
+    end)
+
+    local navList = Instance.new("ScrollingFrame"); navList.Name = "NavList"; navList.Size = UDim2.new(1, 0, 1, -44); navList.Position = UDim2.new(0, 0, 0, 42); navList.BackgroundTransparency = 1; navList.BorderSizePixel = 0; navList.ScrollBarThickness = 2; navList.ScrollBarImageColor3 = Theme.BorderSubtle; navList.CanvasSize = UDim2.new(0, 0, 0, 0); navList.AutomaticCanvasSize = Enum.AutomaticSize.Y; navList.Parent = sidebar
+    do
+        local nl = Instance.new("UIListLayout"); nl.SortOrder = Enum.SortOrder.LayoutOrder; nl.Padding = UDim.new(0, 4); nl.Parent = navList
+        local np = Instance.new("UIPadding"); np.PaddingTop = UDim.new(0, 6); np.PaddingLeft = UDim.new(0, 8); np.PaddingRight = UDim.new(0, 8); np.Parent = navList
+    end
+
+    local contentArea = Instance.new("Frame"); contentArea.Name = "ContentArea"; contentArea.Size = UDim2.new(1, -140, 1, 0); contentArea.Position = UDim2.new(0, 140, 0, 0); contentArea.BackgroundTransparency = 1; contentArea.Parent = bodyFrame
+
+    -- Footer Bar
+    local footerBar = Instance.new("Frame"); footerBar.Name = "FooterBar"; footerBar.Size = UDim2.new(1, 0, 0, 24); footerBar.Position = UDim2.new(0, 0, 1, -24); footerBar.BackgroundColor3 = Theme.SidebarBg; footerBar.BorderSizePixel = 0; footerBar.Parent = mainFrame
+    Instance.new("UICorner", footerBar).CornerRadius = UDim.new(0, 8)
+    do
+        local tf = Instance.new("Frame"); tf.Size = UDim2.new(1, 0, 0, 10); tf.BackgroundColor3 = Theme.SidebarBg; tf.BorderSizePixel = 0; tf.Parent = footerBar
+        local fd = Instance.new("Frame"); fd.Size = UDim2.new(1, 0, 0, 1); fd.BackgroundColor3 = Theme.Divider; fd.BorderSizePixel = 0; fd.Parent = footerBar
+    end
+    local footerBrand = Instance.new("TextLabel"); footerBrand.Size = UDim2.new(0, 260, 1, 0); footerBrand.Position = UDim2.new(0, 12, 0, 0); footerBrand.BackgroundTransparency = 1; footerBrand.Font = Enum.Font.Gotham; footerBrand.Text = "Heavyweight Fishing | Việt Hoá V2.0"; footerBrand.TextColor3 = Theme.TextMuted; footerBrand.TextSize = 10; footerBrand.TextXAlignment = Enum.TextXAlignment.Left; footerBrand.Parent = footerBar
+    local footerKey = Instance.new("TextLabel"); footerKey.Size = UDim2.new(0, 280, 1, 0); footerKey.Position = UDim2.new(1, -292, 0, 0); footerKey.BackgroundTransparency = 1; footerKey.Font = Enum.Font.Gotham; footerKey.Text = "[R-CTRL] Menu | [END] Tắt Script"; footerKey.TextColor3 = Theme.TextMuted; footerKey.TextSize = 10; footerKey.TextXAlignment = Enum.TextXAlignment.Right; footerKey.Parent = footerBar
+
+    -- Toggle UI visibility
+    Window.ToggleUiVisibility = function()
+        mainFrame.Visible = not mainFrame.Visible
+        floatingAvatar.Visible = not mainFrame.Visible
+        if mainFrame.Visible then
+            TweenService:Create(mainFrame, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0}):Play()
+        end
+    end
+
+    minBtn.MouseButton1Click:Connect(Window.ToggleUiVisibility)
+    closeBtn.MouseButton1Click:Connect(Window.ToggleUiVisibility)
+    killBtn.MouseButton1Click:Connect(function()
+        if onKill then onKill() end
+    end)
+
+    -- Tab Switcher
+    function Window.SwitchTab(tabName)
+        for name, frame in pairs(Window.tabFrames) do
+            frame.Visible = (name == tabName)
+        end
+        for name, btn in pairs(Window.tabButtons) do
+            if name == tabName then
+                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.PurpleDark, TextColor3 = Theme.TextWhite}):Play()
+                local pill = btn:FindFirstChild("ActivePill"); if pill then pill.Visible = true end
+            else
+                TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = Theme.SidebarBg, TextColor3 = Theme.TextSubtle}):Play()
+                local pill = btn:FindFirstChild("ActivePill"); if pill then pill.Visible = false end
+            end
+        end
+    end
+
+    -- Tab Creator
+    function Window.CreateTab(name)
+        local btn = Instance.new("TextButton"); btn.Name = "TabBtn_" .. name; btn.Size = UDim2.new(1, 0, 0, 30); btn.BackgroundColor3 = Theme.SidebarBg; btn.Font = Enum.Font.GothamBold; btn.Text = name; btn.TextColor3 = Theme.TextSubtle; btn.TextSize = 12; btn.TextXAlignment = Enum.TextXAlignment.Left; btn.BorderSizePixel = 0; btn.Parent = navList
+        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+        do local p = Instance.new("UIPadding"); p.PaddingLeft = UDim.new(0, 12); p.Parent = btn end
+        local pill = Instance.new("Frame"); pill.Name = "ActivePill"; pill.Size = UDim2.new(0, 3, 0, 16); pill.Position = UDim2.new(0, -9, 0.5, -8); pill.BackgroundColor3 = Theme.PurpleAccent; pill.BorderSizePixel = 0; pill.Visible = false; pill.Parent = btn
+        Instance.new("UICorner", pill).CornerRadius = UDim.new(0, 2)
+        btn.MouseButton1Click:Connect(function() Window.SwitchTab(name) end)
+
+        local page = Instance.new("ScrollingFrame"); page.Name = "TabPage_" .. name; page.Size = UDim2.new(1, 0, 1, 0); page.BackgroundTransparency = 1; page.BorderSizePixel = 0; page.ScrollBarThickness = 3; page.ScrollBarImageColor3 = Theme.BorderPurple; page.CanvasSize = UDim2.new(0, 0, 0, 0); page.AutomaticCanvasSize = Enum.AutomaticSize.Y; page.Visible = false; page.Parent = contentArea
+        do
+            local pl = Instance.new("UIListLayout"); pl.SortOrder = Enum.SortOrder.LayoutOrder; pl.Padding = UDim.new(0, 10); pl.Parent = page
+            local pp = Instance.new("UIPadding"); pp.PaddingTop = UDim.new(0, 12); pp.PaddingBottom = UDim.new(0, 16); pp.PaddingLeft = UDim.new(0, 14); pp.PaddingRight = UDim.new(0, 14); pp.Parent = page
+        end
+        Window.tabFrames[name] = page
+        Window.tabButtons[name] = btn
+        return page
+    end
+
+    return Window
+end
+
+return Window
 
 end
 
@@ -2959,7 +3894,7 @@ end
 --[[
     v2/main.lua
     Identical Hub V2 - Heavyweight Fishing
-    Modular Architecture • Strict Sequential Combo • Clean Optimized Core
+    Rebuilt from backup.lua • 100% Original UI • Modular Architecture • Strict Sequential Combo
 --]]
 
 local Services = __require("core.services")
@@ -2968,8 +3903,9 @@ local Config = ConfigModule.Config
 local State = __require("core.state")
 local Utils = __require("core.utils")
 local Theme = __require("ui.theme")
+local Window = __require("ui.window")
 
--- Features & Combo Modules
+-- Features & Combo
 local StateMachine = __require("combo.state_machine")
 local Fishing = __require("features.fishing")
 local Boss = __require("features.boss")
@@ -2980,12 +3916,11 @@ local Teleport = __require("features.teleport")
 local Visuals = __require("features.visuals")
 local Character = __require("features.character")
 
--- UI Tabs (No Wiki Tab!)
+-- UI Tabs (Exact tabs from backup.lua - Wiki Tab Omitted!)
 local TabCauCa = __require("ui.tabs.tab_cau_ca")
-local TabCombo = __require("ui.tabs.tab_combo")
 local TabSanBoss = __require("ui.tabs.tab_san_boss")
-local TabNhiemVu = __require("ui.tabs.tab_nhiem_vu")
 local TabThanLinh = __require("ui.tabs.tab_than_linh")
+local TabNhiemVu = __require("ui.tabs.tab_nhiem_vu")
 local TabShop = __require("ui.tabs.tab_shop")
 local TabDichChuyen = __require("ui.tabs.tab_dich_chuyen")
 local TabVisuals = __require("ui.tabs.tab_visuals")
@@ -2996,199 +3931,45 @@ local TabThuNghiem = __require("ui.tabs.tab_thu_nghiem")
 -- 1. Dọn dẹp bản cũ
 Services.CleanOldInstances()
 
--- 2. Tạo GUI Gốc
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "IdenticalHeavyweightFishing"
-screenGui.ResetOnSpawn = false
-screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-screenGui.Parent = Services.GetGuiParent()
-State.AddInstance(screenGui)
-
--- Notification Container
-local notifFrame = Instance.new("Frame")
-notifFrame.Name = "Notifications"
-notifFrame.Size = UDim2.new(0, 260, 1, -40)
-notifFrame.Position = UDim2.new(1, -270, 0, 20)
-notifFrame.BackgroundTransparency = 1
-notifFrame.Parent = screenGui
-
-local nLayout = Instance.new("UIListLayout")
-nLayout.SortOrder = Enum.SortOrder.LayoutOrder
-nLayout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-nLayout.Padding = UDim.new(0, 6)
-nLayout.Parent = notifFrame
-
-Utils.SetNotifContainer(notifFrame)
-
--- Khung Chính (Main Window)
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 720, 0, 460)
-mainFrame.Position = UDim2.new(0.5, -360, 0.5, -230)
-mainFrame.BackgroundColor3 = Theme.MainBg
-mainFrame.BorderSizePixel = 0
-mainFrame.ClipsDescendants = true
-mainFrame.Parent = screenGui
-
-local mCorner = Instance.new("UICorner")
-mCorner.CornerRadius = UDim.new(0, 10)
-mCorner.Parent = mainFrame
-
-local mStroke = Instance.new("UIStroke")
-mStroke.Color = Theme.Border
-mStroke.Thickness = 1.2
-mStroke.Parent = mainFrame
-
--- Topbar
-local topbar = Instance.new("Frame")
-topbar.Size = UDim2.new(1, 0, 0, 38)
-topbar.BackgroundColor3 = Theme.SidebarBg
-topbar.BorderSizePixel = 0
-topbar.Parent = mainFrame
-
-local titleLbl = Instance.new("TextLabel")
-titleLbl.Size = UDim2.new(1, -60, 1, 0)
-titleLbl.Position = UDim2.new(0, 14, 0, 0)
-titleLbl.BackgroundTransparency = 1
-titleLbl.Text = "IDENTICAL HUB • HEAVYWEIGHT FISHING V2"
-titleLbl.TextColor3 = Theme.Accent
-titleLbl.Font = Theme.FontBold
-titleLbl.TextSize = 13
-titleLbl.TextXAlignment = Enum.TextXAlignment.Left
-titleLbl.Parent = topbar
-
-local closeBtn = Instance.new("TextButton")
-closeBtn.Size = UDim2.new(0, 28, 0, 28)
-closeBtn.Position = UDim2.new(1, -34, 0.5, -14)
-closeBtn.BackgroundColor3 = Theme.CardBg
-closeBtn.Text = "✕"
-closeBtn.TextColor3 = Theme.TextSecondary
-closeBtn.Font = Theme.FontBold
-closeBtn.TextSize = 12
-closeBtn.Parent = topbar
-
-local cbCorner = Instance.new("UICorner")
-cbCorner.CornerRadius = UDim.new(0, 6)
-cbCorner.Parent = closeBtn
-
-closeBtn.MouseButton1Click:Connect(function()
-    mainFrame.Visible = false
+-- 2. Khởi tạo Giao diện chính (Exact Floating Avatar, TitleBar, Sidebar from backup.lua)
+Window.Init(ConfigModule.SCRIPT_BUILD_COMMIT, function()
+    Utils.ShowNotification("Diệt Script", "Đang đóng script hoàn toàn...", "WARN", 2)
+    task.wait(0.2)
+    State.UnloadScript()
 end)
 
--- Sidebar Tabs
-local sidebar = Instance.new("ScrollingFrame")
-sidebar.Size = UDim2.new(0, 170, 1, -38)
-sidebar.Position = UDim2.new(0, 0, 0, 38)
-sidebar.BackgroundColor3 = Theme.SidebarBg
-sidebar.BorderSizePixel = 0
-sidebar.ScrollBarThickness = 2
-sidebar.CanvasSize = UDim2.new(0, 0, 0, 480)
-sidebar.Parent = mainFrame
+-- 3. Tạo các Tab chức năng (Không có Tab Wiki!)
+local tabFishing      = Window.CreateTab("Câu Cá")
+local tabBoss         = Window.CreateTab("Săn Boss")
+local tabGod          = Window.CreateTab("Thần Linh")
+local tabQuests       = Window.CreateTab("Nhiệm Vụ")
+local tabShop         = Window.CreateTab("Shop & Chế Mồi")
+local tabTeleports    = Window.CreateTab("Dịch Chuyển")
+local tabVisuals      = Window.CreateTab("ESP & Đồ Hoạ")
+local tabPlayer       = Window.CreateTab("Nhân Vật")
+local tabProfiles     = Window.CreateTab("Cài Đặt")
+local tabExperimental = Window.CreateTab("Thử Nghiệm")
 
-local sbLayout = Instance.new("UIListLayout")
-sbLayout.SortOrder = Enum.SortOrder.LayoutOrder
-sbLayout.Padding = UDim.new(0, 3)
-sbLayout.Parent = sidebar
+-- 4. Render nội dung từng Tab
+TabCauCa.Render(tabFishing)
+TabSanBoss.Render(tabBoss)
+TabThanLinh.Render(tabGod)
+TabNhiemVu.Render(tabQuests)
+TabShop.Render(tabShop)
+TabDichChuyen.Render(tabTeleports)
+TabVisuals.Render(tabVisuals)
+TabNhanVat.Render(tabPlayer)
+TabCaiDat.Render(tabProfiles)
+TabThuNghiem.Render(tabExperimental)
 
-local sbPad = Instance.new("UIPadding")
-sbPad.PaddingTop = UDim.new(0, 6)
-sbPad.PaddingBottom = UDim.new(0, 6)
-sbPad.PaddingLeft = UDim.new(0, 8)
-sbPad.PaddingRight = UDim.new(0, 8)
-sbPad.Parent = sidebar
+-- Mặc định hiển thị Tab Câu Cá
+Window.SwitchTab("Câu Cá")
 
--- Content Area
-local contentContainer = Instance.new("Frame")
-contentContainer.Size = UDim2.new(1, -170, 1, -38)
-contentContainer.Position = UDim2.new(0, 170, 0, 38)
-contentContainer.BackgroundTransparency = 1
-contentContainer.Parent = mainFrame
+-- 5. Nạp cấu hình đã lưu (SmartCombo & Boss Targets)
+ConfigModule.LoadSmartComboAndSyncUI(State.UIControllers)
+ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
 
-local tabs = {
-    { id = "cau_ca", label = "🎣 Câu Cá", module = TabCauCa },
-    { id = "combo", label = "⚡ Combo Chiêu", module = TabCombo },
-    { id = "san_boss", label = "🐉 Săn Boss", module = TabSanBoss },
-    { id = "nhiem_vu", label = "📜 Nhiệm Vụ", module = TabNhiemVu },
-    { id = "than_linh", label = "✨ Thần Linh", module = TabThanLinh },
-    { id = "shop", label = "🛒 Cửa Hàng", module = TabShop },
-    { id = "dich_chuyen", label = "🌀 Dịch Chuyển", module = TabDichChuyen },
-    { id = "visuals", label = "👁️ ESP & Đồ Họa", module = TabVisuals },
-    { id = "nhan_vat", label = "🏃 Nhân Vật", module = TabNhanVat },
-    { id = "cai_dat", label = "⚙️ Cài Đặt", module = TabCaiDat },
-    { id = "thu_nghiem", label = "🧪 Thử Nghiệm", module = TabThuNghiem }
-}
-
-local tabFrames = {}
-local tabButtons = {}
-
-local function switchTab(targetId)
-    for id, frame in pairs(tabFrames) do
-        frame.Visible = (id == targetId)
-    end
-    for id, btn in pairs(tabButtons) do
-        if id == targetId then
-            btn.BackgroundColor3 = Theme.Accent
-            btn.TextColor3 = Theme.TextPrimary
-        else
-            btn.BackgroundColor3 = Theme.SidebarBg
-            btn.TextColor3 = Theme.TextSecondary
-        end
-    end
-end
-
-for _, tabInfo in ipairs(tabs) do
-    local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 34)
-    btn.BackgroundColor3 = Theme.SidebarBg
-    btn.Text = "  " .. tabInfo.label
-    btn.TextColor3 = Theme.TextSecondary
-    btn.Font = Theme.FontMedium
-    btn.TextSize = 12
-    btn.TextXAlignment = Enum.TextXAlignment.Left
-    btn.Parent = sidebar
-
-    local bCorner = Instance.new("UICorner")
-    bCorner.CornerRadius = UDim.new(0, 6)
-    bCorner.Parent = btn
-
-    local page = Instance.new("ScrollingFrame")
-    page.Size = UDim2.new(1, 0, 1, 0)
-    page.BackgroundTransparency = 1
-    page.BorderSizePixel = 0
-    page.ScrollBarThickness = 3
-    page.AutomaticCanvasSize = Enum.AutomaticSize.Y
-    page.Visible = false
-    page.Parent = contentContainer
-
-    local pLayout = Instance.new("UIListLayout")
-    pLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    pLayout.Padding = UDim.new(0, 8)
-    pLayout.Parent = page
-
-    local pPad = Instance.new("UIPadding")
-    pPad.PaddingTop = UDim.new(0, 10)
-    pPad.PaddingBottom = UDim.new(0, 14)
-    pPad.PaddingLeft = UDim.new(0, 14)
-    pPad.PaddingRight = UDim.new(0, 14)
-    pPad.Parent = page
-
-    -- Render nội dung của tab
-    pcall(function()
-        tabInfo.module.Render(page, Config)
-    end)
-
-    tabFrames[tabInfo.id] = page
-    tabButtons[tabInfo.id] = btn
-
-    btn.MouseButton1Click:Connect(function()
-        switchTab(tabInfo.id)
-    end)
-end
-
--- Mặc định hiển thị tab Câu Cá
-switchTab("cau_ca")
-
--- 3. Core Runtime Heartbeat Loop
+-- 6. Core Heartbeat Runtime Loop
 local wasMinigame = false
 local wasFishing = false
 
@@ -3219,7 +4000,7 @@ local heartbeatConn = Services.RunService.Heartbeat:Connect(function()
     if isMinigame then
         Fishing.HandleMinigame(Config, fUI)
         local playerHp = Utils.GetPlayerHealth(fUI)
-        StateMachine.Step(Config, fUI, playerHp, Quest.state)
+        StateMachine.Step(Config, fUI, playerHp, State.ticketQuestState)
         Boss.HandleFastSkip(Config, fUI, isMinigame)
     else
         -- Mechanics Ngoài Minigame
@@ -3235,31 +4016,31 @@ local heartbeatConn = Services.RunService.Heartbeat:Connect(function()
         Quest.Tick(Config)
     end
 
-    -- Character Cheats
+    -- Nhân Vật
     Character.ApplyNoclip(Config)
     Character.ApplyWalkOnWater(Config)
 end)
 
 State.AddConnection(heartbeatConn)
 
--- 4. Keybinds & Anti-AFK
+-- 7. Keybinds & Anti-AFK
 Character.SetupAntiAFK()
 
 local inputConn = Services.UserInputService.InputBegan:Connect(function(input, gpe)
     if gpe then return end
     if input.KeyCode == Config.UIKeybind then
-        mainFrame.Visible = not mainFrame.Visible
+        if Window.ToggleUiVisibility then Window.ToggleUiVisibility() end
     elseif input.KeyCode == Config.StopKeybind then
         State.UnloadScript()
     end
 end)
 State.AddConnection(inputConn)
 
--- 5. Đăng ký Global Unload hooks
+-- 8. Global Unload Hooks
 local gEnv = (getgenv and getgenv()) or _G or shared
 if gEnv then
     gEnv.HeavyweightFishingKill = function() State.UnloadScript() end
     gEnv.IdenticalHeavyweightFishingUnload = function() State.UnloadScript() end
 end
 
-Utils.ShowNotification("Identical Hub V2", "Khởi động thành công! Nhấn [RightControl] để ẩn/hiện menu.", "SUCCESS", 4)
+Utils.ShowNotification("CÂU CÁ PRO", "Khởi động thành công! Nhấn [Right-Control] hoặc Avatar để ẩn/hiện menu.", "SUCCESS", 4)
