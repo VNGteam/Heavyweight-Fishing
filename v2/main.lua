@@ -16,6 +16,7 @@ local Window = require(script.ui.window)
 local StateMachine = require(script.combo.state_machine)
 local Fishing = require(script.features.fishing)
 local Boss = require(script.features.boss)
+local BossDps = require(script.features.boss_dps)
 local Quest = require(script.features.quest)
 local Spirits = require(script.features.spirits)
 local Shop = require(script.features.shop)
@@ -44,6 +45,9 @@ Window.Init(ConfigModule.SCRIPT_BUILD_COMMIT, function()
     task.wait(0.2)
     State.UnloadScript()
 end)
+
+-- Khởi tạo Widget Sát Thương Boss (% HP)
+BossDps.Init(Window.screenGui)
 
 -- 3. Tạo các Tab chức năng (Không có Tab Wiki!)
 local tabFishing      = Window.CreateTab("Câu Cá")
@@ -75,6 +79,14 @@ Window.SwitchTab("Câu Cá")
 -- 5. Nạp cấu hình đã lưu (SmartCombo & Boss Targets)
 ConfigModule.LoadSmartComboAndSyncUI(State.UIControllers)
 ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
+
+-- Vòng lặp cập nhật Widget Sát Thương Boss (% HP)
+task.spawn(function()
+    while State.isRunning do
+        pcall(function() BossDps.Update(Config) end)
+        task.wait(0.15)
+    end
+end)
 
 -- 6. Core Heartbeat Runtime Loop
 local wasMinigame = false

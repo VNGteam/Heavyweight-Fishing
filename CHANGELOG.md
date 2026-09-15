@@ -21,6 +21,10 @@ Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đ�
 4. **Đồng Bộ Hóa Toàn Hệ Thống**:
    - Tối ưu hóa mã nguồn trong khối `do ... end` đảm bảo không vượt quá giới hạn 200 biến cục bộ của trình biên dịch Luau.
    - Nâng cấp mã phiên bản tĩnh lên **`v2.2.5`** trong [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua) và [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+5. **Triển Khai Chuẩn Module V2 & Tạo Loader V2 Riêng Biệt (Modular Edition)**:
+   - Tạo mới module độc lập [v2/features/boss_dps.lua](file:///Users/vonguyengiap/Documents/script/v2/features/boss_dps.lua) tích hợp đầy đủ cơ chế theo dõi DPS, tính % HP Boss, và widget giao diện kéo thả mượt mà.
+   - Bổ sung nút gạt cấu hình trong [v2/ui/tabs/tab_san_boss.lua](file:///Users/vonguyengiap/Documents/script/v2/ui/tabs/tab_san_boss.lua) và khởi chạy vòng lặp cập nhật trong [v2/main.lua](file:///Users/vonguyengiap/Documents/script/v2/main.lua).
+   - Tạo bộ Loader mới [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua) nạp trực tiếp bản `v2_bundle.lua` qua mạng lưới đa tầng CDN (GitHub Raw, jsDelivr Edge, Fastly), tối ưu hóa bộ nhớ và chống nghẽn Timeout 100%.
 
 ---
 
