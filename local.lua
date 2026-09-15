@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.6"
+local SCRIPT_BUILD_COMMIT = "v2.1.7"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2757,62 +2757,96 @@ local weatherTotems = {
 }
 
 local StatTiles = {}
-local GetCurrentLocationName = nil
-
-do
-    local islands = {
-        {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9), radius = 450},
-        {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1), radius = 450},
-        {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3), radius = 450},
-        {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7), radius = 450},
-        {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4), radius = 450},
-        {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4), radius = 450},
-        {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6), radius = 450},
-        {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5), radius = 450},
-        {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6), radius = 450},
-        {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7), radius = 450},
+local WorldData = {
+    islands = {
+        {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9), radius = 850},
+        {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1), radius = 850},
+        {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3), radius = 850},
+        {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7), radius = 850},
+        {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4), radius = 850},
+        {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4), radius = 850},
+        {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6), radius = 850},
+        {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5), radius = 850},
+        {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6), radius = 850},
+        {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7), radius = 850},
+    },
+    bossRealms = {
+        {name = "Boss Bạch Tuộc (Phao Biển)", pos = Vector3.new(1608.2, 5.0, -218.3), radius = 450},
+        {name = "Vùng Câu Cá Ngầm Lòng Đất", pos = Vector3.new(112.5, -330.0, -30.8), radius = 450},
+        {name = "Đấu Trường Boss Enzo", pos = Vector3.new(-115.3, 9.2, 1349.5), radius = 450},
     }
+}
 
-    local bossRealms = {
-        {name = "Boss Bạch Tuộc (Phao Biển)", pos = Vector3.new(1608.2, 5.0, -218.3), radius = 350},
-        {name = "Vùng Câu Cá Ngầm Lòng Đất", pos = Vector3.new(112.5, -330.0, -30.8), radius = 350},
-        {name = "Đấu Trường Boss Enzo", pos = Vector3.new(-115.3, 9.2, 1349.5), radius = 350},
-    }
+local function GetCurrentLocationName()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return "Đang tải vị trí...", nil end
+    local myPos = root.Position
 
-    GetCurrentLocationName = function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if not root then return "Đang tải vị trí...", nil end
-        local myPos = root.Position
-
-        if myPos.Y < -150 then
-            return "Vùng Câu Cá Ngầm Lòng Đất", "underground"
-        end
-
-        local bestName = "Đang ở giữa biển"
-        local bestObj = nil
-        local minDist = 999999
-
-        for _, isl in ipairs(islands) do
-            local dist = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(isl.pos.X, 0, isl.pos.Z)).Magnitude
-            if dist < (isl.radius or 450) and dist < minDist then
-                minDist = dist
-                bestName = isl.name
-                bestObj = isl
-            end
-        end
-
-        for _, br in ipairs(bossRealms) do
-            local dist = (myPos - br.pos).Magnitude
-            if dist < (br.radius or 350) and dist < minDist then
-                minDist = dist
-                bestName = br.name
-                bestObj = br
-            end
-        end
-
-        return bestName, bestObj, minDist
+    if myPos.Y < -150 then
+        return "Vùng Câu Cá Ngầm Lòng Đất", "underground"
     end
+
+    local bestName = "Đang ở giữa biển"
+    local bestObj = nil
+    local minDist = 999999
+
+    for _, isl in ipairs(WorldData.islands) do
+        local dist = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(isl.pos.X, 0, isl.pos.Z)).Magnitude
+        if dist < (isl.radius or 850) and dist < minDist then
+            minDist = dist
+            bestName = isl.name
+            bestObj = isl
+        end
+    end
+
+    for _, br in ipairs(WorldData.bossRealms) do
+        local dist = (myPos - br.pos).Magnitude
+        if dist < (br.radius or 450) and dist < minDist then
+            minDist = dist
+            bestName = br.name
+            bestObj = br
+        end
+    end
+
+    return bestName, bestObj, minDist
+end
+
+local function GetCurrentBackpackFishCount()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    local count = 0
+    local limit = 100
+
+    if pData then
+        local inv = pData:FindFirstChild("Inventory")
+        if inv then
+            count = #inv:GetChildren()
+        end
+        local limVal = pData:FindFirstChild("InventoryLimit")
+        if limVal and tonumber(limVal.Value) then
+            limit = tonumber(limVal.Value)
+        end
+    end
+
+    local char = LocalPlayer.Character
+    if char then
+        for _, item in ipairs(char:GetChildren()) do
+            if item:IsA("Tool") and tostring(item.Name):find("|") then
+                count = count + 1
+            end
+        end
+    end
+
+    local bp = LocalPlayer:FindFirstChild("Backpack")
+    if bp then
+        for _, item in ipairs(bp:GetChildren()) do
+            if item:IsA("Tool") and tostring(item.Name):find("|") then
+                count = count + 1
+            end
+        end
+    end
+
+    return count, limit
 end
 
 local sessionStartTime = tick()
@@ -6726,7 +6760,8 @@ end
 -- Lưới 3 cột x 5 hàng (15 chỉ số hiển thị cực gọn, hiển thị đầy đủ map đang đứng & tài nguyên)
 StatTiles.EquippedRod        = createStatGridTile(statsGridContainer, "🎣 Cần Đang Dùng", "Chưa có", Colors.TextWhite, 1)
 StatTiles.EquippedBait       = createStatGridTile(statsGridContainer, "🪱 Mồi Đang Dùng", "Chưa có", Colors.TextWhite, 2)
-StatTiles.CurrentLocation    = createStatGridTile(statsGridContainer, "📍 Map Đang Đứng", GetCurrentLocationName and GetCurrentLocationName() or "Đang nhận diện...", Colors.AccentBlue, 3)
+local initLoc = GetCurrentLocationName()
+StatTiles.CurrentLocation    = createStatGridTile(statsGridContainer, "📍 Map Đang Đứng", initLoc, Colors.AccentBlue, 3)
 
 StatTiles.Uptime             = createStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Colors.AccentYellow, 4)
 StatTiles.FishCaught         = createStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Colors.PurplePrimary, 5)
@@ -6741,7 +6776,8 @@ StatTiles.EssenceOrbs        = createStatGridTile(statsGridContainer, "🔮 Esse
 StatTiles.TraitRerolls       = createStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Colors.AccentYellow, 12)
 
 StatTiles.TicketQuestsToday  = createStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Colors.AccentOrange, 13)
-StatTiles.Backpack           = createStatGridTile(statsGridContainer, "🎒 Sức Chứa Balo", "0 / 100", Colors.TextWhite, 14)
+local curFishCount, curFishLimit = GetCurrentBackpackFishCount()
+StatTiles.Backpack           = createStatGridTile(statsGridContainer, "🎒 Cá Trong Balo", string.format("%d / %d", curFishCount, curFishLimit), Colors.TextWhite, 14)
 StatTiles.TicketCooldown     = createStatGridTile(statsGridContainer, "⏳ Chờ Vé Mới", "Sẵn sàng", Colors.AccentYellow, 15)
 
 -- Nút Reset Thông Số Treo Máy
@@ -9230,7 +9266,8 @@ do
 createCategoryHeader(tabTeleports, "Dịch Chuyển Đến Đảo (Đảo 1 - 10)")
 local islandCard = createCardGroup(tabTeleports)
 
--- (GetCurrentLocationName đã định nghĩa ở phần khởi tạo dùng chung toàn script)
+local islands = WorldData.islands
+local bossRealms = WorldData.bossRealms
 
 -- Hiển thị trực tiếp vị trí đảo người chơi đang đứng
 local infoCurrentMap = createInfoRow(islandCard, "📍 Vị Trí Bạn Đang Đứng", "Đang nhận diện...")
@@ -11827,8 +11864,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 StatTiles.TicketQuestsToday.Set(string.format("%d NV", qCount))
             end
             if StatTiles.Backpack and StatTiles.Backpack.Set then
-                local invCount = pData:FindFirstChild("Inventory") and #pData.Inventory:GetChildren() or 0
-                local limitVal = pData:FindFirstChild("InventoryLimit") and tonumber(pData.InventoryLimit.Value) or 100
+                local invCount, limitVal = GetCurrentBackpackFishCount()
                 StatTiles.Backpack.Set(string.format("%d / %d", invCount, limitVal))
             end
             if StatTiles.TicketCooldown and StatTiles.TicketCooldown.Set then

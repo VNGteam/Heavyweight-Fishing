@@ -2,6 +2,24 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.7] - 2026-09-15
+### 🐛 Sửa Triệt Để Lỗi Khởi Động Line 9265, Sửa Đếm Cá Trong Balo & Nhận Diện Đảo Chuẩn Xác (Fix & Update gì):
+1. **Khắc phục lỗi đỏ khi chạy script: `invalid argument #1 to ipairs (table expected, got nil)` tại dòng 9265**:
+   - *Hiện tượng*: Khi inject script, xuất hiện thông báo lỗi đỏ `CoreGui.10192.Loadstring:9265: invalid argument #1 to ipairs` và toàn bộ vòng lặp cập nhật dữ liệu của script bị ngừng trệ.
+   - *Nguyên nhân*: Bảng `islands` trước đó bị giới hạn phạm vi trong khối `do ... end` ở đầu file, khiến vòng lặp tạo nút dịch chuyển đảo ở Tab Teleports (dòng 9265) nhận giá trị `nil`.
+   - *Khắc phục*: Đưa dữ liệu toàn bộ đảo và boss vào cấu trúc dữ liệu `WorldData = { islands = {...}, bossRealms = {...} }` dùng chung toàn cục. Khai báo rõ ràng `local islands = WorldData.islands` trong khối Tab Teleport, đảm bảo 100% không bao giờ bị nil.
+2. **Khắc phục lỗi hiển thị "Cá Trong Balo Sai"**:
+   - *Nguyên nhân*: Do lỗi dòng 9265 làm script dừng trước khi vào vòng lặp Heartbeat, khiến ô balo bị đứng yên ở giá trị mặc định `"0 / 100"`.
+   - *Khắc phục*: 
+     - Viết hàm `GetCurrentBackpackFishCount()` đọc chính xác tổng số cá từ `pData.Inventory`, cộng thêm cá đang cầm trên tay (Character Tool) và trong balo trang bị (LocalPlayer.Backpack).
+     - Đọc giới hạn balo chuẩn xác từ `pData.InventoryLimit.Value`.
+     - Cập nhật số liệu tức thì ngay khi vừa nạp script và làm mới liên tục mỗi khung hình.
+3. **Mở rộng bán kính nhận diện đảo (Khắc phục "Map Đang Đứng Bị Sai")**:
+   - *Nguyên nhân*: Bán kính nhận diện cũ chỉ là `450 studs`. Khi người chơi đứng câu ở bờ đá, cầu cảng hoặc mỏm xa của đảo (cách tâm đảo >450 studs), script bị nhầm thành `"Đang ở giữa biển"`.
+   - *Khắc phục*: Mở rộng bán kính nhận diện các đảo từ `450` lên `850 studs` (khoảng cách an toàn vì các đảo cách nhau >1100 studs). Đảm bảo đứng bất kỳ vị trí nào trên đảo hoặc mép nước quanh đảo đều nhận diện chính xác 100% tên hòn đảo.
+
+---
+
 ## [v2.1.6] - 2026-09-15
 ### 📍 Hiển Thị Vị Trí Map Đang Đứng & Hoàn Thiện Lưới Thống Kê 3x5 (Fix & Update gì):
 1. **Bổ Sung Chỉ Số "📍 Map Đang Đứng" Vào Bảng Thống Kê & Webhook Discord**:
