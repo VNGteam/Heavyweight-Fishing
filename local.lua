@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.1"
+local SCRIPT_BUILD_COMMIT = "v2.1.2"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -127,7 +127,7 @@ local Config = {
     LoopStrictOrder = true,
     EmergencyHealSkill = "V",
     EmergencyHealHp = 40,
-    SkillEffectDelay = 1.2,
+    SkillEffectDelay = 0.3,
     SmartEffectAutoDetect = true,
     AutoSkills = false,
     SelectedSkill = "One-Strike Heaven Gate",
@@ -6848,7 +6848,7 @@ createSliderRow(comboCard, "Kích Hoạt Hồi Máu Khi HP Dưới", "Ngưỡng 
     SaveSmartCombo()
 end)
 
-createSliderRow(comboCard, "Thời Gian Chờ Ra Chiêu", "Thời gian tối thiểu chờ hết hiệu ứng trước khi tung chiêu tiếp theo", 0.5, 3.5, Config.SkillEffectDelay, true, "s", function(v)
+createSliderRow(comboCard, "Thời Gian Chờ Ra Chiêu", "Thời gian tối thiểu chờ hết hiệu ứng trước khi tung chiêu tiếp theo", 0.1, 2.5, Config.SkillEffectDelay, true, "s", function(v)
     Config.SkillEffectDelay = v
     SaveSmartCombo()
 end)
@@ -10310,9 +10310,8 @@ function comboState.IsSkillReady(sk, fUI)
 
     local now = tick()
     local lastUsed = comboState.usedTimes[cleanKey] or 0
-    local minCD = (comboState.defaultCooldowns and comboState.defaultCooldowns[cleanKey]) or 2.0
-    -- Chống spam cùng 1 phím nhanh hơn thời gian hồi chiêu tối thiểu
-    if (now - lastUsed < minCD) then
+    -- Chống spam cùng 1 phím quá nhanh (0.35s), không khóa cưỡng chế lâu để chiêu ra tức thì khi vừa hồi
+    if (now - lastUsed < 0.35) then
         return false
     end
 
@@ -10505,7 +10504,7 @@ end
 function comboState.IsCharacterCastingSkill()
     local now = tick()
     -- Chỉ coi là animation skill trong tối đa 0.7s kể từ khi tung chiêu, tránh bị kẹt vĩnh viễn
-    if (now - comboState.lastCastTime > 0.7) then
+    if (now - comboState.lastCastTime > 0.35) then
         return false
     end
 
@@ -10809,12 +10808,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             comboState.lastActionTime = 0
             comboState.loopWaitStartTime = 0
             comboState.minigameStartTime = now
+            comboState.usedTimes = {} -- Reset sạch cooldown tạm để cá mới luôn đánh đúng chiêu đầu tiên
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             minigameDurationTracker = 0
             comboState.lastActionTime = 0
             comboState.loopWaitStartTime = 0
             comboState.loopTargetIndex = 1
+            comboState.usedTimes = {}
             secretBossState.webhookSentForCurrent = false
             secretBossState.isCatchingTarget = false
             secretBossState.minigameStartTime = 0
@@ -11278,7 +11279,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         lastSkillTime = now
 
                         -- 1. KIỂM TRA NHỊP CHỜ RA CHIÊU & HOẠT ẢNH NHÂN VẬT (Chống nuốt chiêu & kẹt combo)
-                        local effectDelay = tonumber(Config.SkillEffectDelay) or 1.2
+                        local effectDelay = tonumber(Config.SkillEffectDelay) or 0.3
                         local canActNow = (now - (comboState.lastActionTime or 0)) >= effectDelay
                         if Config.SmartEffectAutoDetect and comboState.IsCharacterCastingSkill() then
                             canActNow = false
