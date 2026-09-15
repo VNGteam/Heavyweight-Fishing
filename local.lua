@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.5"
+local SCRIPT_BUILD_COMMIT = "v2.1.6"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2755,6 +2755,65 @@ local weatherTotems = {
     {name = "Totem Sương Mù (Coconut Isle)", island = "Đảo Quả Dừa (Coconut Isle)", weather = "Foggy (Sương Mù)", pos = Vector3.new(1475.0, 9.8, -1415.0)},
     {name = "Totem Nắng Gắt (Amber Isle)", island = "Đảo Hổ Phách (Amber Isle)", weather = "Blazing Sun (Nắng Gắt)", pos = Vector3.new(1275.0, 9.5, 1450.0)},
 }
+
+local StatTiles = {}
+local GetCurrentLocationName = nil
+
+do
+    local islands = {
+        {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9), radius = 450},
+        {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1), radius = 450},
+        {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3), radius = 450},
+        {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7), radius = 450},
+        {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4), radius = 450},
+        {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4), radius = 450},
+        {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6), radius = 450},
+        {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5), radius = 450},
+        {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6), radius = 450},
+        {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7), radius = 450},
+    }
+
+    local bossRealms = {
+        {name = "Boss Bạch Tuộc (Phao Biển)", pos = Vector3.new(1608.2, 5.0, -218.3), radius = 350},
+        {name = "Vùng Câu Cá Ngầm Lòng Đất", pos = Vector3.new(112.5, -330.0, -30.8), radius = 350},
+        {name = "Đấu Trường Boss Enzo", pos = Vector3.new(-115.3, 9.2, 1349.5), radius = 350},
+    }
+
+    GetCurrentLocationName = function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return "Đang tải vị trí...", nil end
+        local myPos = root.Position
+
+        if myPos.Y < -150 then
+            return "Vùng Câu Cá Ngầm Lòng Đất", "underground"
+        end
+
+        local bestName = "Đang ở giữa biển"
+        local bestObj = nil
+        local minDist = 999999
+
+        for _, isl in ipairs(islands) do
+            local dist = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(isl.pos.X, 0, isl.pos.Z)).Magnitude
+            if dist < (isl.radius or 450) and dist < minDist then
+                minDist = dist
+                bestName = isl.name
+                bestObj = isl
+            end
+        end
+
+        for _, br in ipairs(bossRealms) do
+            local dist = (myPos - br.pos).Magnitude
+            if dist < (br.radius or 350) and dist < minDist then
+                minDist = dist
+                bestName = br.name
+                bestObj = br
+            end
+        end
+
+        return bestName, bestObj, minDist
+    end
+end
 
 local sessionStartTime = tick()
 local initialCash = nil
@@ -6664,22 +6723,26 @@ local function createStatGridTile(parent, titleText, defaultValue, valueColor, l
     }
 end
 
--- Lưới 3 cột x 4 hàng (12 chỉ số hiển thị cực gọn, dễ mở rộng 3x5, 3x6)
-local infoEquippedRod        = createStatGridTile(statsGridContainer, "🎣 Cần Đang Dùng", "Chưa có", Colors.TextWhite, 1)
-local infoEquippedBait       = createStatGridTile(statsGridContainer, "🪱 Mồi Đang Dùng", "Chưa có", Colors.TextWhite, 2)
-local infoUptime             = createStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Colors.AccentYellow, 3)
+-- Lưới 3 cột x 5 hàng (15 chỉ số hiển thị cực gọn, hiển thị đầy đủ map đang đứng & tài nguyên)
+StatTiles.EquippedRod        = createStatGridTile(statsGridContainer, "🎣 Cần Đang Dùng", "Chưa có", Colors.TextWhite, 1)
+StatTiles.EquippedBait       = createStatGridTile(statsGridContainer, "🪱 Mồi Đang Dùng", "Chưa có", Colors.TextWhite, 2)
+StatTiles.CurrentLocation    = createStatGridTile(statsGridContainer, "📍 Map Đang Đứng", GetCurrentLocationName and GetCurrentLocationName() or "Đang nhận diện...", Colors.AccentBlue, 3)
 
-local infoFishCaught         = createStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Colors.PurplePrimary, 4)
-local infoFishPerHour        = createStatGridTile(statsGridContainer, "⚡ Tốc Độ Câu", "0 con/h", Colors.AccentGreen, 5)
-local infoCash               = createStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Colors.AccentGreen, 6)
+StatTiles.Uptime             = createStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Colors.AccentYellow, 4)
+StatTiles.FishCaught         = createStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Colors.PurplePrimary, 5)
+StatTiles.FishPerHour        = createStatGridTile(statsGridContainer, "⚡ Tốc Độ Câu", "0 con/h", Colors.AccentGreen, 6)
 
-local infoCashPerHour        = createStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Colors.AccentGreen, 7)
-local infoGemsGained         = createStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Colors.AccentBlue, 8)
-local infoTickets            = createStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Colors.AccentOrange, 9)
+StatTiles.Cash               = createStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Colors.AccentGreen, 7)
+StatTiles.CashPerHour        = createStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Colors.AccentGreen, 8)
+StatTiles.GemsGained         = createStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Colors.AccentBlue, 9)
 
-local infoEssenceOrbs        = createStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Colors.PurpleAccent, 10)
-local infoTraitRerolls       = createStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Colors.AccentYellow, 11)
-local infoTicketQuestsToday  = createStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Colors.AccentOrange, 12)
+StatTiles.Tickets            = createStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Colors.AccentOrange, 10)
+StatTiles.EssenceOrbs        = createStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Colors.PurpleAccent, 11)
+StatTiles.TraitRerolls       = createStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Colors.AccentYellow, 12)
+
+StatTiles.TicketQuestsToday  = createStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Colors.AccentOrange, 13)
+StatTiles.Backpack           = createStatGridTile(statsGridContainer, "🎒 Sức Chứa Balo", "0 / 100", Colors.TextWhite, 14)
+StatTiles.TicketCooldown     = createStatGridTile(statsGridContainer, "⏳ Chờ Vé Mới", "Sẵn sàng", Colors.AccentYellow, 15)
 
 -- Nút Reset Thông Số Treo Máy
 createButtonRow(statsCard, "Đặt Lại Thông Số Treo (Reset AFK)", "Đặt lại giờ treo và tính lại tốc độ cá/tiền chính xác từ mốc này", "🔄 Reset Thông Số", function()
@@ -6693,10 +6756,10 @@ createButtonRow(statsCard, "Đặt Lại Thông Số Treo (Reset AFK)", "Đặt 
     gemTracker.gained = 0
     lastWebhookStatsTime = tick()
 
-    if infoUptime and infoUptime.Set then infoUptime.Set("00:00:00") end
-    if infoFishPerHour and infoFishPerHour.Set then infoFishPerHour.Set("0 con/h") end
-    if infoCashPerHour and infoCashPerHour.Set then infoCashPerHour.Set("$0 /h") end
-    if infoGemsGained and infoGemsGained.Set then infoGemsGained.Set("+0 Gems") end
+    if StatTiles.Uptime and StatTiles.Uptime.Set then StatTiles.Uptime.Set("00:00:00") end
+    if StatTiles.FishPerHour and StatTiles.FishPerHour.Set then StatTiles.FishPerHour.Set("0 con/h") end
+    if StatTiles.CashPerHour and StatTiles.CashPerHour.Set then StatTiles.CashPerHour.Set("$0 /h") end
+    if StatTiles.GemsGained and StatTiles.GemsGained.Set then StatTiles.GemsGained.Set("+0 Gems") end
 
     ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
 end)
@@ -9167,59 +9230,7 @@ do
 createCategoryHeader(tabTeleports, "Dịch Chuyển Đến Đảo (Đảo 1 - 10)")
 local islandCard = createCardGroup(tabTeleports)
 
-local islands = {
-    {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9), radius = 450},
-    {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1), radius = 450},
-    {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3), radius = 450},
-    {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7), radius = 450},
-    {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4), radius = 450},
-    {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4), radius = 450},
-    {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6), radius = 450},
-    {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5), radius = 450},
-    {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6), radius = 450},
-    {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7), radius = 450},
-}
-
-local bossRealms = {
-    {name = "Boss Bạch Tuộc (Phao Biển)", pos = Vector3.new(1608.2, 5.0, -218.3), radius = 350},
-    {name = "Vùng Câu Cá Ngầm Lòng Đất", pos = Vector3.new(112.5, -330.0, -30.8), radius = 350},
-    {name = "Đấu Trường Boss Enzo", pos = Vector3.new(-115.3, 9.2, 1349.5), radius = 350},
-}
-
-local function GetCurrentLocationName()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return "Đang tải vị trí...", nil end
-    local myPos = root.Position
-
-    if myPos.Y < -150 then
-        return "Vùng Câu Cá Ngầm Lòng Đất", "underground"
-    end
-
-    local bestName = "Đang ở giữa biển"
-    local bestObj = nil
-    local minDist = 999999
-
-    for _, isl in ipairs(islands) do
-        local dist = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(isl.pos.X, 0, isl.pos.Z)).Magnitude
-        if dist < (isl.radius or 450) and dist < minDist then
-            minDist = dist
-            bestName = isl.name
-            bestObj = isl
-        end
-    end
-
-    for _, br in ipairs(bossRealms) do
-        local dist = (myPos - br.pos).Magnitude
-        if dist < (br.radius or 350) and dist < minDist then
-            minDist = dist
-            bestName = br.name
-            bestObj = br
-        end
-    end
-
-    return bestName, bestObj, minDist
-end
+-- (GetCurrentLocationName đã định nghĩa ở phần khởi tạo dùng chung toàn script)
 
 -- Hiển thị trực tiếp vị trí đảo người chơi đang đứng
 local infoCurrentMap = createInfoRow(islandCard, "📍 Vị Trí Bạn Đang Đứng", "Đang nhận diện...")
@@ -9242,6 +9253,9 @@ UpdateAllIslandStatus = function()
     local curLocName = GetCurrentLocationName()
     if infoCurrentMap and infoCurrentMap.Set then
         infoCurrentMap.Set(curLocName)
+    end
+    if StatTiles and StatTiles.CurrentLocation and StatTiles.CurrentLocation.Set then
+        StatTiles.CurrentLocation.Set(curLocName)
     end
     for _, fn in ipairs(islandUpdaters) do
         pcall(fn, curLocName)
@@ -11713,15 +11727,16 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
             end
 
-            if pData:FindFirstChild("FishingRod") and pData.FishingRod.Value ~= "" then infoEquippedRod.Set(pData.FishingRod.Value) end
-            if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "" then infoEquippedBait.Set(pData.EquippedBait.Value) end
+            if pData:FindFirstChild("FishingRod") and pData.FishingRod.Value ~= "" and StatTiles.EquippedRod then StatTiles.EquippedRod.Set(pData.FishingRod.Value) end
+            if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= "" and StatTiles.EquippedBait then StatTiles.EquippedBait.Set(pData.EquippedBait.Value) end
 
-            -- Cập nhật tên vị trí hiện tại mỗi 8 giây (chỉ cập nhật chuỗi text, không redraw giao diện đảo)
-            if not lastIslandCheck or (tick() - lastIslandCheck >= 8) then
+            -- Cập nhật tên vị trí hiện tại mỗi 3 giây (đồng bộ cả Tab Dịch Chuyển và Tab Câu Cá)
+            if not lastIslandCheck or (tick() - lastIslandCheck >= 3) then
                 lastIslandCheck = tick()
-                if GetCurrentLocationName and infoCurrentMap and infoCurrentMap.Set then
+                if GetCurrentLocationName then
                     local curLoc = GetCurrentLocationName()
-                    infoCurrentMap.Set(curLoc)
+                    if infoCurrentMap and infoCurrentMap.Set then infoCurrentMap.Set(curLoc) end
+                    if StatTiles.CurrentLocation and StatTiles.CurrentLocation.Set then StatTiles.CurrentLocation.Set(curLoc) end
                 end
             end
 
@@ -11757,11 +11772,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local curFish = pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
             local curCash = pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
 
-            if infoFishCaught and infoFishCaught.Set then
-                infoFishCaught.Set(FormatWithSpaces(curFish) .. " con")
+            if StatTiles.FishCaught and StatTiles.FishCaught.Set then
+                StatTiles.FishCaught.Set(FormatWithSpaces(curFish) .. " con")
             end
-            if infoCash and infoCash.Set then
-                infoCash.Set("$" .. FormatWithSpaces(curCash))
+            if StatTiles.Cash and StatTiles.Cash.Set then
+                StatTiles.Cash.Set("$" .. FormatWithSpaces(curCash))
             end
 
             if not initialFishCaught then initialFishCaught = curFish end
@@ -11773,8 +11788,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local h = math.floor(elapsedSec / 3600)
             local m = math.floor((elapsedSec % 3600) / 60)
             local s = math.floor(elapsedSec % 60)
-            if infoUptime and infoUptime.Set then
-                infoUptime.Set(string.format("%02d:%02d:%02d", h, m, s))
+            if StatTiles.Uptime and StatTiles.Uptime.Set then
+                StatTiles.Uptime.Set(string.format("%02d:%02d:%02d", h, m, s))
             end
 
             local gainedFish = math.max(0, curFish - initialFishCaught)
@@ -11784,32 +11799,51 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             local fishRate = math.floor(gainedFish / math.max(elapsedHours, 1/3600))
             local cashRate = math.floor(gainedCash / math.max(elapsedHours, 1/3600))
 
-            if infoFishPerHour and infoFishPerHour.Set then
-                infoFishPerHour.Set(FormatWithSpaces(fishRate) .. " con/h")
+            if StatTiles.FishPerHour and StatTiles.FishPerHour.Set then
+                StatTiles.FishPerHour.Set(FormatWithSpaces(fishRate) .. " con/h")
             end
-            if infoCashPerHour and infoCashPerHour.Set then
-                infoCashPerHour.Set("$" .. FormatWithSpaces(cashRate) .. " /h")
+            if StatTiles.CashPerHour and StatTiles.CashPerHour.Set then
+                StatTiles.CashPerHour.Set("$" .. FormatWithSpaces(cashRate) .. " /h")
             end
-            if infoGemsGained and infoGemsGained.Set then
-                infoGemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
+            if StatTiles.GemsGained and StatTiles.GemsGained.Set then
+                StatTiles.GemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
             end
 
-            -- Cập nhật 4 chỉ số mới: Vé nhiệm vụ, Essence Orb, Trait Reroll, Vé xong hôm nay
-            if infoTickets and infoTickets.Set then
+            -- Cập nhật chỉ số tài nguyên, balo và vé nhiệm vụ
+            if StatTiles.Tickets and StatTiles.Tickets.Set then
                 local tVal = pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-                infoTickets.Set(FormatWithSpaces(tVal) .. " Vé")
+                StatTiles.Tickets.Set(FormatWithSpaces(tVal) .. " Vé")
             end
-            if infoEssenceOrbs and infoEssenceOrbs.Set then
+            if StatTiles.EssenceOrbs and StatTiles.EssenceOrbs.Set then
                 local orbVal = pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
-                infoEssenceOrbs.Set(FormatWithSpaces(orbVal) .. " Viên")
+                StatTiles.EssenceOrbs.Set(FormatWithSpaces(orbVal) .. " Viên")
             end
-            if infoTraitRerolls and infoTraitRerolls.Set then
+            if StatTiles.TraitRerolls and StatTiles.TraitRerolls.Set then
                 local rVal = pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
-                infoTraitRerolls.Set(FormatWithSpaces(rVal) .. " Vé")
+                StatTiles.TraitRerolls.Set(FormatWithSpaces(rVal) .. " Vé")
             end
-            if infoTicketQuestsToday and infoTicketQuestsToday.Set then
+            if StatTiles.TicketQuestsToday and StatTiles.TicketQuestsToday.Set then
                 local qCount = pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
-                infoTicketQuestsToday.Set(string.format("%d NV", qCount))
+                StatTiles.TicketQuestsToday.Set(string.format("%d NV", qCount))
+            end
+            if StatTiles.Backpack and StatTiles.Backpack.Set then
+                local invCount = pData:FindFirstChild("Inventory") and #pData.Inventory:GetChildren() or 0
+                local limitVal = pData:FindFirstChild("InventoryLimit") and tonumber(pData.InventoryLimit.Value) or 100
+                StatTiles.Backpack.Set(string.format("%d / %d", invCount, limitVal))
+            end
+            if StatTiles.TicketCooldown and StatTiles.TicketCooldown.Set then
+                local cdVal = pData:FindFirstChild("TicketQuestCooldown") and tonumber(pData.TicketQuestCooldown.Value) or 0
+                local nowServer = Workspace:GetServerTimeNow()
+                local remain = math.max(0, cdVal - nowServer)
+                if ticketQuestState and ticketQuestState.IsAllQuestsDoneToday and ticketQuestState.IsAllQuestsDoneToday() then
+                    StatTiles.TicketCooldown.Set("Hết vé hôm nay")
+                elseif remain > 0 then
+                    local rm = math.floor(remain / 60)
+                    local rs = remain % 60
+                    StatTiles.TicketCooldown.Set(string.format("Chờ %02d:%02d", rm, rs))
+                else
+                    StatTiles.TicketCooldown.Set("Sẵn sàng nhận!")
+                end
             end
 
             if Config.WebhookEnabled and Config.WebhookHourlyStats and (tick() - lastWebhookStatsTime >= (Config.WebhookStatsInterval or 1800)) then
@@ -11825,6 +11859,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         { name = "💰 Tổng Tiền Hiện Tại", value = "$" .. FormatWithSpaces(curCash) .. " (+$" .. FormatWithSpaces(gainedCash) .. ")", inline = true },
                         { name = "📈 Tốc Độ Kiếm Tiền", value = "$" .. FormatWithSpaces(cashRate) .. " /giờ", inline = true },
                         { name = "💎 Gems Thu Được", value = "+" .. FormatWithSpaces(gainedGems) .. " Gems", inline = true },
+                        { name = "📍 Map Đang Đứng", value = tostring(GetCurrentLocationName and GetCurrentLocationName() or "Chưa rõ"), inline = true },
                         { name = "🎫 Vé Nhiệm Vụ", value = FormatWithSpaces(pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0) .. " Vé", inline = true },
                         { name = "🔮 Essence Orb", value = FormatWithSpaces(pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0) .. " Viên", inline = true },
                         { name = "🎲 Trait Rerolls", value = FormatWithSpaces(pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0) .. " Vé", inline = true },

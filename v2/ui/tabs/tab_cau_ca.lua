@@ -43,19 +43,23 @@ function TabCauCa.Render(parent)
 
     local infoEquippedRod        = Components.CreateStatGridTile(statsGridContainer, "🎣 Cần Đang Dùng", "Chưa có", Theme.TextWhite, 1)
     local infoEquippedBait       = Components.CreateStatGridTile(statsGridContainer, "🪱 Mồi Đang Dùng", "Chưa có", Theme.TextWhite, 2)
-    local infoUptime             = Components.CreateStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Theme.AccentYellow, 3)
+    local infoCurrentLocation    = Components.CreateStatGridTile(statsGridContainer, "📍 Map Đang Đứng", "Đang nhận diện...", Theme.AccentBlue, 3)
 
-    local infoFishCaught         = Components.CreateStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Theme.PurplePrimary, 4)
-    local infoFishPerHour        = Components.CreateStatGridTile(statsGridContainer, "⚡ Tốc Độ Câu", "0 con/h", Theme.AccentGreen, 5)
-    local infoCash               = Components.CreateStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Theme.AccentGreen, 6)
+    local infoUptime             = Components.CreateStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Theme.AccentYellow, 4)
+    local infoFishCaught         = Components.CreateStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Theme.PurplePrimary, 5)
+    local infoFishPerHour        = Components.CreateStatGridTile(statsGridContainer, "⚡ Tốc Độ Câu", "0 con/h", Theme.AccentGreen, 6)
 
-    local infoCashPerHour        = Components.CreateStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Theme.AccentGreen, 7)
-    local infoGemsGained         = Components.CreateStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Theme.AccentBlue, 8)
-    local infoTickets            = Components.CreateStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Theme.AccentOrange, 9)
+    local infoCash               = Components.CreateStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Theme.AccentGreen, 7)
+    local infoCashPerHour        = Components.CreateStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Theme.AccentGreen, 8)
+    local infoGemsGained         = Components.CreateStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Theme.AccentBlue, 9)
 
-    local infoEssenceOrbs        = Components.CreateStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Theme.PurpleAccent, 10)
-    local infoTraitRerolls       = Components.CreateStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Theme.AccentYellow, 11)
-    local infoTicketQuestsToday  = Components.CreateStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Theme.AccentOrange, 12)
+    local infoTickets            = Components.CreateStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Theme.AccentOrange, 10)
+    local infoEssenceOrbs        = Components.CreateStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Theme.PurpleAccent, 11)
+    local infoTraitRerolls       = Components.CreateStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Theme.AccentYellow, 12)
+
+    local infoTicketQuestsToday  = Components.CreateStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Theme.AccentOrange, 13)
+    local infoBackpack           = Components.CreateStatGridTile(statsGridContainer, "🎒 Sức Chứa Balo", "0 / 100", Theme.TextWhite, 14)
+    local infoTicketCooldown     = Components.CreateStatGridTile(statsGridContainer, "⏳ Chờ Vé Mới", "Sẵn sàng", Theme.AccentYellow, 15)
 
     Components.CreateButtonRow(statsCard, "Đặt Lại Thông Số Treo (Reset AFK)", "Đặt lại giờ treo và tính lại tốc độ cá/tiền chính xác từ mốc này", "🔄 Reset Thông Số", function()
         local pData = Services.ReplicatedStorage:FindFirstChild("Data") and Services.ReplicatedStorage.Data:FindFirstChild(Services.LocalPlayer.UserId)

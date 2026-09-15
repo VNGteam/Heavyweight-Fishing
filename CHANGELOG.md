@@ -2,6 +2,21 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.6] - 2026-09-15
+### 📍 Hiển Thị Vị Trí Map Đang Đứng & Hoàn Thiện Lưới Thống Kê 3x5 (Fix & Update gì):
+1. **Bổ Sung Chỉ Số "📍 Map Đang Đứng" Vào Bảng Thống Kê & Webhook Discord**:
+   - *Tính năng*: Hiển thị tên hòn đảo hoặc vùng biển người chơi đang đứng (ví dụ: `[1] Đảo Khởi Đầu`, `[6] Đảo Băng Giá`, `[2] Đảo Tre`, `Vùng Câu Cá Ngầm`, v.v.) ngay trên hàng đầu tiên của bảng thống kê Tab Câu Cá.
+   - *Cơ chế hoạt động*: Chuyển `GetCurrentLocationName` lên phạm vi dùng chung toàn script, tự động nhận diện và cập nhật mỗi 3 giây hoặc ngay khi người chơi dịch chuyển / bay qua đảo khác. Đồng bộ luôn vào báo cáo Webhook Discord.
+2. **Hoàn Thiện Bố Cục Lưới Cân Đối 3x5 (15 Ô Metric Hoàn Chỉnh)**:
+   - Bổ sung thêm 2 chỉ số thực chiến quan trọng để lấp đầy hàng thứ 5 thành hình chữ nhật 3 cột x 5 hàng hoàn hảo:
+     - 🎒 **Sức Chứa Balo**: Hiển thị số lượng cá/vật phẩm hiện tại trên tổng sức chứa (ví dụ: `42 / 100`) theo thời gian thực.
+     - ⏳ **Chờ Vé Mới**: Đếm ngược thời gian hồi vé nhiệm vụ trực tiếp (ví dụ: `Chờ 18:24` hoặc `Sẵn sàng nhận!`).
+3. **Tái Cấu Trúc Bảng Dữ Liệu `StatTiles` & Tối Ưu Giới Hạn Biến Cục Bộ (Lua 200 Locals Limit)**:
+   - Gom toàn bộ 15 biến thành viên của bảng thống kê vào bảng `StatTiles = {}` và đóng gói dữ liệu tọa độ đảo trong phạm vi khối lệnh `do ... end`.
+   - Giúp giảm mạnh số lượng biến cục bộ của hàm chính, giải quyết triệt để lỗi biên dịch `too many local variables (limit is 200)` của Lua, giúp script luôn nhẹ và ổn định tối đa.
+
+---
+
 ## [v2.1.5] - 2026-09-15
 ### 📊 Nâng Cấp Bảng Thống Kê 3 Cột, Bổ Sung Chỉ Số & Nút Reset Treo Máy (Fix & Update gì):
 1. **Tái Cấu Trúc Khung Thống Kê Thành Lưới 3 Cột Hiện Đại (Grid 3x4 / 3xN)**:
