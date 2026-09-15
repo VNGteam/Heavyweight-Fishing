@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.4"
+local SCRIPT_BUILD_COMMIT = "v2.1.5"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -6578,14 +6578,128 @@ SwitchTab("Câu Cá")
 
 createCategoryHeader(tabFishing, "Thông Tin Tài Khoản & Thống Kê")
 local statsCard = createCardGroup(tabFishing)
-local infoEquippedRod = createInfoRow(statsCard, "Cần Đang Dùng", "Chưa có")
-local infoEquippedBait = createInfoRow(statsCard, "Mồi Đang Dùng", "Chưa có")
-local infoFishCaught = createInfoRow(statsCard, "Tổng Cá Đã Câu", "0 con")
-local infoCash = createInfoRow(statsCard, "Tiền Hiện Tại", "$0")
-local infoUptime = createInfoRow(statsCard, "Thời Gian Treo Máy", "00:00:00")
-local infoFishPerHour = createInfoRow(statsCard, "Tốc Độ Câu (Fish/h)", "0 con/h")
-local infoCashPerHour = createInfoRow(statsCard, "Tốc Độ Kiếm Tiền", "$0 /h")
-local infoGemsGained = createInfoRow(statsCard, "Gems Thu Được", "+0 Gems")
+
+local statsGridContainer = Instance.new("Frame")
+statsGridContainer.Name = "StatsGridContainer"
+statsGridContainer.Size = UDim2.new(1, 0, 0, 0)
+statsGridContainer.AutomaticSize = Enum.AutomaticSize.Y
+statsGridContainer.BackgroundTransparency = 1
+statsGridContainer.BorderSizePixel = 0
+statsGridContainer.Parent = statsCard
+
+local gridPadding = Instance.new("UIPadding")
+gridPadding.PaddingTop = UDim.new(0, 8)
+gridPadding.PaddingBottom = UDim.new(0, 8)
+gridPadding.PaddingLeft = UDim.new(0, 8)
+gridPadding.PaddingRight = UDim.new(0, 8)
+gridPadding.Parent = statsGridContainer
+
+local gridLayout = Instance.new("UIGridLayout")
+gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+gridLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+gridLayout.CellSize = UDim2.new(1/3, -4, 0, 46)
+gridLayout.Parent = statsGridContainer
+
+local function createStatGridTile(parent, titleText, defaultValue, valueColor, layoutOrder)
+    local tile = Instance.new("Frame")
+    tile.BackgroundColor3 = Colors.ControlBg
+    tile.BorderSizePixel = 0
+    tile.LayoutOrder = layoutOrder or 1
+    tile.Parent = parent
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 5)
+    c.Parent = tile
+
+    local s = Instance.new("UIStroke")
+    s.Color = Colors.BorderSubtle
+    s.Thickness = 1
+    s.Parent = tile
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 5)
+    pad.PaddingBottom = UDim.new(0, 4)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
+    pad.Parent = tile
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, 0, 0, 14)
+    titleLbl.Position = UDim2.new(0, 0, 0, 0)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Font = Enum.Font.Gotham
+    titleLbl.Text = titleText
+    titleLbl.TextColor3 = Colors.TextMuted
+    titleLbl.TextSize = 10
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    titleLbl.Parent = tile
+
+    local valLbl = Instance.new("TextLabel")
+    valLbl.Size = UDim2.new(1, 0, 0, 18)
+    valLbl.Position = UDim2.new(0, 0, 0, 15)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Font = Enum.Font.GothamBold
+    valLbl.Text = defaultValue or "---"
+    valLbl.TextColor3 = valueColor or Colors.PurplePrimary
+    valLbl.TextSize = 11
+    valLbl.TextXAlignment = Enum.TextXAlignment.Left
+    valLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    valLbl.Parent = tile
+
+    tile.MouseEnter:Connect(function()
+        TweenService:Create(s, TweenInfo.new(0.15), {Color = Colors.BorderPurple}):Play()
+        TweenService:Create(tile, TweenInfo.new(0.15), {BackgroundColor3 = Colors.RowHover}):Play()
+    end)
+    tile.MouseLeave:Connect(function()
+        TweenService:Create(s, TweenInfo.new(0.15), {Color = Colors.BorderSubtle}):Play()
+        TweenService:Create(tile, TweenInfo.new(0.15), {BackgroundColor3 = Colors.ControlBg}):Play()
+    end)
+
+    return {
+        frame = tile,
+        Set = function(nv)
+            valLbl.Text = tostring(nv or "")
+        end
+    }
+end
+
+-- Lưới 3 cột x 4 hàng (12 chỉ số hiển thị cực gọn, dễ mở rộng 3x5, 3x6)
+local infoEquippedRod        = createStatGridTile(statsGridContainer, "🎣 Cần Đang Dùng", "Chưa có", Colors.TextWhite, 1)
+local infoEquippedBait       = createStatGridTile(statsGridContainer, "🪱 Mồi Đang Dùng", "Chưa có", Colors.TextWhite, 2)
+local infoUptime             = createStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Colors.AccentYellow, 3)
+
+local infoFishCaught         = createStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Colors.PurplePrimary, 4)
+local infoFishPerHour        = createStatGridTile(statsGridContainer, "⚡ Tốc Độ Câu", "0 con/h", Colors.AccentGreen, 5)
+local infoCash               = createStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Colors.AccentGreen, 6)
+
+local infoCashPerHour        = createStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Colors.AccentGreen, 7)
+local infoGemsGained         = createStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Colors.AccentBlue, 8)
+local infoTickets            = createStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Colors.AccentOrange, 9)
+
+local infoEssenceOrbs        = createStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Colors.PurpleAccent, 10)
+local infoTraitRerolls       = createStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Colors.AccentYellow, 11)
+local infoTicketQuestsToday  = createStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Colors.AccentOrange, 12)
+
+-- Nút Reset Thông Số Treo Máy
+createButtonRow(statsCard, "Đặt Lại Thông Số Treo (Reset AFK)", "Đặt lại giờ treo và tính lại tốc độ cá/tiền chính xác từ mốc này", "🔄 Reset Thông Số", function()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    local curFish = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
+    local curCash = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
+
+    sessionStartTime = tick()
+    initialFishCaught = curFish
+    initialCash = curCash
+    gemTracker.gained = 0
+    lastWebhookStatsTime = tick()
+
+    if infoUptime and infoUptime.Set then infoUptime.Set("00:00:00") end
+    if infoFishPerHour and infoFishPerHour.Set then infoFishPerHour.Set("0 con/h") end
+    if infoCashPerHour and infoCashPerHour.Set then infoCashPerHour.Set("$0 /h") end
+    if infoGemsGained and infoGemsGained.Set then infoGemsGained.Set("+0 Gems") end
+
+    ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
+end)
 
 createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
 local fishCard = createCardGroup(tabFishing)
@@ -11680,6 +11794,24 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 infoGemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
             end
 
+            -- Cập nhật 4 chỉ số mới: Vé nhiệm vụ, Essence Orb, Trait Reroll, Vé xong hôm nay
+            if infoTickets and infoTickets.Set then
+                local tVal = pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
+                infoTickets.Set(FormatWithSpaces(tVal) .. " Vé")
+            end
+            if infoEssenceOrbs and infoEssenceOrbs.Set then
+                local orbVal = pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
+                infoEssenceOrbs.Set(FormatWithSpaces(orbVal) .. " Viên")
+            end
+            if infoTraitRerolls and infoTraitRerolls.Set then
+                local rVal = pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
+                infoTraitRerolls.Set(FormatWithSpaces(rVal) .. " Vé")
+            end
+            if infoTicketQuestsToday and infoTicketQuestsToday.Set then
+                local qCount = pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
+                infoTicketQuestsToday.Set(string.format("%d NV", qCount))
+            end
+
             if Config.WebhookEnabled and Config.WebhookHourlyStats and (tick() - lastWebhookStatsTime >= (Config.WebhookStatsInterval or 1800)) then
                 lastWebhookStatsTime = tick()
                 SendDiscordWebhook(
@@ -11692,7 +11824,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         { name = "⚡ Tốc Độ Câu", value = FormatWithSpaces(fishRate) .. " con/giờ", inline = true },
                         { name = "💰 Tổng Tiền Hiện Tại", value = "$" .. FormatWithSpaces(curCash) .. " (+$" .. FormatWithSpaces(gainedCash) .. ")", inline = true },
                         { name = "📈 Tốc Độ Kiếm Tiền", value = "$" .. FormatWithSpaces(cashRate) .. " /giờ", inline = true },
-                        { name = "💎 Gems Thu Được", value = "+" .. FormatWithSpaces(gainedGems) .. " Gems", inline = true }
+                        { name = "💎 Gems Thu Được", value = "+" .. FormatWithSpaces(gainedGems) .. " Gems", inline = true },
+                        { name = "🎫 Vé Nhiệm Vụ", value = FormatWithSpaces(pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0) .. " Vé", inline = true },
+                        { name = "🔮 Essence Orb", value = FormatWithSpaces(pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0) .. " Viên", inline = true },
+                        { name = "🎲 Trait Rerolls", value = FormatWithSpaces(pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0) .. " Vé", inline = true },
+                        { name = "📜 Vé Xong Hôm Nay", value = string.format("%d NV", pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0), inline = true }
                     }
                 )
             end

@@ -2,6 +2,28 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.5] - 2026-09-15
+### 📊 Nâng Cấp Bảng Thống Kê 3 Cột, Bổ Sung Chỉ Số & Nút Reset Treo Máy (Fix & Update gì):
+1. **Tái Cấu Trúc Khung Thống Kê Thành Lưới 3 Cột Hiện Đại (Grid 3x4 / 3xN)**:
+   - *Vấn đề*: Khung thống kê cũ dạng danh sách dọc 8 dòng đơn điệu, chiếm nhiều diện tích cuộn và khó quan sát tổng thể tài khoản.
+   - *Khắc phục*: Thiết kế lại toàn bộ bằng bố cục lưới 3 cột x 4 hàng (12 ô ô metric) cực kỳ gọn gàng, đẹp mắt và tiết kiệm diện tích. Mỗi ô có viền bo góc, đổi màu hover mượt mà và phân màu chỉ số trực quan (Tiền xanh lá, Gems xanh dương, Vé cam, Ngọc tím, Trait vàng kim).
+   - Kiến trúc linh hoạt, sẵn sàng mở rộng thành 3x5, 3x6 bất cứ lúc nào khi cần bổ sung thêm thông tin.
+2. **Bổ Sung 4 Chỉ Số Tài Sản Mới (Live Update Real-time)**:
+   - 🎫 **Vé Nhiệm Vụ (Tickets)**: Đọc trực tiếp từ `ReplicatedStorage.Data[UserId].Ticket`.
+   - 🔮 **Essence Orb (Ngọc Bản Mệnh)**: Đọc trực tiếp từ `ReplicatedStorage.Data[UserId].EssenceOrb`.
+   - 🎲 **Vé Trait Reroll**: Đọc trực tiếp từ `ReplicatedStorage.Data[UserId]["Trait Reroll"]`.
+   - 📜 **Vé Đã Xong Hôm Nay**: Đọc trực tiếp số nhiệm vụ đã hoàn thành từ `ReplicatedStorage.Data[UserId].TicketQuestDailyCount`.
+   - Các chỉ số này cũng được tự động tích hợp gửi kèm báo cáo Webhook Discord định kỳ.
+3. **Thêm Nút "Đặt Lại Thông Số Treo (Reset AFK)" Tiện Lợi**:
+   - *Vấn đề*: Khi người chơi câu tay hoặc chơi tự do một lúc rồi mới bắt đầu treo máy, thời gian và số cá/tiền cũ làm sai lệch tốc độ Fish/h và Cash/h. Người chơi trước đây phải tắt script rồi inject lại từ đầu rất phiền phức.
+   - *Khắc phục*: Thêm nút `🔄 Reset Thông Số` ngay dưới khung thống kê. Bấm 1 click là:
+     - Đặt lại thời gian treo máy về `00:00:00`.
+     - Lấy mốc cá và tiền hiện tại làm điểm bắt đầu mới (`initialFishCaught = curFish, initialCash = curCash`).
+     - Đặt lại Gems kiếm được về `+0 Gems`.
+     - Tốc độ câu cá và tốc độ tiền được tính chuẩn xác 100% từ đúng thời điểm bắt đầu treo máy!
+
+---
+
 ## [v2.1.4] - 2026-09-15
 ### ☀️ Cân Bằng Ánh Sáng Fullbright & Chống Chói Lóa Theo Thời Tiết (Fix gì):
 1. **Khắc phục lỗi Fullbright bị quá sáng, chói lóa trắng xóa mặt đất khi thời tiết thay đổi (Windy, Sunny)**:
