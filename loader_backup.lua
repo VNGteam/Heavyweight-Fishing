@@ -1,12 +1,21 @@
 --[[
     ===============================================================
-    🚀 IDENTICAL LOADER - BẢN BACKUP (CŨ)
+    🚀 IDENTICAL LOADER - LINK THỰC THI DUY NHẤT (AUTO-UPDATE)
     ===============================================================
+    Cách sử dụng:
+    1. Upload file `local.lua` lên GitHub Repo hoặc GitHub Gist
+    2. Thay đường dẫn bên dưới vào biến SCRIPT_URL
+    3. Bạn chỉ cần chạy 1 dòng loader này trong Executor (Delta, Fluxus, Hydrogen, Synapse, Wave, v.v.)
+    Mỗi khi bạn sửa code và lưu lên link, game sẽ tự động tải bản mới nhất!
 --]]
 
+-- RAW URL (fallback)
 local SCRIPT_URL = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/backup.lua"
+
+-- GitHub API URL (không bị CDN cache, luôn trả bản mới nhất)
 local GITHUB_API_URL = "https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/backup.lua"
 
+-- Base64 decode (dùng để giải mã content từ GitHub API)
 local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local function base64Decode(data)
     data = data:gsub("[^"..b64chars.."=]", "")
@@ -28,7 +37,9 @@ local function base64Decode(data)
     return out:sub(1, #out - pad)
 end
 
+-- Cơ chế Anti-Cache: Thử GitHub API trước (không cache), fallback về raw
 local function FetchScript()
+    -- Bước 1: Thử GitHub API (luôn mới nhất, không bị CDN cache)
     local apiOk, apiResult = pcall(function()
         return game:HttpGet(GITHUB_API_URL .. "?t=" .. tostring(tick()), true)
     end)
@@ -37,6 +48,7 @@ local function FetchScript()
             local HttpService = game:GetService("HttpService")
             local data = HttpService:JSONDecode(apiResult)
             if data and data.content then
+                -- GitHub API trả content dạng base64 (có newline \n cần xóa)
                 local b64 = data.content:gsub("\n", ""):gsub("\r", "")
                 return base64Decode(b64)
             end
@@ -46,6 +58,7 @@ local function FetchScript()
         end
     end
 
+    -- Bước 2: Fallback về raw URL với anti-cache query
     local rawOk, rawResult = pcall(function()
         return game:HttpGet(SCRIPT_URL .. "?nocache=" .. tostring(math.random(1, 999999)), true)
     end)
@@ -56,10 +69,11 @@ local function FetchScript()
     return false, "Không thể tải script từ cả 2 nguồn!"
 end
 
+-- Hiển thị thông báo tải script
 pcall(function()
     game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Identical Backup",
-        Text = "Đang tải bản Backup...",
+        Title = "Identical Hub (Bản Backup Gốc)",
+        Text = "Đang tải bản cập nhật mới nhất...",
         Duration = 3
     })
 end)
@@ -74,6 +88,22 @@ if ok and content and #content > 0 then
         fn()
     end)
     if not runOk then
-        warn("[Identical Backup Loader] Lỗi thực thi:", runErr)
+        warn("[Identical Loader] Lỗi thực thi script:", runErr)
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "❌ Lỗi Chạy Script!",
+                Text = tostring(runErr):sub(1, 100),
+                Duration = 20
+            })
+        end)
     end
+else
+    warn("[Identical Loader] Không thể tải script từ link! Vui lòng kiểm tra lại đường dẫn SCRIPT_URL.")
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Lỗi Tải Script",
+            Text = "Không thể kết nối đến máy chủ lưu trữ code!",
+            Duration = 5
+        })
+    end)
 end
