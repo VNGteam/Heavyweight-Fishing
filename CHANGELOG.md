@@ -2,6 +2,31 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.6] - 2026-09-16
+### 🛡️ Sửa Triệt Để Lỗi Tính Sát Thương 2 Người & Hỗ Trợ Boss Nhiều Mạng (Multi-Phase) (Fix & Upgrade gì):
+1. **Hỗ Trợ Toàn Diện Boss Nhiều Mạng (Multi-Phase Boss - Ví dụ Boss 3 Mạng)**:
+   - *Nguyên nhân lỗi cũ*: Một số Secret Boss có 2 đến 3 mạng (Phase 1, 2, 3 - thuộc tính `HasPhaseLeft = true` trong game). Khi hết mạng 1, máu Boss về 0, script cũ tưởng Boss đã chết nên kích hoạt thông báo chiến thắng và tự đóng bảng sau 6 giây, đồng thời làm mất toàn bộ dữ liệu sát thương của người chơi khi Boss hồi máu sang mạng 2.
+   - *Giải pháp triệt để*:
+     - Bổ sung cơ chế phát hiện chuyển mạng (`phaseTransitionUntil` 4 giây): Khi máu mạng 1 về 0 nhưng Boss vẫn còn trong game hoặc `HasPhaseLeft == true`, bảng không tắt mà hiển thị thông báo chuyển mạng: `⚡ HẠ MẠNG 1! ĐANG QUA MẠNG TIẾP...`.
+     - Tự động cộng dồn máu tổng qua các mạng (`totalBossMaxHp`) khi Boss hồi sinh mạng 2, mạng 3, đồng thời **giữ nguyên toàn bộ sát thương tích lũy** của từng người chơi từ các mạng trước.
+     - Tiêu đề bảng hiển thị rõ số mạng hiện tại: `⚔️ SÁT THƯƠNG BOSS • MẠNG 2 (85% HP)` và `Tên Boss [Mạng 2] • Máu Hiện Tại / Máu Mạng`.
+     - Chỉ kích hoạt màn hình tổng kết vinh danh khi Boss thực sự bị câu lên hoàn toàn (`fish.Parent == nil` và hoàn thành tất cả các mạng).
+2. **Khắc Phục Lỗi Tính Sát Thương Không Chuẩn Khi 2-3 Người Cùng Câu**:
+   - *Nguyên nhân lỗi cũ*: Bản trước áp dụng công thức chia tỷ lệ sát thương theo lực cần câu (`RodPower`), dẫn đến việc khi một người tung chiêu xả đòn 1,000 DMG thì người câu cùng (dù không làm gì hoặc chỉ giữ cần) vẫn bị chia đều sát thương, làm bảng xếp hạng sai lệch hoàn toàn.
+   - *Giải pháp chuẩn xác*:
+     - **Phân tách Đòn Đột Biến (Burst Skill / Slam >= 75 DMG) & Sát Thương Cuộn Cần (Reel DPS < 75 DMG)**.
+     - **Cơ chế bắt đòn đánh thời gian thực**:
+       + Hook trực tiếp `Events.UseSkill` và `Events.Slam` để ghi nhận chính xác đến từng millisecond khi bản thân tung chiêu hoặc nện Perfect Slam.
+       + Theo dõi trạng thái chiêu (`UsingSkill`) và animation Action của những người chơi khác cùng câu.
+       + Khi có đòn burst sát thương lớn (>= 75 DMG), **100% lượng sát thương đó được ghi nhận cho đúng người chơi vừa ra đòn**.
+       + Các nhịp kéo cá thông thường (< 75 DMG) mới được phân chia theo lực cần câu.
+     - Hiển thị song song cả tỷ lệ % HP chuẩn xác trên tổng máu Boss và số sát thương cụ thể: `48.2% (4,820 DMG)`.
+3. **Đồng Bộ Hóa Toàn Diện**:
+   - Cập nhật đồng bộ trên cả bản Master [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và bản Modular [v2/features/boss_dps.lua](file:///Users/vonguyengiap/Documents/script/v2/features/boss_dps.lua).
+   - Nâng cấp mã phiên bản tĩnh lên **`v2.2.6`** trên toàn hệ thống và biên dịch lại [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.2.5] - 2026-09-16
 ### ⚔️ Bảng Đo Sát Thương Săn Boss Đa Người Chơi (% HP DPS Meter HUD) (New Feature & Upgrade gì):
 1. **Hiển Thị % HP Từng Người Chơi Pem Boss Theo Thời Gian Thực**:

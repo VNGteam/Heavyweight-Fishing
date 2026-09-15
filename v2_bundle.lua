@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.5"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.6"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -1535,13 +1535,14 @@ end
 __modules["features.boss_dps"] = function()
 --[[
     v2/features/boss_dps.lua
-    Multiplayer Boss DPS & Damage Percentage Meter HUD
+    Multiplayer Boss DPS & Damage Percentage Meter HUD (Multi-Phase Support)
 --]]
 
 local Services = __require("core.services")
 local Players = Services.Players
 local Workspace = Services.Workspace
 local LocalPlayer = Services.LocalPlayer
+local Events = Services.Events
 local State = __require("core.state")
 local Utils = __require("core.utils")
 local Theme = __require("ui.theme")
@@ -1551,14 +1552,82 @@ local BossDps = {}
 local tracker = {
     active = false,
     currentFish = nil,
+    fishId = "",
     bossName = "Secret Boss",
-    maxHp = 0,
+    currentPhase = 1,
+    phaseMaxHp = 0,
+    totalBossMaxHp = 0,
     curHp = 0,
     lastHp = 0,
     totalDamage = 0,
     players = {},
-    victoryUntil = 0
+    victoryUntil = 0,
+    phaseTransitionUntil = 0
 }
+
+local recentPlayerAction = {}
+
+local function IsPlayerAttacking(pName, char)
+    if not char then return false end
+    if pName == LocalPlayer.Name then
+        local act = recentPlayerAction[pName]
+        if act and (tick() - act) <= 0.45 then
+            return true
+        end
+    end
+    for _, att in ipairs({"UsingSkill", "SkillActive", "IsAttacking", "CastingSkill", "SkillLocked"}) do
+        local val = char:GetAttribute(att)
+        if val == true or (typeof(val) == "number" and val > 0) then
+            return true
+        end
+    end
+    local skillsFolder = char:FindFirstChild("Skills")
+    if skillsFolder then
+        for _, sk in ipairs(skillsFolder:GetChildren()) do
+            local usk = sk:GetAttribute("UsingSkill")
+            if usk and tonumber(usk) and tonumber(usk) > 0 then
+                return true
+            end
+        end
+    end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local anim = hum and hum:FindFirstChildOfClass("Animator")
+    if anim then
+        local ok, tracks = pcall(function() return anim:GetPlayingAnimationTracks() end)
+        if ok and tracks then
+            for _, tr in ipairs(tracks) do
+                if tr.IsPlaying and tr.Priority.Value >= Enum.AnimationPriority.Action.Value then
+                    local name = tr.Name:lower()
+                    if not name:find("fish") and not name:find("rod") and not name:find("reel") and not name:find("idle") and not name:find("walk") and not name:find("run") then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    local lastAct = recentPlayerAction[pName]
+    if lastAct and (tick() - lastAct) <= 0.45 then
+        return true
+    end
+    return false
+end
+
+pcall(function()
+    if Events and Events:FindFirstChild("UseSkill") then
+        local oldUse = Events.UseSkill.FireServer
+        Events.UseSkill.FireServer = function(self, ...)
+            recentPlayerAction[LocalPlayer.Name] = tick()
+            return oldUse(self, ...)
+        end
+    end
+    if Events and Events:FindFirstChild("Slam") then
+        local oldSlam = Events.Slam.FireServer
+        Events.Slam.FireServer = function(self, ...)
+            recentPlayerAction[LocalPlayer.Name] = tick()
+            return oldSlam(self, ...)
+        end
+    end
+end)
 
 local widget = nil
 local dpsTitle = nil
@@ -1799,24 +1868,39 @@ function BossDps.Update(config)
 
     if fish and fish.Parent then
         local bName = fish:GetAttribute("FishName") or "Secret Boss"
-        local maxHp = tonumber(fish:GetAttribute("MaxHealth")) or 10000
+        local phaseMax = tonumber(fish:GetAttribute("MaxHealth")) or 10000
         local curHp = typeof(fish.Value) == "number" and fish.Value or 0
-        if maxHp <= 0 then maxHp = math.max(curHp, 1) end
+        if phaseMax <= 0 then phaseMax = math.max(curHp, 1) end
 
+        -- Khởi tạo Boss mới
         if tracker.currentFish ~= fish then
             tracker.currentFish = fish
+            tracker.fishId = fish.Name
             tracker.bossName = bName
-            tracker.maxHp = maxHp
+            tracker.currentPhase = 1
+            tracker.phaseMaxHp = phaseMax
+            tracker.totalBossMaxHp = phaseMax
             tracker.curHp = curHp
             tracker.lastHp = curHp
             tracker.totalDamage = 0
             tracker.players = {}
             tracker.victoryUntil = 0
+            tracker.phaseTransitionUntil = 0
             tracker.active = true
         end
 
+        -- Nhận diện chuyển mạng (Boss hồi máu sang mạng tiếp theo)
+        if curHp > (tracker.lastHp + 200) and (tracker.lastHp <= 200 or tracker.phaseTransitionUntil > 0) then
+            tracker.currentPhase = tracker.currentPhase + 1
+            tracker.phaseMaxHp = phaseMax
+            tracker.totalBossMaxHp = tracker.totalBossMaxHp + phaseMax
+            tracker.lastHp = curHp
+            tracker.curHp = curHp
+            tracker.phaseTransitionUntil = 0
+        end
+
         local deltaHp = tracker.lastHp - curHp
-        if deltaHp > 0 and deltaHp < (maxHp * 0.95) then
+        if deltaHp > 0 and deltaHp < (phaseMax * 0.95) then
             tracker.totalDamage = tracker.totalDamage + deltaHp
 
             local activeParticipants = {}
@@ -1875,26 +1959,48 @@ function BossDps.Update(config)
                 tracker.players[myName].damage = tracker.players[myName].damage + deltaHp
                 tracker.players[myName].lastHit = now
             else
-                local weights = {}
-                local totalWeight = 0
+                -- Có 2 người trở lên tham gia! Phân loại đòn đánh chính xác
+                local attackers = {}
                 for _, pName in ipairs(activeParticipants) do
-                    local w = 1.0
                     local pl = Players:FindFirstChild(pName)
-                    if pl and pl.Character then
-                        local stats = pl.Character:FindFirstChild("Stats")
-                        local rp = stats and stats:FindFirstChild("RodPower")
-                        if rp and tonumber(rp.Value) and tonumber(rp.Value) > 0 then
-                            w = math.max(tonumber(rp.Value), 10)
-                        end
+                    local char = pl and pl.Character or (pName == myName and LocalPlayer.Character)
+                    if IsPlayerAttacking(pName, char) then
+                        table.insert(attackers, pName)
+                        recentPlayerAction[pName] = now
                     end
-                    weights[pName] = w
-                    totalWeight = totalWeight + w
                 end
 
-                for _, pName in ipairs(activeParticipants) do
-                    local share = deltaHp * (weights[pName] / totalWeight)
-                    tracker.players[pName].damage = tracker.players[pName].damage + share
-                    tracker.players[pName].lastHit = now
+                -- Nếu là đòn burst sát thương lớn (chiêu thức hoặc slam >= 75 dmg)
+                if deltaHp >= 75 and #attackers > 0 then
+                    local sharePerAttacker = deltaHp / #attackers
+                    for _, pName in ipairs(attackers) do
+                        tracker.players[pName].damage = tracker.players[pName].damage + sharePerAttacker
+                        tracker.players[pName].lastHit = now
+                    end
+                else
+                    -- Sát thương kéo dây câu liên tục (continuous rod pull DPS) hoặc không bắt được animation
+                    local weights = {}
+                    local totalWeight = 0
+                    for _, pName in ipairs(activeParticipants) do
+                        local w = 1.0
+                        local pl = Players:FindFirstChild(pName)
+                        local char = pl and pl.Character or (pName == myName and LocalPlayer.Character)
+                        if char then
+                            local stats = char:FindFirstChild("Stats")
+                            local rp = stats and stats:FindFirstChild("RodPower")
+                            if rp and tonumber(rp.Value) and tonumber(rp.Value) > 0 then
+                                w = math.max(tonumber(rp.Value), 10)
+                            end
+                        end
+                        weights[pName] = w
+                        totalWeight = totalWeight + w
+                    end
+
+                    for _, pName in ipairs(activeParticipants) do
+                        local share = deltaHp * (weights[pName] / totalWeight)
+                        tracker.players[pName].damage = tracker.players[pName].damage + share
+                        tracker.players[pName].lastHit = now
+                    end
                 end
             end
         end
@@ -1902,15 +2008,31 @@ function BossDps.Update(config)
         tracker.lastHp = curHp
         tracker.curHp = curHp
 
-        if curHp <= 0 and tracker.victoryUntil == 0 then
-            tracker.victoryUntil = now + 6.0
+        -- Xử lý hết máu 1 mạng
+        local hasPhaseLeft = fish:GetAttribute("HasPhaseLeft") == true
+        if curHp <= 5 then
+            if hasPhaseLeft or fish.Parent ~= nil then
+                if tracker.phaseTransitionUntil == 0 then
+                    tracker.phaseTransitionUntil = now + 4.0
+                end
+            end
         end
 
-        local hpPercent = math.clamp((curHp / maxHp) * 100, 0, 100)
-        dpsTitle.Text = "⚔️ SÁT THƯƠNG BOSS • " .. string.format("%d%% HP", math.floor(hpPercent))
-        dpsTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
-        dpsBossHpLabel.Text = string.format("%s • %s / %s HP", bName, Utils.FormatWithSpaces(math.floor(curHp)), Utils.FormatWithSpaces(maxHp))
-        dpsHpBarFill.Size = UDim2.new(math.clamp(curHp / maxHp, 0, 1), 0, 1, 0)
+        local hpPercent = math.clamp((curHp / phaseMax) * 100, 0, 100)
+        if tracker.phaseTransitionUntil > 0 and now < tracker.phaseTransitionUntil then
+            dpsTitle.Text = string.format("⚡ HẠ MẠNG %d! ĐANG QUA MẠNG TIẾP...", tracker.currentPhase)
+            dpsTitle.TextColor3 = Color3.fromRGB(255, 180, 0)
+        else
+            if tracker.currentPhase > 1 or hasPhaseLeft then
+                dpsTitle.Text = string.format("⚔️ SÁT THƯƠNG BOSS • MẠNG %d (%d%%)", tracker.currentPhase, math.floor(hpPercent))
+            else
+                dpsTitle.Text = string.format("⚔️ SÁT THƯƠNG BOSS • %d%% HP", math.floor(hpPercent))
+            end
+            dpsTitle.TextColor3 = Color3.fromRGB(255, 215, 0)
+        end
+
+        dpsBossHpLabel.Text = string.format("%s [Mạng %d] • %s / %s HP", bName, tracker.currentPhase, Utils.FormatWithSpaces(math.floor(curHp)), Utils.FormatWithSpaces(phaseMax))
+        dpsHpBarFill.Size = UDim2.new(math.clamp(curHp / phaseMax, 0, 1), 0, 1, 0)
 
         local sortedList = {}
         for _, pData in pairs(tracker.players) do
@@ -1920,12 +2042,14 @@ function BossDps.Update(config)
 
         local rowCount = #sortedList
         local visibleRows = math.min(rowCount, 5)
+        local totalFightHp = math.max(tracker.totalBossMaxHp, phaseMax, 1)
+
         for i = 1, math.max(#dpsRowPool, visibleRows) do
             if i <= visibleRows then
                 local row = GetOrCreateDpsRow(i)
                 local pData = sortedList[i]
                 local pDmg = math.floor(pData.damage)
-                local pPctOfBossHp = math.clamp((pData.damage / maxHp) * 100, 0, 100)
+                local pPctOfBossHp = math.clamp((pData.damage / totalFightHp) * 100, 0, 100)
                 local isMe = (pData.name == LocalPlayer.Name)
 
                 local fill = row:FindFirstChild("Fill")
@@ -1943,7 +2067,7 @@ function BossDps.Update(config)
                 nameLbl.Text = string.format("%s %s", rankIcon, nameText)
                 nameLbl.TextColor3 = isMe and Color3.fromRGB(255, 230, 80) or Color3.fromRGB(230, 230, 255)
 
-                dmgLbl.Text = string.format("%.1f%% (%s)", pPctOfBossHp, Utils.FormatWithSpaces(pDmg))
+                dmgLbl.Text = string.format("%.1f%% (%s DMG)", pPctOfBossHp, Utils.FormatWithSpaces(pDmg))
                 dmgLbl.TextColor3 = dpsColors[i] or Color3.fromRGB(0, 210, 255)
 
                 local fillPct = (tracker.totalDamage > 0) and math.clamp(pData.damage / tracker.totalDamage, 0, 1) or 0
@@ -1962,16 +2086,21 @@ function BossDps.Update(config)
         widget.Visible = true
 
     else
+        if tracker.totalDamage > 0 and tracker.victoryUntil == 0 and now > tracker.phaseTransitionUntil then
+            tracker.victoryUntil = now + 7.0
+        end
+
         if tracker.victoryUntil > 0 and now < tracker.victoryUntil then
-            dpsTitle.Text = "🏆 HẠ GỤC BOSS THÀNH CÔNG!"
+            dpsTitle.Text = string.format("🏆 HẠ GỤC BOSS! (HOÀN THÀNH %d MẠNG)", tracker.currentPhase)
             dpsTitle.TextColor3 = Color3.fromRGB(0, 255, 140)
-            dpsBossHpLabel.Text = "Bảng Tổng Kết Sát Thương Của Từng Người Chơi:"
+            dpsBossHpLabel.Text = string.format("Bảng Tổng Kết Sát Thương Cả %d Mạng Của Boss:", tracker.currentPhase)
             dpsHpBarFill.Size = UDim2.new(0, 0, 1, 0)
             widget.Visible = true
         else
             tracker.active = false
             tracker.currentFish = nil
             tracker.victoryUntil = 0
+            tracker.phaseTransitionUntil = 0
             widget.Visible = false
         end
     end
