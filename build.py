@@ -11,7 +11,7 @@ import sys
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 V2_DIR = os.path.join(BASE_DIR, "v2")
-OUTPUT_FILE = os.path.join(BASE_DIR, "local.lua")
+OUTPUT_FILE = os.path.join(BASE_DIR, "v2_bundle.lua")
 
 def get_module_id(filepath):
     rel = os.path.relpath(filepath, V2_DIR)

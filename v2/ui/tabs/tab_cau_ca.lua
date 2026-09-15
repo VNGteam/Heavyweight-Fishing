@@ -11,20 +11,69 @@ local StateMachine = require(script.Parent.Parent.Parent.combo.state_machine)
 local Theme = require(script.Parent.Parent.theme)
 local Utils = require(script.Parent.Parent.Parent.core.utils)
 
+local Services = require(script.Parent.Parent.Parent.core.services)
+
 local TabCauCa = {}
 
 function TabCauCa.Render(parent)
-    -- Section 1: Thống Kê Tài Khoản
+    -- Section 1: Thống Kê Tài Khoản (Lưới 3 cột x 4 hàng)
     Components.CreateCategoryHeader(parent, "Thông Tin Tài Khoản & Thống Kê")
     local statsCard = Components.CreateCardGroup(parent)
-    local infoEquippedRod = Components.CreateInfoRow(statsCard, "Cần Đang Dùng", "Chưa có")
-    local infoEquippedBait = Components.CreateInfoRow(statsCard, "Mồi Đang Dùng", "Chưa có")
-    local infoFishCaught = Components.CreateInfoRow(statsCard, "Tổng Cá Đã Câu", "0 con")
-    local infoCash = Components.CreateInfoRow(statsCard, "Tiền Hiện Tại", "$0")
-    local infoUptime = Components.CreateInfoRow(statsCard, "Thời Gian Treo Máy", "00:00:00")
-    local infoFishPerHour = Components.CreateInfoRow(statsCard, "Tốc Độ Câu (Fish/h)", "0 con/h")
-    local infoCashPerHour = Components.CreateInfoRow(statsCard, "Tốc Độ Kiếm Tiền", "$0 /h")
-    local infoGemsGained = Components.CreateInfoRow(statsCard, "Gems Thu Được", "+0 Gems")
+
+    local statsGridContainer = Instance.new("Frame")
+    statsGridContainer.Name = "StatsGridContainer"
+    statsGridContainer.Size = UDim2.new(1, 0, 0, 0)
+    statsGridContainer.AutomaticSize = Enum.AutomaticSize.Y
+    statsGridContainer.BackgroundTransparency = 1
+    statsGridContainer.BorderSizePixel = 0
+    statsGridContainer.Parent = statsCard
+
+    local gridPadding = Instance.new("UIPadding")
+    gridPadding.PaddingTop = UDim.new(0, 8)
+    gridPadding.PaddingBottom = UDim.new(0, 8)
+    gridPadding.PaddingLeft = UDim.new(0, 8)
+    gridPadding.PaddingRight = UDim.new(0, 8)
+    gridPadding.Parent = statsGridContainer
+
+    local gridLayout = Instance.new("UIGridLayout")
+    gridLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    gridLayout.CellPadding = UDim2.new(0, 6, 0, 6)
+    gridLayout.CellSize = UDim2.new(1/3, -4, 0, 46)
+    gridLayout.Parent = statsGridContainer
+
+    local infoEquippedRod        = Components.CreateStatGridTile(statsGridContainer, "🎣 Cần Đang Dùng", "Chưa có", Theme.TextWhite, 1)
+    local infoEquippedBait       = Components.CreateStatGridTile(statsGridContainer, "🪱 Mồi Đang Dùng", "Chưa có", Theme.TextWhite, 2)
+    local infoUptime             = Components.CreateStatGridTile(statsGridContainer, "⏳ Thời Gian Treo", "00:00:00", Theme.AccentYellow, 3)
+
+    local infoFishCaught         = Components.CreateStatGridTile(statsGridContainer, "🐟 Tổng Cá Đã Câu", "0 con", Theme.PurplePrimary, 4)
+    local infoFishPerHour        = Components.CreateStatGridTile(statsGridContainer, "⚡ Tốc Độ Câu", "0 con/h", Theme.AccentGreen, 5)
+    local infoCash               = Components.CreateStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Theme.AccentGreen, 6)
+
+    local infoCashPerHour        = Components.CreateStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Theme.AccentGreen, 7)
+    local infoGemsGained         = Components.CreateStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Theme.AccentBlue, 8)
+    local infoTickets            = Components.CreateStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Theme.AccentOrange, 9)
+
+    local infoEssenceOrbs        = Components.CreateStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Theme.PurpleAccent, 10)
+    local infoTraitRerolls       = Components.CreateStatGridTile(statsGridContainer, "🎲 Trait Reroll", "0 Vé", Theme.AccentYellow, 11)
+    local infoTicketQuestsToday  = Components.CreateStatGridTile(statsGridContainer, "📜 Vé Xong Hôm Nay", "0 NV", Theme.AccentOrange, 12)
+
+    Components.CreateButtonRow(statsCard, "Đặt Lại Thông Số Treo (Reset AFK)", "Đặt lại giờ treo và tính lại tốc độ cá/tiền chính xác từ mốc này", "🔄 Reset Thông Số", function()
+        local pData = Services.ReplicatedStorage:FindFirstChild("Data") and Services.ReplicatedStorage.Data:FindFirstChild(Services.LocalPlayer.UserId)
+        local curFish = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
+        local curCash = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
+
+        State.sessionStartTime = tick()
+        State.initialFishCaught = curFish
+        State.initialCash = curCash
+        State.gemTracker.gained = 0
+
+        if infoUptime and infoUptime.Set then infoUptime.Set("00:00:00") end
+        if infoFishPerHour and infoFishPerHour.Set then infoFishPerHour.Set("0 con/h") end
+        if infoCashPerHour and infoCashPerHour.Set then infoCashPerHour.Set("$0 /h") end
+        if infoGemsGained and infoGemsGained.Set then infoGemsGained.Set("+0 Gems") end
+
+        Components.ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
+    end)
 
     -- Section 2: Tự Động Câu Cá Cốt Lõi
     Components.CreateCategoryHeader(parent, "Tự Động Câu Cá Cốt Lõi")

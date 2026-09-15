@@ -534,6 +534,70 @@ function Components.CreateInfoRow(parent, labelText, valueText, indexSearch)
     return {frame = row, Set = function(nv) vl.Text = tostring(nv or "") end}
 end
 
+function Components.CreateStatGridTile(parent, titleText, defaultValue, valueColor, layoutOrder)
+    local tile = Instance.new("Frame")
+    tile.BackgroundColor3 = Theme.ControlBg
+    tile.BorderSizePixel = 0
+    tile.LayoutOrder = layoutOrder or 1
+    tile.Parent = parent
+
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 5)
+    c.Parent = tile
+
+    local s = Instance.new("UIStroke")
+    s.Color = Theme.BorderSubtle
+    s.Thickness = 1
+    s.Parent = tile
+
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0, 5)
+    pad.PaddingBottom = UDim.new(0, 4)
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
+    pad.Parent = tile
+
+    local titleLbl = Instance.new("TextLabel")
+    titleLbl.Size = UDim2.new(1, 0, 0, 14)
+    titleLbl.Position = UDim2.new(0, 0, 0, 0)
+    titleLbl.BackgroundTransparency = 1
+    titleLbl.Font = Enum.Font.Gotham
+    titleLbl.Text = titleText
+    titleLbl.TextColor3 = Theme.TextMuted
+    titleLbl.TextSize = 10
+    titleLbl.TextXAlignment = Enum.TextXAlignment.Left
+    titleLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    titleLbl.Parent = tile
+
+    local valLbl = Instance.new("TextLabel")
+    valLbl.Size = UDim2.new(1, 0, 0, 18)
+    valLbl.Position = UDim2.new(0, 0, 0, 15)
+    valLbl.BackgroundTransparency = 1
+    valLbl.Font = Enum.Font.GothamBold
+    valLbl.Text = defaultValue or "---"
+    valLbl.TextColor3 = valueColor or Theme.PurplePrimary
+    valLbl.TextSize = 11
+    valLbl.TextXAlignment = Enum.TextXAlignment.Left
+    valLbl.TextTruncate = Enum.TextTruncate.AtEnd
+    valLbl.Parent = tile
+
+    tile.MouseEnter:Connect(function()
+        Services.TweenService:Create(s, TweenInfo.new(0.15), {Color = Theme.BorderPurple}):Play()
+        Services.TweenService:Create(tile, TweenInfo.new(0.15), {BackgroundColor3 = Theme.RowHover}):Play()
+    end)
+    tile.MouseLeave:Connect(function()
+        Services.TweenService:Create(s, TweenInfo.new(0.15), {Color = Theme.BorderSubtle}):Play()
+        Services.TweenService:Create(tile, TweenInfo.new(0.15), {BackgroundColor3 = Theme.ControlBg}):Play()
+    end)
+
+    return {
+        frame = tile,
+        Set = function(nv)
+            valLbl.Text = tostring(nv or "")
+        end
+    }
+end
+
 function Components.CreateInputRow(parent, labelText, descText, initialVal, callback, indexSearch, placeholder)
     local row = Components.CreateBaseRow(parent, labelText, descText, indexSearch)
     local tb = Instance.new("TextBox")
