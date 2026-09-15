@@ -1,109 +1,150 @@
 --[[
-    ===============================================================
-    🚀 IDENTICAL LOADER - LINK THỰC THI DUY NHẤT (AUTO-UPDATE)
-    ===============================================================
-    Cách sử dụng:
-    1. Upload file `local.lua` lên GitHub Repo hoặc GitHub Gist
-    2. Thay đường dẫn bên dưới vào biến SCRIPT_URL
-    3. Bạn chỉ cần chạy 1 dòng loader này trong Executor (Delta, Fluxus, Hydrogen, Synapse, Wave, v.v.)
-    Mỗi khi bạn sửa code và lưu lên link, game sẽ tự động tải bản mới nhất!
+    ==================================================================
+    🚀 IDENTICAL LOADER (BACKUP) V2.2.3 - TẢI & BIÊN DỊCH SIÊU TỐC
+    ==================================================================
 --]]
 
--- RAW URL (fallback)
-local SCRIPT_URL = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/backup.lua"
-
--- GitHub API URL (không bị CDN cache, luôn trả bản mới nhất)
-local GITHUB_API_URL = "https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/backup.lua"
-
--- Base64 decode (dùng để giải mã content từ GitHub API)
-local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local function base64Decode(data)
-    data = data:gsub("[^"..b64chars.."=]", "")
-    local result = {}
-    local pad = data:sub(-2) == "==" and 2 or (data:sub(-1) == "=" and 1 or 0)
-    data = data:gsub("=", "A")
-    for i = 1, #data, 4 do
-        local n = (b64chars:find(data:sub(i,i))-1) * 262144
-                + (b64chars:find(data:sub(i+1,i+1))-1) * 4096
-                + (b64chars:find(data:sub(i+2,i+2))-1) * 64
-                + (b64chars:find(data:sub(i+3,i+3))-1)
-        table.insert(result, string.char(
-            math.floor(n / 65536) % 256,
-            math.floor(n / 256) % 256,
-            n % 256
-        ))
-    end
-    local out = table.concat(result)
-    return out:sub(1, #out - pad)
+local function Notify(title, text, duration)
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = title or "Identical Hub (Backup)",
+            Text = text or "",
+            Duration = duration or 4
+        })
+    end)
 end
 
--- Cơ chế Anti-Cache: Thử GitHub API trước (không cache), fallback về raw
+local SCRIPT_SOURCES = {
+    {
+        name = "GitHub Raw",
+        url = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/backup.lua?t=" .. tostring(tick())
+    },
+    {
+        name = "jsDelivr Edge CDN",
+        url = "https://cdn.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/backup.lua"
+    },
+    {
+        name = "Fastly CDN",
+        url = "https://fastly.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/backup.lua"
+    }
+}
+
+local function IsValidLuaScript(content)
+    if not content or type(content) ~= "string" then return false end
+    if #content < 30000 then return false end
+    if not content:find("pcall") or not content:find("game") then return false end
+    if content:sub(1, 10) == "{\"message\"" or content:find("API rate limit") then return false end
+    return true
+end
+
+local function OptimizeScript(src)
+    local lines = {}
+    for line in src:gmatch("([^\r\n]*)\r?\n?") do
+        local trimmed = line:match("^%s*(.-)%s*$")
+        if trimmed ~= "" and not trimmed:match("^%-%-[^%[]") and not trimmed:match("^%-%-$") then
+            table.insert(lines, trimmed)
+        end
+    end
+    return table.concat(lines, "\n")
+end
+
 local function FetchScript()
-    -- Bước 1: Thử GitHub API (luôn mới nhất, không bị CDN cache)
+    for idx, source in ipairs(SCRIPT_SOURCES) do
+        local ok, result = pcall(function()
+            return game:HttpGet(source.url, true)
+        end)
+        if ok and IsValidLuaScript(result) then
+            return true, result, source.name
+        end
+        task.wait(0.2)
+    end
+
     local apiOk, apiResult = pcall(function()
-        return game:HttpGet(GITHUB_API_URL .. "?t=" .. tostring(tick()), true)
+        return game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/backup.lua?t=" .. tostring(tick()), true)
     end)
-    if apiOk and apiResult and #apiResult > 100 then
+    if apiOk and apiResult and #apiResult > 1000 then
         local decOk, decoded = pcall(function()
             local HttpService = game:GetService("HttpService")
             local data = HttpService:JSONDecode(apiResult)
             if data and data.content then
-                -- GitHub API trả content dạng base64 (có newline \n cần xóa)
-                local b64 = data.content:gsub("\n", ""):gsub("\r", "")
-                return base64Decode(b64)
+                local b64chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+                local b64 = data.content:gsub("[^"..b64chars.."=]", "")
+                local res = {}
+                local pad = b64:sub(-2) == "==" and 2 or (b64:sub(-1) == "=" and 1 or 0)
+                b64 = b64:gsub("=", "A")
+                for i = 1, #b64, 4 do
+                    local n = (b64chars:find(b64:sub(i,i))-1) * 262144
+                            + (b64chars:find(b64:sub(i+1,i+1))-1) * 4096
+                            + (b64chars:find(b64:sub(i+2,i+2))-1) * 64
+                            + (b64chars:find(b64:sub(i+3,i+3))-1)
+                    table.insert(res, string.char(
+                        math.floor(n / 65536) % 256,
+                        math.floor(n / 256) % 256,
+                        n % 256
+                    ))
+                end
+                local out = table.concat(res)
+                return out:sub(1, #out - pad)
             end
         end)
-        if decOk and decoded and #decoded > 1000 then
-            return true, decoded
+        if decOk and IsValidLuaScript(decoded) then
+            return true, decoded, "GitHub API"
         end
     end
 
-    -- Bước 2: Fallback về raw URL với anti-cache query
-    local rawOk, rawResult = pcall(function()
-        return game:HttpGet(SCRIPT_URL .. "?nocache=" .. tostring(math.random(1, 999999)), true)
-    end)
-    if rawOk and rawResult and #rawResult > 0 then
-        return true, rawResult
-    end
-
-    return false, "Không thể tải script từ cả 2 nguồn!"
+    return false, "Không thể tải mã nguồn từ bất kỳ máy chủ nào! Vui lòng kiểm tra lại kết nối mạng hoặc VPN."
 end
 
--- Hiển thị thông báo tải script
-pcall(function()
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "Identical Hub (Bản Backup Gốc)",
-        Text = "Đang tải bản cập nhật mới nhất...",
-        Duration = 3
-    })
-end)
-
-local ok, content = FetchScript()
-if ok and content and #content > 0 then
-    local runOk, runErr = pcall(function()
-        local fn, compileErr = loadstring(content)
-        if not fn then
-            error("Lỗi biên dịch: " .. tostring(compileErr))
-        end
-        fn()
+local function CompileWithRetry(code, maxAttempts)
+    maxAttempts = maxAttempts or 3
+    local optCode = nil
+    pcall(function()
+        optCode = OptimizeScript(code)
     end)
-    if not runOk then
-        warn("[Identical Loader] Lỗi thực thi script:", runErr)
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "❌ Lỗi Chạy Script!",
-                Text = tostring(runErr):sub(1, 100),
-                Duration = 20
-            })
-        end)
+    
+    local variants = {}
+    if optCode and #optCode > 20000 then
+        table.insert(variants, { name = "bản tối ưu tốc độ", code = optCode })
+    end
+    table.insert(variants, { name = "bản gốc", code = code })
+
+    local lastErr = nil
+    for attempt = 1, maxAttempts do
+        for _, variant in ipairs(variants) do
+            local compileOk, compileResult = pcall(function()
+                return loadstring(variant.code)
+            end)
+            if compileOk and type(compileResult) == "function" then
+                return compileResult
+            end
+            lastErr = compileResult or "Không xác định"
+        end
+
+        if attempt < maxAttempts then
+            Notify("Identical Hub (Backup)", "Biên dịch chậm, đang tự động thử lại (" .. (attempt + 1) .. "/" .. maxAttempts .. ")...", 2)
+            task.wait(0.8)
+        end
+    end
+
+    return nil, lastErr
+end
+
+Notify("Identical Hub (Backup)", "Đang tải bản cập nhật mới nhất...", 3)
+
+local ok, content, sourceName = FetchScript()
+if ok and content then
+    local fn, compileErr = CompileWithRetry(content, 3)
+    if fn then
+        local runOk, runErr = pcall(fn)
+        if not runOk then
+            warn("[Identical Loader Backup] Lỗi thực thi code:", runErr)
+            Notify("❌ Lỗi Chạy Script!", tostring(runErr):sub(1, 100), 15)
+        end
+    else
+        warn("[Identical Loader Backup] Lỗi biên dịch sau nhiều lần thử:", compileErr)
+        Notify("❌ Lỗi Biên Dịch!", tostring(compileErr):sub(1, 100), 15)
     end
 else
-    warn("[Identical Loader] Không thể tải script từ link! Vui lòng kiểm tra lại đường dẫn SCRIPT_URL.")
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Lỗi Tải Script",
-            Text = "Không thể kết nối đến máy chủ lưu trữ code!",
-            Duration = 5
-        })
-    end)
+    warn("[Identical Loader Backup] Thất bại khi nạp code:", content)
+    Notify("❌ Lỗi Mạng!", tostring(content):sub(1, 100), 8)
 end
