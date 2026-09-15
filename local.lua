@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.7"
+local SCRIPT_BUILD_COMMIT = "v2.1.8"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -5518,12 +5518,27 @@ end
 function ticketQuestState.IsAllQuestsDoneToday()
     if not ticketQuestState.allQuestsDoneForToday then return false end
     local today = os.date("%Y-%m-%d")
-    if ticketQuestState.allQuestsDoneDate and ticketQuestState.allQuestsDoneDate ~= today then
-        -- Đã sang ngày mới -> Tự động giải phóng cờ để tiếp tục nhận vé ngày mới!
+    local utcToday = os.date("!%Y-%m-%d")
+    local pData = ticketQuestState.GetPlayerDataFolder()
+    local curDailyCount = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value)
+
+    local isDateChanged = (ticketQuestState.allQuestsDoneDate and ticketQuestState.allQuestsDoneDate ~= today)
+        or (ticketQuestState.allQuestsDoneUtcDate and ticketQuestState.allQuestsDoneUtcDate ~= utcToday)
+    local isServerDailyReset = (ticketQuestState.savedDailyCount and curDailyCount and curDailyCount < ticketQuestState.savedDailyCount)
+
+    if isDateChanged or isServerDailyReset then
+        -- Đã sang ngày mới (nửa đêm máy hoặc 00:00 UTC / Game Server reset) -> Tự động giải phóng cờ để tiếp tục nhận vé ngày mới!
         ticketQuestState.allQuestsDoneForToday = false
         ticketQuestState.allQuestsDoneDate = nil
+        ticketQuestState.allQuestsDoneUtcDate = nil
+        ticketQuestState.savedDailyCount = nil
         ticketQuestState.readyForNewQuest = true
         ticketQuestState.isCooldown = false
+        ticketQuestState.isAtHomeSpot = false
+        ticketQuestState.cooldownEnd = 0
+        ticketQuestState.statusText = "Đã sang ngày mới! Chuẩn bị quay lại NPC nhận vé..."
+        ticketQuestState.UpdateUI()
+        ShowNotification("Ngày Mới - Reset Vé", "Đã sang ngày mới! Bot tự động quay lại NPC nhận vé.", "SUCCESS", 6)
         return false
     end
     return true
@@ -5571,6 +5586,11 @@ function ticketQuestState.HandleDialogue(isClaiming)
     if isDoneToday then
         ticketQuestState.allQuestsDoneForToday = true
         ticketQuestState.allQuestsDoneDate = os.date("%Y-%m-%d")
+        ticketQuestState.allQuestsDoneUtcDate = os.date("!%Y-%m-%d")
+        local pData = ticketQuestState.GetPlayerDataFolder()
+        if pData and pData:FindFirstChild("TicketQuestDailyCount") then
+            ticketQuestState.savedDailyCount = tonumber(pData.TicketQuestDailyCount.Value) or 0
+        end
         ticketQuestState.readyForNewQuest = false
         ticketQuestState.isCooldown = true
         ticketQuestState.statusText = "Đã hết nhiệm vụ hôm nay! (Hẹn ngày mai quay lại)"
@@ -6072,6 +6092,8 @@ function ticketQuestState.ResetCooldown()
     ticketQuestState.isAtHomeSpot = false
     ticketQuestState.allQuestsDoneForToday = false
     ticketQuestState.allQuestsDoneDate = nil
+    ticketQuestState.allQuestsDoneUtcDate = nil
+    ticketQuestState.savedDailyCount = nil
     ticketQuestState.currentProgress = 0
     ticketQuestState.currentQuestType = "none"
     ticketQuestState.statusText = "Đã đặt lại! Sẵn sàng nhận vé mới."
@@ -8858,8 +8880,12 @@ end)
 createButtonRow(manualCard, "Đặt Lại / Bỏ Chặn Hết Vé Hôm Nay", "Xóa cờ đánh dấu hết vé hôm nay để bot thử tương tác nhận vé lại", "🔄 Đặt Lại", function()
     ticketQuestState.allQuestsDoneForToday = false
     ticketQuestState.allQuestsDoneDate = nil
+    ticketQuestState.allQuestsDoneUtcDate = nil
+    ticketQuestState.savedDailyCount = nil
     ticketQuestState.readyForNewQuest = true
     ticketQuestState.isCooldown = false
+    ticketQuestState.isAtHomeSpot = false
+    ticketQuestState.cooldownEnd = 0
     ticketQuestState.statusText = "Đã đặt lại! Sẵn sàng thử nhận vé mới."
     ticketQuestState.UpdateUI()
     ShowNotification("Nhiệm Vụ Vé", "Đã xóa cờ hết vé hôm nay! Bot sẽ thử nhận vé lại.", "SUCCESS", 5)

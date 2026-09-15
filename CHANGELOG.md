@@ -2,6 +2,20 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.8] - 2026-09-15
+### 🎫 Kiểm Tra & Tối Ưu Triệt Để Chu Trình Vé: Hết Vé Hôm Nay, Auto Home Spot & Tự Động Sang Ngày Mới (Audit & Upgrade gì):
+1. **Kiểm tra và xác nhận 100% cơ chế tự động hoạt động chính xác theo yêu cầu**:
+   - **Chuyển ô thống kê thành "Hết vé hôm nay"**: Khi làm hết 20 vé trong ngày, NPC trả về câu thoại `"That's all the quests I've got for today! Come back tomorrow for more."`. Script lập tức nhận diện, gắn cờ `allQuestsDoneForToday = true`, và cập nhật ngay lập tức ô **⏳ Chờ Vé Mới** thành `"Hết vé hôm nay"` (đồng thời thông báo trên tab Nhiệm Vụ).
+   - **Tự động bay về Home Spot câu cá / combo farm tiền**: Khi hết vé hôm nay (hoặc trong thời gian 20 phút hồi chiêu vé), nếu bật `Tự về Home Spot khi xong vé` (`TicketReturnHomeWhenDone = true`), bot tự động bay về tọa độ `HomeFarmSpot`, tự động tạo sàn nước an toàn `IdenticalWaterPlatform`, và sau 1 giây kích hoạt quăng cần `CancelAndRecastRod()`, tiếp tục câu cá, chạy combo skill Z-X-C-V và tự bán cá liên tục mà không bị khựng lại.
+2. **Nâng cấp cơ chế phát hiện Ngày Mới (Auto Reset 00:00 UTC & Server Reset)**:
+   - *Điểm yếu trước đây*: Hàm `IsAllQuestsDoneToday()` chỉ kiểm tra ngày của thiết bị máy tính (`os.date("%Y-%m-%d")`), chỉ đổi ngày vào lúc 00:00 nửa đêm giờ máy tính địa phương. Trong khi Roblox Game Server reset số nhiệm vụ hàng ngày vào lúc **00:00 UTC (tức 07:00 sáng giờ Việt Nam)**!
+   - *Nâng cấp mới*:
+     - Bổ sung kiểm tra ngày chuẩn quốc tế **00:00 UTC** (`os.date("!%Y-%m-%d")`).
+     - Bổ sung theo dõi dữ liệu gốc từ Game Server `pData.TicketQuestDailyCount`: nếu server reset số vé làm trong ngày về nhỏ hơn mốc trước đó (ví dụ từ 20 về 0), script lập tức kích hoạt reset ngày mới ngay!
+     - Ngay khi ngày mới được phát hiện: script tự động xóa toàn bộ cờ khóa (`allQuestsDoneForToday = false`, `readyForNewQuest = true`, `isAtHomeSpot = false`), nhân vật tự động cất cần và bay thẳng từ Home Spot về lại NPC để nhận vé làm tiếp mà người dùng hoàn toàn **không cần canh chừng hay thao tác tay**!
+
+---
+
 ## [v2.1.7] - 2026-09-15
 ### 🐛 Sửa Triệt Để Lỗi Khởi Động Line 9265, Sửa Đếm Cá Trong Balo & Nhận Diện Đảo Chuẩn Xác (Fix & Update gì):
 1. **Khắc phục lỗi đỏ khi chạy script: `invalid argument #1 to ipairs (table expected, got nil)` tại dòng 9265**:
