@@ -2,6 +2,25 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.0] - 2026-09-15
+### 💎 Sửa Triệt Để Lỗi Ảo Hoá Gems Không Đổi (Fix & Upgrade gì):
+1. **Khắc phục nguyên nhân khiến Gems bị giữ nguyên khi ảo hoá**:
+   - *Nguyên nhân 1*: Trong cấu trúc dữ liệu server `ReplicatedStorage.Data[UserId]`, trò chơi không có sẵn ValueBase tên `"Gems"` nên lệnh gán cũ bị bỏ qua (khác với Vé Nhiệm Vụ có sẵn `pData.Ticket`).
+   - *Khắc phục*: Nâng cấp `visualSpoofState.ScanPlayerDataGems()` tự động tạo các đối tượng `IntValue` tên `"Gems"` và `"Gem"`, gán đồng loạt vào `pData`, `LocalPlayer` và `leaderstats`, đồng thời gán cả `Attributes`.
+   - *Nguyên nhân 2 (Giao diện game)*: Các TextLabel hiển thị Gems trên thanh HUD/TopBar của game thường nằm trong khung lồng nhiều cấp hoặc có icon `💎` đứng kèm, điều kiện quét cũ không nhận diện được và bị chặn bởi biểu thức số đơn thuần.
+   - *Khắc phục*: Viết bộ quét thông minh đa tầng `visualSpoofState.ScanPlayerGuiGems()`:
+     - Nhận diện theo tên Label, tên Frame cha, tên Frame ông (grandparent).
+     - Nhận diện theo biểu tượng cảm xúc `💎`, `🔷` hoặc từ khóa `gem`, `diamond`, `ruby`.
+     - Nhận diện theo Icon ảnh (ImageLabel) đứng cạnh TextLabel trong cùng một Frame.
+     - Tự động định dạng giữ nguyên icon (ví dụ: `💎 50 000`, `50 000 Gems`).
+   - *Nguyên nhân 3 (Chống game ghi đè lại)*: Hook sự kiện `label:GetPropertyChangedSignal("Text")`: nếu client game cố gắng cập nhật số Gems thật lên màn hình, script sẽ lập tức cưỡng chế hiển thị lại số Gems ảo ngay trong microsecond kế tiếp.
+2. **Nâng cấp ô Thống Kê Script (Bảng 3x5)**:
+   - Đổi tên Tile 9 từ `"💎 Gems Đã Kiếm"` (vốn kèm dấu `+` của phiên treo máy) thành **`"💎 Gems Hiện Có"`** hiển thị chuẩn dạng tổng tài sản (ví dụ: `50 000 Gems`), đồng bộ 100% với ô `🎫 Vé Nhiệm Vụ`.
+3. **Tái cấu trúc bộ nhớ tránh vượt giới hạn biến (Lua 200 Locals Limit)**:
+   - Đóng gói toàn bộ các hàm hỗ trợ vào bảng phương thức `visualSpoofState`, giải quyết triệt để lỗi biên dịch `too many local variables` của Lua 5.1.
+
+---
+
 ## [v2.1.9] - 2026-09-15
 ### 🎭 Tính Năng Mới: Ảo Hoá Vé Nhiệm Vụ & Gems (Visual Spoof) Lưu Vĩnh Viễn Vào Máy (New Feature & Update gì):
 1. **Thêm nhóm tính năng "🎭 Ảo Hoá Tài Sản (Visual Spoof)" vào Tab Nhân Vật**:

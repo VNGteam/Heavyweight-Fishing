@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.9"
+local SCRIPT_BUILD_COMMIT = "v2.2.0"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2759,28 +2759,29 @@ local weatherTotems = {
 local visualSpoofState = {
     fakeTicket = 0,
     fakeGems = 0,
+    hookedGemLabels = {}
 }
 
-local function GetVisualSpoofFileName()
+function visualSpoofState.GetFileName()
     local accName = (LocalPlayer and LocalPlayer.Name) or "Default"
     local safeAcc = accName:gsub("[^%w_]", "")
     if #safeAcc == 0 then safeAcc = "Default" end
     return "heavyweight_visual_spoof_" .. safeAcc .. ".json"
 end
 
-local function SaveVisualSpoof()
+function visualSpoofState.Save()
     if not writefile then return end
     pcall(function()
         local data = {
             fakeTicket = visualSpoofState.fakeTicket or 0,
             fakeGems = visualSpoofState.fakeGems or 0,
         }
-        writefile(GetVisualSpoofFileName(), HttpService:JSONEncode(data))
+        writefile(visualSpoofState.GetFileName(), HttpService:JSONEncode(data))
     end)
 end
 
-local function LoadVisualSpoof()
-    local fileName = GetVisualSpoofFileName()
+function visualSpoofState.Load()
+    local fileName = visualSpoofState.GetFileName()
     if not readfile or not isfile or not isfile(fileName) then return end
     pcall(function()
         local raw = readfile(fileName)
@@ -2798,7 +2799,184 @@ local function LoadVisualSpoof()
     end)
 end
 
-local function ApplyVisualSpoof(isReset)
+function visualSpoofState.UpdateTextLabelWithGems(label, gNum)
+    if not label or not label:IsA("TextLabel") then return end
+    local oldText = label.Text
+    local formatted = FormatWithSpaces(gNum)
+
+    if oldText:find("💎") then
+        if oldText:find("^%s*💎") then
+            label.Text = "💎 " .. formatted
+        elseif oldText:find("💎%s*$") then
+            label.Text = formatted .. " 💎"
+        else
+            label.Text = "💎 " .. formatted
+        end
+    elseif oldText:find("🔷") then
+        label.Text = "🔷 " .. formatted
+    elseif oldText:lower():find("gem") then
+        if oldText:find(":") then
+            label.Text = "Gems: " .. formatted
+        else
+            label.Text = formatted .. " Gems"
+        end
+    elseif oldText:lower():find("diamond") then
+        label.Text = formatted .. " Diamonds"
+    else
+        label.Text = formatted
+    end
+end
+
+function visualSpoofState.HookGemLabel(label, gNum)
+    if visualSpoofState.hookedGemLabels[label] then return end
+    visualSpoofState.hookedGemLabels[label] = true
+    pcall(function()
+        label:GetPropertyChangedSignal("Text"):Connect(function()
+            if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                local targetText = FormatWithSpaces(visualSpoofState.fakeGems)
+                if not label.Text:find(targetText, 1, true) then
+                    task.defer(function()
+                        if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                            visualSpoofState.UpdateTextLabelWithGems(label, visualSpoofState.fakeGems)
+                        end
+                    end)
+                end
+            end
+        end)
+    end)
+end
+
+function visualSpoofState.ScanPlayerGuiGems(gNum)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return end
+
+    for _, desc in ipairs(pg:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Visible then
+            local selfName = desc.Name:lower()
+            local pName = desc.Parent and desc.Parent.Name:lower() or ""
+            local gpName = desc.Parent and desc.Parent.Parent and desc.Parent.Parent.Name:lower() or ""
+            local txtLower = desc.Text:lower()
+
+            local isGem = false
+
+            -- 1. Direct name match
+            if selfName:find("gem") or selfName:find("diamond") or selfName:find("ruby") or selfName:find("da_quy") or selfName:find("da quy") then
+                isGem = true
+            -- 2. Parent or grandparent match
+            elseif pName:find("gem") or pName:find("diamond") or pName:find("ruby") or pName:find("currency2") then
+                isGem = true
+            elseif gpName:find("gem") or gpName:find("diamond") then
+                isGem = true
+            -- 3. Text content contains gem symbols or keywords
+            elseif txtLower:find("gem") or desc.Text:find("💎") or desc.Text:find("🔷") or txtLower:find("diamond") then
+                isGem = true
+            -- 4. Check siblings for gem icon / image
+            elseif desc.Parent then
+                for _, sib in ipairs(desc.Parent:GetChildren()) do
+                    if sib ~= desc then
+                        local sibName = sib.Name:lower()
+                        if sibName:find("gem") or sibName:find("diamond") or sibName:find("ruby") then
+                            isGem = true
+                            break
+                        end
+                        if sib:IsA("ImageLabel") or sib:IsA("ImageButton") then
+                            local img = tostring(sib.Image):lower()
+                            if img:find("gem") or img:find("diamond") or img:find("ruby") then
+                                isGem = true
+                                break
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- Loại trừ nếu nhầm sang vé, tiền cash, level, exp, hoặc cân nặng cá (kg)
+            if isGem then
+                local isExcluded = selfName:find("ticket") or pName:find("ticket") or desc.Text:find("Vé")
+                    or selfName:find("cash") or pName:find("cash") or desc.Text:find("%$")
+                    or selfName:find("level") or selfName:find("exp")
+                    or desc.Text:find("kg") or desc.Text:find("KG")
+                if not isExcluded then
+                    visualSpoofState.UpdateTextLabelWithGems(desc, gNum)
+                    visualSpoofState.HookGemLabel(desc, gNum)
+                end
+            end
+        end
+    end
+end
+
+function visualSpoofState.ScanPlayerDataGems(gNum)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+    if not pData then return end
+
+    -- 1. Quét sâu tất cả con cháu trong pData
+    for _, item in ipairs(pData:GetDescendants()) do
+        local iName = item.Name:lower()
+        if iName:find("gem") or iName:find("diamond") or iName:find("ruby") or iName:find("crystal") or iName:find("shard") then
+            if item:IsA("ValueBase") then
+                pcall(function() item.Value = gNum end)
+                pcall(function()
+                    item.Changed:Connect(function(v)
+                        if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 and v ~= visualSpoofState.fakeGems then
+                            task.defer(function()
+                                if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                                    item.Value = visualSpoofState.fakeGems
+                                end
+                            end)
+                        end
+                    end)
+                end)
+            end
+        end
+    end
+
+    -- 2. Đặt thuộc tính Attribute trên pData và LocalPlayer
+    for _, a in ipairs({"Gems", "Gem", "Diamonds", "Diamond", "Ruby"}) do
+        pcall(function() pData:SetAttribute(a, gNum) end)
+        pcall(function() LocalPlayer:SetAttribute(a, gNum) end)
+    end
+
+    -- 3. Tạo hoặc gán ValueBase "Gems" và "Gem" trực tiếp trong pData để mọi script game đều đọc được
+    for _, gName in ipairs({"Gems", "Gem"}) do
+        local obj = pData:FindFirstChild(gName)
+        if not obj then
+            pcall(function()
+                local nv = Instance.new("IntValue")
+                nv.Name = gName
+                nv.Value = gNum
+                nv.Parent = pData
+                nv.Changed:Connect(function(v)
+                    if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 and v ~= visualSpoofState.fakeGems then
+                        task.defer(function()
+                            if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+                                nv.Value = visualSpoofState.fakeGems
+                            end
+                        end)
+                    end
+                end)
+            end)
+        else
+            if obj:IsA("ValueBase") then
+                pcall(function() obj.Value = gNum end)
+            end
+        end
+    end
+
+    -- 4. Đặt leaderstats nếu có
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        for _, ch in ipairs(ls:GetChildren()) do
+            local cLow = ch.Name:lower()
+            if cLow:find("gem") or cLow:find("diamond") or cLow:find("ruby") then
+                if ch:IsA("ValueBase") then
+                    pcall(function() ch.Value = gNum end)
+                end
+            end
+        end
+    end
+end
+
+function visualSpoofState.Apply(isReset)
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     local ls = LocalPlayer:FindFirstChild("leaderstats")
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
@@ -2821,7 +2999,6 @@ local function ApplyVisualSpoof(isReset)
         if StatTiles.Tickets and StatTiles.Tickets.Set then
             StatTiles.Tickets.Set(FormatWithSpaces(num) .. " Vé")
         end
-        -- Cập nhật PlayerGui các nhãn vé
         if pg then
             for _, d in ipairs(pg:GetDescendants()) do
                 if d:IsA("TextLabel") and d.Visible then
@@ -2836,53 +3013,29 @@ local function ApplyVisualSpoof(isReset)
             end
         end
     elseif isReset and pData then
-        -- Khôi phục số vé thật
         local tReal = pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
         if StatTiles.Tickets and StatTiles.Tickets.Set then
             StatTiles.Tickets.Set(FormatWithSpaces(tReal) .. " Vé")
         end
     end
 
-    -- 2. Ảo hoá Gems (Đá Quý)
+    -- 2. Ảo hoá Gems (Đá Quý) - Áp dụng cả pData, leaderstats, và PlayerGui
     if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 and not isReset then
         local gNum = visualSpoofState.fakeGems
-        if pData then
-            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
-                local gObj = pData:FindFirstChild(gName)
-                if gObj and gObj:IsA("ValueBase") then
-                    pcall(function() gObj.Value = gNum end)
-                end
-            end
-        end
-        if ls then
-            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
-                local lsG = ls:FindFirstChild(gName)
-                if lsG and lsG:IsA("ValueBase") then
-                    pcall(function() lsG.Value = gNum end)
-                end
-            end
-        end
+        visualSpoofState.ScanPlayerDataGems(gNum)
+        visualSpoofState.ScanPlayerGuiGems(gNum)
         if StatTiles.GemsGained and StatTiles.GemsGained.Set then
-            StatTiles.GemsGained.Set("+" .. FormatWithSpaces(gNum) .. " Gems")
+            StatTiles.GemsGained.Set(FormatWithSpaces(gNum) .. " Gems")
         end
-        -- Cập nhật PlayerGui các nhãn gem
-        if pg then
-            for _, d in ipairs(pg:GetDescendants()) do
-                if d:IsA("TextLabel") and d.Visible then
-                    local sLow = d.Name:lower()
-                    local pLow = d.Parent and d.Parent.Name:lower() or ""
-                    if sLow:find("gem") or pLow:find("gem") or sLow:find("diamond") or pLow:find("diamond") then
-                        if d.Text:match("^[%d%s,%.]+$") or d.Text:find("Gems?") or d.Text:find("Diamond") then
-                            d.Text = FormatWithSpaces(gNum)
-                        end
-                    end
-                end
-            end
+    elseif isReset then
+        if StatTiles.GemsGained and StatTiles.GemsGained.Set then
+            local realG = (GetPlayerCurrentGems and GetPlayerCurrentGems()) or 0
+            StatTiles.GemsGained.Set(FormatWithSpaces(realG) .. " Gems")
         end
     end
 end
 
-local function HookVisualSpoof()
+function visualSpoofState.Hook()
     local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
     if not pData then return end
 
@@ -2903,29 +3056,15 @@ local function HookVisualSpoof()
         end)
     end
 
-    for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
-        local gObj = pData:FindFirstChild(gName)
-        if gObj and gObj:IsA("ValueBase") then
-            pcall(function()
-                gObj.Changed:Connect(function(newVal)
-                    if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
-                        if newVal ~= visualSpoofState.fakeGems then
-                            task.defer(function()
-                                if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
-                                    gObj.Value = visualSpoofState.fakeGems
-                                end
-                            end)
-                        end
-                    end
-                end)
-            end)
-        end
+    if visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+        visualSpoofState.ScanPlayerDataGems(visualSpoofState.fakeGems)
+        visualSpoofState.ScanPlayerGuiGems(visualSpoofState.fakeGems)
     end
 end
 
 -- Tải ngay cài đặt ảo hoá từ máy và hook lắng nghe server
-pcall(LoadVisualSpoof)
-pcall(HookVisualSpoof)
+pcall(visualSpoofState.Load)
+pcall(visualSpoofState.Hook)
 
 local StatTiles = {}
 local WorldData = {
@@ -6965,7 +7104,7 @@ StatTiles.FishPerHour        = createStatGridTile(statsGridContainer, "⚡ Tốc
 
 StatTiles.Cash               = createStatGridTile(statsGridContainer, "💰 Tiền Hiện Tại", "$0", Colors.AccentGreen, 7)
 StatTiles.CashPerHour        = createStatGridTile(statsGridContainer, "📈 Tốc Độ Tiền", "$0 /h", Colors.AccentGreen, 8)
-StatTiles.GemsGained         = createStatGridTile(statsGridContainer, "💎 Gems Đã Kiếm", "+0 Gems", Colors.AccentBlue, 9)
+StatTiles.GemsGained         = createStatGridTile(statsGridContainer, "💎 Gems Hiện Có", "0 Gems", Colors.AccentBlue, 9)
 
 StatTiles.Tickets            = createStatGridTile(statsGridContainer, "🎫 Vé Nhiệm Vụ", "0 Vé", Colors.AccentOrange, 10)
 StatTiles.EssenceOrbs        = createStatGridTile(statsGridContainer, "🔮 Essence Orb", "0 Viên", Colors.PurpleAccent, 11)
@@ -6991,7 +7130,14 @@ createButtonRow(statsCard, "Đặt Lại Thông Số Treo (Reset AFK)", "Đặt 
     if StatTiles.Uptime and StatTiles.Uptime.Set then StatTiles.Uptime.Set("00:00:00") end
     if StatTiles.FishPerHour and StatTiles.FishPerHour.Set then StatTiles.FishPerHour.Set("0 con/h") end
     if StatTiles.CashPerHour and StatTiles.CashPerHour.Set then StatTiles.CashPerHour.Set("$0 /h") end
-    if StatTiles.GemsGained and StatTiles.GemsGained.Set then StatTiles.GemsGained.Set("+0 Gems") end
+    if StatTiles.GemsGained and StatTiles.GemsGained.Set then
+        if visualSpoofState and visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+            StatTiles.GemsGained.Set(FormatWithSpaces(visualSpoofState.fakeGems) .. " Gems")
+        else
+            local realG = (GetPlayerCurrentGems and GetPlayerCurrentGems()) or 0
+            StatTiles.GemsGained.Set(FormatWithSpaces(realG) .. " Gems")
+        end
+    end
 
     ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
 end)
@@ -10104,8 +10250,8 @@ ticketInputRow = createInputRow(spoofCard, "Ảo Hoá Vé Nhiệm Vụ", "Nhập
     local cleanDigits = txt:gsub("[^%d]", "")
     local num = tonumber(cleanDigits) or 0
     visualSpoofState.fakeTicket = num
-    SaveVisualSpoof()
-    ApplyVisualSpoof()
+    visualSpoofState.Save()
+    visualSpoofState.Apply()
     if num > 0 then
         ShowNotification("Ảo Hoá Vé", "Đã ảo hoá thành công: " .. FormatWithSpaces(num) .. " Vé (Đã lưu máy)!", "SUCCESS", 5)
     else
@@ -10117,8 +10263,8 @@ gemsInputRow = createInputRow(spoofCard, "Ảo Hoá Gems / Đá Quý", "Nhập s
     local cleanDigits = txt:gsub("[^%d]", "")
     local num = tonumber(cleanDigits) or 0
     visualSpoofState.fakeGems = num
-    SaveVisualSpoof()
-    ApplyVisualSpoof()
+    visualSpoofState.Save()
+    visualSpoofState.Apply()
     if num > 0 then
         ShowNotification("Ảo Hoá Gems", "Đã ảo hoá thành công: " .. FormatWithSpaces(num) .. " Gems (Đã lưu máy)!", "SUCCESS", 5)
     else
@@ -10129,8 +10275,8 @@ end, "ao hoa gems da quy", "Nhập số Gems... (VD: 999999)")
 createButtonRow(spoofCard, "Khôi Phục Số Thật (Reset)", "Tắt toàn bộ ảo hoá và khôi phục hiển thị số lượng thực tế", "🔄 Khôi Phục Thật", function()
     visualSpoofState.fakeTicket = 0
     visualSpoofState.fakeGems = 0
-    SaveVisualSpoof()
-    ApplyVisualSpoof(true)
+    visualSpoofState.Save()
+    visualSpoofState.Apply(true)
     if ticketInputRow and ticketInputRow.Set then ticketInputRow.Set("") end
     if gemsInputRow and gemsInputRow.Set then gemsInputRow.Set("") end
     ShowNotification("Ảo Hoá", "Đã xóa toàn bộ số ảo và khôi phục số lượng thật!", "SUCCESS", 5)
@@ -12086,9 +12232,10 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
             if StatTiles.GemsGained and StatTiles.GemsGained.Set then
                 if visualSpoofState and visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
-                    StatTiles.GemsGained.Set("+" .. FormatWithSpaces(visualSpoofState.fakeGems) .. " Gems")
+                    StatTiles.GemsGained.Set(FormatWithSpaces(visualSpoofState.fakeGems) .. " Gems")
                 else
-                    StatTiles.GemsGained.Set("+" .. FormatWithSpaces(gainedGems) .. " Gems")
+                    local realG = (GetPlayerCurrentGems and GetPlayerCurrentGems()) or gainedGems
+                    StatTiles.GemsGained.Set(FormatWithSpaces(realG) .. " Gems")
                 end
             end
 
@@ -12100,7 +12247,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 StatTiles.Tickets.Set(FormatWithSpaces(tVal) .. " Vé")
             end
             if visualSpoofState and ((visualSpoofState.fakeTicket and visualSpoofState.fakeTicket > 0) or (visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0)) then
-                ApplyVisualSpoof()
+                visualSpoofState.Apply()
             end
             if StatTiles.EssenceOrbs and StatTiles.EssenceOrbs.Set then
                 local orbVal = pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
