@@ -2,6 +2,41 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.2] - 2026-09-15
+### 🔭 Tầm Nhìn Xa Siêu Nét - Triệt Tiêu Hoàn Toàn Mờ Xa & Sương Mù (Feature & Fix gì):
+1. **Khắc phục nguyên nhân nhìn xa toàn bị mờ map**:
+   - *Nguyên nhân kỹ thuật*: Roblox và trò chơi mặc định sử dụng hiệu ứng `DepthOfFieldEffect` (làm mờ trường ảnh theo khoảng cách) cùng với `Atmosphere.Haze` và `Atmosphere.Density`. Khi nhìn ra xa qua các đảo hoặc đại dương, cảnh vật bị làm mờ nhòe gây nhức mắt và không thể quan sát đảo từ xa.
+   - *Giải pháp triệt để*:
+     - **Tắt toàn bộ hiệu ứng `DepthOfFieldEffect`**: Gán `Enabled = false`, triệt tiêu `FarIntensity = 0` và `NearIntensity = 0` trên cả `Lighting`, `Camera` và `Workspace`.
+     - **Tắt toàn bộ hiệu ứng `BlurEffect`**: Gán `Enabled = false` và `Size = 0`.
+     - **Làm trong suốt khí quyển `Atmosphere`**: Hạ `Density = 0`, `Haze = 0`, `Glare = 0`, `Offset = 0` loại bỏ màn khói sương đục mờ biển.
+     - **Đẩy tầm nhìn sương mù tối đa**: Gán `FogEnd = 1,000,000` và `FogStart = 1,000,000`.
+2. **Thêm nút gạt "Tầm Nhìn Xa (Xóa Mờ Map)" trong Tab Thị Giác & Đồ Họa**:
+   - Mặc định **BẬT SẴN** ngay khi load script, giúp mọi người chơi vừa vào game là nhìn rõ mồn một toàn bộ map và các hòn đảo từ xa siêu nét.
+   - Tự động lưu cấu hình theo tài khoản người dùng (`ClearFarVision`).
+3. **Cơ chế chống game ghi đè (Anti Weather Re-blur)**:
+   - Tự động lắng nghe `Lighting.DescendantAdded` và `Camera.DescendantAdded`: Khi game đổi thời tiết (mưa, bão, sương) và tự tạo hiệu ứng làm mờ mới, script sẽ lập tức triệt tiêu ngay lập tức.
+   - Vòng lặp giám sát liên tục mỗi 2 giây đảm bảo tầm nhìn luôn luôn rõ nét 100% trong suốt quá trình treo máy.
+
+---
+
+## [v2.2.1] - 2026-09-15
+### 🎯 Nhúng Trực Tiếp Toàn Bộ Tọa Độ Vị Trí Câu Săn Boss Gốc Cho Tất Cả Người Dùng (Update gì):
+1. **Cập nhật tọa độ đứng câu & hướng nhìn biển chuẩn xác cho toàn bộ 8 đảo săn Secret Boss**:
+   - Nhúng trực tiếp bộ tọa độ chuẩn (`pos` & `lookAt`) do người dùng cung cấp vào bảng cơ sở dữ liệu gốc `secretBossDatabase` trong script:
+     - 🎋 **Đảo Tre (Bamboo Isle)**: `pos(-1504.8, 14.7, 252.7)`, `lookAt(-1515.0, 14.7, 301.6)`
+     - ☣️ **Đảo Phóng Xạ (Fallout Isle)**: `pos(30.1, 9.3, 1682.3)`, `lookAt(32.3, 9.3, 1732.2)`
+     - 🐟 **Đảo Cá Chép (Perch Isle)**: `pos(126.3, 6.8, -1472.7)`, `lookAt(116.6, 6.8, -1423.6)`
+     - ❄️ **Đảo Băng Giá (Frost Isle)**: `pos(-1519.4, 6.8, -1334.5)`, `lookAt(-1469.6, 6.8, -1338.2)`
+     - 🥥 **Đảo Quả Dừa (Coconut Isle)**: `pos(1250.0, 9.5, -1297.7)`, `lookAt(1289.4, 9.5, -1328.5)`
+     - ☀️ **Đảo Hổ Phách (Amber Isle)**: `pos(1579.8, 18.2, 1238.4)`, `lookAt(1629.5, 18.2, 1233.7)`
+     - 🏔️ **Đảo Đỉnh Sương Mù (Mistpeak)**: `pos(3031.4, 19.2, 94.8)`, `lookAt(3081.0, 19.2, 101.3)`
+     - 🐙 **Vùng Biển Sâu (Secret Ocean)**: `pos(1419.7, 20.5, -208.8)`, `lookAt(1420.1, 20.5, -258.8)`
+2. **Hiệu lực toàn cục cho tất cả người dùng**:
+   - Tất cả người chơi khi chạy script mới sẽ mặc định dùng ngay bộ vị trí câu mép nước và góc nhìn câu tối ưu này khi xuất hiện Secret Boss mà không cần phải đi dò tìm hoặc cài đặt thủ công lại từng đảo!
+
+---
+
 ## [v2.2.0] - 2026-09-15
 ### 💎 Sửa Triệt Để Lỗi Ảo Hoá Gems Không Đổi (Fix & Upgrade gì):
 1. **Khắc phục nguyên nhân khiến Gems bị giữ nguyên khi ảo hoá**:

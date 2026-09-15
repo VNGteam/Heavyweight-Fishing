@@ -40,6 +40,61 @@ function Visuals.ApplyFullbright(enabled)
     end
 end
 
+function Visuals.ApplyClearVision(enabled)
+    local Camera = Workspace.CurrentCamera
+    if enabled then
+        pcall(function()
+            Lighting.FogEnd = 1000000
+            Lighting.FogStart = 1000000
+        end)
+        for _, obj in ipairs(Lighting:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("DepthOfFieldEffect") then
+                    obj.Enabled = false
+                    obj.FarIntensity = 0
+                    obj.NearIntensity = 0
+                elseif obj:IsA("BlurEffect") then
+                    obj.Enabled = false
+                    obj.Size = 0
+                elseif obj:IsA("Atmosphere") then
+                    obj.Density = 0
+                    obj.Haze = 0
+                    obj.Glare = 0
+                    obj.Offset = 0
+                end
+            end)
+        end
+        if Camera then
+            for _, obj in ipairs(Camera:GetDescendants()) do
+                pcall(function()
+                    if obj:IsA("DepthOfFieldEffect") then
+                        obj.Enabled = false
+                    elseif obj:IsA("BlurEffect") then
+                        obj.Enabled = false
+                    elseif obj:IsA("ParticleEmitter") then
+                        obj.Enabled = false
+                    end
+                end)
+            end
+        end
+    else
+        pcall(function()
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+        end)
+        for _, obj in ipairs(Lighting:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+                    obj.Enabled = true
+                elseif obj:IsA("Atmosphere") then
+                    obj.Density = 0.3
+                    obj.Haze = 0.5
+                end
+            end)
+        end
+    end
+end
+
 -- 3. ESP Helper
 function Visuals.AddBillboard(parentPart, title, color)
     if not parentPart or parentPart:FindFirstChild("ESP_Tag") then return end

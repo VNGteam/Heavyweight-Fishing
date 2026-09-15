@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.2.0"
+local SCRIPT_BUILD_COMMIT = "v2.2.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -268,6 +268,7 @@ local Config = {
     ESP_Boss = false,
     ESP_Players = false,
     FishRedRing = true,
+    ClearFarVision = true,
     NoFog = false,
     Fullbright = true,
     FullbrightLevel = 2.0,
@@ -497,6 +498,7 @@ local ConfigLabelMap = {
     ["ESP Người Chơi"] = "ESP_Players",
     ["Vòng Tròn Định Vị Cá"] = "FishRedRing",
     ["Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ"] = "ShowFishWeightRing",
+    ["Tầm Nhìn Xa (Xóa Mờ Map)"] = "ClearFarVision",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
     ["Mức Độ Sáng (Fullbright)"] = "FullbrightLevel",
@@ -711,6 +713,7 @@ Config._essentialKeys = {
     ["FishRedRing"] = true,
     ["ShowFishWeightRing"] = true,
     ["Fullbright"] = true,
+    ["ClearFarVision"] = true,
     ["NoFog"] = true,
     ["HideOverheadNames"] = true,
 
@@ -1787,12 +1790,12 @@ local secretBossDatabase = {
         patterns = {"bamboo", "đảo tre", "dao tre", "đảo 2", "dao 2"},
         weatherPatterns = {"thunderstorm", "bão sấm", "bao sam", "thunder", "sấm", "lightning"},
         bossPatterns = {"scarlet fish", "elder scarlet", "crimson electric eel", "electric eel", "golden dragonfish", "rainbow dragonfish"},
-        pos = Vector3.new(-1187.8, 7.5, -22.5),
-        lookAt = Vector3.new(-1137.9, 7.5, -24.9),
+        pos = Vector3.new(-1504.8, 14.7, 252.7),
+        lookAt = Vector3.new(-1515.0, 14.7, 301.6),
         spots = {
             [1] = {
-                pos = Vector3.new(-1187.8, 7.5, -22.5),
-                lookAt = Vector3.new(-1137.9, 7.5, -24.9),
+                pos = Vector3.new(-1504.8, 14.7, 252.7),
+                lookAt = Vector3.new(-1515.0, 14.7, 301.6),
             },
         },
         bosses = {
@@ -1809,12 +1812,12 @@ local secretBossDatabase = {
         patterns = {"fallout", "phóng xạ", "phong xa", "đảo 3", "dao 3"},
         weatherPatterns = {"rainy", "trời mưa", "troi mua", "heavy rain", "mưa", "rain"},
         bossPatterns = {"alligator gar", "verdant alligator", "verdant grouper", "verdant bonefang", "crimson bonefang", "bonefang"},
-        pos = Vector3.new(12.0, 19.0, 1413.0),
-        lookAt = Vector3.new(8.3, 19.0, 1363.2),
+        pos = Vector3.new(30.1, 9.3, 1682.3),
+        lookAt = Vector3.new(32.3, 9.3, 1732.2),
         spots = {
             [1] = {
-                pos = Vector3.new(12.0, 19.0, 1413.0),
-                lookAt = Vector3.new(8.3, 19.0, 1363.2),
+                pos = Vector3.new(30.1, 9.3, 1682.3),
+                lookAt = Vector3.new(32.3, 9.3, 1732.2),
             },
         },
         bosses = {
@@ -1830,12 +1833,12 @@ local secretBossDatabase = {
         patterns = {"perch", "cá chép", "ca chep", "đảo 5", "dao 5"},
         weatherPatterns = {"windy", "trời gió", "troi gio", "gale", "gió", "wind"},
         bossPatterns = {"flying fish empress", "flying fish emperor", "flying fish"},
-        pos = Vector3.new(-85.3, 9.3, -1340.8),
-        lookAt = Vector3.new(-114.0, 9.3, -1381.8),
+        pos = Vector3.new(126.3, 6.8, -1472.7),
+        lookAt = Vector3.new(116.6, 6.8, -1423.6),
         spots = {
             [1] = {
-                pos = Vector3.new(-85.3, 9.3, -1340.8),
-                lookAt = Vector3.new(-114.0, 9.3, -1381.8),
+                pos = Vector3.new(126.3, 6.8, -1472.7),
+                lookAt = Vector3.new(116.6, 6.8, -1423.6),
             },
         },
         bosses = {
@@ -1849,12 +1852,12 @@ local secretBossDatabase = {
         patterns = {"frost", "băng giá", "bang gia", "đảo băng", "dao bang", "đảo 6", "dao 6"},
         weatherPatterns = {"snowy", "bão tuyết", "bao tuyet", "blizzard", "tuyết", "snow", "frosty"},
         bossPatterns = {"reborn puffer beast", "puffer beast", "frost kingfish", "frost queenfish"},
-        pos = Vector3.new(-1347.6, 8.9, -1454.2),
-        lookAt = Vector3.new(-1353.8, 8.9, -1404.6),
+        pos = Vector3.new(-1519.4, 6.8, -1334.5),
+        lookAt = Vector3.new(-1469.6, 6.8, -1338.2),
         spots = {
             [1] = {
-                pos = Vector3.new(-1347.6, 8.9, -1454.2),
-                lookAt = Vector3.new(-1353.8, 8.9, -1404.6),
+                pos = Vector3.new(-1519.4, 6.8, -1334.5),
+                lookAt = Vector3.new(-1469.6, 6.8, -1338.2),
             },
         },
         bosses = {
@@ -1869,12 +1872,12 @@ local secretBossDatabase = {
         patterns = {"coconut", "quả dừa", "qua dua", "đảo dừa", "dao dua", "đảo 7", "dao 7"},
         weatherPatterns = {"foggy", "sương mù", "suong mu", "dense fog", "mist", "sương", "fog"},
         bossPatterns = {"tigerfang whale", "tigerfang", "tiger fang", "heavenpiercer turtle", "heavenpiercer", "heaven piercer turtle", "heaven piercer", "piercer turtle", "rùa", "rua"},
-        pos = Vector3.new(1412.0, 9.3, -1457.7),
-        lookAt = Vector3.new(1404.0, 9.3, -1408.4),
+        pos = Vector3.new(1250.0, 9.5, -1297.7),
+        lookAt = Vector3.new(1289.4, 9.5, -1328.5),
         spots = {
             [1] = {
-                pos = Vector3.new(1412.0, 9.3, -1457.7),
-                lookAt = Vector3.new(1404.0, 9.3, -1408.4),
+                pos = Vector3.new(1250.0, 9.5, -1297.7),
+                lookAt = Vector3.new(1289.4, 9.5, -1328.5),
             },
         },
         bosses = {
@@ -1888,12 +1891,12 @@ local secretBossDatabase = {
         patterns = {"amber", "hổ phách", "ho phach", "đảo 8", "dao 8"},
         weatherPatterns = {"blazing sun", "nắng gắt", "nang gat", "blazing", "heatwave", "nắng", "sun"},
         bossPatterns = {"draconic koi", "draconic", "sanguine fish", "sanguine"},
-        pos = Vector3.new(1146.0, 9.3, 1391.6),
-        lookAt = Vector3.new(1096.2, 9.3, 1395.8),
+        pos = Vector3.new(1579.8, 18.2, 1238.4),
+        lookAt = Vector3.new(1629.5, 18.2, 1233.7),
         spots = {
             [1] = {
-                pos = Vector3.new(1146.0, 9.3, 1391.6),
-                lookAt = Vector3.new(1096.2, 9.3, 1395.8),
+                pos = Vector3.new(1579.8, 18.2, 1238.4),
+                lookAt = Vector3.new(1629.5, 18.2, 1233.7),
             },
         },
         bosses = {
@@ -1907,12 +1910,12 @@ local secretBossDatabase = {
         patterns = {"mistpeak", "đỉnh sương mù", "dinh suong mu", "đảo 10", "dao 10"},
         weatherPatterns = {"mountain peak", "mistpeak", "đỉnh núi"},
         bossPatterns = {"mountain dragonwhale", "dragonwhale", "mountain fish"},
-        pos = Vector3.new(2579.1, 9.3, 11.7),
-        lookAt = Vector3.new(2529.3, 9.3, 7.3),
+        pos = Vector3.new(3031.4, 19.2, 94.8),
+        lookAt = Vector3.new(3081.0, 19.2, 101.3),
         spots = {
             [1] = {
-                pos = Vector3.new(2579.1, 9.3, 11.7),
-                lookAt = Vector3.new(2529.3, 9.3, 7.3),
+                pos = Vector3.new(3031.4, 19.2, 94.8),
+                lookAt = Vector3.new(3081.0, 19.2, 101.3),
             },
         },
         bosses = {
@@ -1925,12 +1928,12 @@ local secretBossDatabase = {
         patterns = {"octo", "bạch tuộc", "bach tuoc", "phao", "buoy", "secret ocean"},
         weatherPatterns = {"special event", "octo", "bạch tuộc"},
         bossPatterns = {"mirage lanternfish", "lanternfish", "nameless octoparasite", "octoparasite"},
-        pos = Vector3.new(1608.2, 5.5, -218.3),
-        lookAt = Vector3.new(1635.0, 5.0, -235.0),
+        pos = Vector3.new(1419.7, 20.5, -208.8),
+        lookAt = Vector3.new(1420.1, 20.5, -258.8),
         spots = {
             [1] = {
-                pos = Vector3.new(1608.2, 5.5, -218.3),
-                lookAt = Vector3.new(1635.0, 5.0, -235.0),
+                pos = Vector3.new(1419.7, 20.5, -208.8),
+                lookAt = Vector3.new(1420.1, 20.5, -258.8),
             },
         },
         bosses = {
@@ -10046,30 +10049,146 @@ createToggleRow(espCard, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ",
 createCategoryHeader(tabVisuals, "Ánh Sáng & Tối Ưu Giảm Lag")
 local perfCard = createCardGroup(tabVisuals)
 
-createToggleRow(perfCard, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương mù, khói mờ, hạt mưa và sấm sét", Config.NoFog, function(v)
-    Config.NoFog = v
-    if v then
-        Lighting.FogEnd = 1000000
-        Lighting.FogStart = 1000000
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo then
-            atmo.Density = 0
-            atmo.Haze = 0
-            atmo.Glare = 0
+local clearVisionState = {}
+
+function clearVisionState.Apply(enabled)
+    if enabled then
+        pcall(function()
+            Lighting.FogEnd = 1000000
+            Lighting.FogStart = 1000000
+        end)
+        for _, obj in ipairs(Lighting:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("DepthOfFieldEffect") then
+                    obj.Enabled = false
+                    obj.FarIntensity = 0
+                    obj.NearIntensity = 0
+                elseif obj:IsA("BlurEffect") then
+                    obj.Enabled = false
+                    obj.Size = 0
+                elseif obj:IsA("Atmosphere") then
+                    obj.Density = 0
+                    obj.Haze = 0
+                    obj.Glare = 0
+                    obj.Offset = 0
+                end
+            end)
         end
-        for _, d in ipairs(Camera:GetDescendants()) do
-            if d:IsA("ParticleEmitter") then d.Enabled = false end
+        for _, obj in ipairs(Camera:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("DepthOfFieldEffect") then
+                    obj.Enabled = false
+                    obj.FarIntensity = 0
+                    obj.NearIntensity = 0
+                elseif obj:IsA("BlurEffect") then
+                    obj.Enabled = false
+                    obj.Size = 0
+                elseif obj:IsA("ParticleEmitter") then
+                    obj.Enabled = false
+                end
+            end)
+        end
+        for _, obj in ipairs(Workspace:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+                    obj.Enabled = false
+                end
+            end)
         end
     else
-        Lighting.FogEnd = 100000
-        Lighting.FogStart = 0
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo then
-            atmo.Density = 0.3
-            atmo.Haze = 0.5
+        pcall(function()
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+        end)
+        for _, obj in ipairs(Lighting:GetDescendants()) do
+            pcall(function()
+                if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+                    obj.Enabled = true
+                elseif obj:IsA("Atmosphere") then
+                    obj.Density = 0.3
+                    obj.Haze = 0.5
+                end
+            end)
         end
     end
+end
+
+createToggleRow(perfCard, "Tầm Nhìn Xa (Xóa Mờ Map)", "Tắt hiệu ứng làm mờ xa (DepthOfField) & sương mù, nhìn rõ mọi hòn đảo từ xa", Config.ClearFarVision, function(v)
+    Config.ClearFarVision = v
+    clearVisionState.Apply(v or Config.NoFog)
 end)
+
+createToggleRow(perfCard, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương mù, khói mờ, hạt mưa và sấm sét che khuất tầm nhìn", Config.NoFog, function(v)
+    Config.NoFog = v
+    clearVisionState.Apply(v or Config.ClearFarVision)
+end)
+
+-- Lắng nghe đối tượng hiệu ứng mới sinh ra từ hệ thống thời tiết game để triệt tiêu tức thì
+table.insert(activeConnections, Lighting.DescendantAdded:Connect(function(obj)
+    if not (Config.ClearFarVision or Config.NoFog) then return end
+    pcall(function()
+        if obj:IsA("DepthOfFieldEffect") then
+            obj.Enabled = false
+            obj.FarIntensity = 0
+            obj.NearIntensity = 0
+        elseif obj:IsA("BlurEffect") then
+            obj.Enabled = false
+            obj.Size = 0
+        elseif obj:IsA("Atmosphere") then
+            obj.Density = 0
+            obj.Haze = 0
+            obj.Glare = 0
+            obj.Offset = 0
+        end
+    end)
+end))
+
+table.insert(activeConnections, Camera.DescendantAdded:Connect(function(obj)
+    if not (Config.ClearFarVision or Config.NoFog) then return end
+    pcall(function()
+        if obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect") then
+            obj.Enabled = false
+        elseif obj:IsA("ParticleEmitter") then
+            obj.Enabled = false
+        end
+    end)
+end))
+
+-- Vòng lặp duy trì tầm nhìn xa liên tục chống game tự bật lại mờ/sương khi đổi thời tiết
+task.spawn(function()
+    while isRunning do
+        if Config.ClearFarVision or Config.NoFog then
+            pcall(function()
+                if Lighting.FogEnd < 500000 then
+                    Lighting.FogEnd = 1000000
+                    Lighting.FogStart = 1000000
+                end
+                for _, obj in ipairs(Lighting:GetDescendants()) do
+                    if obj:IsA("DepthOfFieldEffect") and obj.Enabled then
+                        obj.Enabled = false
+                        obj.FarIntensity = 0
+                    elseif obj:IsA("BlurEffect") and obj.Enabled then
+                        obj.Enabled = false
+                    elseif obj:IsA("Atmosphere") and (obj.Density > 0.01 or obj.Haze > 0.01) then
+                        obj.Density = 0
+                        obj.Haze = 0
+                    end
+                end
+                for _, obj in ipairs(Camera:GetDescendants()) do
+                    if (obj:IsA("DepthOfFieldEffect") or obj:IsA("BlurEffect")) and obj.Enabled then
+                        obj.Enabled = false
+                    end
+                end
+            end)
+        end
+        task.wait(2)
+    end
+end)
+
+-- Tự động kích hoạt tầm nhìn xa ngay khi load script nếu đang bật
+if Config.ClearFarVision or Config.NoFog then
+    clearVisionState.Apply(true)
+end
 
 local function ApplyFullbright(enabled)
     if enabled then

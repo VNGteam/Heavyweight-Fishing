@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.0"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.2"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -171,6 +171,7 @@ ConfigModule.Config = {
     ESP_Players = false,
     FishRedRing = true,
     ShowFishWeightRing = true,
+    ClearFarVision = true,
     NoFog = false,
     Fullbright = false,
     PerformanceMode = false,
@@ -304,6 +305,7 @@ ConfigModule.ConfigLabelMap = {
     ["ESP Người Chơi"] = "ESP_Players",
     ["Vòng Tròn Định Vị Cá"] = "FishRedRing",
     ["Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ"] = "ShowFishWeightRing",
+    ["Tầm Nhìn Xa (Xóa Mờ Map)"] = "ClearFarVision",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",

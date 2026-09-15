@@ -29,7 +29,14 @@ function TabVisuals.Render(parent)
         Config.Fullbright = v
         Visuals.ApplyFullbright(v)
     end)
-    Components.CreateToggleRow(cardLighting, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương mù và mưa bão che khuất tầm nhìn", Config.NoFog, function(v) Config.NoFog = v end)
+    Components.CreateToggleRow(cardLighting, "Tầm Nhìn Xa (Xóa Mờ Map)", "Tắt hiệu ứng làm mờ xa (DepthOfField) & sương mù, nhìn rõ mọi hòn đảo từ xa", Config.ClearFarVision, function(v)
+        Config.ClearFarVision = v
+        Visuals.ApplyClearVision(v or Config.NoFog)
+    end)
+    Components.CreateToggleRow(cardLighting, "Xóa Sương Mù & Mưa Bão", "Xóa sạch sương mù và mưa bão che khuất tầm nhìn", Config.NoFog, function(v)
+        Config.NoFog = v
+        Visuals.ApplyClearVision(v or Config.ClearFarVision)
+    end)
     Components.CreateToggleRow(cardLighting, "Chế Độ Giảm Lag (Low GFX)", "Giảm đồ họa giúp máy yếu chạy mượt", Config.PerformanceMode, function(v) Config.PerformanceMode = v end)
     Components.CreateToggleRow(cardLighting, "Ẩn Giao Diện Gốc Của Game", "Ẩn các thanh UI mặc định của game để thoáng màn hình", Config.HideGameUI, function(v) Config.HideGameUI = v end)
 end
