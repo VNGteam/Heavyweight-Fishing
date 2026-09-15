@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.4"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.5"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -81,6 +81,7 @@ ConfigModule.Config = {
     AutoServerHopOnDespawn = false,
     FastSkipNonBoss = true,
     SecretBossCheckPower = true,
+    ShowBossDpsMeter = true,
     SecretBossTargets = {
         ["Verdant Alligator Gar"] = true,
         ["Verdant Grouper"] = true,
@@ -264,6 +265,7 @@ ConfigModule.ConfigLabelMap = {
     ["Bỏ Qua Cá Thường (Fast Skip)"] = "FastSkipNonBoss",
     ["Kiểm Tra Lực Cần (Power Check)"] = "SecretBossCheckPower",
     ["Chỉ Săn Khi Đủ Lực Cần (Power Check)"] = "SecretBossCheckPower",
+    ["Hiện Bảng Sát Thương Boss (% HP)"] = "ShowBossDpsMeter",
     ["Tự Đổi Server Khi Hết Boss (Auto-Hop)"] = "AutoServerHopOnDespawn",
     ["Đổi Server Khi Hết Secret Boss"] = "AutoServerHopOnDespawn",
     ["Tự Về Vị Trí Farm Khi Hết Boss / Clear"] = "ReturnToHomeWhenClear",

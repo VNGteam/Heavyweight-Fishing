@@ -2,6 +2,28 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.5] - 2026-09-16
+### ⚔️ Bảng Đo Sát Thương Săn Boss Đa Người Chơi (% HP DPS Meter HUD) (New Feature & Upgrade gì):
+1. **Hiển Thị % HP Từng Người Chơi Pem Boss Theo Thời Gian Thực**:
+   - Khi có 2, 3 người (hoặc nhiều người trong server) cùng câu và xả chiêu vào 1 con Boss, màn hình hiển thị trực tiếp Widget **⚔️ BẢNG SÁT THƯƠNG BOSS**.
+   - Thống kê chi tiết từng người chơi tham gia:
+     - 👤 **Avatar Headshot**: Tự động tải ảnh đại diện Roblox của từng người chơi tham gia.
+     - 🥇 **Huy hiệu thứ hạng**: Tự động xếp hạng DPS từ cao xuống thấp (🥇 Hạng 1, 🥈 Hạng 2, 🥉 Hạng 3...).
+     - 📊 **Phần trăm % HP Boss**: Hiển thị chính xác tỷ lệ % máu Boss mà từng người đã đánh được (ví dụ: `48.5% HP (2,425)`).
+     - 📈 **Thanh tiến trình màu sắc**: Mỗi người chơi có màu thanh sát thương riêng biệt, trực quan và bắt mắt.
+2. **Cơ Chế Phân Bổ Sát Thương Chuẩn Xác & Tổng Kết Chiến Thắng**:
+   - **Tự động bắt đối tượng Boss**: Tự động nhận diện thư mục `fish.PlayerContribution` và danh sách người chơi trong minigame xung quanh Boss.
+   - **Phân bổ sát thương thông minh**: Theo dõi từng nhịp sụt giảm máu của Boss (`deltaHp`), phân chia theo trọng số hành động và lực cần câu (`RodPower`).
+   - **Màn hình tổng kết vinh danh (Victory Screen)**: Khi Boss bị hạ gục (máu về 0), bảng chuyển sang tiêu đề vàng **"🎉 CHIẾN THẮNG!"**, hiển thị bảng tổng kết thành tích công trạng của từng người trong 6 giây trước khi tự đóng.
+3. **Giao Diện Tiện Dụng & Tùy Biến**:
+   - **Kéo thả tự do (Draggable HUD)**: Cho phép dùng chuột (PC) hoặc ngón tay (Mobile) kéo thả thanh tiêu đề để đặt bảng ở bất cứ góc nào trên màn hình.
+   - **Công tắc Bật/Tắt trong Tab Săn Boss**: Bổ sung tùy chọn `"Hiện Bảng Sát Thương Boss (% HP)"` trong thẻ Chat Sniper / Săn Boss, tự động lưu cấu hình theo tài khoản người dùng (`ShowBossDpsMeter`).
+4. **Đồng Bộ Hóa Toàn Hệ Thống**:
+   - Tối ưu hóa mã nguồn trong khối `do ... end` đảm bảo không vượt quá giới hạn 200 biến cục bộ của trình biên dịch Luau.
+   - Nâng cấp mã phiên bản tĩnh lên **`v2.2.5`** trong [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua) và [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.2.4] - 2026-09-15
 ### 📜 Thông Báo Webhook Đạo Sĩ (Taoist & Maoshan) & Tích Hợp Telegram Bot Báo Về Điện Thoại (New Feature & Upgrade gì):
 1. **Thông Báo Phát Hiện Đạo Sĩ (Taoist & Maoshan) Qua Webhook**:
