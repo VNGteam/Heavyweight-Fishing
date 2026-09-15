@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "fix-dialogue-press-timing"
+local SCRIPT_BUILD_COMMIT = "v2-strict-combo"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -1231,7 +1231,9 @@ brandTitle.TextSize = 14; brandTitle.TextXAlignment = Enum.TextXAlignment.Left
 brandTitle.Parent = titleBar
 
 local commitBadge = Instance.new("TextLabel")
-commitBadge.Size = UDim2.new(0, 68, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
+commitBadge.AutomaticSize = Enum.AutomaticSize.X
+commitBadge.Size = UDim2.new(0, 0, 0, 18); commitBadge.Position = UDim2.new(0, 132, 0.5, -9)
+local bPad = Instance.new("UIPadding", commitBadge); bPad.PaddingLeft = UDim.new(0, 6); bPad.PaddingRight = UDim.new(0, 6)
 commitBadge.BackgroundColor3 = Color3.fromRGB(30, 22, 48)
 commitBadge.Font = Enum.Font.Code
 commitBadge.Text = "#" .. tostring(SCRIPT_BUILD_COMMIT)
