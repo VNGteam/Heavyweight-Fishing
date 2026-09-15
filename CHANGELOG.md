@@ -2,6 +2,18 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.4] - 2026-09-15
+### ☀️ Cân Bằng Ánh Sáng Fullbright & Chống Chói Lóa Theo Thời Tiết (Fix gì):
+1. **Khắc phục lỗi Fullbright bị quá sáng, chói lóa trắng xóa mặt đất khi thời tiết thay đổi (Windy, Sunny)**:
+   - *Hiện tượng*: Khi bật Fullbright, có lúc sáng ổn định (ban đêm), nhưng khi đổi sang thời tiết gió bão (Windy) hoặc trời nắng thì mặt đất bị chói lóa trắng xóa, cháy sáng không nhìn rõ vân đá.
+   - *Nguyên nhân*: Mã cũ gán cứng `Lighting.Brightness = 10` và `ExposureCompensation = 1`. Mức này làm ánh sáng mặt trời bị nhân lên 20 lần bình thường. Khi game đổi sang các loại thời tiết có ánh sáng riêng, hai nguồn sáng cộng dồn gây cháy sáng màn hình.
+   - *Khắc phục*:
+     - **Cân bằng lại ánh sáng dịu mắt**: Giảm `Brightness` xuống `2.0` (mức an toàn) và đưa `ExposureCompensation` về `0`. Giữ cho ban đêm vẫn sáng rõ nhưng ban ngày và thời tiết gió bão không bao giờ bị cháy sáng trắng xóa.
+     - **Tự động kìm hãm ánh sáng theo thời tiết (Anti-Glare)**: Lắng nghe sự kiện `Lighting.Changed`. Khi thời tiết game cố đẩy độ sáng hoặc phơi sáng lên quá cao, script tự động kìm hãm lại ở mức an toàn dịu mắt.
+     - **Thêm thanh trượt tùy chỉnh Mức Độ Sáng**: Cho phép người chơi tự do kéo chỉnh độ sáng từ `1.0x` đến `3.5x` trong Tab ESP & Đồ Họa theo sở thích của mình.
+
+---
+
 ## [v2.1.3] - 2026-09-15
 ### 🚀 Cập Nhật Logic Combo Mới: Spam Nhận Nút Khóa -> 0.15s Pass Chiêu (Fix gì):
 1. **Khắc phục triệt để lỗi "X chờ 4-5s C lại chờ khá lâu V lại chờ Z dù màn hình đã hồi"**:

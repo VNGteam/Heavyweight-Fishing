@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.3"
+local SCRIPT_BUILD_COMMIT = "v2.1.4"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -270,6 +270,8 @@ local Config = {
     FishRedRing = true,
     NoFog = false,
     Fullbright = true,
+    FullbrightLevel = 2.0,
+    FullbrightAntiGlare = true,
     PerformanceMode = false,
     HideGameUI = false,
     HideOverheadNames = true,
@@ -497,6 +499,8 @@ local ConfigLabelMap = {
     ["Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ"] = "ShowFishWeightRing",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
+    ["Mức Độ Sáng (Fullbright)"] = "FullbrightLevel",
+    ["Chống Lóa Thời Tiết (Anti-Glare)"] = "FullbrightAntiGlare",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
     ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
     ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",
@@ -9558,15 +9562,22 @@ end)
 
 local function ApplyFullbright(enabled)
     if enabled then
-        Lighting.Brightness = 10
-        Lighting.Ambient = Color3.fromRGB(178, 178, 178)
-        Lighting.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
+        local brightLevel = tonumber(Config.FullbrightLevel) or 2.0
+        Lighting.Brightness = math.clamp(brightLevel, 1.0, 3.5)
+        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+        Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
         Lighting.GlobalShadows = false
-        Lighting.ExposureCompensation = 1
+        Lighting.ExposureCompensation = 0
         local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
         if atmo then
-            atmo.Density = 0
+            atmo.Density = 0.05
             atmo.Haze = 0
+            atmo.Glare = 0
+        end
+        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
+        if bloom then
+            bloom.Intensity = 0.1
+            bloom.Size = 10
         end
     else
         Lighting.Brightness = 2
@@ -9579,12 +9590,41 @@ local function ApplyFullbright(enabled)
             atmo.Density = 0.3
             atmo.Haze = 0.5
         end
+        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
+        if bloom then
+            bloom.Intensity = 1
+        end
     end
 end
 
-createToggleRow(perfCard, "Sáng Màn Hình (Fullbright)", "Tăng độ sáng tối đa, nhìn rõ mọi thứ trong đêm", Config.Fullbright, function(v)
+-- Tự động cân bằng ánh sáng chống chói khi game đổi thời tiết (Windy, Sunny, Night...)
+table.insert(activeConnections, Lighting.Changed:Connect(function(prop)
+    if Config.Fullbright and (Config.FullbrightAntiGlare ~= false) then
+        if prop == "Brightness" and Lighting.Brightness > 3.0 then
+            Lighting.Brightness = tonumber(Config.FullbrightLevel) or 2.0
+        elseif prop == "ExposureCompensation" and Lighting.ExposureCompensation > 0.1 then
+            Lighting.ExposureCompensation = 0
+        end
+    end
+end))
+
+createToggleRow(perfCard, "Sáng Màn Hình (Fullbright)", "Tăng độ sáng dịu mắt, nhìn rõ trong đêm mà không bị chói", Config.Fullbright, function(v)
     Config.Fullbright = v
     ApplyFullbright(v)
+end)
+
+createSliderRow(perfCard, "Mức Độ Sáng (Fullbright)", "Tùy chỉnh độ sáng màn hình theo mắt của bạn", 1.0, 3.5, Config.FullbrightLevel or 2.0, true, "x", function(v)
+    Config.FullbrightLevel = v
+    if Config.Fullbright then
+        ApplyFullbright(true)
+    end
+end)
+
+createToggleRow(perfCard, "Chống Lóa Thời Tiết (Anti-Glare)", "Tự động kìm hãm ánh sáng khi thời tiết đổi sang gió bão, trời nắng chói", Config.FullbrightAntiGlare, function(v)
+    Config.FullbrightAntiGlare = v
+    if Config.Fullbright then
+        ApplyFullbright(true)
+    end
 end)
 
 -- Áp dụng ngay khi script load nếu bật sẵn
