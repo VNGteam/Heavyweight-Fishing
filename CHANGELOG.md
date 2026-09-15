@@ -2,6 +2,31 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.4] - 2026-09-15
+### 📜 Thông Báo Webhook Đạo Sĩ (Taoist & Maoshan) & Tích Hợp Telegram Bot Báo Về Điện Thoại (New Feature & Upgrade gì):
+1. **Thông Báo Phát Hiện Đạo Sĩ (Taoist & Maoshan) Qua Webhook**:
+   - Tự động quét và phát hiện khi **Đạo Sĩ (Taoist)**, **Đạo Sĩ Mao Sơn (Maoshan)** hoặc **Thần Linh (God Spirit)** xuất hiện trong máy chủ (áp dụng cho cả quá trình Auto Server Hop lẫn khi đang treo máy bình thường).
+   - Gửi tức thì thẻ thông báo chi tiết:
+     - 🎯 Tên NPC cụ thể phát hiện được.
+     - 👤 Tên tài khoản tìm thấy.
+     - 📍 Tọa độ đứng chuẩn xác (X, Y, Z).
+     - 🔑 Job ID của máy chủ để anh em kết nối nhanh.
+     - ⚡ Đoạn mã Luau 1 chạm gọi `TeleportToPlaceInstance` để dịch chuyển ngay đến server có Đạo Sĩ.
+     - ⏰ Mốc thời gian chính xác.
+   - **Cơ chế chống spam**: Mỗi NPC trong cùng một server chỉ gửi thông báo đúng 1 lần duy nhất, không gây nghẽn Webhook.
+2. **Tích Hợp Giải Pháp Thay Thế Discord: Ứng Dụng Telegram Bot**:
+   - Ngoài Discord, Telegram Bot là giải pháp tối ưu nhất: hoàn toàn miễn phí, thông báo đẩy rung chuông điện thoại 24/7 tức thì, không bao giờ bị bóp băng thông hay chặn mạng tại Việt Nam.
+   - Bổ sung nhóm cấu hình **📱 Telegram Bot** trong Tab Hồ Sơ / Cài Đặt:
+     - Nhập `Telegram Bot Token` (tạo miễn phí qua `@BotFather`).
+     - Nhập `Telegram Chat ID` (lấy ID qua `@userinfobot`).
+     - Tùy chọn bật/tắt: Báo Secret Boss, Báo Đạo Sĩ (Taoist & Maoshan).
+     - Nút **"Kiểm Tra Telegram (Test)"** gửi tin nhắn mẫu kiểm tra kết nối ngay lập tức.
+     - Tự động lưu cấu hình vĩnh viễn theo tài khoản người dùng (`TelegramBotToken`, `TelegramChatId`, `TelegramEnabled`, v.v.).
+3. **Đồng bộ hóa toàn diện**:
+   - Nâng cấp nhãn phiên bản tĩnh lên **`v2.2.4`** trong [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và `v2/core/config.lua`.
+
+---
+
 ## [v2.2.3] - 2026-09-15
 ### ⚡ Sửa Triệt Để Lỗi "Lỗi biên dịch: Timeout" & Nâng Cấp Bộ Loader Chống Treo (Fix & Upgrade gì):
 1. **Khắc phục triệt để lỗi `Lỗi biên dịch: Timeout` trên Executor**:

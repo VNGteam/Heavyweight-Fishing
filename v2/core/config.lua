@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.3"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.4"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -194,8 +194,16 @@ ConfigModule.Config = {
     WebhookUrl = "",
     WebhookEnabled = false,
     WebhookNotifyBoss = true,
+    WebhookNotifyNPC = true,
     WebhookHourlyStats = false,
     WebhookStatsInterval = 60,
+
+    -- Telegram Bot
+    TelegramEnabled = false,
+    TelegramBotToken = "",
+    TelegramChatId = "",
+    TelegramNotifyBoss = true,
+    TelegramNotifyNPC = true,
 
     -- Keybinds
     UIKeybind = Enum.KeyCode.RightControl,

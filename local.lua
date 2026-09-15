@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.2.3"
+local SCRIPT_BUILD_COMMIT = "v2.2.4"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -296,8 +296,14 @@ local Config = {
     WebhookEnabled = false,
     WebhookUrl = "",
     WebhookNotifyBoss = true,
+    WebhookNotifyNPC = true,
     WebhookHourlyStats = true,
     WebhookStatsInterval = 30,
+    TelegramEnabled = false,
+    TelegramBotToken = "",
+    TelegramChatId = "",
+    TelegramNotifyBoss = true,
+    TelegramNotifyNPC = true,
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End,
     ActiveProfile = "default",
@@ -523,8 +529,16 @@ local ConfigLabelMap = {
     ["Webhook URL"] = "WebhookUrl",
     ["Bật Webhook"] = "WebhookEnabled",
     ["Thông Báo Bắt Được Boss"] = "WebhookNotifyBoss",
+    ["Thông Báo Đạo Sĩ (Taoist & Maoshan)"] = "WebhookNotifyNPC",
     ["Báo Cáo Tiến Độ Mỗi Giờ"] = "WebhookHourlyStats",
-    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval"
+    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval",
+
+    -- Telegram Bot
+    ["Bật Telegram Bot"] = "TelegramEnabled",
+    ["Telegram Bot Token"] = "TelegramBotToken",
+    ["Telegram Chat ID"] = "TelegramChatId",
+    ["Telegram Báo Boss"] = "TelegramNotifyBoss",
+    ["Telegram Báo Đạo Sĩ"] = "TelegramNotifyNPC"
 }
 
 local function GetAccountConfigDir()
@@ -721,7 +735,15 @@ Config._essentialKeys = {
     ["WebhookUrl"] = true,
     ["WebhookEnabled"] = true,
     ["WebhookNotifyBoss"] = true,
+    ["WebhookNotifyNPC"] = true,
     ["WebhookHourlyStats"] = true,
+
+    -- Telegram Bot
+    ["TelegramEnabled"] = true,
+    ["TelegramBotToken"] = true,
+    ["TelegramChatId"] = true,
+    ["TelegramNotifyBoss"] = true,
+    ["TelegramNotifyNPC"] = true,
 
     -- Thời tiết
     ["TargetWeather"] = true,
@@ -3325,6 +3347,76 @@ local function SendDiscordWebhook(title, description, color, fields)
             })
         end
     end)
+end
+
+local function SendTelegramMessage(text)
+    if not Config.TelegramEnabled or not Config.TelegramBotToken or not Config.TelegramChatId or #Config.TelegramBotToken == 0 or #Config.TelegramChatId == 0 then return end
+    pcall(function()
+        local url = "https://api.telegram.org/bot" .. Config.TelegramBotToken .. "/sendMessage"
+        local payload = {
+            chat_id = Config.TelegramChatId,
+            text = text,
+            parse_mode = "Markdown"
+        }
+        local body = HttpService:JSONEncode(payload)
+        local headers = {["Content-Type"] = "application/json"}
+        local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
+        if reqFunc then
+            reqFunc({
+                Url = url,
+                Method = "POST",
+                Headers = headers,
+                Body = body
+            })
+        end
+    end)
+end
+
+local npcAlertsSent = {}
+
+function secretBossState.SendNPCDetectionAlert(npcType, npcName, npcInst)
+    local alertKey = tostring(game.JobId or "local") .. "_" .. tostring(npcType)
+    if npcAlertsSent[alertKey] then return end
+    npcAlertsSent[alertKey] = true
+
+    local posStr = "Không xác định"
+    if npcInst then
+        local root = npcInst:FindFirstChild("HumanoidRootPart") or npcInst.PrimaryPart or npcInst:FindFirstChild("Head") or npcInst:FindFirstChildWhichIsA("BasePart")
+        if root then
+            local p = root.Position
+            posStr = string.format("X: %.1f, Y: %.1f, Z: %.1f", p.X, p.Y, p.Z)
+        end
+    end
+
+    local jobId = tostring(game.JobId or "")
+    local placeId = tostring(game.PlaceId or "0")
+    local playerName = (LocalPlayer and LocalPlayer.Name) or "Unknown"
+    local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
+
+    -- 1. Gửi qua Discord Webhook nếu người dùng bật
+    if Config.WebhookEnabled and Config.WebhookNotifyNPC and Config.WebhookUrl and #Config.WebhookUrl > 0 then
+        local fields = {
+            { name = "🎯 NPC Phát Hiện", value = "**" .. tostring(npcName) .. "**", inline = true },
+            { name = "👤 Người Tìm Thấy", value = playerName, inline = true },
+            { name = "📍 Tọa Độ Đứng", value = posStr, inline = true },
+            { name = "🔑 Job ID Server", value = "```" .. (jobId ~= "" and jobId or "N/A (Chơi 1 mình)") .. "```", inline = false },
+            { name = "⚡ Lệnh Vào Server Nhanh", value = "```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)\n```", inline = false },
+            { name = "⏰ Thời Gian", value = timeStr, inline = true }
+        }
+        SendDiscordWebhook("📜 PHÁT HIỆN " .. tostring(npcName):upper() .. " TRONG SERVER!", "Bot đã tìm thấy **" .. tostring(npcName) .. "** tại server hiện tại!", 16753920, fields)
+    end
+
+    -- 2. Gửi qua Telegram Bot nếu người dùng bật
+    if Config.TelegramEnabled and Config.TelegramNotifyNPC and Config.TelegramBotToken and #Config.TelegramBotToken > 0 and Config.TelegramChatId and #Config.TelegramChatId > 0 then
+        local teleText = "📜 *PHÁT HIỆN " .. tostring(npcName):upper() .. "!*\n\n"
+            .. "🎯 *NPC:* " .. tostring(npcName) .. "\n"
+            .. "👤 *Người tìm thấy:* " .. playerName .. "\n"
+            .. "📍 *Tọa độ:* " .. posStr .. "\n"
+            .. "🔑 *Job ID:* `" .. (jobId ~= "" and jobId or "N/A") .. "`\n"
+            .. "⏰ *Thời gian:* " .. timeStr .. "\n\n"
+            .. "⚡ *Code vào server:*\n`game:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)`"
+        SendTelegramMessage(teleText)
+    end
 end
 
 local function GetPlayerRodPower()
@@ -10662,6 +10754,10 @@ createToggleRow(hookCard, "Thông Báo Bắt Được Boss", "Gửi tin nhắn k
     Config.WebhookNotifyBoss = v
 end)
 
+createToggleRow(hookCard, "Thông Báo Đạo Sĩ (Taoist & Maoshan)", "Gửi tin nhắn JobId server khi phát hiện Đạo Sĩ (Taoist) hoặc Mao Sơn (Maoshan)", Config.WebhookNotifyNPC, function(v)
+    Config.WebhookNotifyNPC = v
+end)
+
 createToggleRow(hookCard, "Báo Cáo Định Kỳ (Mỗi 30 Phút)", "Gửi bảng tổng kết thời gian treo máy, số cá và tiền kiếm được", Config.WebhookHourlyStats, function(v)
     Config.WebhookHourlyStats = v
 end)
@@ -10688,6 +10784,50 @@ createButtonRow(hookCard, "Kiểm Tra Webhook (Test)", "Gửi thử 1 thông bá
             ShowNotification("Webhook", "Đã gửi lệnh test đến Discord!", "SUCCESS")
         else
             ShowNotification("Webhook", "Gửi thất bại! Kiểm tra lại URL Webhook.", "ERROR")
+        end
+    end)
+end)
+
+createCategoryHeader(tabProfiles, "📱 Telegram Bot (Thông Báo Về Điện Thoại)")
+local teleCard = createCardGroup(tabProfiles)
+
+createInputRow(teleCard, "Telegram Bot Token", "Nhập mã Token bot tạo từ @BotFather trên Telegram", Config.TelegramBotToken or "", function(txt)
+    Config.TelegramBotToken = txt
+end)
+
+createInputRow(teleCard, "Telegram Chat ID", "Nhập mã Chat ID cuộc trò chuyện (lấy từ bot @userinfobot)", Config.TelegramChatId or "", function(txt)
+    Config.TelegramChatId = txt
+end)
+
+createToggleRow(teleCard, "Bật Telegram Bot", "Kích hoạt gửi tin nhắn thông báo về ứng dụng Telegram trên điện thoại", Config.TelegramEnabled, function(v)
+    Config.TelegramEnabled = v
+end)
+
+createToggleRow(teleCard, "Thông Báo Bắt Được Boss", "Gửi tin nhắn Telegram khi câu trúng hoặc bắt thành công Boss", Config.TelegramNotifyBoss, function(v)
+    Config.TelegramNotifyBoss = v
+end)
+
+createToggleRow(teleCard, "Thông Báo Đạo Sĩ (Taoist & Maoshan)", "Gửi tin nhắn Telegram kèm JobId khi phát hiện Đạo Sĩ", Config.TelegramNotifyNPC, function(v)
+    Config.TelegramNotifyNPC = v
+end)
+
+createButtonRow(teleCard, "Kiểm Tra Telegram (Test)", "Gửi thử 1 tin nhắn test đến Telegram của bạn ngay lập tức", "Gửi Test", function()
+    if not Config.TelegramBotToken or Config.TelegramBotToken == "" or not Config.TelegramChatId or Config.TelegramChatId == "" then
+        ShowNotification("Telegram", "Vui lòng nhập Bot Token và Chat ID trước!", "WARN")
+        return
+    end
+    ShowNotification("Telegram", "Đang gửi tin nhắn test đến Telegram...", "INFO")
+    task.spawn(function()
+        local ok = pcall(function()
+            local testMsg = "🔔 *TEST TELEGRAM - HEAVYWEIGHT FISHING*\n\n"
+                .. "✅ Kết nối thành công từ tài khoản: *" .. (LocalPlayer and LocalPlayer.Name or "Unknown") .. "*!\n"
+                .. "⏰ Thời gian: " .. os.date("%H:%M:%S - %d/%m/%Y")
+            SendTelegramMessage(testMsg)
+        end)
+        if ok then
+            ShowNotification("Telegram", "Đã gửi lệnh test đến Telegram!", "SUCCESS")
+        else
+            ShowNotification("Telegram", "Gửi thất bại! Kiểm tra lại Token & Chat ID.", "ERROR")
         end
     end)
 end)
@@ -11611,18 +11751,30 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     if statusLabelSecretBoss and statusLabelSecretBoss.Set then
                         statusLabelSecretBoss.Set("🎯 ĐANG CÂU BOSS: " .. tostring(displayBossName) .. "!")
                     end
-                    if Config.WebhookEnabled and Config.WebhookNotifyBoss and not secretBossState.webhookSentForCurrent then
-                        secretBossState.webhookSentForCurrent = true
-                        SendDiscordWebhook(
-                            "🚨 PHÁT HIỆN SECRET BOSS!",
-                            "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng: **" .. tostring(displayBossName) .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
-                            15158332,
-                            {
-                                { name = "🐟 Boss Mục Tiêu", value = tostring(displayBossName), inline = true },
-                                { name = "📍 Bản Đồ", value = tostring(secretBossState.currentMap or "Đảo Hiện Tại"), inline = true },
-                                { name = "⏰ Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
-                            }
-                        )
+                    if (Config.WebhookEnabled and Config.WebhookNotifyBoss) or (Config.TelegramEnabled and Config.TelegramNotifyBoss) then
+                        if not secretBossState.webhookSentForCurrent then
+                            secretBossState.webhookSentForCurrent = true
+                            if Config.WebhookEnabled and Config.WebhookNotifyBoss then
+                                SendDiscordWebhook(
+                                    "🚨 PHÁT HIỆN SECRET BOSS!",
+                                    "Tài khoản **" .. LocalPlayer.Name .. "** đang câu trúng: **" .. tostring(displayBossName) .. "** tại " .. (secretBossState.currentMap or "Đảo hiện tại") .. "!",
+                                    15158332,
+                                    {
+                                        { name = "🐟 Boss Mục Tiêu", value = tostring(displayBossName), inline = true },
+                                        { name = "📍 Bản Đồ", value = tostring(secretBossState.currentMap or "Đảo Hiện Tại"), inline = true },
+                                        { name = "⏰ Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true }
+                                    }
+                                )
+                            end
+                            if Config.TelegramEnabled and Config.TelegramNotifyBoss then
+                                local teleBoss = "🚨 *PHÁT HIỆN SECRET BOSS!*\n\n"
+                                    .. "👤 *Tài khoản:* " .. LocalPlayer.Name .. "\n"
+                                    .. "🐟 *Boss câu trúng:* *" .. tostring(displayBossName) .. "*\n"
+                                    .. "📍 *Vị trí:* " .. tostring(secretBossState.currentMap or "Đảo Hiện Tại") .. "\n"
+                                    .. "⏰ *Thời gian:* " .. os.date("%H:%M:%S - %d/%m/%Y")
+                                SendTelegramMessage(teleBoss)
+                            end
+                        end
                     end
                 else
                     -- Không phải Secret Boss mục tiêu -> Fast Skip giật cần bỏ cá thường
@@ -12813,6 +12965,9 @@ task.spawn(function()
                     local tInst, tName = secretBossState.ScanForTaoistNPC()
                     if tInst then
                         table.insert(foundTargets, tostring(tName or "Đạo Sĩ (Taoist)"))
+                        pcall(function()
+                            secretBossState.SendNPCDetectionAlert("Taoist", tName or "Đạo Sĩ (Taoist)", tInst)
+                        end)
                     end
                 end
 
@@ -12822,6 +12977,9 @@ task.spawn(function()
                     local mInst, mName = secretBossState.ScanForMaoshanNPC()
                     if mInst then
                         table.insert(foundTargets, tostring(mName or "Đạo Sĩ Maoshan"))
+                        pcall(function()
+                            secretBossState.SendNPCDetectionAlert("Maoshan", mName or "Đạo Sĩ Mao Sơn", mInst)
+                        end)
                     end
                 end
 
@@ -12831,6 +12989,9 @@ task.spawn(function()
                     local sp = secretBossState.ScanForGodSpirit()
                     if sp then
                         table.insert(foundTargets, "Thần Linh (God Spirit)")
+                        pcall(function()
+                            secretBossState.SendNPCDetectionAlert("GodSpirit", "Thần Linh (God Spirit)", sp)
+                        end)
                     end
                 end
 
@@ -12857,6 +13018,25 @@ task.spawn(function()
             if not hopOk then
                 warn("[AutoServerHop] Lỗi trong vòng lặp tìm NPC:", tostring(hopErr))
             end
+        end
+    end
+end)
+
+-- Vòng lặp nền giám sát Taoist & Maoshan liên tục trong server để gửi Webhook / Telegram kể cả khi không bật Server Hop
+task.spawn(function()
+    while isRunning do
+        task.wait(7.0)
+        if isRunning and ((Config.WebhookEnabled and Config.WebhookNotifyNPC) or (Config.TelegramEnabled and Config.TelegramNotifyNPC)) then
+            pcall(function()
+                local tInst, tName = secretBossState.ScanForTaoistNPC()
+                if tInst then
+                    secretBossState.SendNPCDetectionAlert("Taoist", tName or "Đạo Sĩ (Taoist)", tInst)
+                end
+                local mInst, mName = secretBossState.ScanForMaoshanNPC()
+                if mInst then
+                    secretBossState.SendNPCDetectionAlert("Maoshan", mName or "Đạo Sĩ Mao Sơn", mInst)
+                end
+            end)
         end
     end
 end)
