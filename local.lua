@@ -8461,8 +8461,14 @@ createToggleRow(questCard, "Tự Động Làm Vé Nhiệm Vụ", "Tự động n
         ticketQuestState.active = true
         ShowNotification("Nhiệm Vụ Vé", "Đã bật tự động làm vé nhiệm vụ! Script sẽ quét và thực hiện quest.", "SUCCESS", 6)
     else
-        ticketQuestState.active = false
-        ShowNotification("Nhiệm Vụ Vé", "Đã tắt tự động làm vé (Tiến độ vẫn được theo dõi liên tục).", "INFO", 4)
+        if ticketQuestState then
+            ticketQuestState.active = false
+            ticketQuestState.isBusyRoutine = false
+            ticketQuestState.currentQuestType = "none"
+            ticketQuestState.isCooldown = false
+            ticketQuestState.isAtHomeSpot = false
+        end
+        ShowNotification("Nhiệm Vụ Vé", "Đã tắt tự động làm vé nhiệm vụ.", "INFO", 4)
     end
     ticketQuestState.ScanAndUpdateStatus()
 end)
@@ -10556,7 +10562,7 @@ function comboState.CastSkill(sk)
         end
     end
 
-    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Khi bật Auto Ticket Quest, CHỈ khóa 1 chiêu cho quest 100 cá & 100 skill!
+    -- KHÓA BẢO VỆ CHO AUTO TICKET QUEST: Chỉ khóa 1 chiêu khi đang BẬT Auto Ticket Quest và đúng quest 100 cá & 100 skill
     if Config.AutoTicketQuest then
         local curQ = ticketQuestState and ticketQuestState.currentQuestType or "none"
 
@@ -10568,24 +10574,6 @@ function comboState.CastSkill(sk)
             local allowedQuick = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
             allowedQuick = allowedQuick and allowedQuick:upper() or "V"
             if cleanKey ~= allowedQuick then return false end
-        end
-        -- Đối với fish_15m hoặc nhiệm vụ khác: TUYỆT ĐỐI KHÔNG CHẶN, cho phép xả combo đầy đủ theo cài đặt người chơi!
-    else
-        -- KHÓA BẢO VỆ CHẶN CHIÊU SAI KHI KHÔNG BẬT AUTO TICKET QUEST NHƯNG ĐANG CÓ QUEST VÉ
-        local curQ = ticketQuestState and ticketQuestState.currentQuestType or "none"
-
-        if curQ == "fish_100" then
-            local allowed = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
-            allowed = allowed and allowed:upper() or "V"
-            if cleanKey ~= allowed then
-                return false -- Chặn đứng 100% các chiêu Z, X, C
-            end
-        elseif curQ == "skill_100" then
-            local allowed = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
-            allowed = allowed and allowed:upper() or "Z"
-            if cleanKey ~= allowed then
-                return false -- Chặn đứng các chiêu khác
-            end
         end
     end
 
@@ -10926,8 +10914,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
 
             if not skipTriggered then
-                -- Đồng bộ trạng thái Quest Ticket từ hệ thống nếu chưa có
-                if ticketQuestState and (not ticketQuestState.currentQuestType or ticketQuestState.currentQuestType == "none") and ticketQuestState.DetectActiveQuest then
+                -- Đồng bộ trạng thái Quest Ticket từ hệ thống nếu chưa có (Chỉ khi BẬT AutoTicketQuest)
+                if Config.AutoTicketQuest and ticketQuestState and (not ticketQuestState.currentQuestType or ticketQuestState.currentQuestType == "none") and ticketQuestState.DetectActiveQuest then
                     local detQ = select(1, ticketQuestState.DetectActiveQuest())
                     if detQ and detQ ~= "none" then
                         ticketQuestState.currentQuestType = detQ
@@ -10936,7 +10924,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                     end
                 end
 
-                local hasActiveTicket = ticketQuestState and ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" and not ticketQuestState.isCompleted
+                local hasActiveTicket = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.currentQuestType and ticketQuestState.currentQuestType ~= "none" and not ticketQuestState.isCompleted
 
                 local isTrainActive = Config.AutoTrainSkill
                 if isTrainActive and Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
@@ -11052,7 +11040,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                             isTrainingBusy = false
                         end)
                     end
-                elseif (Config.AutoTicketQuest or hasActiveTicket) and hasActiveTicket and (ticketQuestState.currentQuestType == "bait_100" or ticketQuestState.currentQuestType == "skill_100" or ticketQuestState.currentQuestType == "fish_100") then
+                elseif Config.AutoTicketQuest and hasActiveTicket and (ticketQuestState.currentQuestType == "bait_100" or ticketQuestState.currentQuestType == "skill_100" or ticketQuestState.currentQuestType == "fish_100") then
                     local qType = ticketQuestState.currentQuestType
                     if qType == "bait_100" then
                         if not ticketQuestState.isBusyRoutine then
@@ -11255,7 +11243,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                     end
                 elseif fUI and fUI.Visible then
-                    local is15mQuest = (Config.AutoTicketQuest or hasActiveTicket) and ticketQuestState and ticketQuestState.currentQuestType == "fish_15m"
+                    local is15mQuest = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.currentQuestType == "fish_15m"
 
                     -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
                     local isHomeFishing = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot and Config.TicketAutoCastAtHome
