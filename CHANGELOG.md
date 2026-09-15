@@ -2,6 +2,17 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.1.3] - 2026-09-15
+### 🚀 Cập Nhật Logic Combo Mới: Spam Nhận Nút Khóa -> 0.15s Pass Chiêu (Fix gì):
+1. **Khắc phục triệt để lỗi "X chờ 4-5s C lại chờ khá lâu V lại chờ Z dù màn hình đã hồi"**:
+   - *Nguyên nhân*: Hàm `IsSkillReady` cũ duyệt toàn bộ `fUI:GetDescendants()`, bị dính các phần tử giả lập số của GUI game (như số level, slot, dame) khiến script tưởng nhầm chiêu đang còn hồi 4-5s.
+   - *Khắc phục theo đề xuất logic của người dùng*:
+     - **Chỉ trỏ thẳng vào nút chuẩn của game**: `PlayerGui.MainGui.Fishing.SkillButton.Frame[key]`.
+     - **Cơ chế phản hồi 0.15s**: Khi nút kỹ năng mở khóa (sáng đèn), script bấm chiêu ngay ➔ Quan sát game/server nhận lệnh và nút chuyển sang trạng thái khóa Cooldown ➔ **0.15s sau lập tức PASS sang chiêu tiếp theo trong chuỗi!**
+     - Loại bỏ hoàn toàn mọi thời gian chờ nhân tạo, giúp combo `X -> C -> V -> Z` xuất chiêu liên hồi mượt mà với tốc độ bàn thờ (chỉ mất ~0.15s cho mỗi chiêu nếu chiêu đang sẵn sàng).
+
+---
+
 ## [v2.1.2] - 2026-09-15
 ### ⚡ Tối Ưu Tốc Độ Ra Chiêu & Sửa Lỗi Thứ Tự Combo (Fix gì):
 1. **Khắc phục triệt để lỗi "Chờ lâu skill trong khi chiêu đã hồi" (Tốc độ tung chiêu siêu nhanh)**:

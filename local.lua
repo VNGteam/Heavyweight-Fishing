@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.1.2"
+local SCRIPT_BUILD_COMMIT = "v2.1.3"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -10303,56 +10303,74 @@ local lastSellTime = 0
 local lastSkillTime = 0
 local isTrainingBusy = false
 
-function comboState.IsSkillReady(sk, fUI)
+function comboState.GetSkillButton(cleanKey, fUI)
+    if not cleanKey then return nil end
+    cleanKey = cleanKey:upper()
+    if not fUI then
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local mg = pg and pg:FindFirstChild("MainGui")
+        fUI = mg and mg:FindFirstChild("Fishing")
+    end
+    if not fUI then return nil end
+    local sb = fUI:FindFirstChild("SkillButton")
+    local fr = sb and sb:FindFirstChild("Frame")
+    if fr and fr:FindFirstChild(cleanKey) then
+        return fr[cleanKey]
+    end
+    for _, d in ipairs(fUI:GetDescendants()) do
+        if d:IsA("GuiButton") and (d.Name:upper() == cleanKey or (d.Name:upper():find("SKILL") and d.Name:upper():find(cleanKey))) then
+            return d
+        end
+    end
+    return nil
+end
+
+function comboState.IsSkillOnCooldown(sk, fUI)
     if not sk or sk == "" or sk == "Tắt" then return false end
     local cleanKey = sk:match("([ZXCVzxcv])") or sk
     cleanKey = cleanKey:upper()
 
-    local now = tick()
-    local lastUsed = comboState.usedTimes[cleanKey] or 0
-    -- Chống spam cùng 1 phím quá nhanh (0.35s), không khóa cưỡng chế lâu để chiêu ra tức thì khi vừa hồi
-    if (now - lastUsed < 0.35) then
+    local btn = comboState.GetSkillButton(cleanKey, fUI)
+    if not btn then
         return false
     end
 
-    if fUI then
-        for _, desc in ipairs(fUI:GetDescendants()) do
-            local nameUpper = desc.Name:upper()
-            if nameUpper == cleanKey or (nameUpper:find("SKILL") and nameUpper:find(cleanKey)) or (nameUpper:find("SLOT") and nameUpper:find(cleanKey)) then
-                if desc:GetAttribute("OnCooldown") == true or desc:GetAttribute("CD") == true then
-                    return false
+    -- 1. Kiểm tra Attribute OnCooldown hoặc CD
+    if btn:GetAttribute("OnCooldown") == true or btn:GetAttribute("CD") == true then
+        return true
+    end
+
+    -- 2. Kiểm tra nhãn đếm giây Cooldown trực tiếp trong nút
+    for _, child in ipairs(btn:GetDescendants()) do
+        if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
+            local txt = child.Text:gsub("%s+", "")
+            local cdMatch = txt:match("(%d+%.?%d*)%s*[sS]") or txt:match("(%d+%.%d+)")
+            if cdMatch then
+                local num = tonumber(cdMatch)
+                if num and num > 0.05 then
+                    return true
                 end
-                for _, child in ipairs(desc:GetDescendants()) do
-                    if child:IsA("TextLabel") and child.Visible and child.Text ~= "" then
-                        local cName = child.Name:lower()
-                        local isCdLabel = cName:find("cd") or cName:find("cooldown") or cName:find("timer") or cName:find("time")
-                        local txt = child.Text
-                        if not cName:find("dmg") and not cName:find("damage") and not cName:find("power") and not cName:find("level") and not cName:find("title") and not cName:find("name") then
-                            local cdWithS = txt:match("^%s*(%d+%.?%d*)%s*[sS]%s*$") or txt:match("^%s*(%d+%.?%d*)%s*sec%s*$")
-                            if cdWithS then
-                                local num = tonumber(cdWithS)
-                                if num and num > 0 and num <= 999 then
-                                    return false
-                                end
-                            elseif isCdLabel then
-                                local numStr = txt:match("^%s*(%d+%.?%d*)%s*$")
-                                local num = tonumber(numStr)
-                                if num and num > 0 and num <= 999 and not (num >= 1 and num <= 4 and not txt:find("%.%")) then
-                                    return false
-                                end
-                            end
-                        end
-                    end
+            end
+            local cName = child.Name:lower()
+            if cName:find("cd") or cName:find("cooldown") or cName:find("timer") then
+                local num = tonumber(txt:match("(%d+%.?%d*)"))
+                if num and num > 0.05 then
+                    return true
                 end
+            end
+        elseif child:IsA("Frame") and child.Visible then
+            local cName = child.Name:lower()
+            if cName == "cooldown" or cName == "cd" or cName:find("cooldownframe") then
+                return true
             end
         end
     end
 
-    return true
+    return false
 end
 
-function comboState.IsSkillOnCooldown(sk, fUI)
-    return not comboState.IsSkillReady(sk, fUI)
+function comboState.IsSkillReady(sk, fUI)
+    return not comboState.IsSkillOnCooldown(sk, fUI)
 end
 
 function comboState.CheckSkillReady(sk, fUI, minCooldown)
@@ -10808,7 +10826,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             comboState.lastActionTime = 0
             comboState.loopWaitStartTime = 0
             comboState.minigameStartTime = now
-            comboState.usedTimes = {} -- Reset sạch cooldown tạm để cá mới luôn đánh đúng chiêu đầu tiên
+            comboState.usedTimes = {}; comboState.lastCastingKey = nil
             secretBossState.webhookSentForCurrent = false
         elseif not isMinigame then
             minigameDurationTracker = 0
@@ -11275,98 +11293,99 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         lastProgressionTime = now
                     end
 
-                    if (Config.SmartComboEnabled or is15mQuest) and (now - lastSkillTime >= 0.1) and not isTrainingBusy then
+                    if (Config.SmartComboEnabled or is15mQuest) and (now - lastSkillTime >= 0.12) and not isTrainingBusy then
                         lastSkillTime = now
 
-                        -- 1. KIỂM TRA NHỊP CHỜ RA CHIÊU & HOẠT ẢNH NHÂN VẬT (Chống nuốt chiêu & kẹt combo)
-                        local effectDelay = tonumber(Config.SkillEffectDelay) or 0.3
-                        local canActNow = (now - (comboState.lastActionTime or 0)) >= effectDelay
-                        if Config.SmartEffectAutoDetect and comboState.IsCharacterCastingSkill() then
-                            canActNow = false
+                        local playerHp = GetPlayerHealth(fUI)
+
+                        -- BƯỚC 1: CỨU NGUY HỒI MÁU (Khi máu người chơi <= EmergencyHealHp)
+                        local didHeal = false
+                        local healKey = Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" and Config.EmergencyHealSkill:match("([ZXCVzxcv])")
+                        if healKey then healKey = healKey:upper() end
+
+                        if healKey and playerHp <= (Config.EmergencyHealHp or 40) then
+                            if not comboState.IsSkillOnCooldown(healKey, fUI) then
+                                comboState.CastSkill(healKey)
+                                comboState.lastActionTime = now
+                                didHeal = true
+                            end
                         end
 
-                        if canActNow then
-                            local playerHp = GetPlayerHealth(fUI)
+                        if not didHeal then
+                            -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU (Spam quan sát server nhận nút khóa -> 0.15s pass nhảy chiêu)
+                            local loopKeys = {}
+                            local curQ = (Config.AutoTicketQuest and ticketQuestState and ticketQuestState.currentQuestType) or "none"
+                            if curQ == "fish_100" then
+                                local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
+                                table.insert(loopKeys, qk and qk:upper() or "V")
+                            elseif curQ == "skill_100" then
+                                local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
+                                table.insert(loopKeys, sk and sk:upper() or "Z")
+                            end
 
-                            -- BƯỚC 1: CỨU NGUY HỒI MÁU (Khi máu người chơi <= EmergencyHealHp, ví dụ <= 40%)
-                            local didHeal = false
-                            local healKey = Config.EmergencyHealSkill and Config.EmergencyHealSkill ~= "Tắt" and Config.EmergencyHealSkill:match("([ZXCVzxcv])")
-                            if healKey then healKey = healKey:upper() end
-
-                            if healKey and playerHp <= (Config.EmergencyHealHp or 40) then
-                                if comboState.IsSkillReady(healKey, fUI) then
-                                    comboState.CastSkill(healKey)
-                                    comboState.lastActionTime = now
-                                    didHeal = true
+                            if #loopKeys == 0 then
+                                for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
+                                    table.insert(loopKeys, k:upper())
                                 end
                             end
 
-                            if not didHeal then
-                                -- BƯỚC 2: THI TRIỂN CHUỖI ĐẢO CHIÊU COMBO (VD: Z -> X -> V...)
-                                local loopKeys = {}
-                                local curQ = ticketQuestState and ticketQuestState.currentQuestType or "none"
-
-                                -- fish_100 và skill_100: chỉ dùng 1 chiêu cố định theo config vé
-                                -- Tất cả còn lại (fish_15m, bait_100, không có quest...): dùng LoopSkills đầy đủ
-                                if curQ == "fish_100" then
-                                    local qk = Config.TicketQuickSkill and Config.TicketQuickSkill:match("([ZXCVzxcv])%s*$")
-                                    table.insert(loopKeys, qk and qk:upper() or "V")
-                                elseif curQ == "skill_100" then
-                                    local sk = Config.TicketSkillKey and Config.TicketSkillKey:match("([ZXCVzxcv])%s*$")
-                                    table.insert(loopKeys, sk and sk:upper() or "Z")
+                            if #loopKeys > 0 then
+                                if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
+                                    comboState.loopTargetIndex = 1
                                 end
 
-                                if #loopKeys == 0 then
-                                    for k in string.gmatch(Config.LoopSkills or "Z, X, V", "([ZXCVzxcv])") do
-                                        table.insert(loopKeys, k:upper())
-                                    end
-                                end
+                                local targetKey = loopKeys[comboState.loopTargetIndex]
+                                local btn = comboState.GetSkillButton(targetKey, fUI)
 
-                                if #loopKeys > 0 then
-                                    if comboState.loopTargetIndex < 1 or comboState.loopTargetIndex > #loopKeys then
-                                        comboState.loopTargetIndex = 1
-                                    end
+                                if not btn and fUI and fUI:FindFirstChild("SkillButton") then
+                                    -- Chiêu này cần câu không có -> Bỏ qua sang chiêu tiếp theo
+                                    comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                else
+                                    local onCd = comboState.IsSkillOnCooldown(targetKey, fUI)
 
-                                    if Config.LoopStrictOrder then
-                                        local targetKey = loopKeys[comboState.loopTargetIndex]
-                                        if not comboState.SkillExists(targetKey, fUI) then
-                                            -- Chiêu này người chơi không có trên UI, bỏ qua sang chiêu tiếp theo
-                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                        elseif comboState.IsSkillReady(targetKey, fUI) then
-                                            comboState.CastSkill(targetKey)
-                                            comboState.lastActionTime = now
-                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
-                                        else
-                                            -- Chiêu đang trong thời gian hồi (cooldown):
-                                            -- BẮT BUỘC CHỜ CHIÊU NÀY HỒI XONG!
-                                            -- Tuyệt đối không nhảy cóc sang chiêu khác, không tăng index!
-                                        end
+                                    if not onCd then
+                                        -- Nút đang sáng: Bấm chiêu ngay!
+                                        comboState.CastSkill(targetKey)
+                                        comboState.lastActionTime = now
+                                        comboState.lastCastingKey = targetKey
+
+                                        -- Sau 0.08s: kiểm tra nếu nút đã bị khóa Cooldown (server đã nhận) -> PASS NHẢY SANG CHIÊU KẾ!
+                                        task.delay(0.08, function()
+                                            if comboState.lastCastingKey == targetKey and comboState.IsSkillOnCooldown(targetKey, fUI) then
+                                                comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                                comboState.lastCastingKey = nil
+                                            end
+                                        end)
                                     else
-                                        local chosenIndex = nil
-                                        for offset = 0, #loopKeys - 1 do
-                                            local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
-                                            local sk = loopKeys[idx]
-                                            if comboState.IsSkillReady(sk, fUI) then
-                                                chosenIndex = idx
-                                                break
+                                        -- Nút đang bị khóa Cooldown:
+                                        -- Nếu vừa bấm chiêu này ở nhịp trước và nút đã khóa thành công:
+                                        if comboState.lastCastingKey == targetKey then
+                                            comboState.loopTargetIndex = (comboState.loopTargetIndex % #loopKeys) + 1
+                                            comboState.lastCastingKey = nil
+                                        elseif not Config.LoopStrictOrder then
+                                            -- Nếu TẮT StrictOrder: linh hoạt tìm chiêu khác đang mở khóa để bấm
+                                            for offset = 1, #loopKeys - 1 do
+                                                local idx = ((comboState.loopTargetIndex - 1 + offset) % #loopKeys) + 1
+                                                local sk = loopKeys[idx]
+                                                if not comboState.IsSkillOnCooldown(sk, fUI) then
+                                                    comboState.CastSkill(sk)
+                                                    comboState.lastActionTime = now
+                                                    comboState.lastCastingKey = sk
+                                                    comboState.loopTargetIndex = (idx % #loopKeys) + 1
+                                                    break
+                                                end
                                             end
                                         end
-                                        if chosenIndex then
-                                            local skillToCast = loopKeys[chosenIndex]
-                                            comboState.CastSkill(skillToCast)
-                                            comboState.lastActionTime = now
-                                            comboState.loopTargetIndex = (chosenIndex % #loopKeys) + 1
-                                        end
                                     end
-                                else
-                                    local fallbackKey = (Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" and Config.QuickCatchSkill:match("([ZXCVzxcv])"))
-                                        or (Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])"))
-                                        or "Z"
-                                    fallbackKey = fallbackKey:upper()
-                                    if comboState.IsSkillReady(fallbackKey, fUI) then
-                                        comboState.CastSkill(fallbackKey)
-                                        comboState.lastActionTime = now
-                                    end
+                                end
+                            else
+                                local fallbackKey = (Config.QuickCatchSkill and Config.QuickCatchSkill ~= "Tắt" and Config.QuickCatchSkill:match("([ZXCVzxcv])"))
+                                    or (Config.OpenerSkill and Config.OpenerSkill ~= "Tắt" and Config.OpenerSkill:match("([ZXCVzxcv])"))
+                                    or "Z"
+                                fallbackKey = fallbackKey:upper()
+                                if not comboState.IsSkillOnCooldown(fallbackKey, fUI) then
+                                    comboState.CastSkill(fallbackKey)
+                                    comboState.lastActionTime = now
                                 end
                             end
                         end
