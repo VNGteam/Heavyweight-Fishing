@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.3.2"
+local SCRIPT_BUILD_COMMIT = "v2.3.3"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -10032,7 +10032,7 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
 end)
 
 -------------------------------------------------------------------------
--- TAB QUẢN LÝ CÁ (FISH MANAGER) - THỬ NGHIỆM KHÓA / MỞ KHÓA
+-- TAB QUẢN LÝ CÁ (FISH MANAGER) - THỬ NGHIỆM KHÓA / MỞ KHÓA V2
 -------------------------------------------------------------------------
 do
     createCategoryHeader(tabFishManager, "Quản Lý Cá - Thử Nghiệm Khóa & Mở Khóa")
@@ -10040,6 +10040,72 @@ do
 
     local TARGET_FISH_NAME = "Crimson Bream Sovereign"
     local isProcessing = false
+    local spyEnabled = false
+    local lastSpyInfo = "Chưa có tín hiệu nào"
+
+    -- Helper trigger button trong UI game
+    local function ClickButton(btn)
+        if not btn then return false end
+        local triggered = false
+        if typeof(firesignal) == "function" then
+            pcall(function() firesignal(btn.MouseButton1Click); triggered = true end)
+            pcall(function() firesignal(btn.MouseButton1Down) end)
+            pcall(function() firesignal(btn.MouseButton1Up) end)
+            pcall(function() firesignal(btn.Activated); triggered = true end)
+        end
+        if typeof(getconnections) == "function" then
+            local ok1, conns1 = pcall(getconnections, btn.MouseButton1Click)
+            if ok1 and type(conns1) == "table" then
+                for _, c in ipairs(conns1) do
+                    pcall(function() c:Fire(); triggered = true end)
+                end
+            end
+            local ok2, conns2 = pcall(getconnections, btn.Activated)
+            if ok2 and type(conns2) == "table" then
+                for _, c in ipairs(conns2) do
+                    pcall(function() c:Fire(); triggered = true end)
+                end
+            end
+        end
+        return triggered
+    end
+
+    -- Tìm con cá trong GUI balo (Fisher_Inventory)
+    local function FindGuiItems()
+        local guiMap = {}
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        local mainGui = pGui and pGui:FindFirstChild("MainGui")
+        local fisherInv = mainGui and mainGui:FindFirstChild("Fisher_Inventory")
+        local scrollFrame = fisherInv and fisherInv:FindFirstChild("Drop")
+            and fisherInv.Drop:FindFirstChild("List")
+            and fisherInv.Drop.List:FindFirstChild("ScrollingFrame")
+
+        if scrollFrame then
+            for _, folder in ipairs(scrollFrame:GetChildren()) do
+                if folder:IsA("Folder") and folder.Name:lower():find(TARGET_FISH_NAME:lower(), 1, true) then
+                    local weightInt = folder.Name:match("|%s*(%d+)")
+                    for _, sub in ipairs(folder:GetChildren()) do
+                        local favFrame = sub:FindFirstChild("Favorite", true)
+                        local btn = favFrame and (favFrame:FindFirstChildWhichIsA("TextButton") or (favFrame:IsA("TextButton") and favFrame))
+                        local star = favFrame and favFrame:FindFirstChild("Star", true)
+                        local isLocked = (sub:GetAttribute("IsFavorite") == true)
+                            or (sub.Name:find("Favorite", 1, true) ~= nil)
+                            or (star and star.Visible == true)
+
+                        table.insert(guiMap, {
+                            folder = folder,
+                            sub = sub,
+                            btn = btn,
+                            isLocked = isLocked,
+                            weightInt = weightInt,
+                            weight = sub:GetAttribute("Weight")
+                        })
+                    end
+                end
+            end
+        end
+        return guiMap
+    end
 
     -- Helper tìm kiếm cá Crimson Bream Sovereign trong Inventory & Hotbar
     local function GetCrimsonBreamItems()
@@ -10052,24 +10118,44 @@ do
         if pData:FindFirstChild("Inventory") then table.insert(containers, pData.Inventory) end
         if pData:FindFirstChild("Hotbar") then table.insert(containers, pData.Hotbar) end
 
+        local guiItems = FindGuiItems()
+
         for _, container in ipairs(containers) do
             for _, item in ipairs(container:GetChildren()) do
                 local rawName = (Wiki and Wiki.GetItemRawName) and Wiki.GetItemRawName(item) or ""
                 local itemName = item.Name
                 -- Kiểm tra tên cá theo raw name hoặc tên item chứa chuỗi
                 if rawName == TARGET_FISH_NAME or itemName:lower():find(TARGET_FISH_NAME:lower(), 1, true) then
-                    local isLocked = false
-                    if Wiki and Wiki.IsItemFavorited then
+                    local isLocked = (itemName:find("Favorite", 1, true) ~= nil)
+                        or (item:GetAttribute("IsFavorite") == true)
+                    
+                    if not isLocked and Wiki and Wiki.IsItemFavorited then
                         isLocked = Wiki.IsItemFavorited(item)
                     end
-                    if not isLocked then
-                        isLocked = (itemName:find("Favorite", 1, true) ~= nil) or (item:GetAttribute("IsFavorite") == true)
+
+                    -- Tìm gui item tương ứng nếu có
+                    local weightInt = itemName:match("|%s*(%d+)")
+                    local matchedGui = nil
+                    for _, g in ipairs(guiItems) do
+                        if weightInt and g.weightInt == weightInt then
+                            matchedGui = g
+                            break
+                        end
+                    end
+                    if not matchedGui and #guiItems > 0 then
+                        matchedGui = guiItems[1]
                     end
 
+                    local entry = {
+                        data = item,
+                        gui = matchedGui,
+                        isLocked = isLocked
+                    }
+
                     if isLocked then
-                        table.insert(lockedItems, item)
+                        table.insert(lockedItems, entry)
                     else
-                        table.insert(unlockedItems, item)
+                        table.insert(unlockedItems, entry)
                     end
                 end
             end
@@ -10082,6 +10168,7 @@ do
     local totalLabel = createInfoRow(fishCard, "Tổng số lượng trong balo", "0 con")
     local lockedLabel = createInfoRow(fishCard, "Đang Khóa (🔒 Favorite)", "0 con")
     local unlockedLabel = createInfoRow(fishCard, "Chưa Khóa (🔓 Mở)", "0 con")
+    local spyLabel = createInfoRow(fishCard, "Tín hiệu Spy", lastSpyInfo)
 
     local function RefreshCounts()
         local locked, unlocked = GetCrimsonBreamItems()
@@ -10135,29 +10222,43 @@ do
         isProcessing = true
         ShowNotification("Khóa Cá", string.format("Bắt đầu khóa %d con %s...", #unlocked, TARGET_FISH_NAME), "INFO", 3)
 
+        -- Xóa cờ bypass để cho phép khóa lại
+        if Wiki and Wiki.temporarilyUnlockedBaitFish then
+            Wiki.temporarilyUnlockedBaitFish[TARGET_FISH_NAME:lower()] = nil
+        end
+
         task.spawn(function()
             local successCount = 0
             local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
-            if not favEvent then
-                ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 4)
-                isProcessing = false
-                return
-            end
 
-            for _, item in ipairs(unlocked) do
-                if item and item.Parent then
-                    pcall(function()
-                        favEvent:FireServer(item)
-                    end)
-                    successCount = successCount + 1
-                    task.wait(0.05) -- Nghỉ 50ms tránh rate-limit
+            for _, entry in ipairs(unlocked) do
+                local done = false
+                -- Cách 1: Click trực tiếp nút GUI của game
+                if entry.gui and entry.gui.btn then
+                    done = ClickButton(entry.gui.btn)
                 end
+
+                -- Cách 2: Gửi Remote Event đa tầng
+                if favEvent then
+                    if entry.data and entry.data.Parent then
+                        pcall(function() favEvent:FireServer(entry.data) end)
+                        pcall(function() favEvent:FireServer(entry.data.Name) end)
+                    end
+                    if entry.gui then
+                        if entry.gui.sub then pcall(function() favEvent:FireServer(entry.gui.sub) end) end
+                        if entry.gui.folder then pcall(function() favEvent:FireServer(entry.gui.folder) end) end
+                    end
+                    done = true
+                end
+
+                if done then successCount = successCount + 1 end
+                task.wait(0.08)
             end
 
             task.wait(0.5)
             RefreshCounts()
             isProcessing = false
-            ShowNotification("Thành Công", string.format("Đã gửi yêu cầu khóa %d con %s!", successCount, TARGET_FISH_NAME), "SUCCESS", 5)
+            ShowNotification("Thành Công", string.format("Đã gửi yêu cầu KHÓA %d con %s!", successCount, TARGET_FISH_NAME), "SUCCESS", 5)
         end)
     end)
 
@@ -10177,33 +10278,84 @@ do
         isProcessing = true
         ShowNotification("Mở Khóa Cá", string.format("Bắt đầu mở khóa %d con %s...", #locked, TARGET_FISH_NAME), "INFO", 3)
 
+        -- QUAN TRỌNG: Bật cờ bypass để hệ thống AutoProtect không tự động khóa lại cá Secret Boss!
+        if Wiki and Wiki.temporarilyUnlockedBaitFish then
+            Wiki.temporarilyUnlockedBaitFish[TARGET_FISH_NAME:lower()] = true
+        end
+
         task.spawn(function()
             local successCount = 0
             local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
-            if not favEvent then
-                ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 4)
-                isProcessing = false
-                return
-            end
 
-            for _, item in ipairs(locked) do
-                if item and item.Parent then
-                    pcall(function()
-                        favEvent:FireServer(item)
-                    end)
-                    successCount = successCount + 1
-                    task.wait(0.05)
+            for _, entry in ipairs(locked) do
+                local done = false
+                -- Cách 1: Click trực tiếp nút GUI của game
+                if entry.gui and entry.gui.btn then
+                    done = ClickButton(entry.gui.btn)
                 end
+
+                -- Cách 2: Gửi Remote Event đa tầng
+                if favEvent then
+                    if entry.data and entry.data.Parent then
+                        pcall(function() favEvent:FireServer(entry.data) end)
+                        pcall(function() favEvent:FireServer(entry.data.Name) end)
+                    end
+                    if entry.gui then
+                        if entry.gui.sub then pcall(function() favEvent:FireServer(entry.gui.sub) end) end
+                        if entry.gui.folder then pcall(function() favEvent:FireServer(entry.gui.folder) end) end
+                    end
+                    done = true
+                end
+
+                if done then successCount = successCount + 1 end
+                task.wait(0.08)
             end
 
             task.wait(0.5)
             RefreshCounts()
             isProcessing = false
-            ShowNotification("Thành Công", string.format("Đã gửi yêu cầu mở khóa %d con %s!", successCount, TARGET_FISH_NAME), "SUCCESS", 5)
+            ShowNotification("Thành Công", string.format("Đã gửi yêu cầu MỞ KHÓA %d con %s!", successCount, TARGET_FISH_NAME), "SUCCESS", 5)
         end)
     end)
 
-    -- Nút 3: Làm mới / Đếm lại
+    -- Nút 3: Bật Spy bắt tín hiệu Remote từ thao tác tay
+    createButtonRow(fishCard, "Bật Spy Bắt Remote", "Bấm nút này rồi mở balo click vào ngôi sao của 1 con cá", "🔍 Bật Spy", function()
+        if spyEnabled then
+            ShowNotification("SPY REMOTE", "Spy đã được bật từ trước! Hãy mở Balo và bấm vào biểu tượng ngôi sao của bất kỳ con cá nào.", "INFO", 5)
+            return
+        end
+        spyEnabled = true
+
+        local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+        pcall(function()
+            if typeof(hookmetamethod) == "function" then
+                local oldNamecall
+                oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+                    local method = getnamecallmethod()
+                    if self == favEvent and (method == "FireServer" or method == "fireServer") then
+                        local args = {...}
+                        local argTypes = {}
+                        local argVals = {}
+                        for i, a in ipairs(args) do
+                            table.insert(argTypes, typeof(a))
+                            table.insert(argVals, tostring(a))
+                        end
+                        lastSpyInfo = string.format("Args(%d): [%s] -> %s", #args, table.concat(argTypes, ", "), table.concat(argVals, ", "))
+                        if spyLabel and spyLabel.Set then
+                            spyLabel.Set(lastSpyInfo)
+                        end
+                        ShowNotification("BẮT ĐƯỢC TÍN HIỆU KHÓA!", lastSpyInfo, "SUCCESS", 8)
+                        print("[FAVORITE SPY]", lastSpyInfo)
+                    end
+                    return oldNamecall(self, ...)
+                end)
+            end
+        end)
+
+        ShowNotification("SPY ĐÃ KÍCH HOẠT", "Bây giờ hãy mở Balo Game và click vào biểu tượng Ngôi Sao của 1 con cá bất kỳ!", "SUCCESS", 6)
+    end)
+
+    -- Nút 4: Làm mới / Đếm lại
     createButtonRow(fishCard, "Quét Lại Balo", "Đếm lại số lượng cá " .. TARGET_FISH_NAME .. " trong balo", "🔄 Quét Lại", function()
         local locked, unlocked = RefreshCounts()
         ShowNotification("Quét Hoàn Tất", string.format("Tìm thấy %d con (🔒 %d khóa, 🔓 %d mở)", #locked + #unlocked, #locked, #unlocked), "SUCCESS", 4)

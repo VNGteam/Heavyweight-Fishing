@@ -2,6 +2,24 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.3.3] - 2026-09-16
+### 🛠️ Nâng Cấp Toàn Diện Cơ Chế Khóa & Mở Khóa Cá (Tab Quản Lý Cá):
+1. **Khắc Phục Hiện Tượng Bấm Nút Không Đổi Trạng Thái**:
+   - **Nguyên nhân**:
+     - Remote `FavoriteItem` của Server game yêu cầu kích hoạt từ client theo chuẩn nội bộ của game; gọi đơn lẻ bằng `Remote:FireServer(item)` từ bên ngoài dễ bị server từ chối hoặc sai instance.
+     - Đồng thời, cơ chế tự động bảo vệ `ProtectInventoryItem` mặc định tự động khóa lại cá Secret Boss (`Crimson Bream Sovereign`) ngay sau khi vừa mở khóa (trong vòng 0.3s khi `ChildAdded` kích hoạt), khiến người chơi cảm giác nút mở khóa không có tác dụng.
+   - **Khắc phục**:
+     - **Tích hợp cơ chế kích hoạt trực tiếp giao diện (Direct GUI Trigger)**: Tìm chính xác `Favorite.TextButton` của con cá `Crimson Bream Sovereign` trong `PlayerGui.MainGui.Fisher_Inventory` và mô phỏng thao tác bấm tay thông qua `firesignal` và `getconnections(btn.MouseButton1Click):Fire()`. Đảm bảo 100% tuân thủ logic gốc của Game.
+     - **Gửi Remote Event Đa Tầng (Fallback)**: Gửi song song cả Instance Data, GUI Element, và Item Name.
+     - **Cờ Bypass AutoProtect Thông Minh**: Tự động cấp cờ `Wiki.temporarilyUnlockedBaitFish["crimson bream sovereign"] = true` khi người dùng bấm **Mở Khóa**, ngăn chặn hoàn toàn việc script tự động khóa lại sau khi mở. Khi người dùng bấm **Khóa Cá**, cờ này sẽ được gỡ bỏ ngay lập tức.
+2. **Thêm Công Cụ "🔍 Bật Spy Bắt Remote"**:
+   - Tích hợp tính năng bắt gói tin mạng của game ngay trên giao diện tab "Quản Lý Cá".
+   - Người dùng bấm nút **Bật Spy**, sau đó mở Balo trong game và click vào biểu tượng Ngôi Sao của bất kỳ con cá nào; hệ thống sẽ chụp lại 100% tên Remote, số lượng tham số, kiểu dữ liệu và giá trị chi tiết hiển thị trực tiếp lên màn hình.
+3. **Đồng Bộ Phiên Bản Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.3.3** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua)).
+
+---
+
 ## [v2.3.2] - 2026-09-16
 ### 🐟 Tab Mới: Quản Lý Cá (Fish Manager) - Tính Năng Thử Nghiệm Khóa & Mở Khóa Cá:
 1. **Thêm Tab Riêng "Quản Lý Cá" Trên Menu Điều Khiển**:
