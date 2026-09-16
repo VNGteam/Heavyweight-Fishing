@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.7"
+local SCRIPT_BUILD_COMMIT = "v2.5.8"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -188,6 +188,21 @@ local Config = {
         ["Mountain Dragonwhale"] = true,
         ["Mirage Lanternfish"] = true,
         ["Nameless Octoparasite"] = true,
+        -- Cá Thường Có Ích (Rơi Skill / Thuyền / Orb / Chế Cần & Mồi)
+        ["Trueform Jiaolongfish"] = true,
+        ["Adult Jiaolong Dragonfish"] = false,
+        ["Elder Jiaolong Dragonfish"] = false,
+        ["Serpent Fish"] = false,
+        ["Ascended Perch"] = true,
+        ["Trueform Perch"] = true,
+        ["Elder Perch VIII"] = false,
+        ["Dark Kingfish"] = false,
+        ["Glorious Elder Turtle"] = false,
+        ["Chromatic Koi"] = false,
+        ["Mountain Fish"] = true,
+        ["Tiger Mirefish"] = true,
+        ["Octoparasitic Fish"] = true,
+        ["Dreadmare Eel"] = false,
     },
     CustomBossSpots = {},
     SelectedCustomSpotIsland = "Đảo Tre (Bamboo Isle)",
@@ -2051,6 +2066,17 @@ local function createToggleRow(parent, labelText, descText, initialVal, callback
         initialVal = false
     end
     local row = createBaseRow(parent, labelText, descText, indexSearch)
+    local tf = row:FindFirstChildOfClass("Frame")
+    local descLbl = nil
+    if tf then
+        tf.Size = UDim2.new(1, -55, 1, 0)
+        for _, child in ipairs(tf:GetChildren()) do
+            if child:IsA("TextLabel") and child.TextSize == 10 then
+                descLbl = child
+                pcall(function() child.TextTruncate = Enum.TextTruncate.AtEnd end)
+            end
+        end
+    end
     local state = initialVal or false
     local btn = Instance.new("TextButton"); btn.Size = UDim2.new(0, 40, 0, 20); btn.Position = UDim2.new(1, -40, 0.5, -10); btn.BackgroundColor3 = state and Colors.PurpleAccent or Colors.ControlBg; btn.Text = ""; btn.BorderSizePixel = 0; btn.Parent = row
     Instance.new("UICorner", btn).CornerRadius = UDim.new(1, 0)
@@ -2071,6 +2097,7 @@ local function createToggleRow(parent, labelText, descText, initialVal, callback
     end)
     local ret = {
         frame = row,
+        descLabel = descLbl,
         Set = function(val, skipCallback)
             state = val
             updateVisuals()
@@ -2228,7 +2255,9 @@ end
 
 local function createInfoRow(parent, labelText, valueText, indexSearch)
     local row = createBaseRow(parent, labelText, "", indexSearch)
-    local vl = Instance.new("TextLabel"); vl.Size = UDim2.new(0, 180, 1, 0); vl.Position = UDim2.new(1, -180, 0, 0); vl.BackgroundTransparency = 1; vl.Font = Enum.Font.GothamBold; vl.Text = valueText; vl.TextColor3 = Colors.PurplePrimary; vl.TextSize = 11; vl.TextXAlignment = Enum.TextXAlignment.Right; vl.Parent = row
+    local tf = row:FindFirstChildOfClass("Frame")
+    if tf then tf.Size = UDim2.new(0.48, -10, 1, 0) end
+    local vl = Instance.new("TextLabel"); vl.Size = UDim2.new(0.52, 0, 1, 0); vl.Position = UDim2.new(0.48, 0, 0, 0); vl.BackgroundTransparency = 1; vl.Font = Enum.Font.GothamBold; vl.Text = valueText; vl.TextColor3 = Colors.PurplePrimary; vl.TextSize = 11; vl.TextXAlignment = Enum.TextXAlignment.Right; pcall(function() vl.TextTruncate = Enum.TextTruncate.AtEnd end); vl.Parent = row
     return {frame = row, Set = function(nv) vl.Text = nv end}
 end
 
@@ -2368,6 +2397,147 @@ local function IsRodOwned(rodName)
     return false
 end
 
+-- ====================================================================
+-- HỆ THỐNG KIỂM TRA TRẠNG THÁI SỞ HỮU THUYỀN, SKILL, ORB & ĐỊNH DẠNG CAPTION CÁ
+-- ====================================================================
+local FishRewardHelper = {}
+
+function FishRewardHelper.GetPlayerDataFolder()
+    local data = ReplicatedStorage:FindFirstChild("Data")
+    if not data then return nil end
+    local uid = LocalPlayer and tostring(LocalPlayer.UserId)
+    if uid and data:FindFirstChild(uid) then
+        return data[uid]
+    end
+    for _, child in ipairs(data:GetChildren()) do
+        if tonumber(child.Name) then
+            return child
+        end
+    end
+    return nil
+end
+
+function FishRewardHelper.HasPlayerBoat(boatName)
+    if not boatName or boatName == "" then return false end
+    local pData = FishRewardHelper.GetPlayerDataFolder()
+    if pData and pData:FindFirstChild("Boats") then
+        local b = pData.Boats:FindFirstChild(boatName)
+        if b and (b.Value == true or b.Value == 1) then
+            return true
+        end
+        local clean = boatName:lower():gsub("[%s%-_]+", "")
+        for _, child in ipairs(pData.Boats:GetChildren()) do
+            if child.Name:lower():gsub("[%s%-_]+", "") == clean and (child.Value == true or child.Value == 1) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function FishRewardHelper.HasPlayerSkill(skillName)
+    if not skillName or skillName == "" then return false end
+    local pData = FishRewardHelper.GetPlayerDataFolder()
+    if pData and pData:FindFirstChild("Skill") then
+        local sFolder = pData.Skill:FindFirstChild(skillName)
+        if sFolder then
+            local owned = sFolder:FindFirstChild("Owned")
+            if owned and (owned.Value == true or owned.Value == 1) then
+                return true
+            end
+        end
+        local clean = skillName:lower():gsub("[%s%-_]+", "")
+        for _, child in ipairs(pData.Skill:GetChildren()) do
+            local cClean = child.Name:lower():gsub("[%s%-_]+", "")
+            if cClean == clean or cClean:find(clean, 1, true) or clean:find(cClean, 1, true) then
+                local owned = child:FindFirstChild("Owned")
+                if owned and (owned.Value == true or owned.Value == 1) then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
+function FishRewardHelper.GetPlayerOrbCount(orbName)
+    local count = 0
+    local pData = FishRewardHelper.GetPlayerDataFolder()
+    if pData then
+        if pData:FindFirstChild("Orb") then
+            local targetClean = orbName and orbName:lower():gsub("[%s%-_]+", "") or ""
+            for _, oItem in ipairs(pData.Orb:GetChildren()) do
+                local vn = oItem:FindFirstChild("ValueName")
+                if vn and vn:IsA("StringValue") then
+                    if targetClean == "" then
+                        count = count + 1
+                    else
+                        local valClean = vn.Value:lower():gsub("[%s%-_]+", "")
+                        if valClean:find(targetClean, 1, true) or targetClean:find(valClean, 1, true) then
+                            count = count + 1
+                        end
+                    end
+                end
+            end
+        end
+        if orbName and orbName:lower():find("essence") then
+            local eo = pData:FindFirstChild("EssenceOrb")
+            if eo and eo:IsA("NumberValue") then
+                count = count + eo.Value
+            end
+        end
+    end
+    return count
+end
+
+function FishRewardHelper.FormatFishCaption(f)
+    local parts = {}
+
+    -- 1. Mục đích / Công dụng (Chế cần, chế mồi, trả quest...)
+    if f.use and f.use ~= "" then
+        table.insert(parts, f.use)
+    end
+
+    -- 2. Thuyền (Boat)
+    if f.boatReward then
+        local bName = f.boatReward.name or f.boatReward
+        local rate = f.boatReward.rate or "5%"
+        local has = FishRewardHelper.HasPlayerBoat(bName)
+        local status = has and "[ĐÃ CÓ]" or "[CHƯA CÓ]"
+        table.insert(parts, string.format("Thuyền %s (%s): %s", bName, rate, status))
+    end
+
+    -- 3. Kỹ năng (Skill)
+    if f.skillReward then
+        local sName = f.skillReward.name or f.skillReward
+        local rate = f.skillReward.rate or "10%"
+        local has = FishRewardHelper.HasPlayerSkill(sName)
+        local status = has and "[ĐÃ CÓ]" or "[CHƯA CÓ]"
+        table.insert(parts, string.format("Skill %s (%s): %s", sName, rate, status))
+    end
+
+    -- 4. Orb
+    if f.orbReward then
+        local oName = f.orbReward.name or f.orbReward
+        local rate = f.orbReward.rate or "20%"
+        local c = FishRewardHelper.GetPlayerOrbCount(oName)
+        table.insert(parts, string.format("Orb %s (%s) [Đang có: x%d]", oName, rate, c))
+    end
+
+    -- 5. Gems
+    if f.gems and f.gems > 0 then
+        table.insert(parts, string.format("+%d Gems", f.gems))
+    elseif f.reward and f.reward ~= "" and not f.use then
+        table.insert(parts, f.reward)
+    end
+
+    if #parts == 0 then
+        return f.reward or "Cá Quý Hiếm"
+    end
+
+    return table.concat(parts, " • ")
+end
+
 local secretBossDatabase = {
     {
         islandName = "Đảo Tre (Bamboo Isle)",
@@ -2384,12 +2554,13 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Scarlet Fish", reward = "+3 Gems"},
-            {name = "Elder Scarlet Fish", reward = "+5 Gems"},
-            {name = "Crimson Electric Eel", reward = "+5 Gems"},
-            {name = "Golden Dragonfish", reward = "+20 Gems"},
-            {name = "Rainbow Dragonfish", reward = "+50 Gems | Rainbow"},
-        }
+            {name = "Golden Dragonfish", use = "Chế Cần & Mồi • Thần Thoại", orbReward = {name = "Dragon Orb", rate = "20%"}, gems = 20},
+            {name = "Rainbow Dragonfish", use = "Chế Cần Heavenpiercer & Mồi Rainbow • Quest Hạ Diêu", gems = 50},
+            {name = "Scarlet Fish", use = "Chế Cần Huyết Long Rod", gems = 3},
+            {name = "Elder Scarlet Fish", use = "Chế Cần Huyết Long Rod", gems = 5},
+            {name = "Crimson Electric Eel", use = "Chế Mồi Rainbow Bait", gems = 5},
+        },
+        usefulFish = {}
     },
     {
         islandName = "Đảo Phóng Xạ (Fallout Isle)",
@@ -2406,10 +2577,16 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Verdant Alligator Gar", reward = "+3 Gems | Skill 25%"},
-            {name = "Verdant Grouper", reward = "+3 Gems | Skill 25%"},
-            {name = "Verdant Bonefang", reward = "+5 Gems | Skill 5%"},
-            {name = "Crimson Bonefang", reward = "+15 Gems | Skill 10%"},
+            {name = "Verdant Alligator Gar", use = "Chế Cần Huyết Long", skillReward = {name = "Beastbreaker Cleave", rate = "25%"}, gems = 3},
+            {name = "Verdant Grouper", use = "Boss Mưa Huyền Thoại", skillReward = {name = "Cyclone Hook", rate = "25%"}, gems = 3},
+            {name = "Verdant Bonefang", use = "Chế Cần Huyết Long", skillReward = {name = "River Suppression", rate = "5%"}, gems = 5},
+            {name = "Crimson Bonefang", use = "Thần Thú Huyết Cốt Nha", skillReward = {name = "Seven Wounds Fusion", rate = "10%"}, gems = 15},
+        },
+        usefulFish = {
+            {name = "Trueform Jiaolongfish", use = "Giao Long Chân Thân • Long Ngư Thần Thoại", skillReward = {name = "Rolling Twin Dragons", rate = "50%"}},
+            {name = "Adult Jiaolong Dragonfish", use = "Trưởng Thành Giao Long • Long Ngư Quý Hiếm"},
+            {name = "Elder Jiaolong Dragonfish", use = "Cổ Đại Giao Long • Long Ngư Thần Thoại"},
+            {name = "Serpent Fish", use = "Mãng Xà Ngư Quý • Cá Quý Đảo Phóng Xạ"},
         }
     },
     {
@@ -2427,8 +2604,13 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Flying Fish Emperor", reward = "+10 Gems | Skill 10%"},
-            {name = "Flying Fish Empress", reward = "+10 Gems | Skill 10%"},
+            {name = "Flying Fish Emperor", use = "Chế Cần Heavenpiercer Rod", skillReward = {name = "Skybreaker Technique", rate = "10%"}, gems = 10},
+            {name = "Flying Fish Empress", use = "Chế Cần Heavenpiercer Rod", skillReward = {name = "Skybreaker Technique", rate = "10%"}, gems = 10},
+        },
+        usefulFish = {
+            {name = "Ascended Perch", use = "Chế Cần Trúc Thánh & Mồi Frost", boatReward = {name = "Ascended Perch", rate = "5%"}},
+            {name = "Trueform Perch", use = "Chân Thân Cá Chép • Cá Quý Đảo Cá Chép", skillReward = {name = "River Suppression", rate = "20%"}},
+            {name = "Elder Perch VIII", use = "Cá Chép Thâm Niên VIII • Giá Trị Cao"},
         }
     },
     {
@@ -2446,9 +2628,12 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Reborn Puffer Beast", reward = "+10 Gems"},
-            {name = "Frost Kingfish", reward = "+10 Gems | Skill Drop"},
-            {name = "Frost Queenfish", reward = "+20 Gems | Queen"},
+            {name = "Reborn Puffer Beast", use = "Chế Cần Trúc Thánh & Trả Quest Giang Lão", gems = 10},
+            {name = "Frost Kingfish", use = "Chế Cần Pure Diamond Rod & Mồi Frost", skillReward = {name = "Pure Yang Wuji", rate = "10%"}, gems = 10},
+            {name = "Frost Queenfish", use = "Chế Cần Pure Diamond Rod • Boss Nữ Hoàng", gems = 20},
+        },
+        usefulFish = {
+            {name = "Dark Kingfish", use = "Hắc Ám Vương Ngư • Cá Quý Hiếm Giá Trị Cao"},
         }
     },
     {
@@ -2466,8 +2651,11 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Tigerfang Whale", reward = "+5 Gems | Skill Drop"},
-            {name = "Heavenpiercer Turtle", reward = "+5 Gems"},
+            {name = "Tigerfang Whale", use = "Boss Sương Mù • Thần Thoại", skillReward = {name = "Rooster Strike", rate = "10%"}, gems = 5},
+            {name = "Heavenpiercer Turtle", use = "Chế Cần Heavenpiercer Rod & Mồi Rainbow Bait", gems = 5},
+        },
+        usefulFish = {
+            {name = "Glorious Elder Turtle", use = "Huy Hoàng Cổ Quy • Thần Quy Huyền Thoại • BẢO VỆ"},
         }
     },
     {
@@ -2485,8 +2673,11 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Draconic Koi", reward = "+5 Gems"},
-            {name = "Sanguine Fish", reward = "+20 Gems | Skill 10%"},
+            {name = "Draconic Koi", use = "Chế Cần Pure Diamond Rod", gems = 5},
+            {name = "Sanguine Fish", use = "Chế Cần Pure Diamond Rod", skillReward = {name = "Blazing Vajra", rate = "10%"}, gems = 20},
+        },
+        usefulFish = {
+            {name = "Chromatic Koi", use = "Thất Sắc Cẩm Lý • Cá Quý Huyền Thoại"},
         }
     },
     {
@@ -2504,7 +2695,12 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Mountain Dragonwhale", reward = "+20 Gems | Skill 5%"},
+            {name = "Mountain Dragonwhale", use = "Thần Long Kình • Thần Thú Đỉnh Núi", skillReward = {name = "Mountain Flip", rate = "5%"}, gems = 20},
+        },
+        usefulFish = {
+            {name = "Mountain Fish", use = "Chế Cần Trúc Thánh & Mồi Nameless Bait", gems = 20},
+            {name = "Tiger Mirefish", use = "Nguyên liệu chế Mồi Nameless Bait (Gọi Boss Bạch Tuộc)"},
+            {name = "Mirage Lanternfish", use = "Nguyên liệu chế Mồi Nameless Bait (Gọi Boss Bạch Tuộc)"},
         }
     },
     {
@@ -2522,8 +2718,12 @@ local secretBossDatabase = {
             },
         },
         bosses = {
-            {name = "Mirage Lanternfish", reward = "+20 Gems"},
-            {name = "Nameless Octoparasite", reward = "+50 Gems | Secret"},
+            {name = "Mirage Lanternfish", use = "Đèn Lồng Ảo Ảnh • Nguyên liệu chế Mồi Nameless Bait", gems = 20},
+            {name = "Nameless Octoparasite", use = "Siêu Boss Biển Sâu • Chế Cần Trúc Thánh & Trả Quest Đạo Sĩ", gems = 50},
+        },
+        usefulFish = {
+            {name = "Octoparasitic Fish", use = "Boss Bạch Tuộc • Nguyên liệu chế Mồi Nameless Bait", gems = 50},
+            {name = "Dreadmare Eel", use = "Kinh Hoàng Hải Man • Cá Boss Biển Sâu Huyền Thoại"},
         }
     }
 }
@@ -2535,6 +2735,13 @@ for _, entry in ipairs(secretBossDatabase) do
         local clean = b.name:gsub("%s+", ""):lower()
         secretBossLookup[clean] = b.name
     end
+    if entry.usefulFish then
+        for _, f in ipairs(entry.usefulFish) do
+            secretBossLookup[f.name:lower()] = f.name
+            local clean = f.name:gsub("%s+", ""):lower()
+            secretBossLookup[clean] = f.name
+        end
+    end
 end
 secretBossLookup["heavenpiercer turtle"] = "Heavenpiercer Turtle"
 secretBossLookup["heaven piercer turtle"] = "Heavenpiercer Turtle"
@@ -2544,10 +2751,24 @@ secretBossLookup["tigerfang whale"] = "Tigerfang Whale"
 secretBossLookup["tiger fang whale"] = "Tigerfang Whale"
 secretBossLookup["mountain dragonwhale"] = "Mountain Dragonwhale"
 secretBossLookup["mountain dragon whale"] = "Mountain Dragonwhale"
-secretBossLookup["mountain fish"] = "Mountain Dragonwhale"
+secretBossLookup["mountain fish"] = "Mountain Fish"
 secretBossLookup["nameless octoparasite"] = "Nameless Octoparasite"
 secretBossLookup["octoparasite"] = "Nameless Octoparasite"
-secretBossLookup["octoparasitic fish"] = "Nameless Octoparasite"
+secretBossLookup["octoparasitic fish"] = "Octoparasitic Fish"
+secretBossLookup["frost queenfish"] = "Frost Queenfish"
+secretBossLookup["frost queen fish"] = "Frost Queenfish"
+secretBossLookup["crimson bonefang"] = "Crimson Bonefang"
+secretBossLookup["crimson bone fang"] = "Crimson Bonefang"
+secretBossLookup["golden dragonfish"] = "Golden Dragonfish"
+secretBossLookup["golden dragon fish"] = "Golden Dragonfish"
+secretBossLookup["rainbow dragonfish"] = "Rainbow Dragonfish"
+secretBossLookup["rainbow dragon fish"] = "Rainbow Dragonfish"
+secretBossLookup["mirage lanternfish"] = "Mirage Lanternfish"
+secretBossLookup["mirage lantern fish"] = "Mirage Lanternfish"
+secretBossLookup["trueform jiaolongfish"] = "Trueform Jiaolongfish"
+secretBossLookup["ascended perch"] = "Ascended Perch"
+secretBossLookup["trueform perch"] = "Trueform Perch"
+secretBossLookup["tiger mirefish"] = "Tiger Mirefish"
 secretBossLookup["frost queenfish"] = "Frost Queenfish"
 secretBossLookup["frost queen fish"] = "Frost Queenfish"
 secretBossLookup["crimson bonefang"] = "Crimson Bonefang"
@@ -9907,21 +10128,69 @@ do
     end)
 end
 
--- Danh sách từng đảo và Secret Boss
-for _, entry in ipairs(secretBossDatabase) do
-    createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
-    local islandBossCard = createCardGroup(tabBoss)
-    for _, b in ipairs(entry.bosses) do
-        local isEnabled = (Config.SecretBossTargets[b.name] == true) or (b.name:find("Heaven") and (Config.SecretBossTargets["Heavenpiercer Turtle"] == true or Config.SecretBossTargets["Heaven Piercer Turtle"] == true))
-        local toggleObj = createToggleRow(islandBossCard, b.name, "Phần thưởng: " .. b.reward, isEnabled, function(v)
-            Config.SecretBossTargets[b.name] = v
-            if b.name:find("Heaven") then
-                Config.SecretBossTargets["Heavenpiercer Turtle"] = v
-                Config.SecretBossTargets["Heaven Piercer Turtle"] = v
+do
+    local fishCaptionLabels = {}
+    local function RefreshAllFishCaptions()
+        for _, item in ipairs(fishCaptionLabels) do
+            pcall(function()
+                if item.label and item.fishData then
+                    item.label.Text = FishRewardHelper.FormatFishCaption(item.fishData)
+                end
+            end)
+        end
+    end
+
+    -- Tự động cập nhật trạng thái sở hữu (Đã có / Chưa có / Số lượng Orb) mỗi 4 giây
+    task.spawn(function()
+        while true do
+            task.wait(4)
+            pcall(RefreshAllFishCaptions)
+        end
+    end)
+
+    -- Danh sách từng đảo: Phân rõ Cá Secret và Cá Thường Có Ích
+    for _, entry in ipairs(secretBossDatabase) do
+        createCategoryHeader(tabBoss, string.format("📍 %s [%s]", entry.islandName, entry.weather))
+
+        -- 1. Card Cá Secret & Thần Thoại
+        local secretCard = createCardGroup(tabBoss)
+        createInfoRow(secretCard, "🔥 CÁ SECRET & THẦN THOẠI", string.format("%d Boss", #entry.bosses))
+        for _, b in ipairs(entry.bosses) do
+            local isEnabled = (Config.SecretBossTargets[b.name] == true) or (b.name:find("Heaven") and (Config.SecretBossTargets["Heavenpiercer Turtle"] == true or Config.SecretBossTargets["Heaven Piercer Turtle"] == true))
+            local cap = FishRewardHelper.FormatFishCaption(b)
+            local toggleObj = createToggleRow(secretCard, b.name, cap, isEnabled, function(v)
+                Config.SecretBossTargets[b.name] = v
+                if b.name:find("Heaven") then
+                    Config.SecretBossTargets["Heavenpiercer Turtle"] = v
+                    Config.SecretBossTargets["Heaven Piercer Turtle"] = v
+                end
+                SaveBossTargets()
+            end)
+            bossTogglesMap[b.name] = toggleObj
+            if toggleObj and toggleObj.descLabel then
+                table.insert(fishCaptionLabels, {label = toggleObj.descLabel, fishData = b})
             end
-            SaveBossTargets()
-        end)
-        bossTogglesMap[b.name] = toggleObj
+        end
+
+        -- 2. Card Cá Thường Có Ích (Rơi Thuyền / Skill / Orb / Chế Cần & Mồi)
+        local usefulCard = createCardGroup(tabBoss)
+        if entry.usefulFish and #entry.usefulFish > 0 then
+            createInfoRow(usefulCard, "🐟 CÁ THƯỜNG CÓ ÍCH (RƠI ĐỒ / CHẾ CẦN)", string.format("%d Loại Cá", #entry.usefulFish))
+            for _, f in ipairs(entry.usefulFish) do
+                local isEnabled = (Config.SecretBossTargets[f.name] == true)
+                local cap = FishRewardHelper.FormatFishCaption(f)
+                local toggleObj = createToggleRow(usefulCard, f.name, cap, isEnabled, function(v)
+                    Config.SecretBossTargets[f.name] = v
+                    SaveBossTargets()
+                end)
+                bossTogglesMap[f.name] = toggleObj
+                if toggleObj and toggleObj.descLabel then
+                    table.insert(fishCaptionLabels, {label = toggleObj.descLabel, fishData = f})
+                end
+            end
+        else
+            createInfoRow(usefulCard, "🐟 CÁ THƯỜNG CÓ ÍCH", "Không có (Đảo này chỉ tập trung săn Cá Secret)")
+        end
     end
 end
 
@@ -10061,19 +10330,21 @@ createButtonRow(rodGuideCard, "Bật Lại Tất Cả Secret Boss", "Bật lại
 end)
 end
 
-createCategoryHeader(tabBoss, "Đấu Trường Boss Enzo")
-local bossFarmCard = createCardGroup(tabBoss)
-createToggleRow(bossFarmCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và đánh bại boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
-createToggleRow(bossFarmCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
+do
+    createCategoryHeader(tabBoss, "Đấu Trường Boss Enzo")
+    local bossFarmCard = createCardGroup(tabBoss)
+    createToggleRow(bossFarmCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và đánh bại boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
+    createToggleRow(bossFarmCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
 
-createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực tiếp đến đấu trường Enzo", "Bay Đến", function()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if root then
-        root.CFrame = CFrame.new(-115.3, 9.2, 1349.5)
-        ShowNotification("Dịch Chuyển", "Đã đến Đấu trường Boss Enzo!", "SUCCESS")
-    end
-end)
+    createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực tiếp đến đấu trường Enzo", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(-115.3, 9.2, 1349.5)
+            ShowNotification("Dịch Chuyển", "Đã đến Đấu trường Boss Enzo!", "SUCCESS")
+        end
+    end)
+end
 
 -------------------------------------------------------------------------
 -- TAB QUẢN LÝ CÁ (FISH MANAGER PRO) - TOÀN DIỆN CHẾ CẦN, CHẾ MỒI & DỌN RÁC

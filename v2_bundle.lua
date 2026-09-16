@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.5.7"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.5.8"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -517,6 +517,21 @@ ConfigModule.Config = {
         ["Mountain Dragonwhale"] = true,
         ["Mirage Lanternfish"] = true,
         ["Nameless Octoparasite"] = true,
+        -- Cá Thường Có Ích (Rơi Skill / Thuyền / Orb / Chế Cần & Mồi)
+        ["Trueform Jiaolongfish"] = true,
+        ["Adult Jiaolong Dragonfish"] = false,
+        ["Elder Jiaolong Dragonfish"] = false,
+        ["Serpent Fish"] = false,
+        ["Ascended Perch"] = true,
+        ["Trueform Perch"] = true,
+        ["Elder Perch VIII"] = false,
+        ["Dark Kingfish"] = false,
+        ["Glorious Elder Turtle"] = false,
+        ["Chromatic Koi"] = false,
+        ["Mountain Fish"] = true,
+        ["Tiger Mirefish"] = true,
+        ["Octoparasitic Fish"] = true,
+        ["Dreadmare Eel"] = false,
     },
     CustomBossSpots = {},
     SelectedCustomSpotIsland = "Đảo Tre (Bamboo Isle)",

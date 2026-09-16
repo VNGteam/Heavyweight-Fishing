@@ -2,6 +2,29 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.8] - 2026-09-16
+### 🎯 Phân Rõ Cá Secret & Cá Thường Có Ích Kèm Caption Trạng Thái Sở Hữu (Skill, Thuyền, Orb, Chế Cần/Mồi):
+1. **Phân Tách Rõ Ràng 2 Nhóm Cá Cho Từng Đảo Trong Tab Săn Boss (Boss Hunter)**:
+   - Thay vì gộp chung toàn bộ cá của một đảo vào 1 card duy nhất, mỗi đảo nay được chia thành **2 Card độc lập**:
+     - **🔥 CÁ SECRET & THẦN THOẠI**: Các boss bí mật theo thời tiết (Golden Dragonfish, Rainbow Dragonfish, Flying Fish Emperor/Empress, Draconic Koi, Tigerfang Whale, Heavenpiercer Turtle, Reborn Puffer Beast, Frost Kingfish, Frost Queenfish, Mountain Dragonwhale, v.v.).
+     - **🐟 CÁ THƯỜNG CÓ ÍCH (RƠI ĐỒ / CHẾ CẦN)**: Các loài cá thường hoặc quý hiếm có ích lợi đặc biệt (Trueform Jiaolongfish, Ascended Perch, Trueform Perch, Mountain Fish, Tiger Mirefish, Octoparasitic Fish, v.v.) kèm công tắc Bật/Tắt riêng biệt để người chơi chủ động lựa chọn câu hoặc bỏ qua.
+   - Nếu đảo không có cá thường đặc biệt (như Đảo Tre - Bamboo Isle), hệ thống hiển thị dòng thông báo gọn gàng: `"Không có (Đảo này chỉ tập trung săn Cá Secret)"`.
+2. **Hiển Thị Caption Nhỏ Gọn, Tối Ưu Diện Tích UI Kèm Trạng Thái Sở Hữu Thời Gian Thực**:
+   - **Công dụng cá**: Nêu rõ dùng để chế cần gì (Heavenpiercer, Sacred Bamboo, Pure Diamond, Huyết Long), chế mồi gì (Rainbow, Nameless, Frost), hoặc trả quest nào (Hạ Diêu, Giang Lão, Đạo Sĩ).
+   - **Rơi Thuyền (Boat Drop)**: Tra cứu tự động từ `ReplicatedStorage.Data[UserId].Boats`. Ví dụ: `Ascended Perch` tại Đảo Cá Chép -> `Thuyền Ascended Perch (5%): [ĐÃ CÓ]` hoặc `[CHƯA CÓ]`.
+   - **Rơi Kỹ Năng (Skill Drop)**: Tra cứu tự động từ `ReplicatedStorage.Data[UserId].Skill[SkillName].Owned`. Ví dụ: `Trueform Jiaolongfish` tại Đảo Phóng Xạ -> `Chế Cần Huyết Long • Skill Rolling Twin Dragons (50%): [ĐÃ CÓ]` hoặc `[CHƯA CÓ]`; `Trueform Perch` -> `Skill River Suppression (20%): [ĐÃ CÓ]` hoặc `[CHƯA CÓ]`.
+   - **Rơi Ngọc (Orb Drop)**: Tự động đếm số lượng ngọc người chơi đang có từ `Data[UserId].Orb` và `EssenceOrb`. Ví dụ: `Golden Dragonfish` tại Đảo Tre -> `Chế Cần & Mồi • Thần Thoại • Orb Dragon Orb (20%) [Đang có: x...] • +20 Gems`.
+   - **Tự động cập nhật trực tiếp (Auto-Sync Live Caption)**: Mỗi 4 giây, hệ thống tự động kiểm tra lại kho đồ của nhân vật để cập nhật ngay lập tức từ `[CHƯA CÓ]` sang `[ĐÃ CÓ]` khi câu được đồ hoặc tăng số lượng Orb mà không cần mở lại menu.
+3. **Cải Tiến Giao Diện Toggle Row**:
+   - Mở rộng khung chứa văn bản mô tả (`tf.Size = UDim2.new(1, -55, 1, 0)`), bổ sung chống tràn chữ `TextTruncate = Enum.TextTruncate.AtEnd`, giúp hiển thị caption dài mượt mà, không bị che khuất hay đè lên nút gạt.
+4. **Tích Hợp Cá Thường Có Ích Vào Logic Săn Boss & Fast-Skip**:
+   - Khởi tạo sẵn các key cá thường có ích trong `Config.SecretBossTargets` (mặc định bật Trueform Jiaolongfish, Ascended Perch, Trueform Perch, Mountain Fish, Tiger Mirefish, Octoparasitic Fish).
+   - Đảm bảo cơ chế Fast-Skip Non-Boss câu trúng các loài cá này mà không bị tự hủy dây câu.
+5. **Đồng Bộ Phiên Bản v2.5.8 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.8` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.7] - 2026-09-16
 ### 🐟 Khắc Phục Triệt Để Vệt Sáng Tròn (White Glow Aura) & Hiển Thị Chuẩn 100% Sprite Cá:
 1. **Sửa Tận Gốc Lỗi Toàn Bộ Ô Nguyên Liệu Hiển Thị Đốm Tròn Phát Sáng Trắng**:
