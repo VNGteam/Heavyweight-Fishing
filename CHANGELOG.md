@@ -2,6 +2,21 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.8] - 2026-09-16
+### 🛠️ Sửa Lỗi Thực Thi UI "attempt to call a nil value" Khi Khởi Động V2 (Fix gì):
+1. **Sửa Lỗi Nil Method Trong Tab Nhiệm Vụ (`CreateStatusRow`)**:
+   - *Nguyên nhân lỗi*: Trong [v2/ui/tabs/tab_nhiem_vu.lua](file:///Users/vonguyengiap/Documents/script/v2/ui/tabs/tab_nhiem_vu.lua), dòng hiển thị trạng thái gọi `Components.CreateStatusRow`. Tuy nhiên, trong [v2/ui/components.lua](file:///Users/vonguyengiap/Documents/script/v2/ui/components.lua) hàm hiển thị dòng thông tin chuẩn là `Components.CreateInfoRow`. Do hàm không tồn tại (`nil`), Executor ném lỗi `adstring:540861:6187: attempt to call a nil value` và dừng quá trình nạp script V2.
+   - *Khắc phục*:
+     - Chuyển `Components.CreateStatusRow` sang `Components.CreateInfoRow` trong `tab_nhiem_vu.lua`.
+     - Đồng thời bổ sung alias `Components.CreateStatusRow = Components.CreateInfoRow` trong `components.lua` để đảm bảo tương thích 100%.
+2. **Sửa Lỗi Gọi `Components.ShowNotification` Trong Tab Câu Cá**:
+   - *Khắc phục*: Thay thế bằng `Utils.ShowNotification`, đồng thời bổ sung `Components.ShowNotification` trỏ sang `Utils.ShowNotification` để phòng ngừa lỗi gọi nhầm.
+3. **Biên Dịch & Cập Nhật Gói V2**:
+   - Đã build lại [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua) và kiểm tra bằng `luac -p`.
+   - Nâng phiên bản lên **`v2.2.8`**.
+
+---
+
 ## [v2.2.7] - 2026-09-16
 ### 🚀 Hoàn Tất Chuyển Giao 100% Tính Năng Sang Kiến Trúc Module V2 (Port 100% Features to Modular Architecture):
 1. **Thông Báo Telegram Bot Đa Kênh & Kiểm Tra Kết Nối Tức Thì**:

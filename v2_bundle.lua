@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.6"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.8"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -4923,9 +4923,13 @@ local TweenService = Services.TweenService
 local UserInputService = Services.UserInputService
 local Theme = __require("ui.theme")
 local State = __require("core.state")
+local Utils = __require("core.utils")
 
 local Components = {}
 Components.rowSearchIndex = {}
+Components.ShowNotification = function(...)
+    return Utils.ShowNotification(...)
+end
 
 function Components.CreateCategoryHeader(parent, text)
     local hdr = Instance.new("Frame")
@@ -5449,6 +5453,8 @@ function Components.CreateInfoRow(parent, labelText, valueText, indexSearch)
     return {frame = row, Set = function(nv) vl.Text = tostring(nv or "") end}
 end
 
+Components.CreateStatusRow = Components.CreateInfoRow
+
 function Components.CreateStatGridTile(parent, titleText, defaultValue, valueColor, layoutOrder)
     local tile = Instance.new("Frame")
     tile.BackgroundColor3 = Theme.ControlBg
@@ -5772,7 +5778,7 @@ function TabCauCa.Render(parent)
         if infoCashPerHour and infoCashPerHour.Set then infoCashPerHour.Set("$0 /h") end
         if infoGemsGained and infoGemsGained.Set then infoGemsGained.Set("+0 Gems") end
 
-        Components.ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
+        Utils.ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
     end)
 
     -- Section 2: Tự Động Câu Cá Cốt Lõi
@@ -6184,7 +6190,7 @@ function TabNhiemVu.Render(parent)
     Components.CreateCategoryHeader(parent, "📊 Trạng Thái Vé Nhiệm Vụ")
     local cardStatus = Components.CreateCardGroup(parent)
 
-    local statusRow = Components.CreateStatusRow(cardStatus, "Tiến Độ Nhiệm Vụ", Quest.state.statusText)
+    local statusRow = Components.CreateInfoRow(cardStatus, "Tiến Độ Nhiệm Vụ", Quest.state.statusText)
     task.spawn(function()
         while true do
             task.wait(1.5)

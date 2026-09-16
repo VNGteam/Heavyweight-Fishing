@@ -8,9 +8,13 @@ local TweenService = Services.TweenService
 local UserInputService = Services.UserInputService
 local Theme = require(script.Parent.theme)
 local State = require(script.Parent.Parent.core.state)
+local Utils = require(script.Parent.Parent.core.utils)
 
 local Components = {}
 Components.rowSearchIndex = {}
+Components.ShowNotification = function(...)
+    return Utils.ShowNotification(...)
+end
 
 function Components.CreateCategoryHeader(parent, text)
     local hdr = Instance.new("Frame")
@@ -533,6 +537,8 @@ function Components.CreateInfoRow(parent, labelText, valueText, indexSearch)
     vl.Parent = row
     return {frame = row, Set = function(nv) vl.Text = tostring(nv or "") end}
 end
+
+Components.CreateStatusRow = Components.CreateInfoRow
 
 function Components.CreateStatGridTile(parent, titleText, defaultValue, valueColor, layoutOrder)
     local tile = Instance.new("Frame")

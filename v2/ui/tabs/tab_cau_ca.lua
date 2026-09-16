@@ -76,7 +76,7 @@ function TabCauCa.Render(parent)
         if infoCashPerHour and infoCashPerHour.Set then infoCashPerHour.Set("$0 /h") end
         if infoGemsGained and infoGemsGained.Set then infoGemsGained.Set("+0 Gems") end
 
-        Components.ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
+        Utils.ShowNotification("Thống Kê Treo", "Đã đặt lại mốc thời gian và tính lại tốc độ câu/tiền từ thời điểm này!", "SUCCESS", 4)
     end)
 
     -- Section 2: Tự Động Câu Cá Cốt Lõi

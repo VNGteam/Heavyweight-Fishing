@@ -17,7 +17,7 @@ function TabNhiemVu.Render(parent)
     Components.CreateCategoryHeader(parent, "📊 Trạng Thái Vé Nhiệm Vụ")
     local cardStatus = Components.CreateCardGroup(parent)
 
-    local statusRow = Components.CreateStatusRow(cardStatus, "Tiến Độ Nhiệm Vụ", Quest.state.statusText)
+    local statusRow = Components.CreateInfoRow(cardStatus, "Tiến Độ Nhiệm Vụ", Quest.state.statusText)
     task.spawn(function()
         while true do
             task.wait(1.5)
