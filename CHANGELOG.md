@@ -2,6 +2,28 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.2] - 2026-09-16
+### ⚡ Khôi Phục Cơ Chế Khóa/Mở Cá Mượt Mà Như Bản Đầu, Sửa Nhận Diện Khóa & Quét Ảnh Sâu:
+1. **Khôi Phục Cơ Chế Kích Hoạt GUI Trực Tiếp (Direct GUI Trigger) - Mượt Mà Như Bản Đầu**:
+   - **Vấn đề**: Bản v2.5.1 chỉ gửi Remote đơn thuần khiến game không đổi trạng thái hoặc bị server bỏ qua.
+   - **Khắc phục**:
+     - Bổ sung hàm `ClickButton(btn)` kích hoạt song song `firesignal` (MouseButton1Click, Activated, MouseButton1Down, MouseButton1Up) và `getconnections(btn.MouseButton1Click):Fire()`.
+     - Hàm `FindGuiFavoriteButton` tự động định vị chính xác thẻ cá và nút ngôi sao `Favorite.TextButton` nằm trong `PlayerGui.MainGui.Main.Inventory.Main.List.ScrollingFrame` cũng như `Fisher_GUI`. Thao tác mượt mà chuẩn xác như tay người bấm trực tiếp trên Balo game.
+     - Kết hợp gửi Remote Event đa tầng (`item`, `item.Name`, `guiChild`) làm lớp đồng bộ fallback.
+2. **Sửa Lỗi Nhận Diện Trạng Thái Khóa (`Wiki.IsItemFavorited`)**:
+   - **Nguyên nhân**: Trong game, item trong Balo là `NumberValue` không có object con, trạng thái khóa được game gắn trực tiếp vào đuôi tên item: `" | Favorite"` (VD: `"Crimson Bream Sovereign | 1541348.67 | Favorite"`).
+   - **Khắc phục**: Ưu tiên kiểm tra trực tiếp chuỗi `itemName:find("Favorite", 1, true)` lên đầu hàm `Wiki.IsItemFavorited(item)`, đảm bảo nhận diện chính xác 100% cá đang khóa hay mở.
+3. **Khắc Phục Lỗi "Cứ Báo Chờ Xử Lý Hay Gì Á" (Anti-Stuck Processing Guard)**:
+   - Thêm bộ đếm thời gian an toàn: Nếu cờ `FM.isProcessing` bị kẹt quá 4 giây do mạng giật lag hoặc tác vụ trước, hệ thống sẽ tự động mở khóa trạng thái (Auto-Reset) để người dùng có thể thao tác ngay mà không bị báo chờ vô hạn.
+   - Bọc toàn bộ các vòng lặp xử lý bất đồng bộ (`task.spawn`) trong `pcall` phòng thủ, đảm bảo `FM.isProcessing = false` luôn luôn được gọi.
+4. **Sửa Lỗi Tìm Kiếm "Crimson" Không Hiện Ảnh (Deep GUI Recursive Image Scan)**:
+   - Cấu trúc thẻ cá trong Balo game phân tầng dạng: `ScrollingFrame -> Folder (Tên Cá | Cân Nặng) -> Frame -> Button -> ImageLabel`.
+   - Nâng cấp hàm `FetchGameFishImage` quét đệ quy sâu toàn bộ cây thư mục `PlayerGui`, khớp tên theo thuộc tính của ancestor và `Title.TextLabel`, tự động cache và hiển thị ảnh cá thật sắc nét ngay khi gõ từ khóa `crim`.
+5. **Đồng Bộ Phiên Bản v2.5.2 Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.5.2** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua)).
+
+---
+
 ## [v2.5.1] - 2026-09-16
 ### 🛡️ Khắc Phục Triệt Để Phân Loại Cá, Sửa Khóa/Mở Cá Toàn Diện & Gợi Ý Tìm Kiếm Thông Minh:
 1. **Sửa Lỗi "Mở Khóa Rác Mở Luôn Cá Quý Chế Cần Mồi"**:

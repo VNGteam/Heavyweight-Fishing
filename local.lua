@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.1"
+local SCRIPT_BUILD_COMMIT = "v2.5.2"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2770,10 +2770,23 @@ end
 function Wiki.IsItemFavorited(item)
     if not item then return false end
 
-    -- Cấu trúc thực tế trong game:
-    -- Mỗi item là Folder đặt tên "FishName | ID"
-    -- Bên trong có 1 NumberValue tên là "Weight | Favorite" (nếu khóa) hoặc chỉ "Weight" (nếu mở)
-    -- Kiểm tra child có tên chứa "Favorite" không
+    -- 1. Kiểm tra trực tiếp tên item (Game Roblox thêm " | Favorite" trực tiếp vào item.Name)
+    local itemName = tostring(item.Name or "")
+    if itemName:find("Favorite", 1, true) or itemName:find("Favourite", 1, true) then
+        return true
+    end
+
+    -- 2. Kiểm tra các attribute của item
+    if item:GetAttribute("IsFavorite") == true or item:GetAttribute("Favorite") == true or item:GetAttribute("Locked") == true then
+        return true
+    end
+
+    -- 3. Kiểm tra các đối tượng con
+    local favVal = item:FindFirstChild("Favorite") or item:FindFirstChild("Favourite")
+    if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
+    local lockVal = item:FindFirstChild("Locked")
+    if lockVal and (lockVal.Value == true or lockVal.Value == 1) then return true end
+
     local ok, result = pcall(function()
         for _, child in ipairs(item:GetChildren()) do
             if child.Name:find("Favorite", 1, true) or child.Name:find("Favourite", 1, true) then
@@ -2784,14 +2797,6 @@ function Wiki.IsItemFavorited(item)
     end)
     if ok and result then return true end
 
-    -- Fallback: kiểm tra attribute và tên item (cho các cấu trúc khác)
-    if item:GetAttribute("IsFavorite") == true or item:GetAttribute("Favorite") == true or item:GetAttribute("Locked") == true then
-        return true
-    end
-    local favVal = item:FindFirstChild("Favorite") or item:FindFirstChild("Favourite")
-    if favVal and (favVal.Value == true or favVal.Value == 1) then return true end
-    local lockVal = item:FindFirstChild("Locked")
-    if lockVal and (lockVal.Value == true or lockVal.Value == 1) then return true end
     return false
 end
 
@@ -10114,75 +10119,34 @@ do
         end
 
         local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-        local mainGui = pGui and pGui:FindFirstChild("MainGui")
+        if not pGui then return "" end
 
-        -- 1. Tìm trong Menu Chế Cần (CraftRod.List)
+        -- Quét toàn diện tìm kiếm ImageLabel thuộc con cá này
         pcall(function()
-            local craftRodList = mainGui and mainGui:FindFirstChild("Menu")
-                and mainGui.Menu:FindFirstChild("CraftRod")
-                and mainGui.Menu.CraftRod:FindFirstChild("List")
-            if craftRodList then
-                for _, rFrame in ipairs(craftRodList:GetChildren()) do
-                    local ingFrame = rFrame:FindFirstChild("Ingredient")
-                    if ingFrame then
-                        for _, slot in ipairs(ingFrame:GetChildren()) do
-                            local btn = slot:FindFirstChild("Button")
-                            local titleLbl = btn and btn:FindFirstChild("Title")
-                            local imgLbl = btn and btn:FindFirstChild("Image")
-                            if titleLbl and imgLbl and imgLbl:IsA("ImageLabel") and imgLbl.Image ~= "" then
-                                local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
-                                if k ~= "" and not FM.FishImageCache[k] then
-                                    FM.FishImageCache[k] = imgLbl.Image
-                                end
+            for _, obj in ipairs(pGui:GetDescendants()) do
+                if obj:IsA("ImageLabel") and obj.Image ~= "" and not obj.Image:find("Star") and not obj.Image:find("star") then
+                    -- Kiểm tra xem ancestor hoặc Title có khớp tên cá không
+                    local parent = obj.Parent
+                    local matched = false
+                    while parent and parent ~= pGui do
+                        local pName = parent.Name:lower():gsub("[%s%-_]+", "")
+                        if pName:find(clean, 1, true) then
+                            matched = true
+                            break
+                        end
+                        local title = parent:FindFirstChild("Title")
+                        if title and title:IsA("TextLabel") then
+                            local tName = title.Text:lower():gsub("[%s%-_]+", "")
+                            if tName:find(clean, 1, true) then
+                                matched = true
+                                break
                             end
                         end
+                        parent = parent.Parent
                     end
-                end
-            end
-        end)
-
-        -- 2. Tìm trong Menu Chế Mồi (CraftBait.List)
-        pcall(function()
-            local craftBaitList = mainGui and mainGui:FindFirstChild("Menu")
-                and mainGui.Menu:FindFirstChild("CraftBait")
-                and mainGui.Menu.CraftBait:FindFirstChild("List")
-            if craftBaitList then
-                for _, bFrame in ipairs(craftBaitList:GetChildren()) do
-                    local ingFrame = bFrame:FindFirstChild("Ingredient")
-                    if ingFrame then
-                        for _, slot in ipairs(ingFrame:GetChildren()) do
-                            local btn = slot:FindFirstChild("Button")
-                            local titleLbl = btn and btn:FindFirstChild("Title")
-                            local imgLbl = btn and btn:FindFirstChild("Image")
-                            if titleLbl and imgLbl and imgLbl:IsA("ImageLabel") and imgLbl.Image ~= "" then
-                                local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
-                                if k ~= "" and not FM.FishImageCache[k] then
-                                    FM.FishImageCache[k] = imgLbl.Image
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end)
-
-        -- 3. Tìm trong Balo người chơi (Main.Inventory.Main.List.ScrollingFrame)
-        pcall(function()
-            local invList = mainGui and mainGui:FindFirstChild("Main")
-                and mainGui.Main:FindFirstChild("Inventory")
-                and mainGui.Main.Inventory:FindFirstChild("Main")
-                and mainGui.Main.Inventory.Main:FindFirstChild("List")
-                and mainGui.Main.Inventory.Main.List:FindFirstChild("ScrollingFrame")
-            if invList then
-                for _, slot in ipairs(invList:GetChildren()) do
-                    local btn = slot:FindFirstChild("Button")
-                    local imgLbl = btn and btn:FindFirstChild("Image")
-                    if imgLbl and imgLbl:IsA("ImageLabel") and imgLbl.Image ~= "" then
-                        local rawName = slot.Name:split("|")[1] or slot.Name
-                        local k = rawName:match("^%s*(.-)%s*$"):lower():gsub("[%s%-_]+", "")
-                        if k ~= "" and not FM.FishImageCache[k] then
-                            FM.FishImageCache[k] = imgLbl.Image
-                        end
+                    if matched then
+                        FM.FishImageCache[clean] = obj.Image
+                        return
                     end
                 end
             end
@@ -10350,18 +10314,89 @@ do
         return protectedList, junkList, countsByName
     end
 
-    -- Thao tác Lock hoặc Unlock một danh sách item (Gọi Remote trực tiếp chuẩn xác 100%)
+    -- Helper trigger button trong UI game (mượt mà như bản đầu)
+    local function ClickButton(btn)
+        if not btn then return false end
+        local triggered = false
+        if typeof(firesignal) == "function" then
+            pcall(function() firesignal(btn.MouseButton1Click); triggered = true end)
+            pcall(function() firesignal(btn.MouseButton1Down) end)
+            pcall(function() firesignal(btn.MouseButton1Up) end)
+            pcall(function() firesignal(btn.Activated); triggered = true end)
+        end
+        if typeof(getconnections) == "function" then
+            local ok1, conns1 = pcall(getconnections, btn.MouseButton1Click)
+            if ok1 and type(conns1) == "table" then
+                for _, c in ipairs(conns1) do
+                    pcall(function() c:Fire(); triggered = true end)
+                end
+            end
+            local ok2, conns2 = pcall(getconnections, btn.Activated)
+            if ok2 and type(conns2) == "table" then
+                for _, c in ipairs(conns2) do
+                    pcall(function() c:Fire(); triggered = true end)
+                end
+            end
+        end
+        return triggered
+    end
+
+    -- Tìm button Favorite của con cá trong GUI Balo PlayerGui (MainGui / Fisher_GUI)
+    local function FindGuiFavoriteButton(cleanName, weightInt)
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        if not pGui then return nil, nil end
+
+        local scrollFrames = {}
+        local mainGui = pGui:FindFirstChild("MainGui")
+        if mainGui then
+            local mainInv = mainGui:FindFirstChild("Main", true) and mainGui.Main:FindFirstChild("Inventory", true)
+            local scroll = mainInv and mainInv:FindFirstChild("ScrollingFrame", true)
+            if scroll then table.insert(scrollFrames, scroll) end
+
+            local fisherInv = mainGui:FindFirstChild("Fisher_Inventory", true)
+            local fScroll = fisherInv and fisherInv:FindFirstChild("ScrollingFrame", true)
+            if fScroll then table.insert(scrollFrames, fScroll) end
+        end
+
+        local fisherGui = pGui:FindFirstChild("Fisher_GUI")
+        if fisherGui then
+            local fScroll = fisherGui:FindFirstChild("ScrollingFrame", true)
+            if fScroll then table.insert(scrollFrames, fScroll) end
+        end
+
+        local cleanTarget = cleanName:lower():gsub("[%s%-_]+", "")
+        for _, scroll in ipairs(scrollFrames) do
+            for _, child in ipairs(scroll:GetChildren()) do
+                local cName = child.Name:lower()
+                local cClean = cName:gsub("[%s%-_]+", "")
+                if cClean:find(cleanTarget, 1, true) then
+                    if not weightInt or cName:find(tostring(weightInt), 1, true) then
+                        local fav = child:FindFirstChild("Favorite", true)
+                        local btn = fav and (fav:FindFirstChildWhichIsA("TextButton") or (fav:IsA("TextButton") and fav))
+                        if not btn then
+                            btn = child:FindFirstChildWhichIsA("TextButton", true)
+                        end
+                        if btn then return btn, child end
+                    end
+                end
+            end
+        end
+        return nil, nil
+    end
+
+    -- Thao tác Lock hoặc Unlock một danh sách item (Kết hợp Click GUI và Remote Đa Tầng)
     local function ProcessBatchItems(items, targetLock, notifyTitle)
+        -- Cơ chế chống kẹt: tự reset sau 4s nếu tác vụ trước đó gặp trục trặc
         if FM.isProcessing then
-            ShowNotification("Quản Lý Cá", "Đang trong tiến trình xử lý, vui lòng đợi!", "WARN", 3)
-            return
+            if tick() - (FM.lastProcessTime or 0) > 4 then
+                FM.isProcessing = false
+            else
+                ShowNotification("Quản Lý Cá", "Đang trong tiến trình xử lý, vui lòng đợi!", "WARN", 2)
+                return
+            end
         end
 
         local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
-        if not favEvent then
-            ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 4)
-            return
-        end
 
         local filtered = {}
         for _, e in ipairs(items) do
@@ -10369,7 +10404,14 @@ do
             if item and item.Parent then
                 local curFav = Wiki.IsItemFavorited(item)
                 if curFav ~= targetLock then
-                    table.insert(filtered, item)
+                    local clean = e.name or Wiki.GetItemRawName(item)
+                    local weightInt = tostring(item.Name):match("|%s*(%d+)")
+                    table.insert(filtered, {
+                        data = item,
+                        clean = clean,
+                        weightInt = weightInt,
+                        curFav = curFav
+                    })
                 end
             end
         end
@@ -10380,38 +10422,52 @@ do
         end
 
         FM.isProcessing = true
+        FM.lastProcessTime = tick()
         local actionText = targetLock and "KHÓA" or "MỞ KHÓA"
         ShowNotification(notifyTitle or "Quản Lý Cá", string.format("Bắt đầu %s %d con cá...", actionText, #filtered), "INFO", 3)
 
+        -- Quản lý bypass AutoProtect để tránh bị khóa lại sau khi vừa mở
         if not targetLock and Wiki and Wiki.temporarilyUnlockedBaitFish then
-            for _, it in ipairs(filtered) do
-                local rawName = Wiki.GetItemRawName(it):lower()
-                Wiki.temporarilyUnlockedBaitFish[rawName] = true
+            for _, entry in ipairs(filtered) do
+                Wiki.temporarilyUnlockedBaitFish[entry.clean:lower()] = true
             end
         elseif targetLock and Wiki and Wiki.temporarilyUnlockedBaitFish then
-            for _, it in ipairs(filtered) do
-                local rawName = Wiki.GetItemRawName(it):lower()
-                Wiki.temporarilyUnlockedBaitFish[rawName] = nil
+            for _, entry in ipairs(filtered) do
+                Wiki.temporarilyUnlockedBaitFish[entry.clean:lower()] = nil
             end
         end
 
         task.spawn(function()
             local successCount = 0
-            for _, item in ipairs(filtered) do
+            for _, entry in ipairs(filtered) do
+                local item = entry.data
                 if item and item.Parent then
-                    local curFav = Wiki.IsItemFavorited(item)
-                    if curFav ~= targetLock then
-                        pcall(function() favEvent:FireServer(item) end)
-                        successCount = successCount + 1
-                        task.wait(0.08)
+                    -- Cách 1: Click trực tiếp nút GUI trong Balo game (cực mượt như bản đầu)
+                    local btn, guiChild = FindGuiFavoriteButton(entry.clean, entry.weightInt)
+                    if btn then
+                        ClickButton(btn)
                     end
+
+                    -- Cách 2: Gửi Remote Event đa tầng làm fallback đồng bộ
+                    if favEvent then
+                        pcall(function() favEvent:FireServer(item) end)
+                        pcall(function() favEvent:FireServer(item.Name) end)
+                        if guiChild then
+                            pcall(function() favEvent:FireServer(guiChild) end)
+                        end
+                    end
+
+                    successCount = successCount + 1
+                    task.wait(0.08)
                 end
             end
 
-            task.wait(0.5)
-            if UpdateCrimsonBreamUI then UpdateCrimsonBreamUI() end
+            task.wait(0.4)
             FM.isProcessing = false
-            ShowNotification("Hoàn Tất", string.format("Đã %s thành công %d/%d con cá!", actionText, successCount, #filtered), "SUCCESS", 5)
+            pcall(function()
+                if UpdateCrimsonBreamUI then UpdateCrimsonBreamUI() end
+            end)
+            ShowNotification("Hoàn Tất", string.format("Đã %s thành công %d/%d con cá!", actionText, successCount, #filtered), "SUCCESS", 4)
         end)
     end
 
@@ -10441,59 +10497,64 @@ do
         end
 
         FM.isProcessing = true
+        FM.lastProcessTime = tick()
         ShowNotification("Bán Cá An Toàn", string.format("Đang chuẩn bị bán %d con [%s]...", #targetItems, targetFishName), "INFO", 3)
 
         task.spawn(function()
-            local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+            local ok, err = pcall(function()
+                local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
 
-            -- 1. Khóa tất cả cá KHÁC loài này
-            for name, data in pairs(counts) do
-                if name ~= targetFishName then
-                    for _, it in ipairs(data.items) do
-                        if it.data and it.data.Parent and not Wiki.IsItemFavorited(it.data) and favEvent then
-                            pcall(function() favEvent:FireServer(it.data) end)
+                -- 1. Khóa tất cả cá KHÁC loài này
+                for name, data in pairs(counts) do
+                    if name ~= targetFishName then
+                        for _, it in ipairs(data.items) do
+                            if it.data and it.data.Parent and not Wiki.IsItemFavorited(it.data) and favEvent then
+                                pcall(function() favEvent:FireServer(it.data) end)
+                                task.wait(0.05)
+                            end
+                        end
+                    end
+                end
+
+                -- 2. Mở khóa đúng số lượng cá muốn bán
+                if Wiki and Wiki.temporarilyUnlockedBaitFish then
+                    Wiki.temporarilyUnlockedBaitFish[targetFishName:lower()] = true
+                end
+                for _, t in ipairs(targetItems) do
+                    if t.data and t.data.Parent and Wiki.IsItemFavorited(t.data) and favEvent then
+                        pcall(function() favEvent:FireServer(t.data) end)
+                        task.wait(0.05)
+                    end
+                end
+
+                -- Khóa lại các con còn lại của loài này nếu bán một phần
+                if #targetItems < #cData.items then
+                    for i = #targetItems + 1, #cData.items do
+                        local remain = cData.items[i]
+                        if remain.data and remain.data.Parent and not Wiki.IsItemFavorited(remain.data) and favEvent then
+                            pcall(function() favEvent:FireServer(remain.data) end)
                             task.wait(0.05)
                         end
                     end
                 end
-            end
 
-            -- 2. Mở khóa đúng số lượng cá muốn bán
-            if Wiki and Wiki.temporarilyUnlockedBaitFish then
-                Wiki.temporarilyUnlockedBaitFish[targetFishName:lower()] = true
-            end
-            for _, t in ipairs(targetItems) do
-                if t.data and t.data.Parent and Wiki.IsItemFavorited(t.data) and favEvent then
-                    pcall(function() favEvent:FireServer(t.data) end)
-                    task.wait(0.05)
+                task.wait(0.3)
+
+                -- 3. Gọi lệnh bán cá
+                local sellEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("SellFish")
+                if sellEvent then
+                    sellEvent:FireServer("All")
+                    ShowNotification("Bán Cá Thành Công", string.format("Đã bán %d con [%s]! Cá khác được giữ an toàn 100%%!", #targetItems, targetFishName), "SUCCESS", 5)
+                else
+                    ShowNotification("Lỗi Bán Cá", "Không tìm thấy Remote SellFish!", "ERROR", 4)
                 end
-            end
+            end)
 
-            -- Khóa lại các con còn lại của loài này nếu bán một phần
-            if #targetItems < #cData.items then
-                for i = #targetItems + 1, #cData.items do
-                    local remain = cData.items[i]
-                    if remain.data and remain.data.Parent and not Wiki.IsItemFavorited(remain.data) and favEvent then
-                        pcall(function() favEvent:FireServer(remain.data) end)
-                        task.wait(0.05)
-                    end
-                end
-            end
-
-            task.wait(0.3)
-
-            -- 3. Gọi lệnh bán cá
-            local sellEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("SellFish")
-            if sellEvent then
-                sellEvent:FireServer("All")
-                ShowNotification("Bán Cá Thành Công", string.format("Đã bán %d con [%s]! Cá khác được giữ an toàn 100%%!", #targetItems, targetFishName), "SUCCESS", 5)
-            else
-                ShowNotification("Lỗi Bán Cá", "Không tìm thấy Remote SellFish!", "ERROR", 4)
-            end
-
-            task.wait(0.8)
-            if UpdateCrimsonBreamUI then UpdateCrimsonBreamUI() end
+            task.wait(0.5)
             FM.isProcessing = false
+            pcall(function()
+                if UpdateCrimsonBreamUI then UpdateCrimsonBreamUI() end
+            end)
         end)
     end
 
