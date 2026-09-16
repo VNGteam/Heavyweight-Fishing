@@ -7200,13 +7200,28 @@ function zengTianguoQuestState.GetTargetSpot()
 end
 
 function zengTianguoQuestState.FindNPCModel()
-    if Workspace:FindFirstChild("NPC") then
-        local funcFolder = Workspace.NPC:FindFirstChild("Function")
+    -- Đồng bộ 100% logic tìm NPC từ tab Dịch Chuyển (findNPCModel)
+    local npcFolder = Workspace:FindFirstChild("NPC")
+    if npcFolder then
+        local funcFolder = npcFolder:FindFirstChild("Function")
         if funcFolder then
-            local direct = funcFolder:FindFirstChild("Zeng Tianguo") or funcFolder:FindFirstChild("Tang Thien Quoc")
-            if direct then return direct end
+            local found = funcFolder:FindFirstChild("Zeng Tianguo") or funcFolder:FindFirstChild("Tang Thien Quoc")
+            if found and (found:FindFirstChild("HumanoidRootPart") or found:FindFirstChildWhichIsA("BasePart")) then
+                return found
+            end
         end
-        for _, ch in ipairs(Workspace.NPC:GetDescendants()) do
+        for _, sub in ipairs(npcFolder:GetChildren()) do
+            local found = sub:FindFirstChild("Zeng Tianguo") or sub:FindFirstChild("Tang Thien Quoc")
+            if found and (found:FindFirstChild("HumanoidRootPart") or found:FindFirstChildWhichIsA("BasePart")) then
+                return found
+            end
+        end
+    end
+    local direct = Workspace:FindFirstChild("Zeng Tianguo", true) or Workspace:FindFirstChild("Tang Thien Quoc", true)
+    if direct then return direct end
+
+    if npcFolder then
+        for _, ch in ipairs(npcFolder:GetDescendants()) do
             if ch:IsA("Model") then
                 local n = ch.Name:lower()
                 if (n:find("zeng") and n:find("tianguo")) or (n:find("tang") and n:find("thien")) then
@@ -7219,22 +7234,25 @@ function zengTianguoQuestState.FindNPCModel()
 end
 
 function zengTianguoQuestState.TeleportToNPC()
-    local npc = zengTianguoQuestState.FindNPCModel()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
     if not root then return false end
 
-    if npc then
-        local cf = (npc:FindFirstChild("HumanoidRootPart") and npc.HumanoidRootPart.CFrame)
-            or (npc:FindFirstChild("Torso") and npc.Torso.CFrame)
-            or npc:GetPivot()
-        if cf then
-            local targetCf = CFrame.new(cf.Position + cf.LookVector * 3.5 + Vector3.new(0, 1.2, 0), cf.Position)
-            ticketQuestState.TeleportTo(targetCf)
-            return true
+    -- Lấy đúng chuẩn 100% tọa độ dịch chuyển của tab Dịch Chuyển: CFrame.new(npcRoot.Position + Vector3.new(0, 3, 3))
+    local model = zengTianguoQuestState.FindNPCModel()
+    if model then
+        local npcRoot = model:FindFirstChild("HumanoidRootPart")
+            or model:FindFirstChildWhichIsA("BasePart")
+        if npcRoot then
+            local targetPos = npcRoot.Position + Vector3.new(0, 3, 3)
+            root.CFrame = CFrame.new(targetPos)
+            zengTianguoQuestState.spotNPC = targetPos
+            return true, model, npcRoot
         end
-    else
-        ticketQuestState.TeleportTo(zengTianguoQuestState.spotNPC)
+    end
+
+    if zengTianguoQuestState.spotNPC then
+        root.CFrame = CFrame.new(zengTianguoQuestState.spotNPC)
         return true
     end
     return false
