@@ -2,6 +2,38 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.9] - 2026-09-16
+### 🌟 Đồng Bộ Toàn Diện 100% Chức Năng Từ Bản Gốc Sang Module V2 (Full Parity Update):
+1. **Bổ Sung 100% Nội Dung Tab Thử Nghiệm (`tab_thu_nghiem.lua`)**:
+   - 👻 **Chế Độ Tàng Hình (Ghost / Invisibility Mode)**: Tàng hình hoàn toàn nhân vật và cần câu trước người chơi khác.
+   - 🎯 **Tự Động Tẩy Luyện Trait (Auto Reroll & Lock Trait)**: Tự động cuộn trait cần câu, hỗ trợ khóa và giữ lại các trait quý hiếm như *Abyssal, Kraken, Golden, Radiant, Corrupted*.
+   - ⛵ **Triệu Hồi Thuyền Tức Thì (Instant Boat Spawner & Remote Buy)**: Mua thuyền từ xa và spawn ngay dưới chân không cần đến bến cảng.
+   - 🔄 **Cửa Hàng Trao Đổi Từ Xa (Remote Exchange Shop)**: Đổi Trait Reroll và Ngọc Tinh Hoa (EssenceOrb) từ xa.
+   - 🎨 **Tùy Biến Màu Sắc Cần Câu (Rod Color & RGB Rainbow Cycle)**: Đổi màu sắc cần câu tùy ý và hiệu ứng chuyển màu RGB 7 sắc cầu vồng.
+   - 🏰 **Quản Lý Bể Nuôi Cá & Gia Viên (Fish Tank & Plot Upgrades)**: Quản lý và nâng cấp bể cá gia viên.
+2. **Bổ Sung Bộ Trang Bị Set 1 & Set 2 Trong Tab Câu Cá (`tab_cau_ca.lua`)**:
+   - Chuyển đổi nhanh giữa 2 cấu hình cần & mồi (Set 1 / Set 2) chỉ với 1 click.
+   - Bộ chọn mồi săn boss và mồi câu thường độc lập.
+3. **Bổ Sung Boss Bạch Tuộc Bí Mật, Đấu Trường Enzo & Cẩm Nang Ráp Cần Trong Tab Săn Boss (`tab_san_boss.lua`)**:
+   - Tích hợp minigame săn **Boss Bạch Tuộc Bí Mật (Octoparasite)** tại Phao Biển và Vùng Lòng Đất.
+   - **Đấu Trường Boss Enzo** với cơ chế kéo cá tự động.
+   - **🎣 Cẩm Nang Ráp Cần (Rod Crafting Guide)**: Hiển thị 6 công thức chế tạo cần câu và mồi câu cao cấp cùng nút lọc nhanh.
+4. **Bổ Sung Thương Nhân Kỹ Năng Sage Yijiu & Vòng Quay Gacha Trong Tab Shop (`tab_shop.lua`)**:
+   - **Sage Yijiu**: Chọn và mua 10 loại bí kíp kỹ năng từ xa.
+   - **Auto Gacha**: Tự động quay thưởng liên tục theo banner (Taiji Banner / Egoless Banner) với số vé tùy chỉnh.
+5. **Đồng Bộ Hoàn Chỉnh Hệ Thống Dịch Chuyển (`tab_dich_chuyen.lua`)**:
+   - Đầy đủ **10 hòn đảo** kèm hiển thị vị trí hiện tại `[BẠN ĐANG Ở ĐÂY]` và khoảng cách `~Xm`, nút copy tọa độ.
+   - **Đấu Trường Boss & Vùng Đất Bí Mật**: Phao Boss Bạch Tuộc, Vùng Câu Cá Ngầm Lòng Đất, Đấu trường Enzo.
+   - **Cửa Hàng Bán Cần (Biao Di)**: 8 shop Biao Di trên các đảo.
+   - **Vị Trí Cần Câu Bí Mật**: 6 tọa độ cần câu ẩn (Anchorbound, Blazeshark, Kraken, Ascendant Bamboo, Lifebloom, Demonic).
+   - **Dịch Chuyển Đến Người Chơi**: Dropdown hiển thị tên kèm khoảng cách, bay đến người chơi đã chọn, làm mới, và bay đến người chơi ngẫu nhiên.
+   - **🧙 17 NPC Nhiệm Vụ Toàn Bản Đồ**: Dịch chuyển tức thì đến tất cả NPC trong game với hệ thống quét model thông minh.
+   - **Đạo Sĩ (Taoist & Maoshan)**: Bay tức thì đến vị trí xuất hiện của Đạo Sĩ nếu có trong server.
+6. **Bổ Sung ESP Cần Bí Mật, Thuyền Bè & Ẩn Tên Trong Tab ESP (`tab_visuals.lua`)**:
+   - ESP Cần Bí Mật, ESP Thuyền Bè, và tùy chọn Ẩn Tên Mặc Định Người Chơi để tối ưu tầm nhìn và giảm lag.
+
+---
+
 ## [v2.2.8] - 2026-09-16
 ### 🛠️ Sửa Lỗi Thực Thi UI "attempt to call a nil value" Khi Khởi Động V2 (Fix gì):
 1. **Sửa Lỗi Nil Method Trong Tab Nhiệm Vụ (`CreateStatusRow`)**:

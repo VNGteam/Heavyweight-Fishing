@@ -16,6 +16,7 @@ Shop.lastSellTime = 0
 Shop.lastBaitBuyTime = 0
 Shop.lastBaitCraftTime = 0
 Shop.lastDailyClaimTime = 0
+Shop.lastGachaTime = 0
 
 local craftMaterialFish = {
     ["Verdant Alligator Gar"] = true,
@@ -203,6 +204,22 @@ function Shop.HandleDailyClaim(config)
     if Events and Events:FindFirstChild("ClaimDaily") then
         pcall(function()
             Events.ClaimDaily:FireServer()
+        end)
+    end
+end
+
+-- 4b. Auto Gacha
+function Shop.HandleGacha(config)
+    if not config.AutoGacha then return end
+    local now = tick()
+    if (now - (Shop.lastGachaTime or 0) < 1.5) then return end
+    Shop.lastGachaTime = now
+
+    local banner = config.GachaBanner or "Taiji Banner"
+    local pulls = tonumber(config.GachaPullsPerAction) or 1
+    if Events and Events:FindFirstChild("Gacha") then
+        pcall(function()
+            Events.Gacha:FireServer(banner, pulls)
         end)
     end
 end

@@ -18,9 +18,29 @@ function TabVisuals.Render(parent)
     Components.CreateToggleRow(cardEsp, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ", "Hiển thị chi tiết cân nặng kg và dạng đột biến", Config.ShowFishWeightRing, function(v) Config.ShowFishWeightRing = v end)
     Components.CreateToggleRow(cardEsp, "ESP Người Chơi", "Định vị người chơi khác trong server", Config.ESP_Players, function(v) Config.ESP_Players = v end)
     Components.CreateToggleRow(cardEsp, "ESP Trùm Boss", "Định vị vị trí xuất hiện Boss", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Cần Câu Bí Mật", "Hiện vị trí các cần câu ẩn trên bản đồ", Config.ESP_SecretRod, function(v) Config.ESP_SecretRod = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Thuyền Bè", "Hiện vị trí tất cả thuyền xung quanh", Config.ESP_Boats, function(v) Config.ESP_Boats = v end)
     Components.CreateToggleRow(cardEsp, "ESP Thần Linh (God Spirit)", "Định vị Thần Linh", Config.ESP_GodSpirit, function(v) Config.ESP_GodSpirit = v end)
     Components.CreateToggleRow(cardEsp, "ESP Đạo Sĩ (Taoist)", "Định vị NPC Đạo Sĩ", Config.ESP_Taoist, function(v) Config.ESP_Taoist = v end)
     Components.CreateToggleRow(cardEsp, "ESP Maoshan", "Định vị NPC Mao Sơn", Config.ESP_Maoshan, function(v) Config.ESP_Maoshan = v end)
+    Components.CreateToggleRow(cardEsp, "Ẩn Tên Mặc Định Người Chơi", "Ẩn toàn bộ bảng tên, danh hiệu và thanh máu trên đầu của người chơi khác", Config.HideOverheadNames, function(v)
+        Config.HideOverheadNames = v
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.DisplayDistanceType = v and Enum.HumanoidDisplayDistanceType.None or Enum.HumanoidDisplayDistanceType.Viewer
+                end
+                for _, d in ipairs(p.Character:GetDescendants()) do
+                    if d:IsA("BillboardGui") and d.Name:sub(1, 4) ~= "ESP_" then
+                        d.Enabled = not v
+                    end
+                end
+            end
+        end
+    end)
 
     Components.CreateCategoryHeader(parent, "Hiệu Ứng Ánh Sáng & Tối Ưu")
     local cardLighting = Components.CreateCardGroup(parent)

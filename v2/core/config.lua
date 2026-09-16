@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.8"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.9"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -24,29 +24,42 @@ ConfigModule.Config = {
 
     -- Smart Combo V2
     SmartComboEnabled = false,
-    FishHpThreshold = 500,
-    QuickCatchSkill = "Z",
-    OpenerSkill = "Z",
-    OpenerMaxCount = 1,
-    LoopSkills = "Z, X, V",
-    LoopStrictOrder = true,           -- [MẶC ĐỊNH BẬT V2]: Luôn giữ đúng thứ tự chiêu
-    EmergencyHealSkill = "V",
-    EmergencyHealHp = 40,
-    SkillEffectDelay = 1.2,
-    SmartEffectAutoDetect = true,
-    AutoSkills = false,
-    SelectedSkill = "One-Strike Heaven Gate",
+    CastMode = "Thủ Công (Mặc Định)",
+    CastSpeedRatio = 1.0,
+    CastDelayAfter = 0.5,
+    SpamClickInterval = 0.05,
+    FishDetectionDelay = 0.5,
+    AutoCastJitter = false,
+    AutoCastJitterRadius = 5,
+    CatchDelayEnabled = false,
+    CatchDelayDuration = 0.8,
+    SpamClickMethod = "VirtualInput",
+    AutoUnstuckCast = true,
 
-    -- Auto Luyện Chiêu (Fast Cancel)
+    -- Bảng Kỹ Năng Combo (Auto Skills)
+    AutoSkills = false,
+    AutoSkillZ = true,
+    SkillCooldownZ = 3.0,
+    SkillTriggerZ = "Ngay Khi Kéo Cá",
+    SkillDelayZ = 0.0,
+    AutoSkillX = true,
+    SkillCooldownX = 5.0,
+    SkillTriggerX = "Ngay Khi Kéo Cá",
+    SkillDelayX = 0.0,
+    AutoSkillC = true,
+    SkillCooldownC = 8.0,
+    SkillTriggerC = "Ngay Khi Kéo Cá",
+    SkillDelayC = 0.0,
+    AutoSkillV = true,
+    SkillCooldownV = 10.0,
+    SkillTriggerV = "Ngay Khi Kéo Cá",
+    SkillDelayV = 0.0,
+
+    -- Luyện Kỹ Năng Tự Động (Train Skill)
     AutoTrainSkill = false,
-    TrainSkill = "Z",
-    TrainCancelDelay = 0.45,
-    Train_Z = false,
-    Train_X = false,
-    Train_C = true,
-    Train_V = true,
+    TrainSkill = "Chiêu Z",
+    TrainCancelDelay = 0.3,
     TrainTargetCount = 100,
-    TrainCurrentCount = 0,
     TrainSkillCooldown = 6.0,
     TrainDelayCatch = true,
 
@@ -68,6 +81,11 @@ ConfigModule.Config = {
     AutoFavouriteFish = false,
     FavouriteFishName = "Colossal Tigerfish",
     MaterialFarming = false,
+
+    -- Vòng Quay Gacha
+    AutoGacha = false,
+    GachaBanner = "Taiji Banner",
+    GachaPullsPerAction = 1,
 
     -- Minigame Khác & Săn Boss Thường
     OctoAutoMinigame = false,

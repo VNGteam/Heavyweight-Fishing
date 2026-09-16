@@ -174,6 +174,7 @@ local heartbeatConn = Services.RunService.Heartbeat:Connect(function()
         Shop.HandleBuyBait(Config)
         Shop.HandleCraftBait(Config)
         Shop.HandleDailyClaim(Config)
+        Shop.HandleGacha(Config)
         Spirits.HandleGodPray(Config)
         Quest.Tick(Config)
     end

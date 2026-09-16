@@ -62,6 +62,30 @@ function TabShop.Render(parent)
     Components.CreateDropdownRow(cardBait, "Chọn Mồi Cần Mua", "Loại mồi muốn tự động mua tại cửa hàng", {"Ancestral Bait", "Midnight Bait", "Basic Bait"}, Config.BuyBaitName or "Ancestral Bait", function(v) Config.BuyBaitName = v end)
     Components.CreateSliderRow(cardBait, "Số Lượng Mua Mỗi Lần", "Số lượng mua mỗi lần gửi yêu cầu", 1, 20, Config.BuyBaitAmount or 5, false, " cái", function(v) Config.BuyBaitAmount = v end)
     Components.CreateSliderRow(cardBait, "Ngưỡng Tự Mua (Khi Dưới)", "Khi số mồi trong túi ít hơn mức này sẽ mua thêm", 5, 50, Config.BuyBaitThreshold or 10, false, " cái", function(v) Config.BuyBaitThreshold = v end)
+    Components.CreateCategoryHeader(parent, "🔮 Thương Nhân Kỹ Năng (Sage Yijiu)")
+    local sageCard = Components.CreateCardGroup(parent)
+    local sageSkills = {"One-Strike Heaven Gate", "Taijiquan Technique", "Infinite Sky Ascension", "Rolling Chaos", "Sever the Gate", "Phoenix Strike Art", "Skyfall Stomp", "Beastbreaker Cleave", "Demonfall Technique", "Dragon Strike"}
+    local chosenSageSkill = sageSkills[1]
+    Components.CreateDropdownRow(sageCard, "Chọn Kỹ Năng", "Kỹ năng muốn học từ NPC Sage Yijiu", sageSkills, chosenSageSkill, function(v) chosenSageSkill = v end)
+
+    Components.CreateButtonRow(sageCard, "Bay Đến & Mua Kỹ Năng", "Dịch chuyển đến Sage Yijiu và mua chiêu thức", "Mua Chiêu", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(-117.5, 6.8, 41.2)
+            task.wait(0.3)
+            if Events and Events:FindFirstChild("BuySkill") then
+                Events.BuySkill:FireServer(chosenSageSkill)
+                Utils.ShowNotification("Sage Yijiu", "Đã mua thành công kỹ năng: " .. chosenSageSkill, "SUCCESS", 4)
+            end
+        end
+    end)
+
+    Components.CreateCategoryHeader(parent, "🎰 Vòng Quay May Mắn (Auto Gacha)")
+    local gachaCard = Components.CreateCardGroup(parent)
+    Components.CreateDropdownRow(gachaCard, "Chọn Vòng Quay Gacha", "Vòng quay muốn rút thưởng", {"Taiji Banner", "Egoless Banner"}, Config.GachaBanner or "Taiji Banner", function(v) Config.GachaBanner = v end)
+    Components.CreateSliderRow(gachaCard, "Số Vé Mỗi Lần Quay", "Số lượng vé dùng cho mỗi lượt rút thưởng", 1, 10, Config.GachaPullsPerAction or 1, false, " vé", function(v) Config.GachaPullsPerAction = v end)
+    Components.CreateToggleRow(gachaCard, "Vòng Quay May Mắn (Auto Gacha)", "Tự động rút thưởng liên tục từ banner đã chọn", Config.AutoGacha, function(v) Config.AutoGacha = v end)
 
     Components.CreateCategoryHeader(parent, "🎣 Cửa Hàng Cần Câu (Rod Shop)")
     local rodShopCard = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Cần Câu Có Thể Mua / Trang Bị", true)

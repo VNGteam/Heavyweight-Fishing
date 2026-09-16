@@ -97,6 +97,135 @@ function TabSanBoss.Render(parent)
         end)
         State.bossTogglesMap[bossName] = ctrl
     end
+
+    -- Boss Bạch Tuộc Bí Mật
+    Components.CreateCategoryHeader(parent, "🐙 Boss Bạch Tuộc Bí Mật (Octoparasite)")
+    local octoCard = Components.CreateCardGroup(parent)
+    Components.CreateToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
+    Components.CreateButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(1608.2, 5.0, -218.3)
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến Phao Boss Bạch Tuộc!", "SUCCESS")
+        end
+    end)
+    Components.CreateButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đến vùng đất câu cá ngầm bí mật", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(112.5, -330.0, -30.8)
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến Vùng Câu Cá Ngầm!", "SUCCESS")
+        end
+    end)
+
+    -- Cần Câu Cần Ráp (Rod Crafting Guide)
+    Components.CreateCategoryHeader(parent, "🎣 Cần Câu Cần Ráp (Rod Crafting Guide)")
+    local rodGuideCard = Components.CreateCollapsibleCardGroup(parent, "Hướng Dẫn Ráp Cần & Bộ Lọc Nhanh", false)
+
+    local rodRecipes = {
+        {
+            rod = "Heavenpiercer Rod",
+            desc = "Cần Thiên Xuyên (Cao Cấp)",
+            bosses = {"Flying Fish Emperor", "Flying Fish Empress", "Rainbow Dragonfish", "Heavenpiercer Turtle"},
+            notes = {
+                ["Flying Fish Emperor"]  = "Nguyên liệu chính",
+                ["Flying Fish Empress"]  = "Nguyên liệu chính",
+                ["Rainbow Dragonfish"]   = "Nguyên liệu + Trả Quest",
+                ["Heavenpiercer Turtle"] = "Nguyên liệu + Mồi Rainbow",
+            }
+        },
+        {
+            rod = "Pure Diamond Rod",
+            desc = "Cần Kim Cương Thuần (Cao Cấp)",
+            bosses = {"Frost Kingfish", "Frost Queenfish", "Sanguine Fish", "Draconic Koi"},
+            notes = {
+                ["Frost Kingfish"]  = "Nguyên liệu + Mồi Frost",
+                ["Frost Queenfish"] = "Nguyên liệu chính",
+                ["Sanguine Fish"]   = "Nguyên liệu chính",
+                ["Draconic Koi"]    = "Nguyên liệu phụ",
+            }
+        },
+        {
+            rod = "Sacred Bamboo Rod",
+            desc = "Cần Trúc Thánh (Cao Cấp)",
+            bosses = {"Nameless Octoparasite", "Reborn Puffer Beast", "Mountain Dragonwhale"},
+            notes = {
+                ["Nameless Octoparasite"] = "Nguyên liệu + Trả Quest Đạo Sĩ",
+                ["Reborn Puffer Beast"]   = "Nguyên liệu + Trả Quest",
+                ["Mountain Dragonwhale"]  = "Nguyên liệu + Mồi Nameless",
+            }
+        },
+        {
+            rod = "Rainbow Bait (Mồi)",
+            desc = "Mồi Rainbow Bait (Gọi Boss Rùa)",
+            bosses = {"Crimson Electric Eel", "Colossal Tigerfish", "Golden Guardian Fish"},
+            notes = {
+                ["Crimson Electric Eel"]  = "Nguyên liệu chính",
+            }
+        },
+        {
+            rod = "Nameless Bait (Mồi)",
+            desc = "Mồi Nameless Bait (Gọi Bạch Tuộc)",
+            bosses = {"Mirage Lanternfish", "Tiger Mirefish", "Octoparasitic Fish"},
+            notes = {
+                ["Mirage Lanternfish"]  = "Nguyên liệu chính",
+            }
+        }
+    }
+
+    for _, recipe in ipairs(rodRecipes) do
+        Components.CreateInfoRow(rodGuideCard, "🪝 " .. recipe.rod, recipe.desc)
+        Components.CreateButtonRow(rodGuideCard,
+            "Ưu Tiên Chỉ Săn Cho: " .. recipe.rod,
+            "Tắt hết boss khác, chỉ bật những boss cần cho " .. recipe.rod,
+            "⚡ Lọc Boss",
+            function()
+                for bName, _ in pairs(Config.SecretBossTargets) do
+                    Config.SecretBossTargets[bName] = false
+                    if State.bossTogglesMap[bName] and State.bossTogglesMap[bName].Set then
+                        pcall(function() State.bossTogglesMap[bName].Set(false, true) end)
+                    end
+                end
+                for _, bName in ipairs(recipe.bosses) do
+                    Config.SecretBossTargets[bName] = true
+                    if State.bossTogglesMap[bName] and State.bossTogglesMap[bName].Set then
+                        pcall(function() State.bossTogglesMap[bName].Set(true, true) end)
+                    end
+                end
+                ConfigModule.SaveBossTargets()
+                Utils.ShowNotification("Lọc Boss", "Đã bật mục tiêu cho: " .. recipe.rod, "SUCCESS", 5)
+            end
+        )
+    end
+
+    Components.CreateButtonRow(rodGuideCard, "Bật Lại Tất Cả Secret Boss", "Khôi phục lại toàn bộ danh sách secret boss", "Bật Tất Cả", function()
+        for bName, _ in pairs(Config.SecretBossTargets) do
+            Config.SecretBossTargets[bName] = true
+            if State.bossTogglesMap[bName] and State.bossTogglesMap[bName].Set then
+                pcall(function() State.bossTogglesMap[bName].Set(true, true) end)
+            end
+        end
+        ConfigModule.SaveBossTargets()
+        Utils.ShowNotification("Boss Targets", "Đã bật lại toàn bộ mục tiêu Secret Boss!", "SUCCESS", 4)
+    end)
+
+    -- Đấu Trường Boss Enzo
+    Components.CreateCategoryHeader(parent, "⚔️ Đấu Trường Boss Enzo")
+    local enzoCard = Components.CreateCardGroup(parent)
+    Components.CreateToggleRow(enzoCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và câu boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
+    Components.CreateToggleRow(enzoCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
+    Components.CreateButtonRow(enzoCard, "Bay Đến Boss Enzo", "Dịch chuyển trực tiếp đến đấu trường Enzo", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(-115.3, 9.2, 1349.5)
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến Đấu trường Boss Enzo!", "SUCCESS")
+        end
+    end)
 end
 
 return TabSanBoss

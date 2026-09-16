@@ -287,13 +287,86 @@ function TabCauCa.Render(parent)
     end)
 
     -- Section 6: Trang Bị Mồi & Cần
-    Components.CreateCategoryHeader(parent, "Trang Bị Mồi & Cần Câu")
+    Components.CreateCategoryHeader(parent, "Tự Động Trang Bị Tối Ưu")
     local loadoutCard = Components.CreateCardGroup(parent)
 
-    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Cần Tốt Nhất", "Tự động cầm cần câu có lực kéo lớn nhất trong túi", Config.AutoEquipBestRod, function(v) Config.AutoEquipBestRod = v end)
-    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Mồi", "Tự động lắp mồi khi câu", Config.AutoEquipBestBait, function(v) Config.AutoEquipBestBait = v end)
-    Components.CreateToggleRow(loadoutCard, "Tự Đổi Mồi Khi Săn Boss", "Tự động đổi mồi đặc biệt khi phát hiện Boss", Config.AutoEquipBossBait, function(v) Config.AutoEquipBossBait = v end)
-    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Pháp Bảo Tốt Nhất", "Tự động trang bị ngọc/pháp bảo tốt nhất", Config.AutoEquipBestOrb, function(v) Config.AutoEquipBestOrb = v end)
+    local baitOptionsList = {
+        "Mồi Tốt Nhất (Cao Nhất)",
+        "Mồi Thấp Nhất (Tiết Kiệm)",
+        "Nameless Bait",
+        "Rainbow Bait",
+        "Frost Bait",
+        "Ancestral Bait",
+        "Elite Bait",
+        "Corrupted Essence Bait",
+        "Crude Mash Bait",
+        "Basic Bait"
+    }
+
+    Components.CreateToggleRow(loadoutCard, "Tự Đổi Mồi Khi Săn Boss", "Tự động đổi sang mồi săn boss tối ưu khi vào chế độ Săn Boss", Config.AutoEquipBossBait, function(v)
+        Config.AutoEquipBossBait = v
+    end)
+    Components.CreateDropdownRow(loadoutCard, "Chọn Mồi Săn Boss", "Loại mồi ưu tiên sử dụng khi săn Boss", baitOptionsList, Config.BaitChoiceBoss or baitOptionsList[1], function(v)
+        Config.BaitChoiceBoss = v
+    end)
+
+    Components.CreateToggleRow(loadoutCard, "Tự Dùng Mồi (Auto Bait)", "Tự động móc loại mồi đã chọn khi câu cá bình thường", Config.AutoEquipBestBait, function(v)
+        Config.AutoEquipBestBait = v
+    end)
+    Components.CreateDropdownRow(loadoutCard, "Chọn Mồi Khi Câu Thường", "Loại mồi sử dụng cho câu cá thông thường", baitOptionsList, Config.BaitChoiceNormal or baitOptionsList[1], function(v)
+        Config.BaitChoiceNormal = v
+    end)
+
+    Components.CreateToggleRow(loadoutCard, "Tự Dùng Cần Tốt Nhất", "Tự động cầm cần câu có lực kéo lớn nhất trong túi", Config.AutoEquipBestRod, function(v) Config.AutoEquipBestRod = v end)
+    Components.CreateToggleRow(loadoutCard, "Tự Dùng Ngọc Tốt Nhất", "Tự động trang bị viên Ngọc có cấp bậc cao nhất", Config.AutoEquipBestOrb, function(v) Config.AutoEquipBestOrb = v end)
+
+    local rodNameList = {
+        "Wooden Rod", "Bamboo Rod", "Iron Hook Rod", "Steel Rod", "Enchanted Steel Rod",
+        "Alloy Rod", "Emerald Rod", "Bloodfire Rod", "Shadow Rod", "Triple Steel Rod",
+        "Golden Rod", "Grandmaster Steel Rod", "Grandmaster Golden Rod", "Steel Spine Rod",
+        "Inferno Rod", "Golden Spine Rod", "Platinum Spine Rod", "Diamond Spine Rod",
+        "Gravisteel Rod", "Auric Gravity Rod", "Inferno Gravity Rod", "Cryo Gravity Rod",
+        "Thunder Thorn Rod", "Starlight Rod", "Heavenpiercer Rod", "Pure Diamond Rod", "Sacred Bamboo Rod"
+    }
+    local baitNameList = {"Basic Bait", "Crude Mash Bait", "Corrupted Essence Bait", "Elite Bait", "Ancestral Bait", "Frost Bait", "Rainbow Bait", "Nameless Bait"}
+
+    Components.CreateDropdownRow(loadoutCard, "Set 1: Cần Câu", "Chọn cần câu cho Bộ Set 1", rodNameList, Config.Loadout1_Rod or rodNameList[1], function(v) Config.Loadout1_Rod = v end)
+    Components.CreateDropdownRow(loadoutCard, "Set 1: Mồi Câu", "Chọn mồi câu cho Bộ Set 1", baitNameList, Config.Loadout1_Bait or baitNameList[1], function(v) Config.Loadout1_Bait = v end)
+    Components.CreateButtonRow(loadoutCard, "Trang Bị Nhanh Set 1", "Trang bị Cần & Mồi đã chọn cho Set 1", "Dùng Set 1", function()
+        local pData = Services.ReplicatedStorage:FindFirstChild("Data") and Services.ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        if pData then
+            if Shop.IsRodOwned(Config.Loadout1_Rod) then
+                if Events:FindFirstChild("EquipFishingRod") then Events.EquipFishingRod:InvokeServer(Config.Loadout1_Rod) end
+                Utils.ShowNotification("Bộ Set #1", "Đã trang bị cần: " .. tostring(Config.Loadout1_Rod), "SUCCESS")
+            else
+                Utils.ShowNotification("Bộ Set #1", "Bạn chưa sở hữu cần: " .. tostring(Config.Loadout1_Rod), "WARN")
+            end
+            local bFolder = pData:FindFirstChild("Bait") and pData.Bait:FindFirstChild(Config.Loadout1_Bait)
+            if bFolder and bFolder.Value > 0 then
+                if Events:FindFirstChild("EquipBait") then Events.EquipBait:InvokeServer(Config.Loadout1_Bait) end
+                Utils.ShowNotification("Bộ Set #1", "Đã trang bị mồi: " .. tostring(Config.Loadout1_Bait), "SUCCESS")
+            end
+        end
+    end)
+
+    Components.CreateDropdownRow(loadoutCard, "Set 2: Cần Câu", "Chọn cần câu cho Bộ Set 2", rodNameList, Config.Loadout2_Rod or rodNameList[1], function(v) Config.Loadout2_Rod = v end)
+    Components.CreateDropdownRow(loadoutCard, "Set 2: Mồi Câu", "Chọn mồi câu cho Bộ Set 2", baitNameList, Config.Loadout2_Bait or baitNameList[1], function(v) Config.Loadout2_Bait = v end)
+    Components.CreateButtonRow(loadoutCard, "Trang Bị Nhanh Set 2", "Trang bị Cần & Mồi đã chọn cho Set 2", "Dùng Set 2", function()
+        local pData = Services.ReplicatedStorage:FindFirstChild("Data") and Services.ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        if pData then
+            if Shop.IsRodOwned(Config.Loadout2_Rod) then
+                if Events:FindFirstChild("EquipFishingRod") then Events.EquipFishingRod:InvokeServer(Config.Loadout2_Rod) end
+                Utils.ShowNotification("Bộ Set #2", "Đã trang bị cần: " .. tostring(Config.Loadout2_Rod), "SUCCESS")
+            else
+                Utils.ShowNotification("Bộ Set #2", "Bạn chưa sở hữu cần: " .. tostring(Config.Loadout2_Rod), "WARN")
+            end
+            local bFolder = pData:FindFirstChild("Bait") and pData.Bait:FindFirstChild(Config.Loadout2_Bait)
+            if bFolder and bFolder.Value > 0 then
+                if Events:FindFirstChild("EquipBait") then Events.EquipBait:InvokeServer(Config.Loadout2_Bait) end
+                Utils.ShowNotification("Bộ Set #2", "Đã trang bị mồi: " .. tostring(Config.Loadout2_Bait), "SUCCESS")
+            end
+        end
+    end)
 
     -- Section 7: Bán Cá & Minigame
     Components.CreateCategoryHeader(parent, "Bán Cá & Minigame Phụ")

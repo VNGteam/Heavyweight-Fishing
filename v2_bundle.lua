@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.8"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.9"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -417,29 +417,42 @@ ConfigModule.Config = {
 
     -- Smart Combo V2
     SmartComboEnabled = false,
-    FishHpThreshold = 500,
-    QuickCatchSkill = "Z",
-    OpenerSkill = "Z",
-    OpenerMaxCount = 1,
-    LoopSkills = "Z, X, V",
-    LoopStrictOrder = true,           -- [MẶC ĐỊNH BẬT V2]: Luôn giữ đúng thứ tự chiêu
-    EmergencyHealSkill = "V",
-    EmergencyHealHp = 40,
-    SkillEffectDelay = 1.2,
-    SmartEffectAutoDetect = true,
-    AutoSkills = false,
-    SelectedSkill = "One-Strike Heaven Gate",
+    CastMode = "Thủ Công (Mặc Định)",
+    CastSpeedRatio = 1.0,
+    CastDelayAfter = 0.5,
+    SpamClickInterval = 0.05,
+    FishDetectionDelay = 0.5,
+    AutoCastJitter = false,
+    AutoCastJitterRadius = 5,
+    CatchDelayEnabled = false,
+    CatchDelayDuration = 0.8,
+    SpamClickMethod = "VirtualInput",
+    AutoUnstuckCast = true,
 
-    -- Auto Luyện Chiêu (Fast Cancel)
+    -- Bảng Kỹ Năng Combo (Auto Skills)
+    AutoSkills = false,
+    AutoSkillZ = true,
+    SkillCooldownZ = 3.0,
+    SkillTriggerZ = "Ngay Khi Kéo Cá",
+    SkillDelayZ = 0.0,
+    AutoSkillX = true,
+    SkillCooldownX = 5.0,
+    SkillTriggerX = "Ngay Khi Kéo Cá",
+    SkillDelayX = 0.0,
+    AutoSkillC = true,
+    SkillCooldownC = 8.0,
+    SkillTriggerC = "Ngay Khi Kéo Cá",
+    SkillDelayC = 0.0,
+    AutoSkillV = true,
+    SkillCooldownV = 10.0,
+    SkillTriggerV = "Ngay Khi Kéo Cá",
+    SkillDelayV = 0.0,
+
+    -- Luyện Kỹ Năng Tự Động (Train Skill)
     AutoTrainSkill = false,
-    TrainSkill = "Z",
-    TrainCancelDelay = 0.45,
-    Train_Z = false,
-    Train_X = false,
-    Train_C = true,
-    Train_V = true,
+    TrainSkill = "Chiêu Z",
+    TrainCancelDelay = 0.3,
     TrainTargetCount = 100,
-    TrainCurrentCount = 0,
     TrainSkillCooldown = 6.0,
     TrainDelayCatch = true,
 
@@ -461,6 +474,11 @@ ConfigModule.Config = {
     AutoFavouriteFish = false,
     FavouriteFishName = "Colossal Tigerfish",
     MaterialFarming = false,
+
+    -- Vòng Quay Gacha
+    AutoGacha = false,
+    GachaBanner = "Taiji Banner",
+    GachaPullsPerAction = 1,
 
     -- Minigame Khác & Săn Boss Thường
     OctoAutoMinigame = false,
@@ -3615,6 +3633,7 @@ Shop.lastSellTime = 0
 Shop.lastBaitBuyTime = 0
 Shop.lastBaitCraftTime = 0
 Shop.lastDailyClaimTime = 0
+Shop.lastGachaTime = 0
 
 local craftMaterialFish = {
     ["Verdant Alligator Gar"] = true,
@@ -3802,6 +3821,22 @@ function Shop.HandleDailyClaim(config)
     if Events and Events:FindFirstChild("ClaimDaily") then
         pcall(function()
             Events.ClaimDaily:FireServer()
+        end)
+    end
+end
+
+-- 4b. Auto Gacha
+function Shop.HandleGacha(config)
+    if not config.AutoGacha then return end
+    local now = tick()
+    if (now - (Shop.lastGachaTime or 0) < 1.5) then return end
+    Shop.lastGachaTime = now
+
+    local banner = config.GachaBanner or "Taiji Banner"
+    local pulls = tonumber(config.GachaPullsPerAction) or 1
+    if Events and Events:FindFirstChild("Gacha") then
+        pcall(function()
+            Events.Gacha:FireServer(banner, pulls)
         end)
     end
 end
@@ -5989,13 +6024,86 @@ function TabCauCa.Render(parent)
     end)
 
     -- Section 6: Trang Bị Mồi & Cần
-    Components.CreateCategoryHeader(parent, "Trang Bị Mồi & Cần Câu")
+    Components.CreateCategoryHeader(parent, "Tự Động Trang Bị Tối Ưu")
     local loadoutCard = Components.CreateCardGroup(parent)
 
-    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Cần Tốt Nhất", "Tự động cầm cần câu có lực kéo lớn nhất trong túi", Config.AutoEquipBestRod, function(v) Config.AutoEquipBestRod = v end)
-    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Mồi", "Tự động lắp mồi khi câu", Config.AutoEquipBestBait, function(v) Config.AutoEquipBestBait = v end)
-    Components.CreateToggleRow(loadoutCard, "Tự Đổi Mồi Khi Săn Boss", "Tự động đổi mồi đặc biệt khi phát hiện Boss", Config.AutoEquipBossBait, function(v) Config.AutoEquipBossBait = v end)
-    Components.CreateToggleRow(loadoutCard, "Tự Động Trang Bị Pháp Bảo Tốt Nhất", "Tự động trang bị ngọc/pháp bảo tốt nhất", Config.AutoEquipBestOrb, function(v) Config.AutoEquipBestOrb = v end)
+    local baitOptionsList = {
+        "Mồi Tốt Nhất (Cao Nhất)",
+        "Mồi Thấp Nhất (Tiết Kiệm)",
+        "Nameless Bait",
+        "Rainbow Bait",
+        "Frost Bait",
+        "Ancestral Bait",
+        "Elite Bait",
+        "Corrupted Essence Bait",
+        "Crude Mash Bait",
+        "Basic Bait"
+    }
+
+    Components.CreateToggleRow(loadoutCard, "Tự Đổi Mồi Khi Săn Boss", "Tự động đổi sang mồi săn boss tối ưu khi vào chế độ Săn Boss", Config.AutoEquipBossBait, function(v)
+        Config.AutoEquipBossBait = v
+    end)
+    Components.CreateDropdownRow(loadoutCard, "Chọn Mồi Săn Boss", "Loại mồi ưu tiên sử dụng khi săn Boss", baitOptionsList, Config.BaitChoiceBoss or baitOptionsList[1], function(v)
+        Config.BaitChoiceBoss = v
+    end)
+
+    Components.CreateToggleRow(loadoutCard, "Tự Dùng Mồi (Auto Bait)", "Tự động móc loại mồi đã chọn khi câu cá bình thường", Config.AutoEquipBestBait, function(v)
+        Config.AutoEquipBestBait = v
+    end)
+    Components.CreateDropdownRow(loadoutCard, "Chọn Mồi Khi Câu Thường", "Loại mồi sử dụng cho câu cá thông thường", baitOptionsList, Config.BaitChoiceNormal or baitOptionsList[1], function(v)
+        Config.BaitChoiceNormal = v
+    end)
+
+    Components.CreateToggleRow(loadoutCard, "Tự Dùng Cần Tốt Nhất", "Tự động cầm cần câu có lực kéo lớn nhất trong túi", Config.AutoEquipBestRod, function(v) Config.AutoEquipBestRod = v end)
+    Components.CreateToggleRow(loadoutCard, "Tự Dùng Ngọc Tốt Nhất", "Tự động trang bị viên Ngọc có cấp bậc cao nhất", Config.AutoEquipBestOrb, function(v) Config.AutoEquipBestOrb = v end)
+
+    local rodNameList = {
+        "Wooden Rod", "Bamboo Rod", "Iron Hook Rod", "Steel Rod", "Enchanted Steel Rod",
+        "Alloy Rod", "Emerald Rod", "Bloodfire Rod", "Shadow Rod", "Triple Steel Rod",
+        "Golden Rod", "Grandmaster Steel Rod", "Grandmaster Golden Rod", "Steel Spine Rod",
+        "Inferno Rod", "Golden Spine Rod", "Platinum Spine Rod", "Diamond Spine Rod",
+        "Gravisteel Rod", "Auric Gravity Rod", "Inferno Gravity Rod", "Cryo Gravity Rod",
+        "Thunder Thorn Rod", "Starlight Rod", "Heavenpiercer Rod", "Pure Diamond Rod", "Sacred Bamboo Rod"
+    }
+    local baitNameList = {"Basic Bait", "Crude Mash Bait", "Corrupted Essence Bait", "Elite Bait", "Ancestral Bait", "Frost Bait", "Rainbow Bait", "Nameless Bait"}
+
+    Components.CreateDropdownRow(loadoutCard, "Set 1: Cần Câu", "Chọn cần câu cho Bộ Set 1", rodNameList, Config.Loadout1_Rod or rodNameList[1], function(v) Config.Loadout1_Rod = v end)
+    Components.CreateDropdownRow(loadoutCard, "Set 1: Mồi Câu", "Chọn mồi câu cho Bộ Set 1", baitNameList, Config.Loadout1_Bait or baitNameList[1], function(v) Config.Loadout1_Bait = v end)
+    Components.CreateButtonRow(loadoutCard, "Trang Bị Nhanh Set 1", "Trang bị Cần & Mồi đã chọn cho Set 1", "Dùng Set 1", function()
+        local pData = Services.ReplicatedStorage:FindFirstChild("Data") and Services.ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        if pData then
+            if Shop.IsRodOwned(Config.Loadout1_Rod) then
+                if Events:FindFirstChild("EquipFishingRod") then Events.EquipFishingRod:InvokeServer(Config.Loadout1_Rod) end
+                Utils.ShowNotification("Bộ Set #1", "Đã trang bị cần: " .. tostring(Config.Loadout1_Rod), "SUCCESS")
+            else
+                Utils.ShowNotification("Bộ Set #1", "Bạn chưa sở hữu cần: " .. tostring(Config.Loadout1_Rod), "WARN")
+            end
+            local bFolder = pData:FindFirstChild("Bait") and pData.Bait:FindFirstChild(Config.Loadout1_Bait)
+            if bFolder and bFolder.Value > 0 then
+                if Events:FindFirstChild("EquipBait") then Events.EquipBait:InvokeServer(Config.Loadout1_Bait) end
+                Utils.ShowNotification("Bộ Set #1", "Đã trang bị mồi: " .. tostring(Config.Loadout1_Bait), "SUCCESS")
+            end
+        end
+    end)
+
+    Components.CreateDropdownRow(loadoutCard, "Set 2: Cần Câu", "Chọn cần câu cho Bộ Set 2", rodNameList, Config.Loadout2_Rod or rodNameList[1], function(v) Config.Loadout2_Rod = v end)
+    Components.CreateDropdownRow(loadoutCard, "Set 2: Mồi Câu", "Chọn mồi câu cho Bộ Set 2", baitNameList, Config.Loadout2_Bait or baitNameList[1], function(v) Config.Loadout2_Bait = v end)
+    Components.CreateButtonRow(loadoutCard, "Trang Bị Nhanh Set 2", "Trang bị Cần & Mồi đã chọn cho Set 2", "Dùng Set 2", function()
+        local pData = Services.ReplicatedStorage:FindFirstChild("Data") and Services.ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        if pData then
+            if Shop.IsRodOwned(Config.Loadout2_Rod) then
+                if Events:FindFirstChild("EquipFishingRod") then Events.EquipFishingRod:InvokeServer(Config.Loadout2_Rod) end
+                Utils.ShowNotification("Bộ Set #2", "Đã trang bị cần: " .. tostring(Config.Loadout2_Rod), "SUCCESS")
+            else
+                Utils.ShowNotification("Bộ Set #2", "Bạn chưa sở hữu cần: " .. tostring(Config.Loadout2_Rod), "WARN")
+            end
+            local bFolder = pData:FindFirstChild("Bait") and pData.Bait:FindFirstChild(Config.Loadout2_Bait)
+            if bFolder and bFolder.Value > 0 then
+                if Events:FindFirstChild("EquipBait") then Events.EquipBait:InvokeServer(Config.Loadout2_Bait) end
+                Utils.ShowNotification("Bộ Set #2", "Đã trang bị mồi: " .. tostring(Config.Loadout2_Bait), "SUCCESS")
+            end
+        end
+    end)
 
     -- Section 7: Bán Cá & Minigame
     Components.CreateCategoryHeader(parent, "Bán Cá & Minigame Phụ")
@@ -6013,55 +6121,397 @@ end
 __modules["ui.tabs.tab_dich_chuyen"] = function()
 --[[
     v2/ui/tabs/tab_dich_chuyen.lua
-    Exact Tab Dịch Chuyển from backup.lua (Islands, Boss Realms, Players, NPCs, Server Hop)
+    Full Teleport System: 10 Islands, Boss Realms, Secret Rods, Rod Dealers, Players & 17 Quest NPCs
 --]]
 
 local Components = __require("ui.components")
 local Teleport = __require("features.teleport")
 local Services = __require("core.services")
+local Spirits = __require("features.spirits")
+local Utils = __require("core.utils")
+
+local Players = Services.Players
+local LocalPlayer = Services.LocalPlayer
+local Workspace = Services.Workspace
 
 local TabDichChuyen = {}
 
-function TabDichChuyen.Render(parent)
-    Components.CreateCategoryHeader(parent, "Dịch Chuyển Đến Các Đảo")
-    local cardIslands = Components.CreateCardGroup(parent)
-
-    local islandList = {
-        { name = "Đảo Khởi Đầu (Starter Isle)", pos = Vector3.new(0, 15, 0) },
-        { name = "Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1187.8, 7.5, -22.5) },
-        { name = "Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(12.0, 19.0, 1413.0) },
-        { name = "Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-85.3, 9.3, -1340.8) },
-        { name = "Đảo Băng Tuyết (Glacier Isle)", pos = Vector3.new(650, 20, -1200) },
-        { name = "Đảo Núi Lửa (Volcano Isle)", pos = Vector3.new(-1400, 25, 800) },
-        { name = "Đại Dương Sâu (Deep Ocean)", pos = Vector3.new(2000, 10, 2000) },
-        { name = "Vực Thẳm (Abyssal Trench)", pos = Vector3.new(-2500, 5, -3000) }
+local WorldData = {
+    islands = {
+        {name = "[1] Đảo Khởi Đầu (Spawn)", pos = Vector3.new(-200.7, 11.1, 35.9), radius = 850},
+        {name = "[2] Đảo Tre (Bamboo Isle)", pos = Vector3.new(-1223.0, 7.3, -24.1), radius = 850},
+        {name = "[3] Đảo Phóng Xạ (Fallout Isle)", pos = Vector3.new(65.5, 8.8, 1181.3), radius = 850},
+        {name = "[4] Đảo Thống Trị (Sovereign Isle)", pos = Vector3.new(-1276.4, 8.8, 1239.7), radius = 850},
+        {name = "[5] Đảo Cá Chép (Perch Isle)", pos = Vector3.new(-62.0, 11.9, -1321.4), radius = 850},
+        {name = "[6] Đảo Băng Giá (Frost Isle)", pos = Vector3.new(-1366.0, 11.9, -1495.4), radius = 850},
+        {name = "[7] Đảo Quả Dừa (Coconut Isle)", pos = Vector3.new(1493.6, 9.1, -1430.6), radius = 850},
+        {name = "[8] Đảo Hổ Phách (Amber Isle)", pos = Vector3.new(1259.4, 9.1, 1401.5), radius = 850},
+        {name = "[9] Đảo Chiến Trường (Battlefield)", pos = Vector3.new(1393.5, 11.3, 169.6), radius = 850},
+        {name = "[10] Đảo Đỉnh Sương Mù (Mistpeak)", pos = Vector3.new(2660.2, 8.8, -86.7), radius = 850},
+    },
+    bossRealms = {
+        {name = "Boss Bạch Tuộc (Phao Biển)", pos = Vector3.new(1608.2, 5.0, -218.3), radius = 450},
+        {name = "Vùng Câu Cá Ngầm Lòng Đất", pos = Vector3.new(112.5, -330.0, -30.8), radius = 450},
+        {name = "Đấu Trường Boss Enzo", pos = Vector3.new(-115.3, 9.2, 1349.5), radius = 450},
     }
+}
 
-    for _, isl in ipairs(islandList) do
-        Components.CreateButtonRow(cardIslands, isl.name, "Bay đến đảo ngay lập tức", "Bay Tới", function()
-            Teleport.To(isl.pos)
+local function GetCurrentLocationName()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return "Đang tải vị trí...", nil end
+    local myPos = root.Position
+
+    if myPos.Y < -150 then
+        return "Vùng Câu Cá Ngầm Lòng Đất", "underground"
+    end
+
+    local bestName = "Đang ở giữa biển"
+    local bestObj = nil
+    local minDist = 999999
+
+    for _, isl in ipairs(WorldData.islands) do
+        local dist = (Vector3.new(myPos.X, 0, myPos.Z) - Vector3.new(isl.pos.X, 0, isl.pos.Z)).Magnitude
+        if dist < (isl.radius or 850) and dist < minDist then
+            minDist = dist
+            bestName = isl.name
+            bestObj = isl
+        end
+    end
+
+    for _, br in ipairs(WorldData.bossRealms) do
+        local dist = (myPos - br.pos).Magnitude
+        if dist < (br.radius or 450) and dist < minDist then
+            minDist = dist
+            bestName = br.name
+            bestObj = br
+        end
+    end
+
+    return bestName, bestObj, minDist
+end
+
+function TabDichChuyen.Render(parent)
+    -- ============================================================
+    -- 1. DỊCH CHUYỂN ĐẾN ĐẢO (1 - 10)
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "🏝️ Dịch Chuyển Đến Đảo (Đảo 1 - 10)")
+    local islandCard = Components.CreateCardGroup(parent)
+
+    local infoCurrentMap = Components.CreateInfoRow(islandCard, "📍 Vị Trí Bạn Đang Đứng", "Đang nhận diện...")
+
+    Components.CreateButtonRow(islandCard, "📋 Sao Chép Tọa Độ Hiện Tại", "Copy tọa độ đứng hiện tại vào Clipboard để lưu trữ", "Sao Chép", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if not root then return end
+        local pos = root.Position
+        local str = string.format("Vector3.new(%.1f, %.1f, %.1f)", pos.X, pos.Y, pos.Z)
+        pcall(function()
+            if setclipboard then setclipboard(str)
+            elseif toclipboard then toclipboard(str) end
         end)
-    end
-
-    Components.CreateCategoryHeader(parent, "Dịch Chuyển Tới Người Chơi")
-    local cardPlr = Components.CreateCardGroup(parent)
-    local plrNames = {}
-    for _, p in ipairs(Services.Players:GetPlayers()) do
-        if p ~= Services.LocalPlayer then table.insert(plrNames, p.Name) end
-    end
-    if #plrNames == 0 then table.insert(plrNames, "Không có ai khác") end
-
-    local selectedPlr = plrNames[1]
-    Components.CreateDropdownRow(cardPlr, "Chọn Người Chơi", "Danh sách người chơi trong phòng", plrNames, selectedPlr, function(v)
-        selectedPlr = v
+        Utils.ShowNotification("TỌA ĐỘ HIỆN TẠI", "Đã copy: " .. str .. " vào Clipboard!", "SUCCESS", 5)
     end)
-    Components.CreateButtonRow(cardPlr, "Bay Tới Người Chơi Đã Chọn", "Dịch chuyển tức thời đến tọa độ người chơi", "Bay Tới", function()
-        if selectedPlr and selectedPlr ~= "Không có ai khác" then
-            Teleport.ToPlayer(selectedPlr)
+
+    task.spawn(function()
+        while true do
+            task.wait(2.0)
+            if infoCurrentMap and infoCurrentMap.Set then
+                local locName = GetCurrentLocationName()
+                infoCurrentMap.Set(locName)
+            end
         end
     end)
 
-    Components.CreateCategoryHeader(parent, "Chuyển Server (Server Hop)")
+    for _, isl in ipairs(WorldData.islands) do
+        Components.CreateButtonRow(islandCard, isl.name, "Bay thẳng đến " .. isl.name, "Bay Tới", function()
+            local curLoc = GetCurrentLocationName()
+            if curLoc == isl.name then
+                Utils.ShowNotification("Dịch Chuyển", "Bạn đang ở ngay " .. isl.name .. " rồi!", "INFO", 3)
+                return
+            end
+            Teleport.To(isl.pos + Vector3.new(0, 3, 0))
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến " .. isl.name .. "!", "SUCCESS", 3)
+        end)
+    end
+
+    -- ============================================================
+    -- 2. ĐẤU TRƯỜNG BOSS & VÙNG ĐẤT BÍ MẬT
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "🐙 Đấu Trường Boss & Vùng Đất Bí Mật")
+    local bossRealmCard = Components.CreateCardGroup(parent)
+
+    for _, br in ipairs(WorldData.bossRealms) do
+        Components.CreateButtonRow(bossRealmCard, br.name, "Dịch chuyển tức thì đến " .. br.name, "Bay Đến", function()
+            Teleport.To(br.pos + Vector3.new(0, 3, 0))
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến " .. br.name .. "!", "SUCCESS", 4)
+        end)
+    end
+
+    -- ============================================================
+    -- 3. CỬA HÀNG BÁN CẦN (BIAO DI)
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "🏪 Cửa Hàng Bán Cần (Biao Di)")
+    local rodDealerCard = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Thợ Bán Cần Tại Các Đảo", false)
+
+    local rodDealers = {
+        {name = "[1] Shop Đảo Khởi Đầu", pos = Vector3.new(-151.4, 8.7, -49.9)},
+        {name = "[2] Shop Đảo Tre", pos = Vector3.new(-1236.8, 7.3, -174.1)},
+        {name = "[3] Shop Đảo Phóng Xạ", pos = Vector3.new(138.4, 9.0, 1179.7)},
+        {name = "[4] Shop Đảo Thống Trị", pos = Vector3.new(-1262.6, 8.2, 1202.2)},
+        {name = "[5] Shop Đảo Cá Chép", pos = Vector3.new(-9.5, 9.2, -1330.0)},
+        {name = "[6] Shop Đảo Băng Giá", pos = Vector3.new(-1400.4, 9.2, -1490.6)},
+        {name = "[7] Shop Đảo Quả Dừa", pos = Vector3.new(1446.0, 9.3, -1408.0)},
+        {name = "[8] Shop Đảo Hổ Phách", pos = Vector3.new(1292.7, 8.2, 1497.4)},
+    }
+
+    for _, rd in ipairs(rodDealers) do
+        Components.CreateButtonRow(rodDealerCard, rd.name, "Bay trực tiếp đến " .. rd.name, "Bay Đến", function()
+            Teleport.To(rd.pos + Vector3.new(0, 3, 0))
+            Utils.ShowNotification("Cửa Hàng", "Đã đến " .. rd.name .. "!", "SUCCESS", 3)
+        end)
+    end
+
+    -- ============================================================
+    -- 4. VỊ TRÍ CẦN CÂU BÍ MẬT
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "✨ Vị Trí Cần Câu Bí Mật (Secret Rods)")
+    local sRodCard = Components.CreateCardGroup(parent)
+
+    local secretRods = {
+        {name = "Anchorbound Rod", pos = Vector3.new(-1208.5, 56.3, 1646.2)},
+        {name = "Blazeshark Rod", pos = Vector3.new(-8.4, 53.9, 6.7)},
+        {name = "Kraken Rod", pos = Vector3.new(1543.8, 73.4, 1490.9)},
+        {name = "Ascendant Bamboo Rod", pos = Vector3.new(-1360.6, 140.6, 31.0)},
+        {name = "Lifebloom Rod", pos = Vector3.new(-114.9, 74.9, -1533.2)},
+        {name = "Demonic Rod", pos = Vector3.new(1181.9, 82.9, -1243.8)}
+    }
+
+    for _, sr in ipairs(secretRods) do
+        Components.CreateButtonRow(sRodCard, sr.name, "Bay đến tọa độ lấy cần: " .. sr.name, "Bay Đến", function()
+            Teleport.To(sr.pos + Vector3.new(0, 3, 0))
+            Utils.ShowNotification("Cần Bí Mật", "Đã bay đến vị trí " .. sr.name .. "!", "SUCCESS", 4)
+        end)
+    end
+
+    -- ============================================================
+    -- 5. DỊCH CHUYỂN ĐẾN NGƯỜI CHƠI TRONG MAP
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "👥 Dịch Chuyển Đến Người Chơi Trong Map")
+    local srvCard = Components.CreateCardGroup(parent)
+
+    local playerLookup = {}
+    local selectedPlayerKey = nil
+
+    local function BuildPlayerList()
+        local list = {}
+        table.clear(playerLookup)
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        local myPos = myRoot and myRoot.Position
+
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer then
+                local distStr = ""
+                if myPos and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                    local d = math.floor((p.Character.HumanoidRootPart.Position - myPos).Magnitude)
+                    distStr = string.format(" [%dm]", d)
+                end
+                local key = string.format("%s (@%s)%s", p.DisplayName, p.Name, distStr)
+                table.insert(list, key)
+                playerLookup[key] = p
+            end
+        end
+
+        if #list == 0 then
+            table.insert(list, "Không có người chơi khác")
+        end
+        return list
+    end
+
+    local initialPlayerList = BuildPlayerList()
+    selectedPlayerKey = initialPlayerList[1]
+
+    local playerDropdown = Components.CreateDropdownRow(srvCard, "Chọn Người Chơi", "Danh sách người chơi đang có mặt trong server", initialPlayerList, selectedPlayerKey, function(v)
+        selectedPlayerKey = v
+    end)
+
+    local function RefreshPlayerDropdown()
+        local newList = BuildPlayerList()
+        if playerDropdown and playerDropdown.Refresh then
+            playerDropdown.Refresh(newList, true)
+            selectedPlayerKey = playerDropdown.Get and playerDropdown.Get() or newList[1]
+        end
+    end
+
+    Components.CreateButtonRow(srvCard, "Bay Đến Người Chơi Đã Chọn", "Dịch chuyển tức thì đến ngay bên cạnh người chơi đang chọn", "🚀 Bay Đến", function()
+        local targetPlayer = playerLookup[selectedPlayerKey]
+        if not targetPlayer then
+            local uName = selectedPlayerKey and selectedPlayerKey:match("@([%w_]+)")
+            if uName then
+                targetPlayer = Players:FindFirstChild(uName)
+            end
+        end
+
+        if not targetPlayer or not targetPlayer.Parent then
+            Utils.ShowNotification("Dịch Chuyển", "Vui lòng chọn người chơi hợp lệ!", "WARN", 3)
+            RefreshPlayerDropdown()
+            return
+        end
+
+        local tChar = targetPlayer.Character
+        local tRoot = tChar and tChar:FindFirstChild("HumanoidRootPart")
+        local myChar = LocalPlayer.Character
+        local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+        if myRoot and tRoot then
+            myRoot.CFrame = tRoot.CFrame + Vector3.new(0, 2, 3)
+            Utils.ShowNotification("Dịch Chuyển", "Đã bay đến người chơi: " .. targetPlayer.DisplayName, "SUCCESS", 4)
+            RefreshPlayerDropdown()
+        else
+            Utils.ShowNotification("Dịch Chuyển", "Người chơi này chưa hồi sinh hoặc không có nhân vật!", "WARN", 3)
+        end
+    end)
+
+    Components.CreateButtonRow(srvCard, "Làm Mới Danh Sách Người Chơi", "Cập nhật danh sách người chơi vừa tham gia hoặc rời server", "🔄 Làm Mới", function()
+        RefreshPlayerDropdown()
+        Utils.ShowNotification("Danh Sách", "Đã cập nhật danh sách người chơi trong map!", "INFO", 3)
+    end)
+
+    local lastTpTarget = nil
+    Components.CreateButtonRow(srvCard, "Bay Đến Người Chơi Ngẫu Nhiên", "Dịch chuyển tức thì đến vị trí của một người chơi bất kỳ", "🎲 Ngẫu Nhiên", function()
+        local targets = {}
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+                table.insert(targets, p)
+            end
+        end
+        if #targets == 0 then
+            Utils.ShowNotification("Dịch Chuyển", "Không tìm thấy người chơi nào khác trong server.", "WARN", 3)
+            return
+        end
+        local pool = {}
+        for _, p in ipairs(targets) do
+            if not (#targets > 1 and p == lastTpTarget) then
+                table.insert(pool, p)
+            end
+        end
+        local selected = (#pool > 0 and pool[math.random(1, #pool)]) or targets[math.random(1, #targets)]
+        lastTpTarget = selected
+        local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+        if root and selected.Character and selected.Character:FindFirstChild("HumanoidRootPart") then
+            root.CFrame = selected.Character.HumanoidRootPart.CFrame + Vector3.new(0, 2, 3)
+            Utils.ShowNotification("Dịch Chuyển", "Đã bay đến người chơi: " .. selected.DisplayName, "SUCCESS", 4)
+            RefreshPlayerDropdown()
+        end
+    end)
+
+    -- ============================================================
+    -- 6. DỊCH CHUYỂN ĐẾN 17 NPC NHIỆM VỤ
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "🧙 Dịch Chuyển Đến 17 NPC Nhiệm Vụ")
+    local npcTeleCard = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Tất Cả NPC Trong Game", true)
+
+    local questNPCList = {
+        { name="Ha Dieu De",            path="Function",  icon="🏆", role="Main Quest",          desc="Trả quest cá Rainbow Dragonfish & Heavenpiercer Turtle", island="Bamboo / Coconut / Frost" },
+        { name="Giang Lao",             path="Function",  icon="🎣", role="Main Quest",          desc="NPC nhiệm vụ chính • Trả quest cá nặng", island="Bamboo / Mistpeak / World Angler" },
+        { name="Sage Yijiu",            path="Function",  icon="🔮", role="Skill Shop + Quest",  desc="Bán skill Heavenpiercer & Pure Diamond • Trả quest Frost", island="Frost Isle / World Angler" },
+        { name="Blind Grand Angler",    path="Function",  icon="👁️", role="Main Quest",          desc="Lão ngư ông mù • Trả quest mở khóa câu bí mật", island="Battlefield Isle" },
+        { name="Duan Gan",              path="Function",  icon="🗡️", role="Main Quest",          desc="Võ sĩ gãy cần • Quest chính • Cần Huyết Long", island="Đảo chính" },
+        { name="Bac Minh",              path="Function",  icon="⬆️", role="Skill Shop",          desc="Bán và nâng cấp kỹ năng câu cá bằng Gems", island="Đảo chính" },
+        { name="Zeng Tianguo",          path="Function",  icon="⚡", role="Skill Upgrade",       desc="Nâng cấp kỹ năng đặc biệt", island="Perch / Sovereign" },
+        { name="Tang Thien Quoc",       path="Function",  icon="🌟", role="Skill Upgrade",       desc="NPC nâng cấp kỹ năng cấp cao", island="Sovereign / Perch" },
+        { name="Biao Di",               path="Function",  icon="🎯", role="Thợ Chế Cần Câu",    desc="Craft & mua bán cần câu các loại", island="Mọi đảo chính" },
+        { name="Hua Heshang",           path="Function",  icon="🐉", role="Dragon Quest",        desc="Yêu cầu skill Dragon Subjugation", island="Đảo chính" },
+        { name="The Shadow",            path="Function",  icon="🌑", role="Bí Mật / PVP",       desc="Nhiệm vụ bí mật và PVP arena đặc biệt", island="Đảo chính" },
+        { name="Lao Ngo",               path="Function",  icon="👴", role="Quest Phụ",           desc="Lão Ngô • Cung cấp thông tin câu hiếm", island="Đảo chính" },
+        { name="Nanjiang",              path="Function",  icon="🗺️", role="Quest Phụ",           desc="Nam Giang • Thông tin đảo và vị trí câu hiếm", island="Đảo chính" },
+        { name="Giang Lao PVP",         path="Function",  icon="⚔️", role="PVP Arena",           desc="Đấu trường PVP câu cá • Nhận Stars đổi skin cần", island="Battlefield Isle" },
+        { name="Battlefield Isle's Giang Lao", path="Function", icon="🏟️", role="Battlefield Quest", desc="Quest đấu trường Battlefield", island="Battlefield Isle" },
+        { name="Ticket Quest Giver",    path="Function",  icon="🎫", role="Sự Kiện",             desc="Phát nhiệm vụ vé hàng ngày (Daily Tickets)", island="Đảo chính" },
+        { name="Nana",                  path="SellFish",  icon="🐟", role="Bán Cá",             desc="Thu mua cá nhanh lấy Gems", island="Mọi đảo" },
+        { name="Ba Chang",              path="BuyBait",   icon="🪱", role="Bán Mồi Câu",        desc="Bán mồi câu cơ bản giá rẻ", island="Đảo chính / Coconut" },
+    }
+
+    local function findNPCModel(npcName, npcPath)
+        local npcFolder = Workspace:FindFirstChild("NPC")
+        if npcFolder then
+            local pathFolder = npcFolder:FindFirstChild(npcPath)
+            if pathFolder then
+                local found = pathFolder:FindFirstChild(npcName)
+                if found and (found:FindFirstChild("HumanoidRootPart") or found:IsA("BasePart")) then
+                    return found
+                end
+            end
+            for _, sub in ipairs(npcFolder:GetChildren()) do
+                local found = sub:FindFirstChild(npcName)
+                if found then return found end
+            end
+        end
+        return Workspace:FindFirstChild(npcName, true)
+    end
+
+    for _, npc in ipairs(questNPCList) do
+        local title = string.format("%s %s [%s]", npc.icon, npc.name, npc.role)
+        local desc = string.format("%s\n📍 %s", npc.desc, npc.island)
+        Components.CreateButtonRow(npcTeleCard, title, desc, "Bay Đến", function()
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            if not root then
+                Utils.ShowNotification("Lỗi", "Nhân vật chưa spawn!", "ERROR", 3)
+                return
+            end
+            local model = findNPCModel(npc.name, npc.path)
+            if model then
+                local npcRoot = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChildWhichIsA("BasePart")
+                if npcRoot then
+                    root.CFrame = CFrame.new(npcRoot.Position + Vector3.new(0, 3, 3))
+                    Utils.ShowNotification("✅ Đến " .. npc.name, "Đã bay đến NPC " .. npc.name .. "!", "SUCCESS", 4)
+                    return
+                end
+            end
+            Utils.ShowNotification("❌ Không Tìm Thấy", "NPC '" .. npc.name .. "' không có trong map lúc này.", "WARN", 4)
+        end)
+    end
+
+    -- ============================================================
+    -- 7. DỊCH CHUYỂN ĐẾN ĐẠO SĨ (TAOIST & MAOSHAN)
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "📜 Dịch Chuyển Đến Đạo Sĩ (Taoist & Maoshan)")
+    local taoistTeleCard = Components.CreateCardGroup(parent)
+
+    Components.CreateButtonRow(taoistTeleCard, "📜 Bay Đến Đạo Sĩ (Taoist)", "Dịch chuyển tức thì đến NPC Đạo Sĩ nếu có trong server", "Bay Đến", function()
+        local tInst, tName = Spirits.ScanForTaoistNPC()
+        if tInst then
+            local ok = Spirits.TeleportToNPC(tInst)
+            if ok then
+                Utils.ShowNotification("Đạo Sĩ (Taoist)", "Đã dịch chuyển đến vị trí " .. tostring(tName) .. "!", "SUCCESS", 5)
+            else
+                Utils.ShowNotification("Đạo Sĩ (Taoist)", "Không lấy được tọa độ Đạo Sĩ.", "WARN", 3)
+            end
+        else
+            Utils.ShowNotification("Đạo Sĩ (Taoist)", "Server này hiện chưa có Đạo Sĩ (Taoist)! Hãy bật 'Đổi Server Tìm Taoist'.", "WARN", 5)
+        end
+    end)
+
+    Components.CreateButtonRow(taoistTeleCard, "✨ Bay Đến Đạo Sĩ Maoshan", "Dịch chuyển tức thì đến NPC Đạo Sĩ Maoshan nếu có trong server", "Bay Đến", function()
+        local mInst, mName = Spirits.ScanForMaoshanNPC()
+        if mInst then
+            local ok = Spirits.TeleportToNPC(mInst)
+            if ok then
+                Utils.ShowNotification("Đạo Sĩ Maoshan", "Đã dịch chuyển đến vị trí " .. tostring(mName) .. "!", "SUCCESS", 5)
+            else
+                Utils.ShowNotification("Đạo Sĩ Maoshan", "Không lấy được tọa độ Đạo Sĩ Maoshan.", "WARN", 3)
+            end
+        else
+            Utils.ShowNotification("Đạo Sĩ Maoshan", "Server này hiện chưa có Đạo Sĩ Maoshan! Hãy bật 'Đổi Server Tìm Maoshan'.", "WARN", 5)
+        end
+    end)
+
+    -- ============================================================
+    -- 8. CHUYỂN SERVER (SERVER HOP)
+    -- ============================================================
+    Components.CreateCategoryHeader(parent, "🌐 Chuyển Server (Server Hop)")
     local cardHop = Components.CreateCardGroup(parent)
     Components.CreateButtonRow(cardHop, "Chuyển Server Khác (Hop Server)", "Tìm server ngẫu nhiên còn chỗ và chuyển vào", "Đổi Server", function()
         Teleport.ServerHop()
@@ -6375,6 +6825,135 @@ function TabSanBoss.Render(parent)
         end)
         State.bossTogglesMap[bossName] = ctrl
     end
+
+    -- Boss Bạch Tuộc Bí Mật
+    Components.CreateCategoryHeader(parent, "🐙 Boss Bạch Tuộc Bí Mật (Octoparasite)")
+    local octoCard = Components.CreateCardGroup(parent)
+    Components.CreateToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
+    Components.CreateButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(1608.2, 5.0, -218.3)
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến Phao Boss Bạch Tuộc!", "SUCCESS")
+        end
+    end)
+    Components.CreateButtonRow(octoCard, "Bay Đến Vùng Lòng Đất", "Dịch chuyển đến vùng đất câu cá ngầm bí mật", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(112.5, -330.0, -30.8)
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến Vùng Câu Cá Ngầm!", "SUCCESS")
+        end
+    end)
+
+    -- Cần Câu Cần Ráp (Rod Crafting Guide)
+    Components.CreateCategoryHeader(parent, "🎣 Cần Câu Cần Ráp (Rod Crafting Guide)")
+    local rodGuideCard = Components.CreateCollapsibleCardGroup(parent, "Hướng Dẫn Ráp Cần & Bộ Lọc Nhanh", false)
+
+    local rodRecipes = {
+        {
+            rod = "Heavenpiercer Rod",
+            desc = "Cần Thiên Xuyên (Cao Cấp)",
+            bosses = {"Flying Fish Emperor", "Flying Fish Empress", "Rainbow Dragonfish", "Heavenpiercer Turtle"},
+            notes = {
+                ["Flying Fish Emperor"]  = "Nguyên liệu chính",
+                ["Flying Fish Empress"]  = "Nguyên liệu chính",
+                ["Rainbow Dragonfish"]   = "Nguyên liệu + Trả Quest",
+                ["Heavenpiercer Turtle"] = "Nguyên liệu + Mồi Rainbow",
+            }
+        },
+        {
+            rod = "Pure Diamond Rod",
+            desc = "Cần Kim Cương Thuần (Cao Cấp)",
+            bosses = {"Frost Kingfish", "Frost Queenfish", "Sanguine Fish", "Draconic Koi"},
+            notes = {
+                ["Frost Kingfish"]  = "Nguyên liệu + Mồi Frost",
+                ["Frost Queenfish"] = "Nguyên liệu chính",
+                ["Sanguine Fish"]   = "Nguyên liệu chính",
+                ["Draconic Koi"]    = "Nguyên liệu phụ",
+            }
+        },
+        {
+            rod = "Sacred Bamboo Rod",
+            desc = "Cần Trúc Thánh (Cao Cấp)",
+            bosses = {"Nameless Octoparasite", "Reborn Puffer Beast", "Mountain Dragonwhale"},
+            notes = {
+                ["Nameless Octoparasite"] = "Nguyên liệu + Trả Quest Đạo Sĩ",
+                ["Reborn Puffer Beast"]   = "Nguyên liệu + Trả Quest",
+                ["Mountain Dragonwhale"]  = "Nguyên liệu + Mồi Nameless",
+            }
+        },
+        {
+            rod = "Rainbow Bait (Mồi)",
+            desc = "Mồi Rainbow Bait (Gọi Boss Rùa)",
+            bosses = {"Crimson Electric Eel", "Colossal Tigerfish", "Golden Guardian Fish"},
+            notes = {
+                ["Crimson Electric Eel"]  = "Nguyên liệu chính",
+            }
+        },
+        {
+            rod = "Nameless Bait (Mồi)",
+            desc = "Mồi Nameless Bait (Gọi Bạch Tuộc)",
+            bosses = {"Mirage Lanternfish", "Tiger Mirefish", "Octoparasitic Fish"},
+            notes = {
+                ["Mirage Lanternfish"]  = "Nguyên liệu chính",
+            }
+        }
+    }
+
+    for _, recipe in ipairs(rodRecipes) do
+        Components.CreateInfoRow(rodGuideCard, "🪝 " .. recipe.rod, recipe.desc)
+        Components.CreateButtonRow(rodGuideCard,
+            "Ưu Tiên Chỉ Săn Cho: " .. recipe.rod,
+            "Tắt hết boss khác, chỉ bật những boss cần cho " .. recipe.rod,
+            "⚡ Lọc Boss",
+            function()
+                for bName, _ in pairs(Config.SecretBossTargets) do
+                    Config.SecretBossTargets[bName] = false
+                    if State.bossTogglesMap[bName] and State.bossTogglesMap[bName].Set then
+                        pcall(function() State.bossTogglesMap[bName].Set(false, true) end)
+                    end
+                end
+                for _, bName in ipairs(recipe.bosses) do
+                    Config.SecretBossTargets[bName] = true
+                    if State.bossTogglesMap[bName] and State.bossTogglesMap[bName].Set then
+                        pcall(function() State.bossTogglesMap[bName].Set(true, true) end)
+                    end
+                end
+                ConfigModule.SaveBossTargets()
+                Utils.ShowNotification("Lọc Boss", "Đã bật mục tiêu cho: " .. recipe.rod, "SUCCESS", 5)
+            end
+        )
+    end
+
+    Components.CreateButtonRow(rodGuideCard, "Bật Lại Tất Cả Secret Boss", "Khôi phục lại toàn bộ danh sách secret boss", "Bật Tất Cả", function()
+        for bName, _ in pairs(Config.SecretBossTargets) do
+            Config.SecretBossTargets[bName] = true
+            if State.bossTogglesMap[bName] and State.bossTogglesMap[bName].Set then
+                pcall(function() State.bossTogglesMap[bName].Set(true, true) end)
+            end
+        end
+        ConfigModule.SaveBossTargets()
+        Utils.ShowNotification("Boss Targets", "Đã bật lại toàn bộ mục tiêu Secret Boss!", "SUCCESS", 4)
+    end)
+
+    -- Đấu Trường Boss Enzo
+    Components.CreateCategoryHeader(parent, "⚔️ Đấu Trường Boss Enzo")
+    local enzoCard = Components.CreateCardGroup(parent)
+    Components.CreateToggleRow(enzoCard, "Tự Động Săn Boss (Enzo)", "Liên tục triệu hồi và câu boss Enzo", Config.AutoFarmBoss, function(v) Config.AutoFarmBoss = v end)
+    Components.CreateToggleRow(enzoCard, "Tự Săn Secret Boss (Bạch Tuộc)", "Tự chế mồi Nameless Bait, triệu hồi và tiêu diệt", Config.AutoFarmSecretBoss, function(v) Config.AutoFarmSecretBoss = v end)
+    Components.CreateButtonRow(enzoCard, "Bay Đến Boss Enzo", "Dịch chuyển trực tiếp đến đấu trường Enzo", "Bay Đến", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(-115.3, 9.2, 1349.5)
+            Utils.ShowNotification("Dịch Chuyển", "Đã đến Đấu trường Boss Enzo!", "SUCCESS")
+        end
+    end)
 end
 
 return TabSanBoss
@@ -6446,6 +7025,30 @@ function TabShop.Render(parent)
     Components.CreateDropdownRow(cardBait, "Chọn Mồi Cần Mua", "Loại mồi muốn tự động mua tại cửa hàng", {"Ancestral Bait", "Midnight Bait", "Basic Bait"}, Config.BuyBaitName or "Ancestral Bait", function(v) Config.BuyBaitName = v end)
     Components.CreateSliderRow(cardBait, "Số Lượng Mua Mỗi Lần", "Số lượng mua mỗi lần gửi yêu cầu", 1, 20, Config.BuyBaitAmount or 5, false, " cái", function(v) Config.BuyBaitAmount = v end)
     Components.CreateSliderRow(cardBait, "Ngưỡng Tự Mua (Khi Dưới)", "Khi số mồi trong túi ít hơn mức này sẽ mua thêm", 5, 50, Config.BuyBaitThreshold or 10, false, " cái", function(v) Config.BuyBaitThreshold = v end)
+    Components.CreateCategoryHeader(parent, "🔮 Thương Nhân Kỹ Năng (Sage Yijiu)")
+    local sageCard = Components.CreateCardGroup(parent)
+    local sageSkills = {"One-Strike Heaven Gate", "Taijiquan Technique", "Infinite Sky Ascension", "Rolling Chaos", "Sever the Gate", "Phoenix Strike Art", "Skyfall Stomp", "Beastbreaker Cleave", "Demonfall Technique", "Dragon Strike"}
+    local chosenSageSkill = sageSkills[1]
+    Components.CreateDropdownRow(sageCard, "Chọn Kỹ Năng", "Kỹ năng muốn học từ NPC Sage Yijiu", sageSkills, chosenSageSkill, function(v) chosenSageSkill = v end)
+
+    Components.CreateButtonRow(sageCard, "Bay Đến & Mua Kỹ Năng", "Dịch chuyển đến Sage Yijiu và mua chiêu thức", "Mua Chiêu", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.CFrame = CFrame.new(-117.5, 6.8, 41.2)
+            task.wait(0.3)
+            if Events and Events:FindFirstChild("BuySkill") then
+                Events.BuySkill:FireServer(chosenSageSkill)
+                Utils.ShowNotification("Sage Yijiu", "Đã mua thành công kỹ năng: " .. chosenSageSkill, "SUCCESS", 4)
+            end
+        end
+    end)
+
+    Components.CreateCategoryHeader(parent, "🎰 Vòng Quay May Mắn (Auto Gacha)")
+    local gachaCard = Components.CreateCardGroup(parent)
+    Components.CreateDropdownRow(gachaCard, "Chọn Vòng Quay Gacha", "Vòng quay muốn rút thưởng", {"Taiji Banner", "Egoless Banner"}, Config.GachaBanner or "Taiji Banner", function(v) Config.GachaBanner = v end)
+    Components.CreateSliderRow(gachaCard, "Số Vé Mỗi Lần Quay", "Số lượng vé dùng cho mỗi lượt rút thưởng", 1, 10, Config.GachaPullsPerAction or 1, false, " vé", function(v) Config.GachaPullsPerAction = v end)
+    Components.CreateToggleRow(gachaCard, "Vòng Quay May Mắn (Auto Gacha)", "Tự động rút thưởng liên tục từ banner đã chọn", Config.AutoGacha, function(v) Config.AutoGacha = v end)
 
     Components.CreateCategoryHeader(parent, "🎣 Cửa Hàng Cần Câu (Rod Shop)")
     local rodShopCard = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Cần Câu Có Thể Mua / Trang Bị", true)
@@ -6575,20 +7178,312 @@ end
 __modules["ui.tabs.tab_thu_nghiem"] = function()
 --[[
     v2/ui/tabs/tab_thu_nghiem.lua
-    Exact Tab Thử Nghiệm from backup.lua
+    Ghost Mode, Auto Reroll Trait, Instant Boat Spawner, Remote Exchange, Rod Colors & Fish Tank
 --]]
 
 local Components = __require("ui.components")
+local ConfigModule = __require("core.config")
+local Config = ConfigModule.Config
+local Services = __require("core.services")
+local LocalPlayer = Services.LocalPlayer
+local ReplicatedStorage = Services.ReplicatedStorage
+local Events = Services.Events
+local Utils = __require("core.utils")
+local Shop = __require("features.shop")
 
 local TabThuNghiem = {}
 
 function TabThuNghiem.Render(parent)
-    Components.CreateCategoryHeader(parent, "Tính Năng Thử Nghiệm & Đang Phát Triển")
-    local cardExp = Components.CreateCardGroup(parent)
+    -- 1. 👻 CHẾ ĐỘ TÀNG HÌNH (GHOST / INVISIBILITY MODE)
+    Components.CreateCategoryHeader(parent, "👻 CHẾ ĐỘ TÀNG HÌNH (GHOST / INVISIBILITY MODE)")
+    local ghostCard = Components.CreateCardGroup(parent)
 
-    Components.CreateInfoRow(cardExp, "Trạng Thái Engine", "Modular V2 (Strict Sequential Combo)")
-    Components.CreateInfoRow(cardExp, "Giao Diện Hoạt Động", "Identical Theme (Full Original Layout)")
-    Components.CreateInfoRow(cardExp, "Tab Wiki", "Đã gỡ bỏ theo yêu cầu để tối ưu hiệu năng")
+    local function ApplyGhostInvisibility(state)
+        Config.GhostInvisibility = state
+        pcall(function()
+            local remotesFolder = ReplicatedStorage:FindFirstChild("Remotes")
+            if remotesFolder and remotesFolder:FindFirstChild("ToggleInvisibility") then
+                remotesFolder.ToggleInvisibility:InvokeServer(state)
+            end
+        end)
+
+        local char = LocalPlayer.Character
+        if char then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") and part.Name ~= "HumanoidRootPart" then
+                    part.LocalTransparencyModifier = state and 0.65 or 0
+                elseif part:IsA("BillboardGui") then
+                    part.Enabled = not state
+                end
+            end
+        end
+
+        Utils.ShowNotification("Tàng Hình", state and "Đã BẬT Tàng Hình Server! Người chơi khác không thể nhìn thấy bạn." or "Đã TẮT Tàng Hình! Nhân vật hiển thị bình thường.", state and "SUCCESS" or "INFO", 4)
+    end
+
+    Components.CreateToggleRow(ghostCard, "Bật Tàng Hình Server (Ghost Mode)", "Ẩn hoàn toàn nhân vật khỏi tầm nhìn của người chơi khác và admin", Config.GhostInvisibility, function(v)
+        ApplyGhostInvisibility(v)
+    end)
+
+    Components.CreateButtonRow(ghostCard, "Làm Mới Trạng Thái Tàng Hình", "Bắn lại remote tàng hình phòng khi server vừa hồi sinh nhân vật", "Làm Mới", function()
+        ApplyGhostInvisibility(Config.GhostInvisibility)
+    end)
+
+    -- 2. 🎯 TỰ ĐỘNG TẨY LUYỆN TRAIT (AUTO REROLL & LOCK TRAIT)
+    Components.CreateCategoryHeader(parent, "🎯 TỰ ĐỘNG TẨY LUYỆN TRAIT (AUTO REROLL & LOCK TRAIT)")
+    local traitCard = Components.CreateCardGroup(parent)
+
+    local traitList = {
+        "Azure Dragon", "White Tiger", "Vermilion Bird", "Black Tortoise",
+        "Assassin", "Berserk", "Chrono", "Executioner", "Powerful",
+        "Precision", "Rapid", "Sharp", "Swift"
+    }
+
+    Components.CreateDropdownRow(traitCard, "Chọn Trait Cần Săn", "Trait mục tiêu bot sẽ tự động roll cho đến khi trúng", traitList, Config.TargetTraitName or traitList[1], function(v)
+        Config.TargetTraitName = v
+    end)
+
+    local infoTraitRerolls = Components.CreateInfoRow(traitCard, "Vé Reroll Hiện Có", "Đang tải...")
+    local function UpdateTraitRerollInfo()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        local count = pData and pData:FindFirstChild("Trait Reroll") and pData["Trait Reroll"].Value or 0
+        if infoTraitRerolls and infoTraitRerolls.Set then
+            infoTraitRerolls.Set(string.format("%d Vé", count))
+        end
+    end
+    task.spawn(UpdateTraitRerollInfo)
+
+    local isAutoRerolling = false
+    local function RunAutoRerollTrait()
+        if isAutoRerolling then return end
+        isAutoRerolling = true
+        task.spawn(function()
+            local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+            Utils.ShowNotification("Reroll Trait", "Bắt đầu tự động Reroll săn Trait: " .. tostring(Config.TargetTraitName), "INFO", 4)
+
+            while isAutoRerolling and Config.AutoRerollTrait do
+                local currentRerolls = pData and pData:FindFirstChild("Trait Reroll") and pData["Trait Reroll"].Value or 0
+                UpdateTraitRerollInfo()
+
+                if currentRerolls <= 0 then
+                    Utils.ShowNotification("Hết Vé", "Đã hết vé Reroll Trait!", "WARN", 5)
+                    Config.AutoRerollTrait = false
+                    isAutoRerolling = false
+                    break
+                end
+
+                if Events and Events:FindFirstChild("RerollTrait") then
+                    local res = Events.RerollTrait:InvokeServer()
+                    local targetLower = tostring(Config.TargetTraitName or ""):lower()
+                    local isHit = false
+
+                    if type(res) == "string" and res:lower():find(targetLower, 1, true) then
+                        isHit = true
+                    end
+
+                    if not isHit and pData and pData:FindFirstChild("LockTrait") then
+                        local tVal = pData.LockTrait:FindFirstChild(Config.TargetTraitName)
+                        if tVal and tVal.Value == true then
+                            isHit = true
+                        end
+                    end
+
+                    if isHit then
+                        Utils.ShowNotification("TRÚNG TRAIT!", string.format("Đã roll trúng [%s]! Tự động khóa bảo vệ ngay lập tức.", Config.TargetTraitName), "SUCCESS", 8)
+                        if Events:FindFirstChild("LockTrait") then
+                            Events.LockTrait:FireServer(Config.TargetTraitName)
+                        end
+                        Config.AutoRerollTrait = false
+                        isAutoRerolling = false
+                        break
+                    end
+                end
+                task.wait(0.35)
+            end
+            isAutoRerolling = false
+            UpdateTraitRerollInfo()
+        end)
+    end
+
+    Components.CreateToggleRow(traitCard, "Tự Động Reroll Đến Khi Trúng", "Tự động roll liên tục và khóa lại khi ra đúng Trait mục tiêu", Config.AutoRerollTrait, function(v)
+        Config.AutoRerollTrait = v
+        if v then
+            RunAutoRerollTrait()
+        else
+            isAutoRerolling = false
+        end
+    end)
+
+    Components.CreateButtonRow(traitCard, "Reroll 1 Lần Thủ Công", "Thực hiện roll trait 1 lần ngay lập tức", "Reroll 1 Lần", function()
+        if Events and Events:FindFirstChild("RerollTrait") then
+            local res = Events.RerollTrait:InvokeServer()
+            UpdateTraitRerollInfo()
+            Utils.ShowNotification("Reroll Trait", "Kết quả roll: " .. tostring(res or "Đã roll thành công"), "INFO", 4)
+        end
+    end)
+
+    Components.CreateButtonRow(traitCard, "Khóa / Mở Khóa Trait Đang Chọn", "Chuyển đổi trạng thái khóa bảo vệ cho Trait đang chọn", "Khóa / Mở", function()
+        if Events and Events:FindFirstChild("LockTrait") then
+            Events.LockTrait:FireServer(Config.TargetTraitName)
+            Utils.ShowNotification("Khóa Trait", "Đã gửi lệnh đổi trạng thái khóa cho: " .. tostring(Config.TargetTraitName), "SUCCESS", 3)
+        end
+    end)
+
+    -- 3. ⛵ TRIỆU HỒI THUYỀN TỨC THÌ (INSTANT BOAT SPAWNER)
+    Components.CreateCategoryHeader(parent, "⛵ TRIỆU HỒI THUYỀN TỨC THÌ (INSTANT BOAT SPAWNER)")
+    local boatCard = Components.CreateCardGroup(parent)
+
+    local boatList = {"Boat", "Golden Boat", "Rainbow Boat", "Ascended Perch", "Kunfish Overlord"}
+    Components.CreateDropdownRow(boatCard, "Chọn Loại Thuyền", "Chọn thuyền muốn triệu hồi hoặc mua", boatList, Config.SelectedBoat or boatList[1], function(v)
+        Config.SelectedBoat = v
+    end)
+
+    local function SpawnBoatNow(boatName)
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local bShop = remotes and remotes:FindFirstChild("BoatShop")
+        if bShop and bShop:FindFirstChild("Spawn") then
+            bShop.Spawn:FireServer(boatName)
+            Utils.ShowNotification("Triệu Hồi Thuyền", "Đã triệu hồi thuyền [" .. tostring(boatName) .. "] tại vị trí của bạn!", "SUCCESS", 4)
+        elseif Events and Events:FindFirstChild("SpawnBoat") then
+            Events.SpawnBoat:FireServer(boatName)
+            Utils.ShowNotification("Triệu Hồi Thuyền", "Đã triệu hồi thuyền [" .. tostring(boatName) .. "] tại vị trí của bạn!", "SUCCESS", 4)
+        else
+            Utils.ShowNotification("Thuyền", "Không tìm thấy remote triệu hồi thuyền!", "WARN", 4)
+        end
+    end
+
+    Components.CreateButtonRow(boatCard, "Triệu Hồi Thuyền Đang Chọn", "Triệu hồi thuyền xuất hiện ngay tại vị trí bạn đang đứng", "Triệu Hồi", function()
+        SpawnBoatNow(Config.SelectedBoat)
+    end)
+
+    Components.CreateButtonRow(boatCard, "Mua Thuyền Đang Chọn (Từ Xa)", "Mua thuyền từ xa qua Remote mà không cần gặp NPC bến tàu", "Mua Thuyền", function()
+        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+        local bShop = remotes and remotes:FindFirstChild("BoatShop")
+        if bShop and bShop:FindFirstChild("Buy") then
+            bShop.Buy:FireServer(Config.SelectedBoat)
+            Utils.ShowNotification("Mua Thuyền", "Đã gửi yêu cầu mua thuyền: " .. tostring(Config.SelectedBoat), "SUCCESS", 4)
+        end
+    end)
+
+    -- 4. 🔄 CỬA HÀNG TRAO ĐỔI TỪ XA (REMOTE EXCHANGE SHOP)
+    Components.CreateCategoryHeader(parent, "🔄 CỬA HÀNG TRAO ĐỔI TỪ XA (REMOTE EXCHANGE SHOP)")
+    local exCard = Components.CreateCardGroup(parent)
+
+    local exchangeItems = {"Trait Reroll", "EssenceOrb"}
+    Components.CreateDropdownRow(exCard, "Vật Phẩm Cần Đổi", "Chọn loại vật phẩm muốn trao đổi", exchangeItems, Config.SelectedExchangeItem or exchangeItems[1], function(v)
+        Config.SelectedExchangeItem = v
+    end)
+
+    Components.CreateSliderRow(exCard, "Số Lượng Đổi", "Số lượng vật phẩm đổi trong 1 lần bấm", 1, 20, Config.ExchangeAmount or 1, false, " cái", function(v)
+        Config.ExchangeAmount = v
+    end)
+
+    Components.CreateButtonRow(exCard, "Thực Hiện Đổi Vật Phẩm", "Gửi remote đổi vật phẩm đã chọn ngay lập tức", "Đổi Ngay", function()
+        if Events and Events:FindFirstChild("Exchange") then
+            Events.Exchange:FireServer(Config.SelectedExchangeItem, Config.ExchangeAmount)
+            Utils.ShowNotification("Đổi Đồ", string.format("Đã gửi yêu cầu đổi %d [%s]!", Config.ExchangeAmount, Config.SelectedExchangeItem), "SUCCESS", 4)
+            task.delay(1, UpdateTraitRerollInfo)
+        else
+            Utils.ShowNotification("Lỗi", "Không tìm thấy Remote Exchange!", "WARN", 4)
+        end
+    end)
+
+    Components.CreateButtonRow(exCard, "Đổi Nhanh 5 Vé Trait Reroll", "Đổi nhanh 5 Vé Reroll Trait chỉ với 1 click", "Đổi 5 Vé", function()
+        if Events and Events:FindFirstChild("Exchange") then
+            Events.Exchange:FireServer("Trait Reroll", 5)
+            Utils.ShowNotification("Đổi Vé", "Đã gửi yêu cầu đổi nhanh 5 Vé Trait Reroll!", "SUCCESS", 4)
+            task.delay(1, UpdateTraitRerollInfo)
+        end
+    end)
+
+    Components.CreateButtonRow(exCard, "Đổi Nhanh 5 Ngọc EssenceOrb", "Đổi nhanh 5 Ngọc EssenceOrb chỉ với 1 click", "Đổi 5 Ngọc", function()
+        if Events and Events:FindFirstChild("Exchange") then
+            Events.Exchange:FireServer("EssenceOrb", 5)
+            Utils.ShowNotification("Đổi Ngọc", "Đã gửi yêu cầu đổi nhanh 5 Ngọc EssenceOrb!", "SUCCESS", 4)
+        end
+    end)
+
+    -- 5. 🎨 TÙY BIẾN MÀU SẮC CẦN CÂU (ROD COLOR & RGB RAINBOW)
+    Components.CreateCategoryHeader(parent, "🎨 TÙY BIẾN MÀU SẮC CẦN CÂU (ROD COLOR & RGB RAINBOW)")
+    local colorCard = Components.CreateCardGroup(parent)
+
+    local colorMap = {
+        ["Vàng Kim (Gold)"] = Color3.fromRGB(255, 215, 0),
+        ["Đỏ Rực (Red)"] = Color3.fromRGB(255, 30, 30),
+        ["Xanh Biển (Cyan)"] = Color3.fromRGB(0, 220, 255),
+        ["Xanh Lá (Emerald)"] = Color3.fromRGB(40, 255, 120),
+        ["Tím Huyền Bí (Purple)"] = Color3.fromRGB(180, 50, 255),
+        ["Trắng Tuyết (White)"] = Color3.fromRGB(255, 255, 255),
+        ["Hồng Neon (Pink)"] = Color3.fromRGB(255, 105, 180),
+    }
+    local colorNames = {"Vàng Kim (Gold)", "Đỏ Rực (Red)", "Xanh Biển (Cyan)", "Xanh Lá (Emerald)", "Tím Huyền Bí (Purple)", "Trắng Tuyết (White)", "Hồng Neon (Pink)"}
+
+    local function ApplyRodColor(c3)
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        local rodName = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value or ""
+        if Events and Events:FindFirstChild("SetRodSkinColor") then
+            Events.SetRodSkinColor:FireServer(rodName, c3)
+        end
+    end
+
+    Components.CreateDropdownRow(colorCard, "Màu Sắc Cần Câu", "Chọn màu phát sáng yêu thích cho cần câu", colorNames, Config.SelectedRodColor or colorNames[1], function(v)
+        Config.SelectedRodColor = v
+        local c3 = colorMap[v]
+        if c3 then ApplyRodColor(c3) end
+    end)
+
+    Components.CreateButtonRow(colorCard, "Áp Dụng Màu Đã Chọn", "Đổi màu cần câu theo màu được chọn ở trên", "Đổi Màu", function()
+        local c3 = colorMap[Config.SelectedRodColor] or Color3.fromRGB(255, 215, 0)
+        ApplyRodColor(c3)
+        Utils.ShowNotification("Màu Cần Câu", "Đã đổi màu cần câu sang: " .. tostring(Config.SelectedRodColor), "SUCCESS", 4)
+    end)
+
+    Components.CreateToggleRow(colorCard, "Chế Độ RGB Cầu Vồng (Rainbow Cycle)", "Tự động xoay chuyển màu liên tục theo dải quang phổ 7 màu", Config.RainbowRodColor, function(v)
+        Config.RainbowRodColor = v
+        if v then
+            Utils.ShowNotification("Màu Cầu Vồng", "Đã BẬT hiệu ứng đổi màu RGB Cầu Vồng cho cần câu!", "SUCCESS", 4)
+        end
+    end)
+
+    Components.CreateButtonRow(colorCard, "Đặt Lại Màu Mặc Định (Reset)", "Khôi phục màu cần câu về ban đầu của game", "Reset Màu", function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        local rodName = pData and pData:FindFirstChild("FishingRod") and pData.FishingRod.Value or ""
+        if Events and Events:FindFirstChild("ResetRodSkinColor") then
+            Events.ResetRodSkinColor:FireServer(rodName)
+            Utils.ShowNotification("Màu Cần", "Đã reset màu cần câu về mặc định!", "SUCCESS", 4)
+        end
+    end)
+
+    -- 6. 🏰 QUẢN LÝ BỂ NUÔI CÁ & GIA VIÊN (FISH TANK & PLOT)
+    Components.CreateCategoryHeader(parent, "🏰 QUẢN LÝ BỂ NUÔI CÁ & GIA VIÊN (FISH TANK & PLOT)")
+    local tankCard = Components.CreateCardGroup(parent)
+
+    Components.CreateButtonRow(tankCard, "Thả Cá Quý / Đột Biến Vào Bể", "Tự quét balo và thả các con cá Secret Boss / Đột biến vào bể nuôi", "Thả Vào Bể", function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+        if not pData or not pData:FindFirstChild("Inventory") then return end
+        local count = 0
+        for _, item in ipairs(pData.Inventory:GetChildren()) do
+            if Shop.IsMutatedFish(item) then
+                if Events and Events:FindFirstChild("AddFishToFishTank") then
+                    Events.AddFishToFishTank:FireServer(item)
+                    count = count + 1
+                    task.wait(0.1)
+                end
+            end
+        end
+        if count > 0 then
+            Utils.ShowNotification("Bể Cá", string.format("Đã thả %d con cá quý / đột biến vào bể nuôi!", count), "SUCCESS", 5)
+        else
+            Utils.ShowNotification("Bể Cá", "Không có cá Secret Boss hoặc đột biến trong balo.", "INFO", 4)
+        end
+    end)
+
+    Components.CreateButtonRow(tankCard, "Nâng Cấp Gia Viên (Upgrade Plot)", "Nâng cấp hòn đảo cá nhân của bạn từ xa", "Nâng Cấp", function()
+        if Events and Events:FindFirstChild("UpgradePlot") then
+            local res = Events.UpgradePlot:InvokeServer()
+            Utils.ShowNotification("Gia Viên", "Đã gửi lệnh nâng cấp Plot! " .. tostring(res or ""), "SUCCESS", 4)
+        end
+    end)
 end
 
 return TabThuNghiem
@@ -6616,9 +7511,29 @@ function TabVisuals.Render(parent)
     Components.CreateToggleRow(cardEsp, "Hiện Cân Nặng & Đột Biến Trên Vòng Đỏ", "Hiển thị chi tiết cân nặng kg và dạng đột biến", Config.ShowFishWeightRing, function(v) Config.ShowFishWeightRing = v end)
     Components.CreateToggleRow(cardEsp, "ESP Người Chơi", "Định vị người chơi khác trong server", Config.ESP_Players, function(v) Config.ESP_Players = v end)
     Components.CreateToggleRow(cardEsp, "ESP Trùm Boss", "Định vị vị trí xuất hiện Boss", Config.ESP_Boss, function(v) Config.ESP_Boss = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Cần Câu Bí Mật", "Hiện vị trí các cần câu ẩn trên bản đồ", Config.ESP_SecretRod, function(v) Config.ESP_SecretRod = v end)
+    Components.CreateToggleRow(cardEsp, "ESP Thuyền Bè", "Hiện vị trí tất cả thuyền xung quanh", Config.ESP_Boats, function(v) Config.ESP_Boats = v end)
     Components.CreateToggleRow(cardEsp, "ESP Thần Linh (God Spirit)", "Định vị Thần Linh", Config.ESP_GodSpirit, function(v) Config.ESP_GodSpirit = v end)
     Components.CreateToggleRow(cardEsp, "ESP Đạo Sĩ (Taoist)", "Định vị NPC Đạo Sĩ", Config.ESP_Taoist, function(v) Config.ESP_Taoist = v end)
     Components.CreateToggleRow(cardEsp, "ESP Maoshan", "Định vị NPC Mao Sơn", Config.ESP_Maoshan, function(v) Config.ESP_Maoshan = v end)
+    Components.CreateToggleRow(cardEsp, "Ẩn Tên Mặc Định Người Chơi", "Ẩn toàn bộ bảng tên, danh hiệu và thanh máu trên đầu của người chơi khác", Config.HideOverheadNames, function(v)
+        Config.HideOverheadNames = v
+        local Players = game:GetService("Players")
+        local LocalPlayer = Players.LocalPlayer
+        for _, p in ipairs(Players:GetPlayers()) do
+            if p ~= LocalPlayer and p.Character then
+                local hum = p.Character:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.DisplayDistanceType = v and Enum.HumanoidDisplayDistanceType.None or Enum.HumanoidDisplayDistanceType.Viewer
+                end
+                for _, d in ipairs(p.Character:GetDescendants()) do
+                    if d:IsA("BillboardGui") and d.Name:sub(1, 4) ~= "ESP_" then
+                        d.Enabled = not v
+                    end
+                end
+            end
+        end
+    end)
 
     Components.CreateCategoryHeader(parent, "Hiệu Ứng Ánh Sáng & Tối Ưu")
     local cardLighting = Components.CreateCardGroup(parent)
@@ -7183,6 +8098,7 @@ local heartbeatConn = Services.RunService.Heartbeat:Connect(function()
         Shop.HandleBuyBait(Config)
         Shop.HandleCraftBait(Config)
         Shop.HandleDailyClaim(Config)
+        Shop.HandleGacha(Config)
         Spirits.HandleGodPray(Config)
         Quest.Tick(Config)
     end
