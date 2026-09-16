@@ -140,6 +140,18 @@ ConfigModule.Config = {
     TicketReturnHomeWhenDone = true,
     TicketAutoCastAtHome = true,
     TicketRemoteClaim = true,
+    AutoBuyTickets = false,
+
+    -- Lọc Bán Cá & Kho Báu
+    KeepMutations = true,
+    KeepHeavyFish = false,
+    HeavyFishThreshold = 1000,
+
+    -- Visual Spoofing
+    SpoofGemsEnabled = false,
+    SpoofGemsAmount = 99,
+    SpoofTicketsEnabled = false,
+    SpoofTicketsAmount = 99,
 
     -- Quản Lý Độ Ưu Tiên (Priority Manager)
     PrioritySystemEnabled = true,
@@ -336,8 +348,24 @@ ConfigModule.ConfigLabelMap = {
     ["Webhook URL"] = "WebhookUrl",
     ["Bật Webhook"] = "WebhookEnabled",
     ["Thông Báo Bắt Được Boss"] = "WebhookNotifyBoss",
+    ["Thông Báo Phát Hiện NPC"] = "WebhookNotifyNPC",
     ["Báo Cáo Tiến Độ Mỗi Giờ"] = "WebhookHourlyStats",
-    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval"
+    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval",
+
+    ["Bật Telegram Bot"] = "TelegramEnabled",
+    ["Telegram Bot Token"] = "TelegramBotToken",
+    ["Telegram Chat ID"] = "TelegramChatId",
+    ["Báo Boss Về Telegram"] = "TelegramNotifyBoss",
+    ["Báo NPC Về Telegram"] = "TelegramNotifyNPC",
+
+    ["Giữ Cá Đột Biến"] = "KeepMutations",
+    ["Giữ Cá Nặng Kg"] = "KeepHeavyFish",
+    ["Ngưỡng Cân Nặng (kg)"] = "HeavyFishThreshold",
+
+    ["Fake Số Gem"] = "SpoofGemsEnabled",
+    ["Số Gem Ảo"] = "SpoofGemsAmount",
+    ["Fake Số Vé"] = "SpoofTicketsEnabled",
+    ["Số Vé Ảo"] = "SpoofTicketsAmount"
 }
 
 -- 3. Account Persistence Helpers

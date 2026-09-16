@@ -2,6 +2,39 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.2.7] - 2026-09-16
+### 🚀 Hoàn Tất Chuyển Giao 100% Tính Năng Sang Kiến Trúc Module V2 (Port 100% Features to Modular Architecture):
+1. **Thông Báo Telegram Bot Đa Kênh & Kiểm Tra Kết Nối Tức Thì**:
+   - Tích hợp trọn vẹn thông báo Telegram Bot gửi thông báo về điện thoại: Săn Boss, quét thấy Đạo Sĩ (Taoist), Đạo Sĩ Mao Sơn (Maoshan), Thần Linh (God Spirit), và Server Thời Tiết.
+   - Thêm nút **"Kiểm Tra Telegram Bot"** gửi tin nhắn mẫu kiểm tra Token và Chat ID.
+   - Tích hợp trường JobID và mã 1-click teleport tham gia server ngay lập tức trên điện thoại.
+2. **Hệ Thống Tự Động Đổi Server (Auto Server Hop) Cho NPC & Thời Tiết**:
+   - Tự động nhảy server liên tục và khôi phục sau khi đổi server (`HeavyweightFishing_NPCHop.json` và `HeavyweightFishing_WeatherHop.json`).
+   - Hỗ trợ đổi server tìm: **Đạo Sĩ (Taoist)**, **Đạo Sĩ Mao Sơn (Maoshan)**, **Thần Linh (God Spirit)**.
+   - Hỗ trợ đổi server tìm thời tiết mong muốn: **Bão Sấm**, **Bão Tuyết**, **Sương Mù**, **Nắng Gắt**, **Trời Mưa**, **Trời Gió**, **Mưa Axit**, **Trăng Máu**, **Boss Realm** hoặc bất kỳ thời tiết đặc biệt nào.
+   - Bổ sung các nút tương tác nhanh với 4 Bàn Thờ Thời Tiết (Weather Totems).
+3. **Quản Lý Vòng Đời Vé Nhiệm Vụ Toàn Diện (Daily Ticket Quests Lifecycle)**:
+   - Tự động nhận diện loại nhiệm vụ chính xác 0ms từ dữ liệu gốc `ReplicatedStorage.Data[UserId].Quest` (100 cá, 1.5M cá Map 9, 100 chiêu, 100 mồi).
+   - Tự động bay đến đảo và vị trí câu tương ứng, tự động trang bị mồi hoặc tháo mồi.
+   - Xử lý mượt mà toàn bộ quy trình hội thoại NPC (chọn Quest, nhận Easy/Hard, nộp vé và *Leave*).
+   - Tự động nhận biết câu thoại hết vé trong ngày và tự giải phóng cờ khi bước sang ngày mới (theo cả giờ máy tính và 00:00 UTC).
+   - Tự động quay về Home Spot câu cá combo trong thời gian chờ hồi chiêu vé.
+4. **Bộ Lọc Bán Cá Nâng Cao & Tự Động Chế Mồi Tối Ưu**:
+   - Tự động khóa bảo vệ cá đột biến (`Shiny`, `Giant`, `Golden`, `Albino`, `Corrupted`, `Colossal`, `Heavyweight`, `Dark`, `Radiant`).
+   - Giữ lại cá nặng theo ngưỡng tùy chỉnh (`MinWeightToKeep`), giữ cá quý chỉ định, và giữ cá nguyên liệu chế mồi.
+   - Tự động chế tạo mồi và tự động mua mồi khi số lượng dưới ngưỡng an toàn.
+5. **Phân Bổ Điểm Câu Săn Boss & Jitter Chống Trùng Lặp**:
+   - Chế độ chọn điểm câu: **Tự Động (Theo Acc)** băm ID người chơi để phân bổ 5 slot câu an toàn khác nhau, chống chồng chéo khi treo nhiều acc/bot.
+   - Tùy chọn **Jitter dịch chuyển** tạo độ lệch ngẫu nhiên bán kính 0.5 - 5.0 studs chống trùng tọa độ tuyệt đối.
+6. **Ảo Hoá Tài Sản (Visual Spoofing) Cho Gems & Tickets**:
+   - Module `spoof.lua` cho phép thay đổi giao diện hiển thị Gems và Tickets ảo, duy trì bền vững với hook lắng nghe giá trị `Changed`.
+   - Tự động lưu cấu hình theo từng tài khoản và có nút Reset khôi phục số dư thật.
+7. **Biên Dịch & Đồng Bộ Bộ Nạp Loader V2**:
+   - Biên dịch thành công gói `v2_bundle.lua` (31 submodules, 110 requires, 0 lỗi cú pháp).
+   - Bộ nạp độc lập `loader_v2.lua` sẵn sàng chạy thử nghiệm 100% tính năng với hiệu năng tối đa.
+
+---
+
 ## [v2.2.6] - 2026-09-16
 ### 🛡️ Sửa Triệt Để Lỗi Tính Sát Thương 2 Người & Hỗ Trợ Boss Nhiều Mạng (Multi-Phase) (Fix & Upgrade gì):
 1. **Hỗ Trợ Toàn Diện Boss Nhiều Mạng (Multi-Phase Boss - Ví dụ Boss 3 Mạng)**:

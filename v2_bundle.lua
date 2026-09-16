@@ -533,6 +533,18 @@ ConfigModule.Config = {
     TicketReturnHomeWhenDone = true,
     TicketAutoCastAtHome = true,
     TicketRemoteClaim = true,
+    AutoBuyTickets = false,
+
+    -- Lọc Bán Cá & Kho Báu
+    KeepMutations = true,
+    KeepHeavyFish = false,
+    HeavyFishThreshold = 1000,
+
+    -- Visual Spoofing
+    SpoofGemsEnabled = false,
+    SpoofGemsAmount = 99,
+    SpoofTicketsEnabled = false,
+    SpoofTicketsAmount = 99,
 
     -- Quản Lý Độ Ưu Tiên (Priority Manager)
     PrioritySystemEnabled = true,
@@ -729,8 +741,24 @@ ConfigModule.ConfigLabelMap = {
     ["Webhook URL"] = "WebhookUrl",
     ["Bật Webhook"] = "WebhookEnabled",
     ["Thông Báo Bắt Được Boss"] = "WebhookNotifyBoss",
+    ["Thông Báo Phát Hiện NPC"] = "WebhookNotifyNPC",
     ["Báo Cáo Tiến Độ Mỗi Giờ"] = "WebhookHourlyStats",
-    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval"
+    ["Tần Suất Gửi Báo Cáo"] = "WebhookStatsInterval",
+
+    ["Bật Telegram Bot"] = "TelegramEnabled",
+    ["Telegram Bot Token"] = "TelegramBotToken",
+    ["Telegram Chat ID"] = "TelegramChatId",
+    ["Báo Boss Về Telegram"] = "TelegramNotifyBoss",
+    ["Báo NPC Về Telegram"] = "TelegramNotifyNPC",
+
+    ["Giữ Cá Đột Biến"] = "KeepMutations",
+    ["Giữ Cá Nặng Kg"] = "KeepHeavyFish",
+    ["Ngưỡng Cân Nặng (kg)"] = "HeavyFishThreshold",
+
+    ["Fake Số Gem"] = "SpoofGemsEnabled",
+    ["Số Gem Ảo"] = "SpoofGemsAmount",
+    ["Fake Số Vé"] = "SpoofTicketsEnabled",
+    ["Số Vé Ảo"] = "SpoofTicketsAmount"
 }
 
 -- 3. Account Persistence Helpers
@@ -1361,6 +1389,142 @@ function Utils.SendDiscordWebhook(title, description, color, fields, webhookUrl)
     end
 end
 
+-- 5. Telegram Bot Sender
+function Utils.SendTelegramMessage(token, chatId, text)
+    if not token or token == "" or not chatId or chatId == "" or not text or text == "" then return end
+    pcall(function()
+        local url = "https://api.telegram.org/bot" .. token .. "/sendMessage"
+        local payload = {
+            chat_id = chatId,
+            text = text,
+            parse_mode = "Markdown"
+        }
+        local body = HttpService:JSONEncode(payload)
+        local headers = { ["Content-Type"] = "application/json" }
+        local req = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+        if req then
+            task.spawn(function()
+                pcall(req, {
+                    Url = url,
+                    Method = "POST",
+                    Headers = headers,
+                    Body = body
+                })
+            end)
+        end
+    end)
+end
+
+-- 6. NPC Detection Alert (Discord + Telegram with Anti-Spam)
+local npcAlertsSent = {}
+function Utils.SendNPCDetectionAlert(npcType, npcName, npcInst, config)
+    if not config then return end
+    local alertKey = tostring(game.JobId or "local") .. "_" .. tostring(npcType)
+    if npcAlertsSent[alertKey] then return end
+    npcAlertsSent[alertKey] = true
+
+    local posStr = "Không xác định"
+    if npcInst then
+        local root = npcInst:FindFirstChild("HumanoidRootPart") or npcInst.PrimaryPart or npcInst:FindFirstChild("Head") or npcInst:FindFirstChildWhichIsA("BasePart")
+        if root then
+            local p = root.Position
+            posStr = string.format("X: %.1f, Y: %.1f, Z: %.1f", p.X, p.Y, p.Z)
+        end
+    end
+
+    local jobId = tostring(game.JobId or "")
+    local placeId = tostring(game.PlaceId or "0")
+    local playerName = (LocalPlayer and LocalPlayer.Name) or "Unknown"
+    local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
+
+    -- Discord Webhook
+    if config.WebhookEnabled and config.WebhookNotifyNPC and config.WebhookUrl and #config.WebhookUrl > 0 then
+        local fields = {
+            { name = "🎯 NPC Phát Hiện", value = "**" .. tostring(npcName) .. "**", inline = true },
+            { name = "👤 Người Tìm Thấy", value = playerName, inline = true },
+            { name = "📍 Tọa Độ Đứng", value = posStr, inline = true },
+            { name = "🔑 Job ID Server", value = "```" .. (jobId ~= "" and jobId or "N/A (Chơi 1 mình)") .. "```", inline = false },
+            { name = "⚡ Lệnh Vào Server Nhanh", value = "```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)\n```", inline = false },
+            { name = "⏰ Thời Gian", value = timeStr, inline = true }
+        }
+        Utils.SendDiscordWebhook("📜 PHÁT HIỆN " .. tostring(npcName):upper() .. " TRONG SERVER!", "Bot đã tìm thấy **" .. tostring(npcName) .. "** tại server hiện tại!", 16753920, fields, config.WebhookUrl)
+    end
+
+    -- Telegram Bot
+    if config.TelegramEnabled and config.TelegramNotifyNPC and config.TelegramBotToken and #config.TelegramBotToken > 0 and config.TelegramChatId and #config.TelegramChatId > 0 then
+        local teleText = "📜 *PHÁT HIỆN " .. tostring(npcName):upper() .. "!*\n\n"
+            .. "🎯 *NPC:* " .. tostring(npcName) .. "\n"
+            .. "👤 *Người tìm thấy:* " .. playerName .. "\n"
+            .. "📍 *Tọa độ:* " .. posStr .. "\n"
+            .. "🔑 *Job ID:* `" .. (jobId ~= "" and jobId or "N/A") .. "`\n"
+            .. "⏰ *Thời gian:* " .. timeStr .. "\n\n"
+            .. "⚡ *Code vào server:*\n`game:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)`"
+        Utils.SendTelegramMessage(config.TelegramBotToken, config.TelegramChatId, teleText)
+    end
+end
+
+-- 7. Queue Script On Teleport & ServerHop
+function Utils.QueueScriptOnTeleport()
+    local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    if qot then
+        pcall(function()
+            qot([[loadstring(game:HttpGet("https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/loader_v2.lua"))()]])
+        end)
+    end
+end
+
+function Utils.ServerHop(avoidServers)
+    Utils.ShowNotification("Đổi Server", "Đang tìm kiếm server phù hợp...", "WARN")
+    Utils.QueueScriptOnTeleport()
+    task.spawn(function()
+        local placeId = game.PlaceId
+        local avoidMap = {}
+        if avoidServers and type(avoidServers) == "table" then
+            for _, sid in ipairs(avoidServers) do avoidMap[sid] = true end
+        end
+        avoidMap[game.JobId] = true
+
+        local cursor = ""
+        local candidates = {}
+        for page = 1, 4 do
+            local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", placeId, cursor ~= "" and ("&cursor=" .. cursor) or "")
+            local ok, res = pcall(function() return game:HttpGet(url) end)
+            if ok and res then
+                local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
+                if bOk and body and body.data then
+                    for _, s in ipairs(body.data) do
+                        if s.playing and s.maxPlayers and s.id and not avoidMap[s.id] then
+                            local free = s.maxPlayers - s.playing
+                            if free >= 2 then
+                                table.insert(candidates, s.id)
+                            end
+                        end
+                    end
+                    if #candidates >= 5 then break end
+                    cursor = body.nextPageCursor or ""
+                    if not cursor or cursor == "" then break end
+                end
+            end
+            task.wait(0.15)
+        end
+
+        local TeleportService = Services.TeleportService
+        local chosen = (#candidates > 0 and candidates[math.random(1, #candidates)]) or nil
+        if chosen then
+            Utils.ShowNotification("Đổi Server", "Đã tìm thấy server mới! Đang chuyển...", "SUCCESS", 3)
+            task.wait(0.5)
+            local ok, err = pcall(function() TeleportService:TeleportToPlaceInstance(placeId, chosen, LocalPlayer) end)
+            if not ok then
+                pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
+            end
+            return
+        end
+        Utils.ShowNotification("Đổi Server", "Đang chuyển sang server ngẫu nhiên...", "INFO", 3)
+        task.wait(0.5)
+        pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
+    end)
+end
+
 return Utils
 
 end
@@ -1368,7 +1532,7 @@ end
 __modules["features.boss"] = function()
 --[[
     v2/features/boss.lua
-    Secret Boss Hunting, Fast Skip, Spot Teleportation & Chat Sniper
+    Secret Boss Hunting, Fast Skip, Spot Allocation, Teleportation & Chat Sniper
 --]]
 
 local Services = __require("core.services")
@@ -1396,7 +1560,7 @@ Boss.database = {
         patterns = {"glacier", "ice", "bang tuyet"},
         reqPower = 500,
         pos = Vector3.new(650, 20, -1200),
-        bosses = { "Glacier Leviathan", "Armored Shark" }
+        bosses = { "Glacier Leviathan", "Armored Shark", "Frost Kingfish", "Frost Queenfish" }
     },
     ["Volcano Island"] = {
         islandName = "Volcano Island",
@@ -1404,7 +1568,7 @@ Boss.database = {
         patterns = {"volcano", "nui lua", "lava", "magma"},
         reqPower = 1000,
         pos = Vector3.new(-1400, 25, 800),
-        bosses = { "Lava Serpent", "Magma Behemoth", "Volcanic Shark" }
+        bosses = { "Lava Serpent", "Magma Behemoth", "Volcanic Shark", "Reborn Puffer Beast" }
     },
     ["Deep Ocean"] = {
         islandName = "Deep Ocean",
@@ -1412,7 +1576,7 @@ Boss.database = {
         patterns = {"ocean", "deep", "kraken"},
         reqPower = 1500,
         pos = Vector3.new(2000, 10, 2000),
-        bosses = { "Kraken", "Corrupted Kraken", "Phantom Kraken", "Ancient Megalodon", "Megalodon" }
+        bosses = { "Kraken", "Corrupted Kraken", "Phantom Kraken", "Ancient Megalodon", "Megalodon", "Heaven Piercer Turtle" }
     },
     ["Abyssal Trench"] = {
         islandName = "Abyssal Trench",
@@ -1420,7 +1584,7 @@ Boss.database = {
         patterns = {"abyss", "vuc tham", "depth"},
         reqPower = 2500,
         pos = Vector3.new(-2500, 5, -3000),
-        bosses = { "Abyssal Behemoth", "Ancient Depth Serpent", "Void Serpent", "Abyss Dweller" }
+        bosses = { "Abyssal Behemoth", "Ancient Depth Serpent", "Void Serpent", "Abyss Dweller", "Mountain Dragonwhale", "Mirage Lanternfish", "Nameless Octoparasite" }
     }
 }
 
@@ -1436,10 +1600,60 @@ Boss.activeBoss = nil
 Boss.isCatchingTarget = false
 Boss.lastHookedCheckTime = 0
 Boss.webhookSentForCurrent = false
+Boss.customSpots = {}
 
--- 2. Detect Currently Hooked Fish Name
+-- 2. Quản lý Slot Điểm Câu An Toàn Theo Acc & Jitter
+function Boss.GetAllocatedSlot(config)
+    if config.BossSpotAllocationMode == "Tự Động (Theo Acc)" then
+        local uid = LocalPlayer.UserId or 12345
+        return (uid % 5) + 1
+    else
+        return tonumber(config.SelectedCustomSpotSlot) or 1
+    end
+end
+
+function Boss.ApplyJitter(pos, config)
+    if not config.BossTeleportJitter or not pos then return pos end
+    local dist = tonumber(config.BossTeleportJitterDist) or 1.0
+    local rx = (math.random() - 0.5) * 2 * dist
+    local rz = (math.random() - 0.5) * 2 * dist
+    return pos + Vector3.new(rx, 0, rz)
+end
+
+function Boss.LoadCustomSpots()
+    if not (isfile and readfile and isfile("HeavyweightFishing_CustomSpots.json")) then return end
+    pcall(function()
+        local raw = readfile("HeavyweightFishing_CustomSpots.json")
+        local dec = HttpService:JSONDecode(raw)
+        if dec and type(dec) == "table" then
+            Boss.customSpots = dec
+        end
+    end)
+end
+
+function Boss.SaveCustomSpots()
+    if not (writefile and HttpService) then return end
+    pcall(function()
+        writefile("HeavyweightFishing_CustomSpots.json", HttpService:JSONEncode(Boss.customSpots))
+    end)
+end
+
+function Boss.SetCustomSpot(island, slot, pos)
+    if not Boss.customSpots[island] then Boss.customSpots[island] = {} end
+    Boss.customSpots[island][tostring(slot)] = { x = pos.X, y = pos.Y, z = pos.Z }
+    Boss.SaveCustomSpots()
+end
+
+function Boss.GetCustomSpot(island, slot)
+    if Boss.customSpots[island] and Boss.customSpots[island][tostring(slot)] then
+        local p = Boss.customSpots[island][tostring(slot)]
+        return Vector3.new(p.x, p.y, p.z)
+    end
+    return nil
+end
+
+-- 3. Detect Currently Hooked Fish Name
 function Boss.GetCurrentHookedFishName(fUI)
-    -- Check Attribute on Character or Player
     local char = LocalPlayer.Character
     if char then
         local fishName = char:GetAttribute("HookedFish") or char:GetAttribute("FishName") or char:GetAttribute("TargetFish")
@@ -1448,7 +1662,6 @@ function Boss.GetCurrentHookedFishName(fUI)
         end
     end
 
-    -- Check TextLabels inside Fishing UI
     if fUI then
         for _, d in ipairs(fUI:GetDescendants()) do
             if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
@@ -1465,7 +1678,7 @@ function Boss.GetCurrentHookedFishName(fUI)
     return "Unknown"
 end
 
--- 3. Fast-Skip Non-Target Fish
+-- 4. Fast-Skip Non-Target Fish
 function Boss.HandleFastSkip(config, fUI, isMinigame)
     if not isMinigame or not config.FastSkipNonTarget then return end
     local now = tick()
@@ -1481,22 +1694,28 @@ function Boss.HandleFastSkip(config, fUI, isMinigame)
 
         if isTarget then
             Boss.isCatchingTarget = true
-            -- Send Discord Webhook Alert once per boss encounter
-            if config.SecretBossAlertWebhook and not Boss.webhookSentForCurrent and config.WebhookUrl ~= "" then
+            if config.SecretBossAlertWebhook and not Boss.webhookSentForCurrent then
                 Boss.webhookSentForCurrent = true
-                Utils.SendDiscordWebhook(
-                    "🔥 ĐÃ CẮN CÂU SECRET BOSS!",
-                    string.format("Người chơi **%s** vừa móc câu thành công Boss: **%s**!", LocalPlayer.Name, hookedName),
-                    16711680,
-                    {
-                        { name = "Boss Name", value = hookedName, inline = true },
-                        { name = "Tọa Độ", value = tostring(LocalPlayer.Character and LocalPlayer.Character:GetPivot().Position or "N/A"), inline = true }
-                    },
-                    config.WebhookUrl
-                )
+                if config.WebhookUrl ~= "" then
+                    Utils.SendDiscordWebhook(
+                        "🔥 ĐÃ CẮN CÂU SECRET BOSS!",
+                        string.format("Người chơi **%s** vừa móc câu thành công Boss: **%s**!", LocalPlayer.Name, hookedName),
+                        16711680,
+                        {
+                            { name = "Boss Name", value = hookedName, inline = true },
+                            { name = "Tọa Độ", value = tostring(LocalPlayer.Character and LocalPlayer.Character:GetPivot().Position or "N/A"), inline = true }
+                        },
+                        config.WebhookUrl
+                    )
+                end
+                if config.TelegramNotifyBoss and config.TelegramBotToken ~= "" and config.TelegramChatId ~= "" then
+                    Utils.SendTelegramMessage(
+                        config,
+                        string.format("🔥 *ĐÃ CẮN CÂU SECRET BOSS!*\\nNgười chơi: `%s`\\nBoss: *%s*", LocalPlayer.Name, hookedName)
+                    )
+                end
             end
         else
-            -- Not our target boss -> Fast Skip!
             Boss.isCatchingTarget = false
             pcall(function()
                 if Events and Events:FindFirstChild("CancelCast") then
@@ -1507,26 +1726,39 @@ function Boss.HandleFastSkip(config, fUI, isMinigame)
     end
 end
 
--- 4. Chat Sniper (Monitor system announcements for boss spawns)
+-- 5. Chat Sniper & Teleport
 function Boss.HandleChatMessage(message, config)
     if not config.AutoChatSecretBoss or not message or message == "" then return end
     local lowerMsg = message:lower()
 
+    if lowerMsg:find("caught") or lowerMsg:find("has caught") or lowerMsg:find("câu được") or lowerMsg:find("bắt được") then
+        return
+    end
+
     for bossName, islandData in pairs(Boss.lookup) do
         if lowerMsg:find(bossName:lower(), 1, true) then
-            Utils.ShowNotification("Săn Boss Bí Mật", "Phát hiện Boss [" .. bossName .. "] xuất hiện! Đang chuẩn bị...", "WARN", 5)
+            Utils.ShowNotification("Săn Boss Bí Mật", "Phát hiện Boss [" .. bossName .. "] xuất hiện! Đang di chuyển...", "WARN", 5)
             Boss.activeBoss = bossName
 
-            -- Teleport player to island location
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            if root and islandData.pos then
-                root.CFrame = CFrame.new(islandData.pos + Vector3.new(0, 5, 0))
+            local slot = Boss.GetAllocatedSlot(config)
+            local customPos = Boss.GetCustomSpot(islandData.islandName, slot)
+            local targetPos = customPos or islandData.pos
+
+            if targetPos then
+                targetPos = Boss.ApplyJitter(targetPos, config)
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                if root then
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    root.CFrame = CFrame.new(targetPos + Vector3.new(0, 5, 0))
+                end
             end
             break
         end
     end
 end
+
+pcall(Boss.LoadCustomSpots)
 
 return Boss
 
@@ -2412,91 +2644,572 @@ end
 __modules["features.quest"] = function()
 --[[
     v2/features/quest.lua
-    Automated Daily Ticket Quests & Dialogue Handling
+    Automated Daily Ticket Quests Lifecycle, Dialogue Handling & Cooldown Management
 --]]
 
 local Services = __require("core.services")
-local Events = Services.Events
-local LocalPlayer = Services.LocalPlayer
 local Workspace = Services.Workspace
+local ReplicatedStorage = Services.ReplicatedStorage
+local LocalPlayer = Services.LocalPlayer
+local HttpService = Services.HttpService
+local Events = Services.Events
 local Utils = __require("core.utils")
 
 local Quest = {}
 
 Quest.state = {
     active = false,
-    currentQuestType = "none",  -- "fish_100", "skill_100", "fish_15m", "bait_100", "none"
+    currentQuestType = "none", -- "fish_15m", "bait_100", "skill_100", "fish_100", "none"
+    currentQuestTitle = "Chưa nhận nhiệm vụ",
+    currentProgress = 0,
+    targetProgress = 100,
+    isCompleted = false,
     isCooldown = false,
+    cooldownEnd = 0,
+    readyForNewQuest = false,
+    isAcceptingQuest = false,
+    isInteracting = false,
+    lastAcceptTime = 0,
+    lastClaimAttempt = 0,
+    lastNpcInteract = 0,
+    lastSyncTime = 0,
+    lastBaitBuy = 0,
+    lastBaitEquip = 0,
     isBusyRoutine = false,
     isAtHomeSpot = false,
-    lastScanTime = 0
+    statusText = "Đang quét nhiệm vụ...",
+    allQuestsDoneForToday = false,
+    allQuestsDoneDate = nil,
+    allQuestsDoneUtcDate = nil,
+    savedDailyCount = nil,
+
+    -- Spots
+    spot100Fish = Vector3.new(-96, 9, 234),
+    spot100Bait = Vector3.new(-96, 9, 231),
+    spot100Skill = Vector3.new(-96, 9, 234),
+    spot15MFish = Vector3.new(1619, 13, 334),
+    spotNPC = Vector3.new(-200.7, 11.1, 35.9),
+
+    cachedNPCModel = nil,
+    cachedNPCPos = nil,
+    cachedNPCCFrame = nil,
+    cachedNPCPrompt = nil,
 }
 
--- 1. Click button safely across multiple executor layers
-local function clickGuiButton(btn)
-    if not btn or not btn:IsA("GuiButton") or not btn.Visible then return false end
-    pcall(function()
-        if firesignal then
-            if btn.Activated then firesignal(btn.Activated) end
-            if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
-        end
-        if getconnections then
-            for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end
-            for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end
-        end
-    end)
-    return true
+function Quest.GetServerTimeNow()
+    local ok, t = pcall(function() return Workspace:GetServerTimeNow() end)
+    if ok and t and t > 0 then return math.floor(t) end
+    return os.time()
 end
 
--- 2. Detect Active Quest from Data/PlayerGui
-function Quest.DetectActiveQuest()
-    local pData = LocalPlayer:FindFirstChild("Data")
-    local questFolder = pData and pData:FindFirstChild("Quest")
-    if questFolder then
-        for _, item in ipairs(questFolder:GetChildren()) do
-            local name = item.Name:lower()
-            if name:find("fish") and name:find("100") then
-                Quest.state.currentQuestType = "fish_100"
-                return "fish_100"
-            elseif name:find("skill") or (name:find("cast") and name:find("100")) then
-                Quest.state.currentQuestType = "skill_100"
-                return "skill_100"
-            elseif name:find("15m") or name:find("giant") or name:find("heavy") then
-                Quest.state.currentQuestType = "fish_15m"
-                return "fish_15m"
-            elseif name:find("bait") then
-                Quest.state.currentQuestType = "bait_100"
-                return "bait_100"
+function Quest.GetPlayerDataFolder()
+    local pData = ReplicatedStorage:FindFirstChild("Data")
+    if pData and pData:FindFirstChild(tostring(LocalPlayer.UserId)) then
+        return pData[tostring(LocalPlayer.UserId)]
+    end
+    return nil
+end
+
+function Quest.SerializeSpot(spot)
+    if not spot then return nil end
+    if typeof(spot) == "CFrame" then
+        return { x = spot.Position.X, y = spot.Position.Y, z = spot.Position.Z, cframe = {spot:GetComponents()} }
+    elseif typeof(spot) == "Vector3" then
+        return { x = spot.X, y = spot.Y, z = spot.Z }
+    elseif type(spot) == "table" and (spot.cframe or spot.x) then
+        return spot
+    end
+    return nil
+end
+
+function Quest.DeserializeSpot(data, defaultCf)
+    if not data then return defaultCf end
+    if typeof(data) == "CFrame" then return data end
+    if typeof(data) == "Vector3" then return CFrame.new(data) end
+    if type(data) == "table" then
+        if data.cframe and #data.cframe == 12 then
+            return CFrame.new(table.unpack(data.cframe))
+        elseif data.x and data.y and data.z then
+            return CFrame.new(data.x, data.y, data.z)
+        end
+    end
+    return defaultCf
+end
+
+function Quest.SaveSpots()
+    if not (writefile and HttpService) then return end
+    pcall(function()
+        local data = {
+            spot100Fish = Quest.SerializeSpot(Quest.state.spot100Fish),
+            spot100Bait = Quest.SerializeSpot(Quest.state.spot100Bait),
+            spot100Skill = Quest.SerializeSpot(Quest.state.spot100Skill),
+            spot15MFish = Quest.SerializeSpot(Quest.state.spot15MFish),
+            spotNPC = Quest.SerializeSpot(Quest.state.spotNPC),
+            cooldownEnd = Quest.state.cooldownEnd,
+        }
+        writefile("HeavyweightFishing_TicketSpots.json", HttpService:JSONEncode(data))
+    end)
+end
+
+function Quest.LoadSpots()
+    if not (isfile and readfile and isfile("HeavyweightFishing_TicketSpots.json")) then return end
+    pcall(function()
+        local raw = readfile("HeavyweightFishing_TicketSpots.json")
+        local dec = HttpService:JSONDecode(raw)
+        if dec and type(dec) == "table" then
+            if dec.spot100Fish then Quest.state.spot100Fish = Quest.DeserializeSpot(dec.spot100Fish, Quest.state.spot100Fish) end
+            if dec.spot100Bait then Quest.state.spot100Bait = Quest.DeserializeSpot(dec.spot100Bait, Quest.state.spot100Bait) end
+            if dec.spot100Skill then Quest.state.spot100Skill = Quest.DeserializeSpot(dec.spot100Skill, Quest.state.spot100Skill) end
+            if dec.spot15MFish then Quest.state.spot15MFish = Quest.DeserializeSpot(dec.spot15MFish, Quest.state.spot15MFish) end
+            if dec.spotNPC then Quest.state.spotNPC = Quest.DeserializeSpot(dec.spotNPC, Quest.state.spotNPC) end
+            if dec.cooldownEnd and dec.cooldownEnd > tick() then
+                Quest.state.cooldownEnd = dec.cooldownEnd
+                Quest.state.isCooldown = true
+            end
+        end
+    end)
+end
+
+function Quest.TeleportTo(target)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not target then return end
+
+    local targetCf = nil
+    if typeof(target) == "CFrame" then
+        targetCf = target
+    elseif typeof(target) == "Vector3" then
+        targetCf = CFrame.new(target + Vector3.new(0, 1.5, 0))
+    elseif type(target) == "table" then
+        if target.cframe and #target.cframe == 12 then
+            targetCf = CFrame.new(table.unpack(target.cframe))
+        elseif target.x and target.y and target.z then
+            targetCf = CFrame.new(target.x, target.y + 1.5, target.z)
+        end
+    end
+
+    if targetCf then
+        local wp = Workspace:FindFirstChild("IdenticalWaterPlatform") or Workspace:FindFirstChild("WaterPlatform")
+        if not wp then
+            wp = Instance.new("Part")
+            wp.Name = "IdenticalWaterPlatform"
+            wp.Size = Vector3.new(30, 2, 30)
+            wp.Transparency = 1
+            wp.Anchored = true
+            wp.CanCollide = true
+            wp.Parent = Workspace
+        end
+        wp.CFrame = CFrame.new(targetCf.Position.X, targetCf.Position.Y - 2.8, targetCf.Position.Z)
+        wp.CanCollide = true
+
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.CFrame = targetCf + Vector3.new(0, 1.5, 0)
+        task.wait(0.12)
+        root.CFrame = targetCf
+        task.wait(0.12)
+    end
+end
+
+function Quest.FindTicketNPC()
+    if Quest.state.cachedNPCModel and Quest.state.cachedNPCModel.Parent and Quest.state.cachedNPCPos then
+        return Quest.state.cachedNPCModel, Quest.state.cachedNPCPos, Quest.state.cachedNPCPrompt, Quest.state.cachedNPCCFrame
+    end
+
+    local function extractModelData(inst)
+        if not inst then return nil end
+        local cf = inst:IsA("Model") and inst:GetPivot() or (inst:IsA("BasePart") and inst.CFrame)
+        local prompt = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
+        return cf, prompt
+    end
+
+    local directModel = Workspace:FindFirstChild("Ticket Quest") or Workspace:FindFirstChild("TicketNPC")
+    if directModel then
+        local cf, p = extractModelData(directModel)
+        if cf then
+            Quest.state.cachedNPCModel = directModel
+            Quest.state.cachedNPCPos = cf.Position
+            Quest.state.cachedNPCCFrame = cf
+            Quest.state.cachedNPCPrompt = p
+            Quest.state.spotNPC = cf.Position
+            return directModel, cf.Position, p, cf
+        end
+    end
+
+    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns"}) do
+        local folder = Workspace:FindFirstChild(fName)
+        if folder then
+            for _, inst in ipairs(folder:GetChildren()) do
+                local n = inst.Name:lower()
+                if n:find("ticket") or n:find("giver") then
+                    local cf, p = extractModelData(inst)
+                    if cf then
+                        Quest.state.cachedNPCModel = inst
+                        Quest.state.cachedNPCPos = cf.Position
+                        Quest.state.cachedNPCCFrame = cf
+                        Quest.state.cachedNPCPrompt = p
+                        Quest.state.spotNPC = cf.Position
+                        return inst, cf.Position, p, cf
+                    end
+                end
             end
         end
     end
 
-    Quest.state.currentQuestType = "none"
-    return "none"
-end
-
--- 3. Handle NPC Dialogue
-function Quest.HandleDialogue()
-    local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-    local dGui = pGui and (pGui:FindFirstChild("DialogueGui") or pGui:FindFirstChild("Dialogue") or pGui:FindFirstChild("TalkGui"))
-    if not dGui or not dGui.Visible then return false end
-
-    for _, desc in ipairs(dGui:GetDescendants()) do
-        if desc:IsA("GuiButton") and desc.Visible then
-            local txt = ""
-            if desc:IsA("TextButton") then
-                txt = desc.Text:lower()
-            end
-            for _, child in ipairs(desc:GetChildren()) do
-                if child:IsA("TextLabel") and child.Visible then
-                    txt = txt .. " " .. child.Text:lower()
+    for _, inst in ipairs(Workspace:GetChildren()) do
+        if inst:IsA("Model") then
+            local n = inst.Name:lower()
+            if n:find("ticket") and (n:find("quest") or n:find("giver") or n:find("npc")) then
+                local cf, p = extractModelData(inst)
+                if cf then
+                    Quest.state.cachedNPCModel = inst
+                    Quest.state.cachedNPCPos = cf.Position
+                    Quest.state.cachedNPCCFrame = cf
+                    Quest.state.cachedNPCPrompt = p
+                    Quest.state.spotNPC = cf.Position
+                    return inst, cf.Position, p, cf
                 end
             end
+        end
+    end
 
-            -- Click through accept, claim, continue buttons
-            if txt:find("nhận") or txt:find("accept") or txt:find("claim") or txt:find("tiếp") or txt:find("yes") or txt:find("ok") then
-                clickGuiButton(desc)
-                return true
+    return nil, Quest.state.spotNPC, nil, nil
+end
+
+function Quest.OrientCameraTo(focusPos, standPos)
+    local cam = Workspace.CurrentCamera
+    if not cam or not focusPos then return end
+    pcall(function()
+        local dir = standPos and (standPos - focusPos) or -cam.CFrame.LookVector
+        local dir2D = Vector3.new(dir.X, 0, dir.Z)
+        if dir2D.Magnitude < 0.1 then
+            dir2D = Vector3.new(0, 0, 1)
+        else
+            dir2D = dir2D.Unit
+        end
+        local refPos = standPos or (focusPos + dir2D * 3.0)
+        local camPos = refPos + (dir2D * 4.5) + Vector3.new(0, 2.2, 0)
+        local camFocus = focusPos + Vector3.new(0, 0.8, 0)
+        cam.CameraType = Enum.CameraType.Custom
+        cam.CFrame = CFrame.lookAt(camPos, camFocus)
+        cam.Focus = CFrame.new(camFocus)
+    end)
+end
+
+function Quest.TeleportToNPC()
+    local npcModel, npcPos, prompt, npcCFrame = Quest.FindTicketNPC()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function()
+            hum.Sit = false
+            hum:UnequipTools()
+        end)
+    end
+    if Events and Events:FindFirstChild("CancelCast") then
+        pcall(function() Events.CancelCast:FireServer() end)
+    end
+
+    local promptFound = prompt
+    if not promptFound and npcModel then
+        promptFound = npcModel:FindFirstChildWhichIsA("ProximityPrompt", true)
+    end
+
+    local focusPos, standPos, targetCF = nil, nil, nil
+
+    if npcCFrame then
+        focusPos = npcCFrame.Position
+        local fwd = npcCFrame.LookVector
+        local fwd2D = Vector3.new(fwd.X, 0, fwd.Z)
+        if fwd2D.Magnitude > 0.05 then
+            fwd2D = fwd2D.Unit
+        else
+            fwd2D = Vector3.new(0, 0, 1)
+        end
+        standPos = focusPos + (fwd2D * 2.8)
+        standPos = Vector3.new(standPos.X, focusPos.Y, standPos.Z)
+        targetCF = CFrame.lookAt(standPos, Vector3.new(focusPos.X, standPos.Y, focusPos.Z))
+    elseif typeof(Quest.state.spotNPC) == "CFrame" then
+        targetCF = Quest.state.spotNPC
+        standPos = targetCF.Position
+        focusPos = standPos + (targetCF.LookVector * 2.8)
+    elseif npcPos or Quest.state.spotNPC then
+        local rawPos = npcPos or (typeof(Quest.state.spotNPC) == "Vector3" and Quest.state.spotNPC) or (Quest.state.spotNPC and Quest.state.spotNPC.Position)
+        if rawPos then
+            focusPos = rawPos
+            standPos = focusPos + Vector3.new(0, 0, 2.8)
+            targetCF = CFrame.lookAt(standPos, focusPos)
+        end
+    end
+
+    if root and targetCF and standPos then
+        local dist = (root.Position - standPos).Magnitude
+        if dist > 3.0 then
+            Quest.TeleportTo(targetCF)
+            task.wait(0.25)
+        else
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = targetCF
+            task.wait(0.08)
+        end
+        Quest.OrientCameraTo(focusPos, standPos)
+    end
+
+    if promptFound then
+        pcall(function()
+            promptFound.RequiresLineOfSight = false
+            promptFound.MaxActivationDistance = math.max(promptFound.MaxActivationDistance or 10, 35)
+            promptFound.Enabled = true
+        end)
+    end
+
+    return npcModel, focusPos or npcPos, promptFound, standPos
+end
+
+function Quest.GetDialogueGui()
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+    local mg = pg:FindFirstChild("MainGui")
+    if mg and mg:FindFirstChild("Menu") and mg.Menu:FindFirstChild("Dialogue") then
+        return mg.Menu.Dialogue
+    end
+    for _, g in ipairs(pg:GetChildren()) do
+        if g:IsA("ScreenGui") then
+            local d = g:FindFirstChild("Dialogue", true)
+            if d then return d end
+        end
+    end
+    return nil
+end
+
+function Quest.IsDialogueOpen()
+    local dlg = Quest.GetDialogueGui()
+    return dlg and dlg.Visible == true
+end
+
+function Quest.GetDialogueButtons()
+    local dlg = Quest.GetDialogueGui()
+    if not dlg then return {} end
+    local bf = dlg:FindFirstChild("ButtonFrame")
+    if not bf then return {} end
+
+    local buttons = {}
+    for _, ch in ipairs(bf:GetChildren()) do
+        if ch:IsA("TextButton") and ch.Name ~= "Template" and ch.Visible then
+            local titleObj = ch:FindFirstChild("Title") or ch:FindFirstChildWhichIsA("TextLabel", true)
+            local text = (titleObj and titleObj.Text) or ch.Text or ""
+            local clean = text:lower():gsub("%*", ""):gsub("%s+", " "):match("^%s*(.-)%s*$") or ""
+            local idx = tonumber(ch.Name) or 0
+            table.insert(buttons, {
+                button = ch,
+                index = idx,
+                name = ch.Name,
+                text = text,
+                clean = clean
+            })
+        end
+    end
+    table.sort(buttons, function(a, b) return a.index < b.index end)
+    return buttons
+end
+
+function Quest.ClearUINavigation()
+    pcall(function()
+        local gs = game:GetService("GuiService")
+        if gs then
+            gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
+        end
+    end)
+end
+
+function Quest.ClickButtonEntry(entry, explicitActionId)
+    if not entry or not entry.button then return false end
+    local btn = entry.button
+    local idx = entry.index
+    local clean = entry.clean or ""
+    local actionId = explicitActionId
+
+    if not actionId then
+        if clean == "quest" then
+            actionId = "Quest"
+        elseif clean:find("hard") then
+            actionId = "HardAcceptQuest"
+        elseif clean:find("easy") then
+            actionId = "EasyAcceptQuest"
+        elseif clean:find("leave") or clean:find("close") then
+            actionId = "Close"
+        end
+    end
+
+    pcall(function()
+        if firesignal then
+            if btn:IsA("GuiButton") and btn.Activated then firesignal(btn.Activated) end
+            if btn:IsA("GuiButton") and btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+        end
+    end)
+
+    pcall(function()
+        if getconnections then
+            local conns = getconnections(btn.Activated)
+            if not conns or #conns == 0 then conns = getconnections(btn.MouseButton1Click) end
+            if conns then
+                for _, c in ipairs(conns) do
+                    if c.Fire then c:Fire() elseif c.Function then pcall(c.Function) end
+                end
+            end
+        end
+    end)
+
+    if Events and Events:FindFirstChild("ChooseDialogueOption") then
+        if actionId and #actionId > 0 then
+            pcall(function() Events.ChooseDialogueOption:FireServer(actionId) end)
+        end
+        if idx and idx > 0 then
+            pcall(function() Events.ChooseDialogueOption:FireServer(idx) end)
+        end
+    end
+
+    return true
+end
+
+function Quest.CloseDialogue()
+    if Events and Events:FindFirstChild("ChooseDialogueOption") then
+        pcall(function() Events.ChooseDialogueOption:FireServer("Close") end)
+    end
+    pcall(function()
+        local dlg = Quest.GetDialogueGui()
+        if dlg then dlg.Visible = false end
+    end)
+    Quest.ClearUINavigation()
+end
+
+function Quest.CheckAllQuestsDoneToday()
+    local dlg = Quest.GetDialogueGui()
+    if not dlg then return false end
+    for _, d in ipairs(dlg:GetDescendants()) do
+        if d:IsA("TextLabel") and d.Visible and d.Text ~= "" then
+            local low = d.Text:lower()
+            if (low:find("all the quests") or low:find("all the quest") or low:find("come back tomorrow"))
+               and (low:find("today") or low:find("tomorrow") or low:find("more")) then
+                return true, d.Text
+            end
+        end
+    end
+    return false
+end
+
+function Quest.IsAllQuestsDoneToday()
+    if not Quest.state.allQuestsDoneForToday then return false end
+    local today = os.date("%Y-%m-%d")
+    local utcToday = os.date("!%Y-%m-%d")
+    local pData = Quest.GetPlayerDataFolder()
+    local curDailyCount = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value)
+
+    local isDateChanged = (Quest.state.allQuestsDoneDate and Quest.state.allQuestsDoneDate ~= today)
+        or (Quest.state.allQuestsDoneUtcDate and Quest.state.allQuestsDoneUtcDate ~= utcToday)
+    local isServerDailyReset = (Quest.state.savedDailyCount and curDailyCount and curDailyCount < Quest.state.savedDailyCount)
+
+    if isDateChanged or isServerDailyReset then
+        Quest.state.allQuestsDoneForToday = false
+        Quest.state.allQuestsDoneDate = nil
+        Quest.state.allQuestsDoneUtcDate = nil
+        Quest.state.savedDailyCount = nil
+        Quest.state.readyForNewQuest = true
+        Quest.state.isCooldown = false
+        Quest.state.isAtHomeSpot = false
+        Quest.state.cooldownEnd = 0
+        Quest.state.statusText = "Đã sang ngày mới! Chuẩn bị quay lại NPC nhận vé..."
+        Utils.ShowNotification("Ngày Mới - Reset Vé", "Đã sang ngày mới! Bot tự động quay lại NPC nhận vé.", "SUCCESS", 6)
+        return false
+    end
+    return true
+end
+
+function Quest.HandleDialogue(isClaiming, config)
+    if not Quest.IsDialogueOpen() then return false end
+
+    local isHard = (config and config.TicketDifficulty or "Hard") == "Hard"
+    local targetDiffKeyword = isHard and "hard" or "easy"
+
+    local buttons = Quest.GetDialogueButtons()
+    if #buttons == 0 then
+        task.wait(0.25)
+        buttons = Quest.GetDialogueButtons()
+    end
+    if #buttons == 0 then return false end
+
+    local questBtn, leaveBtn, diffBtn = nil, nil, nil
+    for _, b in ipairs(buttons) do
+        if b.clean == "quest" or (b.clean:find("quest") and not b.clean:find("accept") and not b.clean:find("nevermind")) then
+            questBtn = b
+        end
+        if b.clean:find("leave") or b.clean:find("xong") or b.clean:find("close") then
+            leaveBtn = b
+        end
+        if b.clean:find(targetDiffKeyword) and (b.clean:find("quest") or b.clean:find("accept")) then
+            diffBtn = b
+        end
+    end
+
+    local isDoneToday = Quest.CheckAllQuestsDoneToday()
+    if isDoneToday then
+        Quest.state.allQuestsDoneForToday = true
+        Quest.state.allQuestsDoneDate = os.date("%Y-%m-%d")
+        Quest.state.allQuestsDoneUtcDate = os.date("!%Y-%m-%d")
+        local pData = Quest.GetPlayerDataFolder()
+        if pData and pData:FindFirstChild("TicketQuestDailyCount") then
+            Quest.state.savedDailyCount = tonumber(pData.TicketQuestDailyCount.Value) or 0
+        end
+        Quest.state.readyForNewQuest = false
+        Quest.state.isCooldown = true
+        Quest.state.statusText = "Đã hết nhiệm vụ hôm nay! (Hẹn ngày mai quay lại)"
+        Utils.ShowNotification("Hết Nhiệm Vụ", "NPC: Đã hết tất cả vé nhiệm vụ hôm nay! Hẹn gặp lại ngày mai.", "WARN", 8)
+        if leaveBtn then
+            Quest.ClickButtonEntry(leaveBtn, "Close")
+        end
+        task.wait(0.3)
+        Quest.CloseDialogue()
+        return true
+    end
+
+    if leaveBtn then
+        Quest.ClickButtonEntry(leaveBtn, "Close")
+        task.wait(0.3)
+        Quest.CloseDialogue()
+        return true
+    end
+
+    if diffBtn then
+        local action = isHard and "HardAcceptQuest" or "EasyAcceptQuest"
+        Quest.ClickButtonEntry(diffBtn, action)
+        task.wait(0.4)
+        Quest.CloseDialogue()
+        return true
+    end
+
+    if questBtn then
+        Quest.ClickButtonEntry(questBtn, "Quest")
+        local t0 = tick()
+        while (tick() - t0) < 3.5 do
+            task.wait(0.2)
+            if not Quest.IsDialogueOpen() then return true end
+
+            local nextButtons = Quest.GetDialogueButtons()
+            for _, nb in ipairs(nextButtons) do
+                if nb.clean:find("leave") or nb.clean:find("close") then
+                    Quest.ClickButtonEntry(nb, "Close")
+                    task.wait(0.3)
+                    Quest.CloseDialogue()
+                    return true
+                end
+                if not isClaiming and (nb.clean:find(targetDiffKeyword) or nb.clean:find("accept")) then
+                    local act = isHard and "HardAcceptQuest" or "EasyAcceptQuest"
+                    Quest.ClickButtonEntry(nb, act)
+                    task.wait(0.4)
+                    Quest.CloseDialogue()
+                    return true
+                end
             end
         end
     end
@@ -2504,16 +3217,380 @@ function Quest.HandleDialogue()
     return false
 end
 
--- 4. Quest Tick Logic
-function Quest.Tick(config)
-    if not config.AutoTicketQuest or Quest.state.isBusyRoutine then return end
-    local now = tick()
-    if (now - Quest.state.lastScanTime < 1.0) then return end
-    Quest.state.lastScanTime = now
+function Quest.InteractNPC(isClaiming, config)
+    local isHard = (config and config.TicketDifficulty or "Hard") == "Hard"
+    Quest.state.isInteracting = true
 
-    Quest.DetectActiveQuest()
-    Quest.HandleDialogue()
+    local function _execute()
+        if Quest.IsDialogueOpen() then
+            if Quest.HandleDialogue(isClaiming, config) then
+                return true
+            end
+            task.wait(0.4)
+            if Quest.IsDialogueOpen() and Quest.HandleDialogue(isClaiming, config) then
+                return true
+            end
+            return false
+        end
+
+        local npcModel, focusPos, promptFound, standPos = Quest.TeleportToNPC()
+        if not promptFound and npcModel then
+            promptFound = npcModel:FindFirstChildWhichIsA("ProximityPrompt", true)
+        end
+
+        if promptFound then
+            pcall(function()
+                promptFound.RequiresLineOfSight = false
+                promptFound.MaxActivationDistance = math.max(promptFound.MaxActivationDistance or 10, 35)
+                promptFound.Enabled = true
+            end)
+        end
+
+        if not Quest.IsDialogueOpen() then
+            if promptFound and fireproximityprompt then
+                fireproximityprompt(promptFound)
+            end
+            pcall(function()
+                local vim = game:GetService("VirtualInputManager")
+                if vim then
+                    vim:SendKeyEvent(true, Enum.KeyCode.E, false, game)
+                    task.wait(0.08)
+                    vim:SendKeyEvent(false, Enum.KeyCode.E, false, game)
+                end
+            end)
+        end
+
+        local success = false
+        local t0 = tick()
+        while (tick() - t0) < 4.5 do
+            task.wait(0.2)
+            if Quest.IsDialogueOpen() then
+                if Quest.HandleDialogue(isClaiming, config) then
+                    success = true
+                    break
+                end
+            end
+        end
+
+        if Events and Events:FindFirstChild("ClaimQuest") and isClaiming then
+            pcall(function() Events.ClaimQuest:FireServer("Ticket", config and config.TicketDifficulty or "Hard") end)
+        end
+
+        if success then
+            if isClaiming then
+                Utils.ShowNotification("Nhiệm Vụ Vé", "Đã nộp nhiệm vụ & nhận thưởng vé thành công!", "SUCCESS", 5)
+            else
+                Utils.ShowNotification("Nhiệm Vụ Vé", "Đã nhận thành công nhiệm vụ " .. (isHard and "Hard" or "Easy") .. " Ticket!", "SUCCESS", 5)
+            end
+        end
+
+        return success
+    end
+
+    local ok, res = pcall(_execute)
+    Quest.state.isInteracting = false
+    Quest.ClearUINavigation()
+    return ok and res or false
 end
+
+function Quest.DetectActiveQuest()
+    local detectedType = nil
+    local detectedTitle = nil
+    local detectedCur = 0
+    local detectedMax = 0
+    local isDone = false
+    local detectedCooldownSec = nil
+
+    local pData = Quest.GetPlayerDataFolder()
+    if pData then
+        local cdVal = pData:FindFirstChild("TicketQuestCooldown")
+        if cdVal and tonumber(cdVal.Value) then
+            local stamp = tonumber(cdVal.Value)
+            local nowServer = Quest.GetServerTimeNow()
+            if stamp > nowServer then
+                detectedCooldownSec = stamp - nowServer
+            end
+        end
+
+        local questFolder = pData:FindFirstChild("Quest")
+        if questFolder then
+            local tq = questFolder:FindFirstChild("Hard Ticket Quest", true) 
+                or questFolder:FindFirstChild("Ticket Quest", true) 
+                or questFolder:FindFirstChild("Easy Ticket Quest", true)
+            if not tq then
+                for _, ch in ipairs(questFolder:GetDescendants()) do
+                    if ch:IsA("Folder") or ch:IsA("Configuration") then
+                        local cn = ch.Name:lower()
+                        if cn:find("ticket") and cn:find("quest") then
+                            tq = ch
+                            break
+                        end
+                    end
+                end
+            end
+
+            if tq then
+                local curVal = tq:FindFirstChild("1")
+                if curVal and tonumber(curVal.Value) ~= nil then
+                    detectedCur = tonumber(curVal.Value)
+                end
+
+                local objFolder = tq:FindFirstChild("Objective")
+                local objVal = objFolder and objFolder:FindFirstChild("1")
+                local objStr = objVal and tostring(objVal.Value or "") or ""
+                local rawTitle, rawMax, rawCode = objStr:match("^([^,]+),([^,]+),?(.*)$")
+
+                detectedMax = tonumber(rawMax) or 100
+                detectedTitle = (rawTitle and #rawTitle > 0) and rawTitle or tq.Name
+                local codeLow = (rawCode or ""):lower()
+                local titleLow = (detectedTitle):lower()
+
+                if codeLow:find("skill") or titleLow:find("skill") or titleLow:find("chiêu") or titleLow:find("kỹ năng") then
+                    detectedType = "skill_100"
+                    if detectedMax == 0 then detectedMax = 100 end
+                elseif codeLow:find("bait") or titleLow:find("bait") or titleLow:find("mồi") then
+                    detectedType = "bait_100"
+                    if detectedMax == 0 then detectedMax = 100 end
+                elseif detectedMax == 10 or titleLow:find("1.5") or titleLow:find("1500") or titleLow:find("heavy") then
+                    detectedType = "fish_15m"
+                    if detectedMax == 0 then detectedMax = 10 end
+                else
+                    detectedType = "fish_100"
+                    if detectedMax == 0 then detectedMax = 100 end
+                end
+
+                if detectedMax > 0 and detectedCur >= detectedMax then
+                    isDone = true
+                end
+
+                return detectedType, detectedTitle, detectedCur, detectedMax, isDone, detectedCooldownSec
+            end
+        end
+
+        if detectedCooldownSec and detectedCooldownSec > 0 then
+            return nil, nil, 0, 0, false, detectedCooldownSec
+        else
+            return nil, nil, 0, 0, false, nil
+        end
+    end
+
+    return nil, nil, 0, 0, false, nil
+end
+
+function Quest.ScanAndUpdateStatus()
+    local qType, qTitle, cur, max, done, cdSec = Quest.DetectActiveQuest()
+    if qType then
+        Quest.state.currentQuestType = qType
+        Quest.state.currentQuestTitle = qTitle or Quest.state.currentQuestTitle
+        Quest.state.currentProgress = cur
+        Quest.state.targetProgress = max
+        Quest.state.isCompleted = done
+        Quest.state.active = true
+        Quest.state.isCooldown = false
+        Quest.state.readyForNewQuest = false
+        Quest.state.statusText = string.format("Đang làm: %s (%d/%d)", Quest.state.currentQuestTitle, cur, max)
+    elseif cdSec and cdSec > 0 then
+        Quest.state.isCooldown = true
+        Quest.state.cooldownEnd = tick() + cdSec
+        Quest.state.active = false
+        Quest.state.currentQuestType = "none"
+        Quest.state.currentProgress = 0
+        local mins = math.floor(cdSec / 60)
+        local secs = cdSec % 60
+        Quest.state.statusText = string.format("Chờ hồi chiêu vé (%02d:%02d)", mins, secs)
+    else
+        Quest.state.active = false
+        Quest.state.currentQuestType = "none"
+        Quest.state.currentProgress = 0
+        Quest.state.isCompleted = false
+        Quest.state.readyForNewQuest = true
+        Quest.state.isCooldown = false
+        Quest.state.statusText = "Sẵn sàng nhận nhiệm vụ vé mới!"
+    end
+    return qType, qTitle, cur, max, done, cdSec
+end
+
+-- 4. Vòng lặp chính Tick của Ticket Quest
+function Quest.Tick(config)
+    if not config.AutoTicketQuest or Quest.state.isBusyRoutine or Quest.state.isInteracting then return end
+
+    if Quest.IsAllQuestsDoneToday() then
+        Quest.state.statusText = "Đã hết nhiệm vụ hôm nay! Hẹn gặp lại ngày mai."
+        return
+    end
+
+    local now = tick()
+    local qType, qTitle, cur, max, done, detectedCd = Quest.ScanAndUpdateStatus()
+    local isDoneNow = Quest.state.isCompleted or done or (Quest.state.targetProgress > 0 and Quest.state.currentProgress >= Quest.state.targetProgress)
+
+    if isDoneNow then
+        Quest.state.isCooldown = false
+        Quest.state.cooldownEnd = 0
+    end
+
+    -- 1. Cooldown
+    local hasActiveQuest = (Quest.state.currentQuestType and Quest.state.currentQuestType ~= "none") or (qType ~= nil)
+    if not hasActiveQuest and not isDoneNow and Quest.state.isCooldown then
+        local remain = math.max(0, math.floor((Quest.state.cooldownEnd or 0) - now))
+        if remain > 0 then
+            local mins = math.floor(remain / 60)
+            local secs = remain % 60
+            Quest.state.statusText = string.format("Đang chờ hồi chiêu vé (còn %02d:%02d)", mins, secs)
+
+            if config.TicketReturnHomeWhenDone and config.HomeFarmSpot and not Quest.state.isAtHomeSpot then
+                local homeTarget = config.HomeFarmSpot
+                Quest.TeleportTo(homeTarget)
+                Quest.state.isAtHomeSpot = true
+                Quest.state.statusText = string.format("Chờ hồi: về Home Spot farm (còn %02d:%02d)", mins, secs)
+                Utils.ShowNotification("Home Spot", "Đã về Home Spot để câu farm trong lúc chờ vé!", "SUCCESS", 5)
+            end
+            return
+        else
+            Quest.state.readyForNewQuest = true
+            Quest.state.isCooldown = false
+            Quest.state.isAtHomeSpot = false
+            Quest.state.statusText = "Hồi chiêu đã xong! Chuẩn bị nhận vé mới..."
+        end
+    end
+
+    -- 2. Đã hoàn thành nhiệm vụ -> Nộp vé tại NPC
+    if isDoneNow then
+        if now - (Quest.state.lastClaimAttempt or 0) >= 3.5 then
+            Quest.state.lastClaimAttempt = now
+            Quest.state.statusText = "Đã xong nhiệm vụ! Đang nộp vé..."
+
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then
+                pcall(function() hum.Sit = false hum:UnequipTools() end)
+            end
+            if Events and Events:FindFirstChild("CancelCast") then
+                pcall(function() Events.CancelCast:FireServer() end)
+            end
+
+            local claimSuccess = Quest.InteractNPC(true, config)
+            Quest.ClearUINavigation()
+            task.wait(0.5)
+
+            local checkType, _, _, _, checkDone, checkCd = Quest.DetectActiveQuest()
+            if checkType == nil or claimSuccess or (checkCd and checkCd > 0) then
+                local setCooldown = (checkCd and checkCd > 0) and checkCd or (20 * 60)
+                Quest.state.cooldownEnd = now + setCooldown
+                Quest.state.isCooldown = true
+                Quest.state.isCompleted = false
+                Quest.state.isAtHomeSpot = false
+                Quest.state.currentQuestType = "none"
+                Quest.state.currentProgress = 0
+                Quest.state.active = false
+                Quest.state.statusText = string.format("Đã nộp vé! Đang chờ hồi chiêu (%d phút)", math.ceil(setCooldown / 60))
+                Quest.SaveSpots()
+                Utils.ShowNotification("Nhiệm Vụ Vé", string.format("Đã nộp vé thành công! Hồi chiêu %d phút.", math.ceil(setCooldown / 60)), "SUCCESS", 8)
+            end
+        end
+        return
+    end
+
+    -- 3. Chưa có quest nào -> Đến NPC nhận vé
+    if Quest.state.currentQuestType == "none" then
+        if now - Quest.state.lastNpcInteract >= 10.0 then
+            Quest.state.lastNpcInteract = now
+            Quest.state.statusText = "Đang tương tác NPC nhận vé mới..."
+            Quest.state.isAcceptingQuest = true
+            Quest.state.isCooldown = false
+            Quest.state.isAtHomeSpot = false
+
+            Quest.InteractNPC(false, config)
+            Quest.ClearUINavigation()
+
+            task.wait(3.0)
+            Quest.state.isAcceptingQuest = false
+            local freshType, freshTitle, freshCur, freshMax = Quest.DetectActiveQuest()
+            if freshType then
+                Quest.state.readyForNewQuest = false
+                Quest.state.currentQuestType = freshType
+                Quest.state.currentQuestTitle = freshTitle or "Nhiệm Vụ Vé"
+                Quest.state.targetProgress = freshMax > 0 and freshMax or (freshType == "fish_15m" and 10 or 100)
+                Quest.state.currentProgress = freshCur or 0
+                Quest.state.active = true
+                Quest.state.isAtHomeSpot = false
+                Quest.state.statusText = "Đang làm: " .. Quest.state.currentQuestTitle
+
+                local targetSpot = Quest.state.spot100Fish
+                if freshType == "fish_15m" then targetSpot = Quest.state.spot15MFish
+                elseif freshType == "bait_100" then targetSpot = Quest.state.spot100Bait or Quest.state.spot100Fish
+                elseif freshType == "skill_100" then targetSpot = Quest.state.spot100Skill or Quest.state.spot100Fish end
+
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
+                if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
+                    Quest.TeleportTo(targetSpot)
+                end
+                Quest.CloseDialogue()
+            end
+        end
+        return
+    end
+
+    -- 4. Quest đang hoạt động -> Bay tới điểm câu và làm nhiệm vụ
+    Quest.state.active = true
+    Quest.state.isAtHomeSpot = false
+
+    local char = LocalPlayer.Character
+    local isFishing = char and char:GetAttribute("Fishing") == true
+    local isMinigame = char and char:GetAttribute("Minigame") == true
+    if isFishing or isMinigame then return end
+
+    local targetSpot = Quest.state.spot100Fish
+    if Quest.state.currentQuestType == "fish_15m" then targetSpot = Quest.state.spot15MFish
+    elseif Quest.state.currentQuestType == "bait_100" then targetSpot = Quest.state.spot100Bait or Quest.state.spot100Fish
+    elseif Quest.state.currentQuestType == "skill_100" then targetSpot = Quest.state.spot100Skill or Quest.state.spot100Fish end
+
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
+    if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
+        Quest.TeleportTo(targetSpot)
+        Quest.CloseDialogue()
+    end
+
+    -- Tự bán cá nếu đầy balo
+    if config.TicketAutoSellFull then
+        local pData = Quest.GetPlayerDataFolder()
+        if pData and pData:FindFirstChild("InventoryLimit") then
+            local invCount = 0
+            if pData:FindFirstChild("Inventory") then invCount = invCount + #pData.Inventory:GetChildren() end
+            if invCount >= (pData.InventoryLimit.Value - 1) then
+                if Events and Events:FindFirstChild("SellFish") then
+                    Events.SellFish:FireServer("All")
+                end
+            end
+        end
+    end
+
+    -- Quản lý mồi cho quest 100 bait
+    if Quest.state.currentQuestType == "bait_100" then
+        local baitName = config.TicketBaitChoice or "Basic Bait"
+        local pData = Quest.GetPlayerDataFolder()
+        if pData and pData:FindFirstChild("Bait") then
+            local bVal = pData.Bait:FindFirstChild(baitName)
+            local bCount = bVal and bVal.Value or 0
+            if bCount < 5 and (now - Quest.state.lastBaitBuy >= 2.0) then
+                Quest.state.lastBaitBuy = now
+                if Events and Events:FindFirstChild("BuyBait") then
+                    Events.BuyBait:FireServer(baitName, 30)
+                end
+            end
+            if pData:FindFirstChild("EquippedBait") and pData.EquippedBait.Value ~= baitName and (now - Quest.state.lastBaitEquip >= 2.0) then
+                Quest.state.lastBaitEquip = now
+                if Events and Events:FindFirstChild("EquipBait") then
+                    task.spawn(function() Events.EquipBait:InvokeServer(baitName) end)
+                end
+            end
+        end
+    end
+end
+
+pcall(Quest.LoadSpots)
 
 return Quest
 
@@ -2522,10 +3599,12 @@ end
 __modules["features.shop"] = function()
 --[[
     v2/features/shop.lua
-    Auto Sell, Bait Purchasing & Crafting, Rod Shop & Daily Rewards
+    Auto Sell with Advanced Protection (Mutations, Weight, Favourites),
+    Bait Purchasing & Crafting, Rod Shop & Daily Rewards
 --]]
 
 local Services = __require("core.services")
+local ReplicatedStorage = Services.ReplicatedStorage
 local Events = Services.Events
 local LocalPlayer = Services.LocalPlayer
 local Utils = __require("core.utils")
@@ -2537,18 +3616,134 @@ Shop.lastBaitBuyTime = 0
 Shop.lastBaitCraftTime = 0
 Shop.lastDailyClaimTime = 0
 
--- 1. Auto Sell Fish
+local craftMaterialFish = {
+    ["Verdant Alligator Gar"] = true,
+    ["Verdant Grouper"] = true,
+    ["Verdant Bonefang"] = true,
+    ["Crimson Bonefang"] = true,
+    ["Scarlet Fish"] = true,
+    ["Elder Scarlet Fish"] = true,
+    ["Crimson Electric Eel"] = true,
+    ["Golden Dragonfish"] = true,
+    ["Rainbow Dragonfish"] = true,
+    ["Draconic Koi"] = true,
+    ["Sanguine Fish"] = true,
+}
+
+function Shop.GetPlayerDataFolder()
+    local pData = ReplicatedStorage:FindFirstChild("Data")
+    if pData and pData:FindFirstChild(tostring(LocalPlayer.UserId)) then
+        return pData[tostring(LocalPlayer.UserId)]
+    end
+    return nil
+end
+
+function Shop.IsItemFavorited(item)
+    if not item then return false end
+    local fav = item:FindFirstChild("Favorite") or item:FindFirstChild("Favorited") or item:FindFirstChild("Locked")
+    if fav and fav:IsA("BoolValue") and fav.Value == true then
+        return true
+    end
+    for _, attr in ipairs({"Favorite", "Favorited", "Locked"}) do
+        if item:GetAttribute(attr) == true then return true end
+    end
+    return false
+end
+
+function Shop.IsMutatedFish(item)
+    if not item then return false end
+    local name = tostring(item.Name or "")
+    for _, kw in ipairs({"Shiny", "Giant", "Golden", "Albino", "Corrupted", "Colossal", "Heavyweight", "Dark", "Radiant"}) do
+        if name:find(kw) then return true end
+    end
+    local mutVal = item:FindFirstChild("Mutation")
+    if mutVal and tostring(mutVal.Value) ~= "" and tostring(mutVal.Value) ~= "None" then
+        return true
+    end
+    for _, attr in ipairs({"Mutation", "Mutated", "Variant"}) do
+        local v = item:GetAttribute(attr)
+        if v and tostring(v) ~= "" and tostring(v) ~= "None" then
+            return true
+        end
+    end
+    return false
+end
+
+function Shop.GetItemWeight(item)
+    if not item then return 0 end
+    local wVal = item:FindFirstChild("Weight") or item:FindFirstChild("Kg")
+    if wVal and tonumber(wVal.Value) then
+        return tonumber(wVal.Value)
+    end
+    local wAttr = item:GetAttribute("Weight") or item:GetAttribute("Kg")
+    if wAttr and tonumber(wAttr) then
+        return tonumber(wAttr)
+    end
+    local n = tostring(item.Name or "")
+    local num = n:match("(%d+%.?%d*)%s*[kK][gG]") or n:match("(%d+%.?%d*)%s*[mM]")
+    if num then
+        return tonumber(num) or 0
+    end
+    return 0
+end
+
+function Shop.ProtectInventoryItem(item, config, showNotify)
+    if not item or Shop.IsItemFavorited(item) then return false end
+    local itemName = tostring(item.Name or "")
+    local shouldProtect = false
+    local reason = ""
+
+    if config.AutoProtectMutations and Shop.IsMutatedFish(item) then
+        shouldProtect = true
+        reason = "Cá Đột Biến"
+    elseif config.KeepFishOverWeight and config.MinWeightToKeep and config.MinWeightToKeep > 0 then
+        local w = Shop.GetItemWeight(item)
+        if w >= config.MinWeightToKeep then
+            shouldProtect = true
+            reason = string.format("Trọng Lượng (%.1fkg)", w)
+        end
+    elseif config.AutoFavouriteFish and config.FavouriteFishName and config.FavouriteFishName ~= "" then
+        if itemName:lower():find(config.FavouriteFishName:lower()) then
+            shouldProtect = true
+            reason = "Cá Quý Chỉ Định"
+        end
+    elseif config.MaterialFarming and craftMaterialFish[itemName] then
+        shouldProtect = true
+        reason = "Nguyên Liệu Chế Tạo"
+    end
+
+    if shouldProtect and Events and Events:FindFirstChild("FavoriteItem") then
+        Events.FavoriteItem:FireServer(item)
+        if showNotify then
+            Utils.ShowNotification("Khóa Cá", string.format("Đã tự động KHÓA bảo vệ [%s] (%s)!", itemName, reason), "SUCCESS", 5)
+        end
+        return true
+    end
+    return false
+end
+
+function Shop.ProtectAllInventoryItems(config, showNotify)
+    local pData = Shop.GetPlayerDataFolder()
+    if pData and pData:FindFirstChild("Inventory") then
+        for _, item in ipairs(pData.Inventory:GetChildren()) do
+            Shop.ProtectInventoryItem(item, config, showNotify)
+        end
+    end
+end
+
+-- 1. Auto Sell Fish với bộ lọc bảo vệ
 function Shop.HandleAutoSell(config)
-    if not config.AutoSellFish then return end
+    if not config.AutoSell then return end
     local now = tick()
     local interval = tonumber(config.SellInterval) or 30
     if (now - Shop.lastSellTime < interval) then return end
     Shop.lastSellTime = now
 
+    Shop.ProtectAllInventoryItems(config, false)
+
     if Events and Events:FindFirstChild("SellFish") then
         pcall(function()
-            local mode = config.AutoSellRarity or "All"
-            Events.SellFish:FireServer(mode)
+            Events.SellFish:FireServer("All")
         end)
     end
 end
@@ -2557,14 +3752,25 @@ end
 function Shop.HandleBuyBait(config)
     if not config.AutoBuyBait then return end
     local now = tick()
-    if (now - Shop.lastBaitBuyTime < 5.0) then return end
-    Shop.lastBaitBuyTime = now
+    local delayTime = tonumber(config.BuyBaitDelay) or 1.0
+    if (now - Shop.lastBaitBuyTime < delayTime) then return end
 
-    local baitType = config.AutoBuyBaitType or "Basic Bait"
-    if Events and Events:FindFirstChild("BuyBait") then
-        pcall(function()
-            Events.BuyBait:FireServer(baitType)
-        end)
+    local baitType = config.BuyBaitName or "Ancestral Bait"
+    local threshold = tonumber(config.BuyBaitThreshold) or 10
+    local amount = tonumber(config.BuyBaitAmount) or 5
+
+    local pData = Shop.GetPlayerDataFolder()
+    if pData and pData:FindFirstChild("Bait") then
+        local bVal = pData.Bait:FindFirstChild(baitType)
+        local count = bVal and tonumber(bVal.Value) or 0
+        if count <= threshold then
+            Shop.lastBaitBuyTime = now
+            if Events and Events:FindFirstChild("BuyBait") then
+                pcall(function()
+                    Events.BuyBait:FireServer(baitType, amount)
+                end)
+            end
+        end
     end
 end
 
@@ -2572,13 +3778,15 @@ end
 function Shop.HandleCraftBait(config)
     if not config.AutoCraftBait then return end
     local now = tick()
-    if (now - Shop.lastBaitCraftTime < 5.0) then return end
+    if (now - Shop.lastBaitCraftTime < 3.0) then return end
     Shop.lastBaitCraftTime = now
 
-    local baitType = config.AutoCraftBaitType or "Secret Bait"
+    local baitType = config.CraftBaitName or "Nameless Bait"
+    local amount = tonumber(config.CraftAmount) or 1
+
     if Events and Events:FindFirstChild("CraftBait") then
         pcall(function()
-            Events.CraftBait:FireServer(baitType)
+            Events.CraftBait:FireServer(baitType, amount)
         end)
     end
 end
@@ -2587,7 +3795,8 @@ end
 function Shop.HandleDailyClaim(config)
     if not config.AutoClaimDaily then return end
     local now = tick()
-    if (now - Shop.lastDailyClaimTime < 300) then return end
+    local delayTime = tonumber(config.DailyClaimDelay) or 0.5
+    if (now - Shop.lastDailyClaimTime < (delayTime * 60)) then return end
     Shop.lastDailyClaimTime = now
 
     if Events and Events:FindFirstChild("ClaimDaily") then
@@ -2597,10 +3806,25 @@ function Shop.HandleDailyClaim(config)
     end
 end
 
--- 5. Rod Shop Helpers
+-- 5. Lắng nghe vật phẩm mới thêm vào kho để khóa bảo vệ ngay lập tức
+function Shop.InitInventoryWatcher(config)
+    task.spawn(function()
+        local pDataInit = ReplicatedStorage:WaitForChild("Data", 10)
+        local userFolder = pDataInit and pDataInit:WaitForChild(tostring(LocalPlayer.UserId), 10)
+        local invFolder = userFolder and userFolder:WaitForChild("Inventory", 10)
+        if invFolder then
+            invFolder.ChildAdded:Connect(function(child)
+                task.wait(0.3)
+                Shop.ProtectInventoryItem(child, config, true)
+            end)
+        end
+    end)
+end
+
+-- 6. Rod Shop Helpers
 function Shop.IsRodOwned(rodName)
     if not rodName or rodName == "Wooden Rod" then return true end
-    local pData = LocalPlayer:FindFirstChild("Data")
+    local pData = Shop.GetPlayerDataFolder()
     if pData then
         local inv = pData:FindFirstChild("FishingRodInventory") or pData:FindFirstChild("Inventory")
         if inv and inv:FindFirstChild(rodName) then return true end
@@ -2628,45 +3852,617 @@ end
 __modules["features.spirits"] = function()
 --[[
     v2/features/spirits.lua
-    God Spirit Praying & Taoist / Maoshan Scanning
+    God Spirit Praying, Taoist & Maoshan Scanning, Teleportation & Auto Server Hop
 --]]
 
 local Services = __require("core.services")
-local Events = Services.Events
 local Workspace = Services.Workspace
+local ReplicatedStorage = Services.ReplicatedStorage
 local LocalPlayer = Services.LocalPlayer
+local HttpService = Services.HttpService
+local TeleportService = Services.TeleportService
+local Events = Services.Events
 local Utils = __require("core.utils")
+local Colors = __require("ui.theme").Colors
 
 local Spirits = {}
 
+Spirits.cachedTaoist = nil
+Spirits.lastTaoistScan = 0
+Spirits.cachedMaoshan = nil
+Spirits.lastMaoshanScan = 0
+Spirits.cachedGod = nil
+Spirits.lastGodScan = 0
 Spirits.lastGodPrayTime = 0
+Spirits.lastHopAttempt = 0
+Spirits.npcHopVisited = {}
 
--- 1. Auto God Pray
-function Spirits.HandleGodPray(config)
-    if not config.AutoGodPray then return end
-    local now = tick()
-    if (now - Spirits.lastGodPrayTime < 60) then return end
+local function getCandidateNPCFolders()
+    local candidateFolders = {}
+    for _, fName in ipairs({"NPC", "NPCs", "Merchant", "Merchants", "Entities", "Characters"}) do
+        local f = Workspace:FindFirstChild(fName)
+        if f then
+            table.insert(candidateFolders, f)
+            for _, subName in ipairs({"Function", "Merchant", "Merchants", "Taoist", "SellFish", "SetSpawn", "BuyBait", "BuyFishingRod"}) do
+                local sf = f:FindFirstChild(subName)
+                if sf then table.insert(candidateFolders, sf) end
+            end
+        end
+    end
+    return candidateFolders
+end
 
-    if Events and Events:FindFirstChild("Pray") then
+local function isTaoistText(str)
+    if not str or typeof(str) ~= "string" or str == "" then return false end
+    local s = str:lower()
+    if s:find("angler") or s:find("blind") or s:find("maoshan") or s:find("mao shan") then
+        return false
+    end
+    return (s:find("taoist") or s:find("đạo sĩ") or s:find("dao si") or s:find("daoshi")) ~= nil
+end
+
+local function isMaoshanText(str)
+    if not str or typeof(str) ~= "string" or str == "" then return false end
+    local s = str:lower()
+    if s:find("angler") or s:find("blind") then
+        return false
+    end
+    return (s:find("maoshan") or s:find("mao shan") or s:find("mao_shan") or s:find("biao ge")) ~= nil
+end
+
+local function isNPCModel(inst)
+    if not inst or not inst:IsA("Model") then return false end
+    return inst:FindFirstChildOfClass("Humanoid") ~= nil
+        or inst:FindFirstChild("HumanoidRootPart") ~= nil
+        or inst:FindFirstChild("Head") ~= nil
+end
+
+-- Quét tìm Đạo Sĩ (Taoist)
+function Spirits.ScanForTaoistNPC()
+    local candidateFolders = getCandidateNPCFolders()
+
+    for _, folder in ipairs(candidateFolders) do
+        for _, n in ipairs(folder:GetChildren()) do
+            if isNPCModel(n) and isTaoistText(n.Name) then
+                return n, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange or Color3.fromRGB(255, 170, 0), "📜"
+            end
+        end
+    end
+
+    for _, folder in ipairs(candidateFolders) do
+        for _, d in ipairs(folder:GetDescendants()) do
+            if d:IsA("ProximityPrompt") then
+                local act = tostring(d.ActionText or "")
+                local obj = tostring(d.ObjectText or "")
+                local pName = d.Parent and d.Parent.Name or ""
+                if isTaoistText(act) or isTaoistText(obj) or isTaoistText(pName) then
+                    local model = d:FindFirstAncestorOfClass("Model") or d.Parent
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange or Color3.fromRGB(255, 170, 0), "📜"
+                    end
+                end
+            elseif d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then
+                if isTaoistText(d.Text) then
+                    local model = d:FindFirstAncestorOfClass("Model") or d.Parent
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange or Color3.fromRGB(255, 170, 0), "📜"
+                    end
+                end
+            end
+        end
+    end
+
+    for _, n in ipairs(Workspace:GetChildren()) do
+        if isNPCModel(n) and isTaoistText(n.Name) then
+            return n, "Đạo Sĩ (Taoist)", "Taoist", Colors.AccentOrange or Color3.fromRGB(255, 170, 0), "📜"
+        end
+    end
+
+    return nil
+end
+
+-- Quét tìm Đạo Sĩ Mao Sơn (Maoshan)
+function Spirits.ScanForMaoshanNPC()
+    local candidateFolders = getCandidateNPCFolders()
+
+    for _, folder in ipairs(candidateFolders) do
+        for _, n in ipairs(folder:GetChildren()) do
+            if isNPCModel(n) and isMaoshanText(n.Name) then
+                return n, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary or Color3.fromRGB(168, 85, 247), "✨"
+            end
+        end
+    end
+
+    for _, folder in ipairs(candidateFolders) do
+        for _, d in ipairs(folder:GetDescendants()) do
+            if d:IsA("ProximityPrompt") then
+                local act = tostring(d.ActionText or "")
+                local obj = tostring(d.ObjectText or "")
+                local pName = d.Parent and d.Parent.Name or ""
+                if isMaoshanText(act) or isMaoshanText(obj) or isMaoshanText(pName) then
+                    local model = d:FindFirstAncestorOfClass("Model") or d.Parent
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary or Color3.fromRGB(168, 85, 247), "✨"
+                    end
+                end
+            elseif d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then
+                if isMaoshanText(d.Text) then
+                    local model = d:FindFirstAncestorOfClass("Model") or d.Parent
+                    if model and not (model.Name:lower():find("angler") or model.Name:lower():find("blind")) then
+                        return model, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary or Color3.fromRGB(168, 85, 247), "✨"
+                    end
+                end
+            end
+        end
+    end
+
+    for _, n in ipairs(Workspace:GetChildren()) do
+        if isNPCModel(n) and isMaoshanText(n.Name) then
+            return n, "Đạo Sĩ Maoshan", "Maoshan", Colors.PurplePrimary or Color3.fromRGB(168, 85, 247), "✨"
+        end
+    end
+
+    return nil
+end
+
+-- Quét tìm Thần Linh (God Spirit)
+function Spirits.ScanForGodSpirit()
+    local godKeywords = {"spirit", "god spirit", "godspirit", "thần linh", "than linh"}
+    local function matchesGod(str)
+        if not str or typeof(str) ~= "string" or str == "" then return nil end
+        local s = str:lower()
+        for _, pat in ipairs(godKeywords) do
+            if s:find(pat, 1, true) then return pat end
+        end
+        return nil
+    end
+
+    local candidateFolders = {}
+    for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters"}) do
+        local f = Workspace:FindFirstChild(fName)
+        if f then table.insert(candidateFolders, f) end
+    end
+
+    for _, folder in ipairs(candidateFolders) do
+        for _, n in ipairs(folder:GetChildren()) do
+            if (n:IsA("Model") or n:IsA("BasePart")) and matchesGod(n.Name) then
+                return n
+            end
+        end
+    end
+
+    for _, folder in ipairs(candidateFolders) do
+        for _, d in ipairs(folder:GetDescendants()) do
+            if d:IsA("ProximityPrompt") then
+                local pat = matchesGod(d.ActionText) or matchesGod(d.ObjectText) or matchesGod(d.Parent and d.Parent.Name)
+                if pat then
+                    return d:FindFirstAncestorOfClass("Model") or d.Parent
+                end
+            elseif d:IsA("TextLabel") and d.Visible and d.Text and #d.Text > 0 then
+                if matchesGod(d.Text) then
+                    return d:FindFirstAncestorOfClass("Model") or d.Parent
+                end
+            end
+        end
+    end
+
+    for _, n in ipairs(Workspace:GetChildren()) do
+        if (n:IsA("Model") or n:IsA("BasePart")) and matchesGod(n.Name) then
+            return n
+        end
+    end
+
+    return nil
+end
+
+-- Lưu & Xóa Trạng Thái Hop NPC
+function Spirits.SaveNPCHopState(config)
+    if not (writefile and isfile) then return end
+    local isAnyActive = config.AutoServerHopTaoist or config.AutoServerHopMaoshan or config.AutoServerHopGod
+    if isAnyActive then
         pcall(function()
-            Events.Pray:FireServer()
-            Spirits.lastGodPrayTime = now
-            Utils.ShowNotification("Thần Linh", "Đã thực hiện bái Thần!", "SUCCESS", 3)
+            writefile("HeavyweightFishing_NPCHop.json", HttpService:JSONEncode({
+                Active = true,
+                Taoist = config.AutoServerHopTaoist == true,
+                Maoshan = config.AutoServerHopMaoshan == true,
+                God = config.AutoServerHopGod == true,
+                Visited = Spirits.npcHopVisited or {},
+                StartTime = tick()
+            }))
+        end)
+    else
+        pcall(function()
+            if isfile("HeavyweightFishing_NPCHop.json") and delfile then
+                delfile("HeavyweightFishing_NPCHop.json")
+            end
         end)
     end
 end
 
--- 2. Scan Taoist / Maoshan NPCs in workspace
-function Spirits.FindSpecialNPC(namePattern)
-    for _, obj in ipairs(Workspace:GetChildren()) do
-        if obj:IsA("Model") and obj.Name:lower():find(namePattern:lower()) then
-            return obj
+function Spirits.ClearNPCHopState(config)
+    config.AutoServerHopTaoist = false
+    config.AutoServerHopMaoshan = false
+    config.AutoServerHopGod = false
+    pcall(function()
+        if isfile and isfile("HeavyweightFishing_NPCHop.json") and delfile then
+            delfile("HeavyweightFishing_NPCHop.json")
+        end
+    end)
+end
+
+function Spirits.CheckNPCHopOnJoin(config)
+    if not (isfile and readfile and isfile("HeavyweightFishing_NPCHop.json")) then return end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(readfile("HeavyweightFishing_NPCHop.json"))
+    end)
+    if ok and type(data) == "table" and data.Active then
+        if data.Taoist then config.AutoServerHopTaoist = true end
+        if data.Maoshan then config.AutoServerHopMaoshan = true end
+        if data.God then config.AutoServerHopGod = true end
+        Spirits.npcHopVisited = data.Visited or {}
+        Utils.ShowNotification("Đổi Server", "Tiếp tục quét tìm NPC trong server mới...", "INFO", 5)
+    end
+end
+
+-- Teleport tới NPC
+function Spirits.TeleportToNPC(inst)
+    if not inst then return false end
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local cf = nil
+    if inst:IsA("Model") then
+        cf = inst:GetPivot()
+    elseif inst:IsA("BasePart") then
+        cf = inst.CFrame
+    end
+
+    if cf then
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.CFrame = cf + Vector3.new(0, 3, 0)
+        return true
+    end
+    return false
+end
+
+-- 1. Auto God Pray
+function Spirits.HandleGodPray(config)
+    if not (config.AutoGodSpiritCheck or config.AutoPrayGodSpirit) then return end
+    local now = tick()
+    if (now - Spirits.lastGodPrayTime < 60) then return end
+
+    local sp = Spirits.ScanForGodSpirit()
+    if sp then
+        pcall(function()
+            Utils.SendNPCDetectionAlert(config, "GodSpirit", "Thần Linh (God Spirit)", sp)
+        end)
+        if config.AutoPrayGodSpirit and Events and Events:FindFirstChild("Pray") then
+            pcall(function()
+                Events.Pray:FireServer()
+                Spirits.lastGodPrayTime = now
+                Utils.ShowNotification("Thần Linh", "Đã thực hiện bái Thần!", "SUCCESS", 3)
+            end)
         end
     end
-    return nil
+end
+
+-- 2. Vòng lặp Auto Hop Đạo Sĩ / Mao Sơn / Thần Linh
+function Spirits.Tick(config)
+    Spirits.HandleGodPray(config)
+
+    if not (config.AutoServerHopTaoist or config.AutoServerHopMaoshan or config.AutoServerHopGod) then
+        return
+    end
+
+    local now = tick()
+    if (now - Spirits.lastHopAttempt < 10) then return end
+
+    local enabledTargets = {}
+    local foundTargets = {}
+
+    if config.AutoServerHopTaoist then
+        table.insert(enabledTargets, "Đạo Sĩ (Taoist)")
+        local tInst, tName = Spirits.ScanForTaoistNPC()
+        if tInst then
+            table.insert(foundTargets, tostring(tName or "Đạo Sĩ (Taoist)"))
+            pcall(function()
+                Utils.SendNPCDetectionAlert(config, "Taoist", tName or "Đạo Sĩ (Taoist)", tInst)
+            end)
+        end
+    end
+
+    if config.AutoServerHopMaoshan then
+        table.insert(enabledTargets, "Đạo Sĩ Maoshan")
+        local mInst, mName = Spirits.ScanForMaoshanNPC()
+        if mInst then
+            table.insert(foundTargets, tostring(mName or "Đạo Sĩ Maoshan"))
+            pcall(function()
+                Utils.SendNPCDetectionAlert(config, "Maoshan", mName or "Đạo Sĩ Mao Sơn", mInst)
+            end)
+        end
+    end
+
+    if config.AutoServerHopGod then
+        table.insert(enabledTargets, "Thần Linh (God Spirit)")
+        local sp = Spirits.ScanForGodSpirit()
+        if sp then
+            table.insert(foundTargets, "Thần Linh (God Spirit)")
+            pcall(function()
+                Utils.SendNPCDetectionAlert(config, "GodSpirit", "Thần Linh (God Spirit)", sp)
+            end)
+        end
+    end
+
+    -- Nếu tìm thấy ít nhất 1 NPC mục tiêu
+    if #foundTargets > 0 then
+        local foundStr = table.concat(foundTargets, ", ")
+        Utils.ShowNotification("ĐÃ TÌM THẤY!", "Đã phát hiện " .. foundStr .. " trong server này! Dừng đổi server.", "SUCCESS", 8)
+        Spirits.ClearNPCHopState(config)
+        return
+    end
+
+    -- Nếu không thấy mục tiêu -> Tiến hành nhảy Server tiếp theo
+    Spirits.lastHopAttempt = now
+    Spirits.SaveNPCHopState(config)
+    local targetList = table.concat(enabledTargets, ", ")
+    Utils.ShowNotification("Đổi Server", "Không có " .. targetList .. " ở server này. Đang tìm server khác...", "INFO", 5)
+    task.delay(1.5, function()
+        Utils.ServerHop(Spirits.npcHopVisited)
+    end)
 end
 
 return Spirits
+
+end
+
+__modules["features.spoof"] = function()
+--[[
+    v2/features/spoof.lua
+    Visual Spoofing (Ảo Hoá Hiển Thị) Gems & Tickets
+--]]
+
+local Services = __require("core.services")
+local ReplicatedStorage = Services.ReplicatedStorage
+local LocalPlayer = Services.LocalPlayer
+local HttpService = Services.HttpService
+local Utils = __require("core.utils")
+
+local Spoof = {}
+
+Spoof.fakeTicket = 0
+Spoof.fakeGems = 0
+Spoof.hookedGemLabels = {}
+
+function Spoof.FormatWithSpaces(num)
+    if not num then return "0" end
+    local s = tostring(math.floor(math.abs(num)))
+    local res = ""
+    local len = #s
+    for i = 1, len do
+        res = res .. s:sub(i, i)
+        if (len - i) % 3 == 0 and i ~= len then
+            res = res .. " "
+        end
+    end
+    return (num < 0 and "-" or "") .. res
+end
+
+function Spoof.GetFileName()
+    local accName = (LocalPlayer and LocalPlayer.Name) or "Default"
+    local safeAcc = accName:gsub("[^%w_]", "")
+    if #safeAcc == 0 then safeAcc = "Default" end
+    return "heavyweight_visual_spoof_" .. safeAcc .. ".json"
+end
+
+function Spoof.Save()
+    if not writefile then return end
+    pcall(function()
+        local data = {
+            fakeTicket = Spoof.fakeTicket or 0,
+            fakeGems = Spoof.fakeGems or 0,
+        }
+        writefile(Spoof.GetFileName(), HttpService:JSONEncode(data))
+    end)
+end
+
+function Spoof.Load()
+    local fileName = Spoof.GetFileName()
+    if not (readfile and isfile and isfile(fileName)) then return end
+    pcall(function()
+        local raw = readfile(fileName)
+        if raw and #raw > 0 then
+            local dec = HttpService:JSONDecode(raw)
+            if type(dec) == "table" then
+                if dec.fakeTicket and tonumber(dec.fakeTicket) then
+                    Spoof.fakeTicket = tonumber(dec.fakeTicket)
+                end
+                if dec.fakeGems and tonumber(dec.fakeGems) then
+                    Spoof.fakeGems = tonumber(dec.fakeGems)
+                end
+            end
+        end
+    end)
+end
+
+function Spoof.UpdateTextLabelWithGems(label, gNum)
+    if not label or not label:IsA("TextLabel") then return end
+    local oldText = label.Text
+    local formatted = Spoof.FormatWithSpaces(gNum)
+
+    if oldText:find("💎") then
+        if oldText:find("^%s*💎") then
+            label.Text = "💎 " .. formatted
+        elseif oldText:find("💎%s*$") then
+            label.Text = formatted .. " 💎"
+        else
+            label.Text = "💎 " .. formatted
+        end
+    elseif oldText:find("🔷") then
+        label.Text = "🔷 " .. formatted
+    elseif oldText:lower():find("gem") then
+        if oldText:find(":") then
+            label.Text = "Gems: " .. formatted
+        else
+            label.Text = formatted .. " Gems"
+        end
+    elseif oldText:lower():find("diamond") then
+        label.Text = formatted .. " Diamonds"
+    else
+        label.Text = formatted
+    end
+end
+
+function Spoof.HookGemLabel(label, gNum)
+    if Spoof.hookedGemLabels[label] then return end
+    Spoof.hookedGemLabels[label] = true
+    pcall(function()
+        label:GetPropertyChangedSignal("Text"):Connect(function()
+            if Spoof.fakeGems and Spoof.fakeGems > 0 then
+                local targetText = Spoof.FormatWithSpaces(Spoof.fakeGems)
+                if not label.Text:find(targetText, 1, true) then
+                    task.defer(function()
+                        if Spoof.fakeGems and Spoof.fakeGems > 0 then
+                            Spoof.UpdateTextLabelWithGems(label, Spoof.fakeGems)
+                        end
+                    end)
+                end
+            end
+        end)
+    end)
+end
+
+function Spoof.ScanPlayerGuiGems(gNum)
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return end
+
+    for _, desc in ipairs(pg:GetDescendants()) do
+        if desc:IsA("TextLabel") and desc.Visible then
+            local selfName = desc.Name:lower()
+            local pName = desc.Parent and desc.Parent.Name:lower() or ""
+            local isGem = false
+
+            if selfName:find("gem") or selfName:find("diamond") or selfName:find("ruby") or selfName:find("da_quy") then
+                isGem = true
+            elseif pName:find("gem") or pName:find("diamond") or pName:find("ruby") or pName:find("currency2") then
+                isGem = true
+            end
+
+            if isGem then
+                Spoof.UpdateTextLabelWithGems(desc, gNum)
+                Spoof.HookGemLabel(desc, gNum)
+            end
+        end
+    end
+end
+
+function Spoof.ScanPlayerDataGems(gNum)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+    if pData then
+        for _, gName in ipairs({"Gem", "Gems", "Diamond", "Diamonds", "Ruby", "Currency2"}) do
+            local item = pData:FindFirstChild(gName)
+            if item and item:IsA("ValueBase") then
+                pcall(function()
+                    item.Value = gNum
+                    item.Changed:Connect(function(v)
+                        if Spoof.fakeGems and Spoof.fakeGems > 0 and v ~= Spoof.fakeGems then
+                            task.defer(function()
+                                if Spoof.fakeGems and Spoof.fakeGems > 0 then
+                                    item.Value = Spoof.fakeGems
+                                end
+                            end)
+                        end
+                    end)
+                end)
+            end
+        end
+    end
+
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    if ls then
+        for _, gName in ipairs({"Gem", "Gems", "Diamond", "Diamonds"}) do
+            local nv = ls:FindFirstChild(gName)
+            if nv and nv:IsA("ValueBase") then
+                pcall(function()
+                    nv.Value = gNum
+                end)
+            end
+        end
+    end
+end
+
+function Spoof.Apply(isReset)
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+    local ls = LocalPlayer:FindFirstChild("leaderstats")
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+
+    -- 1. Spoof Tickets
+    if Spoof.fakeTicket and Spoof.fakeTicket > 0 and not isReset then
+        local num = Spoof.fakeTicket
+        if pData then
+            local tObj = pData:FindFirstChild("Ticket") or pData:FindFirstChild("Tickets")
+            if tObj and tObj:IsA("ValueBase") then
+                pcall(function() tObj.Value = num end)
+            end
+        end
+        if ls then
+            local lsT = ls:FindFirstChild("Ticket") or ls:FindFirstChild("Tickets")
+            if lsT and lsT:IsA("ValueBase") then
+                pcall(function() lsT.Value = num end)
+            end
+        end
+        if pg then
+            for _, d in ipairs(pg:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Visible then
+                    local sLow = d.Name:lower()
+                    local pLow = d.Parent and d.Parent.Name:lower() or ""
+                    if sLow:find("ticket") or pLow:find("ticket") then
+                        if d.Text:match("^[%d%s,%.]+$") or d.Text:find("Vé") or d.Text:find("Ticket") then
+                            d.Text = Spoof.FormatWithSpaces(num)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    -- 2. Spoof Gems
+    if Spoof.fakeGems and Spoof.fakeGems > 0 and not isReset then
+        local gNum = Spoof.fakeGems
+        Spoof.ScanPlayerDataGems(gNum)
+        Spoof.ScanPlayerGuiGems(gNum)
+    end
+end
+
+function Spoof.Hook()
+    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
+    if not pData then return end
+
+    local tObj = pData:FindFirstChild("Ticket") or pData:FindFirstChild("Tickets")
+    if tObj and tObj:IsA("ValueBase") then
+        pcall(function()
+            tObj.Changed:Connect(function(newVal)
+                if Spoof.fakeTicket and Spoof.fakeTicket > 0 and newVal ~= Spoof.fakeTicket then
+                    task.defer(function()
+                        if Spoof.fakeTicket and Spoof.fakeTicket > 0 then
+                            tObj.Value = Spoof.fakeTicket
+                        end
+                    end)
+                end
+            end)
+        end)
+    end
+
+    if Spoof.fakeGems and Spoof.fakeGems > 0 then
+        Spoof.ScanPlayerDataGems(Spoof.fakeGems)
+        Spoof.ScanPlayerGuiGems(Spoof.fakeGems)
+    end
+end
+
+pcall(Spoof.Load)
+pcall(Spoof.Hook)
+
+return Spoof
 
 end
 
@@ -2876,6 +4672,243 @@ function Visuals.ClearAllESP()
 end
 
 return Visuals
+
+end
+
+__modules["features.weather"] = function()
+--[[
+    v2/features/weather.lua
+    Weather Detection, Weather Totems Interaction & Auto Server Hop
+--]]
+
+local Services = __require("core.services")
+local Workspace = Services.Workspace
+local ReplicatedStorage = Services.ReplicatedStorage
+local LocalPlayer = Services.LocalPlayer
+local HttpService = Services.HttpService
+local Utils = __require("core.utils")
+
+local Weather = {}
+
+Weather.isHopping = false
+Weather.currentTargetWeather = nil
+Weather.visitedServers = {}
+Weather.lastHopCheck = 0
+
+Weather.totems = {
+    {name = "Totem Bão Sấm (Bamboo Isle)", island = "Đảo Tre (Bamboo Isle)", weather = "Thunderstorm (Bão Sấm)", pos = Vector3.new(-1242.0, 8.5, -195.0)},
+    {name = "Totem Bão Tuyết (Frost Isle)", island = "Đảo Băng (Frost Isle)", weather = "Snowy (Bão Tuyết)", pos = Vector3.new(-1390.0, 10.2, -1515.0)},
+    {name = "Totem Sương Mù (Coconut Isle)", island = "Đảo Quả Dừa (Coconut Isle)", weather = "Foggy (Sương Mù)", pos = Vector3.new(1475.0, 9.8, -1415.0)},
+    {name = "Totem Nắng Gắt (Amber Isle)", island = "Đảo Hổ Phách (Amber Isle)", weather = "Blazing Sun (Nắng Gắt)", pos = Vector3.new(1275.0, 9.5, 1450.0)},
+}
+
+Weather.weatherChoices = {
+    "Bất Kỳ Thời Tiết Nào (Trừ Clear)",
+    "Thunderstorm (Bão Sấm)",
+    "Snowy (Bão Tuyết)",
+    "Foggy (Sương Mù)",
+    "Blazing Sun (Nắng Gắt)",
+    "Rainy (Trời Mưa)",
+    "Windy (Trời Gió)",
+    "Acid Rain (Mưa Axit)",
+    "Blood Moon (Trăng Máu)",
+    "Boss Realm",
+}
+
+function Weather.DetectWeatherPattern(text)
+    if not text or typeof(text) ~= "string" then return nil, nil end
+    local lower = text:lower()
+
+    if lower:find("clear") or lower:find("sunny") or lower:find("normal") or lower:find("none")
+       or lower:find("trong xanh") or lower:find("bình thường") then
+        return nil, "Clear"
+    end
+
+    local patterns = {
+        {"thunder", "Thunderstorm (Bão Sấm)"},
+        {"snow", "Snowy (Bão Tuyết)"},
+        {"fog", "Foggy (Sương Mù)"},
+        {"blazing", "Blazing Sun (Nắng Gắt)"},
+        {"sun", "Blazing Sun (Nắng Gắt)"},
+        {"rain", "Rainy (Trời Mưa)"},
+        {"wind", "Windy (Trời Gió)"},
+        {"acid", "Acid Rain (Mưa Axit)"},
+        {"blood", "Blood Moon (Trăng Máu)"},
+        {"realm", "Boss Realm"},
+    }
+
+    for _, p in ipairs(patterns) do
+        if lower:find(p[1], 1, true) then
+            return p[2], p[2]
+        end
+    end
+
+    return text, text
+end
+
+function Weather.DetectWeather()
+    -- 1. Workspace
+    local wsWeather = Workspace:GetAttribute("Weather") or Workspace:GetAttribute("CurrentWeather") or Workspace:GetAttribute("ActiveWeather")
+    if typeof(wsWeather) == "string" and #wsWeather > 0 then
+        local _, wName = Weather.DetectWeatherPattern(wsWeather)
+        if wName then return wName end
+    end
+    if Workspace:FindFirstChild("Weather") then
+        local wObj = Workspace.Weather
+        if wObj:IsA("StringValue") and #wObj.Value > 0 then
+            local _, wName = Weather.DetectWeatherPattern(wObj.Value)
+            if wName then return wName end
+        end
+    end
+
+    -- 2. ReplicatedStorage
+    if ReplicatedStorage then
+        local rsWeather = ReplicatedStorage:GetAttribute("Weather") or ReplicatedStorage:GetAttribute("CurrentWeather")
+        if typeof(rsWeather) == "string" and #rsWeather > 0 then
+            local _, wName = Weather.DetectWeatherPattern(rsWeather)
+            if wName then return wName end
+        end
+        if ReplicatedStorage:FindFirstChild("Weather") then
+            local rwObj = ReplicatedStorage.Weather
+            if rwObj:IsA("StringValue") and #rwObj.Value > 0 then
+                local _, wName = Weather.DetectWeatherPattern(rwObj.Value)
+                if wName then return wName end
+            end
+        end
+    end
+
+    -- 3. PlayerGui
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if pg and pg:FindFirstChild("MainGui") then
+        for _, d in ipairs(pg.MainGui:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text >= 3 and #d.Text <= 45 then
+                local dName = d.Name:lower()
+                local pName = d.Parent and d.Parent.Name:lower() or ""
+                if (dName:find("weather") or dName:find("climate") or dName:find("season")
+                    or pName:find("weather") or pName:find("climate") or pName:find("season"))
+                    and not dName:find("island") and not dName:find("map") then
+                    local _, wName = Weather.DetectWeatherPattern(d.Text)
+                    if wName then return wName end
+                end
+            end
+        end
+    end
+
+    return "Clear"
+end
+
+function Weather.IsWeatherMatch(currentWeatherName, targetWeather)
+    if not currentWeatherName or currentWeatherName == "" or currentWeatherName == "Clear" then
+        return false
+    end
+    if not targetWeather or targetWeather == "Bất Kỳ Thời Tiết Nào (Trừ Clear)" or targetWeather == "Bất Kỳ Thời Tiết Nào" then
+        return currentWeatherName ~= "Clear"
+    end
+    local curLow = currentWeatherName:lower()
+    local tgtLow = targetWeather:lower()
+    return curLow:find(tgtLow, 1, true) ~= nil or tgtLow:find(curLow, 1, true) ~= nil
+end
+
+function Weather.SaveWeatherHopState(config)
+    if not (writefile and HttpService) then return end
+    pcall(function()
+        writefile("HeavyweightFishing_WeatherHop.json", HttpService:JSONEncode({
+            Active = config.AutoWeatherHop == true,
+            TargetWeather = config.TargetWeather,
+            AutoFish = config.WeatherHopAutoFish,
+            Webhook = config.WeatherHopAlertWebhook,
+            Visited = Weather.visitedServers,
+            StartTime = tick()
+        }))
+    end)
+end
+
+function Weather.ClearWeatherHopState(config)
+    config.AutoWeatherHop = false
+    Weather.isHopping = false
+    pcall(function()
+        if isfile and isfile("HeavyweightFishing_WeatherHop.json") and delfile then
+            delfile("HeavyweightFishing_WeatherHop.json")
+        end
+    end)
+end
+
+function Weather.CheckWeatherHopOnJoin(config)
+    if not (isfile and readfile and isfile("HeavyweightFishing_WeatherHop.json")) then return end
+    local ok, data = pcall(function()
+        return HttpService:JSONDecode(readfile("HeavyweightFishing_WeatherHop.json"))
+    end)
+    if ok and type(data) == "table" and data.Active then
+        config.AutoWeatherHop = true
+        Weather.isHopping = true
+        if data.TargetWeather then config.TargetWeather = data.TargetWeather end
+        Weather.currentTargetWeather = config.TargetWeather
+        Weather.visitedServers = data.Visited or {}
+        Utils.ShowNotification("Tìm Thời Tiết", string.format("Đang kiểm tra thời tiết cho: %s...", config.TargetWeather), "INFO", 5)
+    end
+end
+
+function Weather.InteractTotem(totem)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root or not totem or not totem.pos then return end
+
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.CFrame = CFrame.new(totem.pos + Vector3.new(0, 3, 0))
+    Utils.ShowNotification("Bàn Thờ Thời Tiết", "Đã đến " .. totem.name .. "! Đang tương tác...", "SUCCESS", 4)
+    task.wait(0.4)
+
+    pcall(function()
+        for _, d in ipairs(Workspace:GetDescendants()) do
+            if d:IsA("ProximityPrompt") and (d.Parent:IsA("BasePart") or d.Parent:IsA("Model")) then
+                local pPos = d.Parent:IsA("BasePart") and d.Parent.Position or d.Parent:GetPivot().Position
+                if (pPos - totem.pos).Magnitude <= 35 then
+                    if fireproximityprompt then
+                        fireproximityprompt(d)
+                    end
+                end
+            end
+        end
+    end)
+end
+
+function Weather.Tick(config)
+    if not config.AutoWeatherHop then return end
+    local now = tick()
+    if (now - Weather.lastHopCheck < 6.0) then return end
+    Weather.lastHopCheck = now
+
+    local curWeather = Weather.DetectWeather()
+    local target = config.TargetWeather or "Bất Kỳ Thời Tiết Nào (Trừ Clear)"
+
+    if Weather.IsWeatherMatch(curWeather, target) then
+        Utils.ShowNotification("TÌM THẤY THỜI TIẾT", string.format("🎉 ĐÃ TÌM THẤY SERVER!\nThời tiết: %s (Mục tiêu: %s)", curWeather, target), "SUCCESS", 10)
+        Weather.ClearWeatherHopState(config)
+
+        if config.WeatherHopAlertWebhook then
+            local fields = {
+                { name = "Thời Tiết", value = curWeather, inline = true },
+                { name = "Server Job ID", value = game.JobId, inline = false }
+            }
+            if config.WebhookUrl ~= "" then
+                Utils.SendDiscordWebhook("🌪️ PHÁT HIỆN SERVER THỜI TIẾT!", "Đã tìm thấy thời tiết: **" .. curWeather .. "**", 3447003, fields, config.WebhookUrl)
+            end
+            if config.TelegramNotifyWeather and config.TelegramBotToken ~= "" and config.TelegramChatId ~= "" then
+                Utils.SendTelegramMessage(config, string.format("🌪️ *PHÁT HIỆN SERVER THỜI TIẾT!*\nThời tiết: *%s*\nJob ID: `%s`", curWeather, game.JobId))
+            end
+        end
+        return
+    end
+
+    -- Không khớp -> Lưu trạng thái và nhảy server tiếp
+    Weather.SaveWeatherHopState(config)
+    Utils.ShowNotification("Đổi Server", string.format("Thời tiết hiện tại: %s (Không khớp). Tiếp tục đổi server...", curWeather), "WARN", 4)
+    task.delay(1.5, function()
+        Utils.ServerHop(Weather.visitedServers)
+    end)
+end
+
+return Weather
 
 end
 
@@ -3528,7 +5561,7 @@ end
 __modules["ui.tabs.tab_cai_dat"] = function()
 --[[
     v2/ui/tabs/tab_cai_dat.lua
-    Exact Tab Cài Đặt from backup.lua (Profiles, Priority Manager, Webhooks & Unload)
+    Profiles, Priority Manager, Discord Webhook, Telegram Bot & System Exit
 --]]
 
 local Components = __require("ui.components")
@@ -3576,18 +5609,77 @@ function TabCaiDat.Render(parent)
         Config.PrioritySystemEnabled = v
     end)
 
-    Components.CreateCategoryHeader(parent, "Cảnh Báo Discord Webhook")
+    -- Discord Webhook
+    Components.CreateCategoryHeader(parent, "📢 Cảnh Báo Discord Webhook")
     local cardWebhook = Components.CreateCardGroup(parent)
     Components.CreateInputRow(cardWebhook, "Webhook URL", "Dán đường dẫn Webhook Discord tại đây", Config.WebhookUrl or "", function(v)
         Config.WebhookUrl = v
     end, nil, "https://discord.com/api/webhooks/...")
-    Components.CreateToggleRow(cardWebhook, "Bật Webhook", "Kích hoạt gửi tin nhắn về Discord", Config.WebhookEnabled, function(v)
+    Components.CreateToggleRow(cardWebhook, "Bật Webhook Discord", "Kích hoạt gửi tin nhắn về Discord", Config.WebhookEnabled, function(v)
         Config.WebhookEnabled = v
     end)
     Components.CreateToggleRow(cardWebhook, "Thông Báo Bắt Được Boss", "Gửi tin nhắn khi câu trúng Secret Boss", Config.WebhookNotifyBoss, function(v)
         Config.WebhookNotifyBoss = v
     end)
+    Components.CreateToggleRow(cardWebhook, "Thông Báo Đạo Sĩ (Taoist & Maoshan & Thần Linh)", "Gửi JobID kèm lệnh bay tức thì khi phát hiện NPC", Config.WebhookNotifyNPC, function(v)
+        Config.WebhookNotifyNPC = v
+    end)
+    Components.CreateToggleRow(cardWebhook, "Thông Báo Thời Tiết Đặc Biệt", "Gửi tin nhắn khi phát hiện server thời tiết", Config.WebhookNotifyWeather, function(v)
+        Config.WebhookNotifyWeather = v
+    end)
+    Components.CreateButtonRow(cardWebhook, "Kiểm Tra Webhook Discord", "Gửi 1 tin nhắn test đến kênh Discord", "Test Webhook", function()
+        if not Config.WebhookUrl or Config.WebhookUrl == "" then
+            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
+            return
+        end
+        Utils.SendDiscordWebhook(
+            "✅ TEST KẾT NỐI DISCORD THÀNH CÔNG!",
+            "Heavyweight Fishing Hub V2 đã kết nối thành công với webhook này!",
+            65280,
+            {
+                { name = "Thời Gian", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = true },
+                { name = "Job ID", value = game.JobId, inline = false }
+            },
+            Config.WebhookUrl
+        )
+        Utils.ShowNotification("Webhook", "Đã gửi tin nhắn test đến Discord!", "SUCCESS", 4)
+    end)
 
+    -- Telegram Bot
+    Components.CreateCategoryHeader(parent, "✈️ Thông Báo Telegram Bot")
+    local cardTele = Components.CreateCardGroup(parent)
+    Components.CreateInputRow(cardTele, "Bot Token", "Token lấy từ @BotFather", Config.TelegramBotToken or "", function(v)
+        Config.TelegramBotToken = v
+    end, nil, "123456789:ABCdefGhIJKlmNoPQR...")
+    Components.CreateInputRow(cardTele, "Chat ID", "ID của bạn hoặc nhóm (lấy từ @userinfobot)", Config.TelegramChatId or "", function(v)
+        Config.TelegramChatId = v
+    end, nil, "123456789 hoặc -100...")
+    Components.CreateToggleRow(cardTele, "Bật Telegram Bot", "Kích hoạt gửi thông báo qua Telegram", Config.TelegramEnabled, function(v)
+        Config.TelegramEnabled = v
+    end)
+    Components.CreateToggleRow(cardTele, "Báo Săn Boss", "Gửi thông báo khi gặp Secret Boss", Config.TelegramNotifyBoss, function(v)
+        Config.TelegramNotifyBoss = v
+    end)
+    Components.CreateToggleRow(cardTele, "Báo Đạo Sĩ / Mao Sơn / Thần Linh", "Gửi thông báo khi quét thấy NPC đặc biệt", Config.TelegramNotifyNPC, function(v)
+        Config.TelegramNotifyNPC = v
+    end)
+    Components.CreateToggleRow(cardTele, "Báo Thời Tiết Server", "Gửi thông báo khi tìm thấy thời tiết", Config.TelegramNotifyWeather, function(v)
+        Config.TelegramNotifyWeather = v
+    end)
+    Components.CreateButtonRow(cardTele, "Kiểm Tra Telegram Bot", "Gửi tin nhắn test kiểm tra kết nối", "Test Telegram", function()
+        if not Config.TelegramBotToken or Config.TelegramBotToken == "" or not Config.TelegramChatId or Config.TelegramChatId == "" then
+            Utils.ShowNotification("Telegram", "Vui lòng nhập Bot Token và Chat ID trước!", "WARN", 3)
+            return
+        end
+        local ok = Utils.SendTelegramMessage(Config, "🤖 *Heavyweight Fishing Hub V2*\n✅ *Kiểm tra kết nối Telegram thành công!*\nThời gian: `" .. os.date("%H:%M:%S - %d/%m/%Y") .. "`\nJob ID: `" .. game.JobId .. "`")
+        if ok then
+            Utils.ShowNotification("Telegram", "Đã gửi tin nhắn test đến Telegram!", "SUCCESS", 4)
+        else
+            Utils.ShowNotification("Telegram", "Gửi tin nhắn thất bại, hãy kiểm tra Token và Chat ID!", "ERROR", 5)
+        end
+    end)
+
+    -- Exit
     Components.CreateCategoryHeader(parent, "Hệ Thống & Thoát")
     local cardExit = Components.CreateCardGroup(parent)
     Components.CreateButtonRow(cardExit, "Hủy Script Hoàn Toàn (Unload)", "Xóa toàn bộ giao diện và ngắt kết nối an toàn", "Hủy Script", function()
@@ -3977,18 +6069,20 @@ end
 __modules["ui.tabs.tab_nhan_vat"] = function()
 --[[
     v2/ui/tabs/tab_nhan_vat.lua
-    Exact Tab Nhân Vật from backup.lua (Speed, Fly, Noclip, Walk on water, Anti-AFK)
+    Character Physics, Fly, Noclip, Walk on Water, Anti-AFK & Visual Spoofing
 --]]
 
 local Components = __require("ui.components")
 local ConfigModule = __require("core.config")
 local Config = ConfigModule.Config
 local Character = __require("features.character")
+local Spoof = __require("features.spoof")
+local Utils = __require("core.utils")
 
 local TabNhanVat = {}
 
 function TabNhanVat.Render(parent)
-    Components.CreateCategoryHeader(parent, "Di Chuyển & Thể Chất")
+    Components.CreateCategoryHeader(parent, "🏃 Di Chuyển & Thể Chất")
     local cardMove = Components.CreateCardGroup(parent)
 
     Components.CreateToggleRow(cardMove, "Tăng Tốc Độ Chạy (Speed)", "Tăng tốc độ di chuyển của nhân vật", Config.WalkSpeedEnabled, function(v)
@@ -4018,7 +6112,45 @@ function TabNhanVat.Render(parent)
         Config.InfiniteJump = v
     end)
 
-    Components.CreateCategoryHeader(parent, "Hệ Thống & Chống Treo")
+    Components.CreateCategoryHeader(parent, "🎭 Ảo Hoá Tài Sản (Visual Spoof)")
+    local cardSpoof = Components.CreateCardGroup(parent)
+
+    local targetGems = Spoof.fakeGems or 0
+    local targetTickets = Spoof.fakeTicket or 0
+
+    Components.CreateInputRow(cardSpoof, "Số Gems Ảo", "Nhập số lượng Gems muốn hiển thị trên màn hình", tostring(targetGems), function(v)
+        local n = tonumber(v)
+        if n and n >= 0 then targetGems = n end
+    end, nil, "VD: 9999999")
+
+    Components.CreateButtonRow(cardSpoof, "Áp Dụng Gems Ảo", "Đổi giao diện hiển thị Gems sang con số trên", "Đổi Gems", function()
+        Spoof.fakeGems = targetGems
+        Spoof.Save()
+        Spoof.Apply(false)
+        Utils.ShowNotification("Visual Spoof", "Đã ảo hóa Gems thành: " .. Spoof.FormatWithSpaces(targetGems), "SUCCESS", 4)
+    end)
+
+    Components.CreateInputRow(cardSpoof, "Số Vé Ảo (Tickets)", "Nhập số lượng vé muốn hiển thị", tostring(targetTickets), function(v)
+        local n = tonumber(v)
+        if n and n >= 0 then targetTickets = n end
+    end, nil, "VD: 100")
+
+    Components.CreateButtonRow(cardSpoof, "Áp Dụng Vé Ảo", "Đổi giao diện hiển thị Vé sang con số trên", "Đổi Vé", function()
+        Spoof.fakeTicket = targetTickets
+        Spoof.Save()
+        Spoof.Apply(false)
+        Utils.ShowNotification("Visual Spoof", "Đã ảo hóa Vé thành: " .. tostring(targetTickets), "SUCCESS", 4)
+    end)
+
+    Components.CreateButtonRow(cardSpoof, "Khôi Phục Thực Tế (Reset)", "Trả lại số Gems và Vé thật của tài khoản", "Reset", function()
+        Spoof.fakeGems = 0
+        Spoof.fakeTicket = 0
+        Spoof.Save()
+        Spoof.Apply(true)
+        Utils.ShowNotification("Visual Spoof", "Đã khôi phục số dư thật!", "INFO", 4)
+    end)
+
+    Components.CreateCategoryHeader(parent, "🛡️ Hệ Thống & Chống Treo")
     local cardSystem = Components.CreateCardGroup(parent)
     Components.CreateToggleRow(cardSystem, "Chống Văng Game (Anti-AFK)", "Ngăn chặn bị kick khi treo máy qua đêm", Config.AntiAFK, function(v)
         Config.AntiAFK = v
@@ -4035,22 +6167,40 @@ end
 __modules["ui.tabs.tab_nhiem_vu"] = function()
 --[[
     v2/ui/tabs/tab_nhiem_vu.lua
-    Exact Tab Nhiệm Vụ from backup.lua (Daily Tickets Engine & Settings)
+    Daily Tickets Engine, Settings, Spots Management & Remote Actions
 --]]
 
 local Components = __require("ui.components")
 local ConfigModule = __require("core.config")
 local Config = ConfigModule.Config
+local Quest = __require("features.quest")
+local Services = __require("core.services")
+local LocalPlayer = Services.LocalPlayer
+local Utils = __require("core.utils")
 
 local TabNhiemVu = {}
 
 function TabNhiemVu.Render(parent)
-    Components.CreateCategoryHeader(parent, "Tự Động Nộp & Làm Vé Nhiệm Vụ (Tickets)")
+    Components.CreateCategoryHeader(parent, "📊 Trạng Thái Vé Nhiệm Vụ")
+    local cardStatus = Components.CreateCardGroup(parent)
+
+    local statusRow = Components.CreateStatusRow(cardStatus, "Tiến Độ Nhiệm Vụ", Quest.state.statusText)
+    task.spawn(function()
+        while true do
+            task.wait(1.5)
+            if statusRow and statusRow.Set then
+                statusRow.Set(Quest.state.statusText)
+            end
+        end
+    end)
+
+    Components.CreateCategoryHeader(parent, "🎟️ Tự Động Nộp & Làm Vé Nhiệm Vụ (Tickets)")
     local cardTicket = Components.CreateCardGroup(parent)
 
     Components.CreateToggleRow(cardTicket, "Tự Động Nộp Vé Nhiệm Vụ (Tickets)", "Tự động nhận, thực hiện và trả nhiệm vụ vé hàng ngày", Config.AutoTicketQuest, function(v) Config.AutoTicketQuest = v end)
-    Components.CreateDropdownRow(cardTicket, "Chọn Độ Khó Vé Nhiệm Vụ", "Độ khó nhiệm vụ muốn ưu tiên nhận", {"Easy", "Medium", "Hard"}, Config.TicketDifficulty, function(v) Config.TicketDifficulty = v end)
+    Components.CreateDropdownRow(cardTicket, "Chọn Độ Khó Vé Nhiệm Vụ", "Độ khó nhiệm vụ muốn ưu tiên nhận", {"Hard", "Easy"}, Config.TicketDifficulty, function(v) Config.TicketDifficulty = v end)
     Components.CreateDropdownRow(cardTicket, "Chế Độ Nhiệm Vụ", "Chế độ lọc loại nhiệm vụ ưu tiên", {"Tự Động (Auto Detect)", "100 Cá (Fish 100)", "100 Chiêu (Skill 100)", "15m Cá (Size 15m)", "100 Mồi (Bait 100)"}, Config.TicketQuestMode, function(v) Config.TicketQuestMode = v end)
+    Components.CreateDropdownRow(cardTicket, "Mồi Cho Nhiệm Vụ 100 Mồi", "Loại mồi dùng khi làm quest 100 mồi", {"Basic Bait", "Ancestral Bait", "Secret Bait"}, Config.TicketBaitChoice, function(v) Config.TicketBaitChoice = v end)
     Components.CreateDropdownRow(cardTicket, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Chiêu spam cho nhiệm vụ 100 skill", {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}, Config.TicketSkillKey, function(v) Config.TicketSkillKey = v end)
     Components.CreateDropdownRow(cardTicket, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu kết liễu nhanh cho nhiệm vụ 100 cá", {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}, Config.TicketQuickSkill, function(v) Config.TicketQuickSkill = v end)
     Components.CreateToggleRow(cardTicket, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự bán cá giải phóng chỗ trống khi đang làm vé", Config.TicketAutoSellFull, function(v) Config.TicketAutoSellFull = v end)
@@ -4058,6 +6208,61 @@ function TabNhiemVu.Render(parent)
     Components.CreateToggleRow(cardTicket, "Tự Động Quăng Cần Tại Home Spot", "Tiếp tục farm cá tại Home Spot khi hoàn thành vé", Config.TicketAutoCastAtHome, function(v) Config.TicketAutoCastAtHome = v end)
     Components.CreateToggleRow(cardTicket, "Nhận & Nộp Vé Từ Xa (Remote)", "Thực hiện nhận và trả nhiệm vụ từ xa", Config.TicketRemoteClaim, function(v) Config.TicketRemoteClaim = v end)
     Components.CreateToggleRow(cardTicket, "Tự Động Nhận Thưởng Hàng Ngày (Daily)", "Tự động nhận quà đăng nhập mỗi ngày", Config.AutoClaimDaily, function(v) Config.AutoClaimDaily = v end)
+
+    Components.CreateCategoryHeader(parent, "⚡ Thao Tác Nhanh")
+    local cardActions = Components.CreateCardGroup(parent)
+
+    Components.CreateButtonRow(cardActions, "Nộp Vé Ngay Lập Tức", "Dịch chuyển tức thì đến NPC và nộp vé hoàn thành", "Nộp Vé", function()
+        Utils.ShowNotification("Nhiệm Vụ Vé", "Đang tiến hành nộp vé...", "INFO", 3)
+        task.spawn(function()
+            Quest.InteractNPC(true, Config)
+        end)
+    end)
+
+    Components.CreateButtonRow(cardActions, "Nhận Vé Mới Ngay", "Dịch chuyển đến NPC và nhận vé nhiệm vụ mới", "Nhận Vé", function()
+        Utils.ShowNotification("Nhiệm Vụ Vé", "Đang tiến hành nhận vé mới...", "INFO", 3)
+        task.spawn(function()
+            Quest.InteractNPC(false, Config)
+        end)
+    end)
+
+    Components.CreateButtonRow(cardActions, "Bay Đến NPC Vé", "Dịch chuyển tức thì đến vị trí của NPC trao vé", "Bay Đến", function()
+        Quest.TeleportToNPC()
+        Utils.ShowNotification("Nhiệm Vụ Vé", "Đã bay đến vị trí NPC nhận vé!", "SUCCESS", 4)
+    end)
+
+    Components.CreateCategoryHeader(parent, "📍 Cài Đặt Điểm Câu Cho Từng Loại Vé")
+    local cardSpots = Components.CreateCardGroup(parent)
+
+    Components.CreateButtonRow(cardSpots, "Lưu Vị Trí Hiện Tại Làm Điểm 100 Cá", "Đặt tọa độ đứng hiện tại làm điểm farm 100 con cá", "Lưu 100 Cá", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Quest.state.spot100Fish = root.Position
+            Quest.SaveSpots()
+            Utils.ShowNotification("Điểm Câu", "Đã lưu điểm làm nhiệm vụ 100 con cá!", "SUCCESS", 4)
+        end
+    end)
+
+    Components.CreateButtonRow(cardSpots, "Lưu Vị Trí Hiện Tại Làm Điểm 1.5M Cá", "Đặt tọa độ đứng hiện tại làm điểm farm cá 1.5M (Map 9)", "Lưu 1.5M Cá", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Quest.state.spot15MFish = root.Position
+            Quest.SaveSpots()
+            Utils.ShowNotification("Điểm Câu", "Đã lưu điểm làm nhiệm vụ cá 1.5M!", "SUCCESS", 4)
+        end
+    end)
+
+    Components.CreateButtonRow(cardSpots, "Lưu Vị Trí Hiện Tại Làm Điểm 100 Mồi", "Đặt tọa độ đứng hiện tại làm điểm farm tiêu thụ 100 mồi", "Lưu 100 Mồi", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Quest.state.spot100Bait = root.Position
+            Quest.SaveSpots()
+            Utils.ShowNotification("Điểm Câu", "Đã lưu điểm làm nhiệm vụ 100 mồi!", "SUCCESS", 4)
+        end
+    end)
 end
 
 return TabNhiemVu
@@ -4067,18 +6272,23 @@ end
 __modules["ui.tabs.tab_san_boss"] = function()
 --[[
     v2/ui/tabs/tab_san_boss.lua
-    Exact Tab Săn Boss from backup.lua (Chat Hunter, Fast Skip, Power Check, Custom Spots & Full Boss Target List)
+    Secret Boss Hunter, Fast Skip, Spot Allocation, Jitter, Weather Server Hop & Totems
 --]]
 
 local Components = __require("ui.components")
 local State = __require("core.state")
 local ConfigModule = __require("core.config")
 local Config = ConfigModule.Config
+local Boss = __require("features.boss")
+local Weather = __require("features.weather")
+local Services = __require("core.services")
+local LocalPlayer = Services.LocalPlayer
+local Utils = __require("core.utils")
 
 local TabSanBoss = {}
 
 function TabSanBoss.Render(parent)
-    Components.CreateCategoryHeader(parent, "Tự Động Săn Boss & Đổi Server")
+    Components.CreateCategoryHeader(parent, "👹 Tự Động Săn Boss & Đổi Server")
     local bossCoreCard = Components.CreateCardGroup(parent)
 
     Components.CreateToggleRow(bossCoreCard, "Bật Chế Độ Săn Boss (Tự Quăng Cần & Lọc Cá)", "Tự động thả cần câu và săn boss tại chỗ", Config.AutoHuntBoss, function(v) Config.AutoHuntBoss = v end)
@@ -4089,32 +6299,66 @@ function TabSanBoss.Render(parent)
     Components.CreateToggleRow(bossCoreCard, "Tự Đổi Server Khi Hết Boss (Auto-Hop)", "Tự chuyển server mới khi boss biến mất", Config.AutoServerHopOnDespawn, function(v) Config.AutoServerHopOnDespawn = v end)
     Components.CreateToggleRow(bossCoreCard, "Tự Về Vị Trí Farm Khi Hết Boss / Clear", "Quay lại điểm câu farm chính sau khi săn boss xong", Config.ReturnToHomeWhenClear, function(v) Config.ReturnToHomeWhenClear = v end)
 
+    Components.CreateCategoryHeader(parent, "📍 Phân Bổ Điểm Đứng & Chống Trùng Tọa Độ")
+    local spotCard = Components.CreateCardGroup(parent)
+
+    Components.CreateDropdownRow(spotCard, "Chế Độ Chọn Điểm Câu Boss", "Phân chia điểm câu an toàn tránh giẫm chân bot khác", {"Tự Động (Theo Acc)", "Cố Định"}, Config.BossSpotAllocationMode or "Tự Động (Theo Acc)", function(v) Config.BossSpotAllocationMode = v end)
+    Components.CreateToggleRow(spotCard, "Bật Jitter Dịch Chuyển (Lệch Tọa Độ)", "Tạo độ lệch nhẹ ngẫu nhiên khi bay tránh trùng lặp tuyệt đối", Config.BossTeleportJitter, function(v) Config.BossTeleportJitter = v end)
+    Components.CreateSliderRow(spotCard, "Khoảng Cách Jitter", "Bán kính độ lệch tọa độ khi dịch chuyển", 0.5, 5.0, Config.BossTeleportJitterDist or 1.0, false, " studs", function(v) Config.BossTeleportJitterDist = v end)
+
+    local islandList = {"Đảo Tre (Bamboo Isle)", "Đảo Quả Dừa (Coconut Isle)", "Đảo Hổ Phách (Amber Isle)", "Đảo Băng (Frost Isle)", "Đảo Bão Tố (Storm Isle)"}
+    local selectedIsland = Config.SelectedCustomSpotIsland or islandList[1]
+    local selectedSlot = Config.SelectedCustomSpotSlot or 1
+
+    Components.CreateDropdownRow(spotCard, "Chọn Hòn Đảo", "Hòn đảo muốn tùy chỉnh điểm câu boss", islandList, selectedIsland, function(v)
+        selectedIsland = v
+        Config.SelectedCustomSpotIsland = v
+    end)
+    Components.CreateDropdownRow(spotCard, "Chọn Slot Điểm Câu (1-5)", "Vị trí slot điểm an toàn", {"1", "2", "3", "4", "5"}, tostring(selectedSlot), function(v)
+        selectedSlot = tonumber(v) or 1
+        Config.SelectedCustomSpotSlot = selectedSlot
+    end)
+    Components.CreateButtonRow(spotCard, "Lưu Vị Trí Hiện Tại Cho Slot Này", "Lưu tọa độ đứng hiện tại làm điểm an toàn cho hòn đảo đã chọn", "Lưu Slot", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Boss.SetCustomSpot(selectedIsland, selectedSlot, root.Position)
+            Utils.ShowNotification("Điểm Boss", string.format("Đã lưu Slot %d cho %s!", selectedSlot, selectedIsland), "SUCCESS", 4)
+        end
+    end)
+
+    -- Weather Server Hop Card
+    Components.CreateCategoryHeader(parent, "🌪️ Tự Động Tìm Server Thời Tiết")
+    local weatherCard = Components.CreateCardGroup(parent)
+
+    Components.CreateToggleRow(weatherCard, "Tự Động Tìm Server Thời Tiết", "Tự động đổi server liên tục đến khi gặp thời tiết mong muốn", Config.AutoWeatherHop, function(v)
+        Config.AutoWeatherHop = v
+        Weather.SaveWeatherHopState(Config)
+    end)
+    Components.CreateDropdownRow(weatherCard, "Thời Tiết Cần Tìm", "Loại thời tiết muốn bot tìm kiếm", Weather.weatherChoices, Config.TargetWeather or Weather.weatherChoices[1], function(v)
+        Config.TargetWeather = v
+    end)
+    Components.CreateToggleRow(weatherCard, "Tự Động Câu / Săn Khi Tìm Thấy", "Bắt đầu câu ngay khi vào server có thời tiết mục tiêu", Config.WeatherHopAutoFish, function(v) Config.WeatherHopAutoFish = v end)
+    Components.CreateToggleRow(weatherCard, "Gửi Webhook Khi Tìm Thấy Server", "Gửi thông báo JobID vào Discord/Telegram", Config.WeatherHopAlertWebhook, function(v) Config.WeatherHopAlertWebhook = v end)
+
+    Components.CreateCategoryHeader(parent, "🌩️ Bàn Thờ Thời Tiết (Weather Totems)")
+    local totemCard = Components.CreateCardGroup(parent)
+
+    for _, t in ipairs(Weather.totems) do
+        Components.CreateButtonRow(totemCard, t.name, "Bay đến và kích hoạt: " .. t.weather, "Kích Hoạt", function()
+            Weather.InteractTotem(t)
+        end)
+    end
+
     Components.CreateCategoryHeader(parent, "🎯 Mục Tiêu Secret Boss (Bật / Tắt Từng Con)")
-    local targetsGroup = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Boss Mục Tiêu (" .. tostring(22) .. " Loại)", true)
+    local targetsGroup = Components.CreateCollapsibleCardGroup(parent, "Danh Sách Boss Mục Tiêu", true)
 
     local bossList = {
-        "Verdant Alligator Gar",
-        "Verdant Grouper",
-        "Verdant Bonefang",
-        "Crimson Bonefang",
-        "Scarlet Fish",
-        "Elder Scarlet Fish",
-        "Crimson Electric Eel",
-        "Golden Dragonfish",
-        "Rainbow Dragonfish",
-        "Flying Fish Emperor",
-        "Flying Fish Empress",
-        "Draconic Koi",
-        "Sanguine Fish",
-        "Tigerfang Whale",
-        "Heavenpiercer Turtle",
-        "Heaven Piercer Turtle",
-        "Reborn Puffer Beast",
-        "Frost Kingfish",
-        "Frost Queenfish",
-        "Mountain Dragonwhale",
-        "Mirage Lanternfish",
-        "Nameless Octoparasite"
+        "Verdant Alligator Gar", "Verdant Grouper", "Verdant Bonefang", "Crimson Bonefang",
+        "Scarlet Fish", "Elder Scarlet Fish", "Crimson Electric Eel", "Golden Dragonfish", "Rainbow Dragonfish",
+        "Flying Fish Emperor", "Flying Fish Empress", "Draconic Koi", "Sanguine Fish",
+        "Tigerfang Whale", "Heavenpiercer Turtle", "Heaven Piercer Turtle", "Reborn Puffer Beast",
+        "Frost Kingfish", "Frost Queenfish", "Mountain Dragonwhale", "Mirage Lanternfish", "Nameless Octoparasite"
     }
 
     for _, bossName in ipairs(bossList) do
@@ -4134,18 +6378,58 @@ end
 __modules["ui.tabs.tab_shop"] = function()
 --[[
     v2/ui/tabs/tab_shop.lua
-    Exact Tab Shop & Chế Mồi from backup.lua (Bait crafting/buying & Rod Shop)
+    Auto Sell with Advanced Protection Filters, Bait Crafting/Buying & Rod Shop
 --]]
 
 local Components = __require("ui.components")
 local ConfigModule = __require("core.config")
 local Config = ConfigModule.Config
 local Shop = __require("features.shop")
+local Services = __require("core.services")
+local LocalPlayer = Services.LocalPlayer
+local Events = Services.Events
+local Utils = __require("core.utils")
 
 local TabShop = {}
 
 function TabShop.Render(parent)
-    Components.CreateCategoryHeader(parent, "Tự Động Chế Mồi & Mua Mồi")
+    Components.CreateCategoryHeader(parent, "💰 Kinh Tế & Tự Động Bán Cá")
+    local sellCard = Components.CreateCardGroup(parent)
+
+    Components.CreateToggleRow(sellCard, "Tự Động Bán Cá (Auto Sell)", "Tự động bán toàn bộ cá trong balo theo chu kỳ", Config.AutoSell, function(v) Config.AutoSell = v end)
+    Components.CreateSliderRow(sellCard, "Thời Gian Giãn Cách Bán", "Chu kỳ số giây tự động bán cá 1 lần", 10, 300, Config.SellInterval, false, "s", function(v) Config.SellInterval = v end)
+
+    Components.CreateButtonRow(sellCard, "Bán Ngay & Bay Đến Nana", "Dịch chuyển tức thì đến NPC Nana và bán cá an toàn", "Bán Ngay", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(-203.5, 7.3, 107.1)
+            task.wait(0.3)
+            Shop.ProtectAllInventoryItems(Config, false)
+            if Events and Events:FindFirstChild("SellFish") then
+                Events.SellFish:FireServer("All")
+                Utils.ShowNotification("Bán Cá", "Đã bán cá cho NPC Nana thành công!", "SUCCESS", 4)
+            end
+        end
+    end)
+
+    local fishList = {
+        "Verdant Alligator Gar", "Verdant Grouper", "Verdant Bonefang", "Crimson Bonefang",
+        "Scarlet Fish", "Elder Scarlet Fish", "Crimson Electric Eel", "Golden Dragonfish", "Rainbow Dragonfish",
+        "Flying Fish Emperor", "Flying Fish Empress", "Draconic Koi", "Sanguine Fish",
+        "Tigerfang Whale", "Heavenpiercer Turtle", "Reborn Puffer Beast", "Frost Kingfish", "Frost Queenfish",
+        "Mountain Dragonwhale", "Mirage Lanternfish", "Nameless Octoparasite"
+    }
+
+    Components.CreateToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted...", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
+    Components.CreateToggleRow(sellCard, "Giữ Cá Theo Trọng Lượng", "Giữ lại mọi con cá có cân nặng vượt ngưỡng", Config.KeepFishOverWeight, function(v) Config.KeepFishOverWeight = v end)
+    Components.CreateSliderRow(sellCard, "Ngưỡng Cân Nặng Giữ (kg)", "Mức cân nặng tối thiểu để giữ cá lại không bán", 100, 1000000, Config.MinWeightToKeep or 1000, true, " kg", function(v) Config.MinWeightToKeep = v end)
+    Components.CreateToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá quý hiếm đã chọn, không bao giờ bị bán nhầm", Config.AutoFavouriteFish, function(v) Config.AutoFavouriteFish = v end)
+    Components.CreateDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName or fishList[1], function(v) Config.FavouriteFishName = v end)
+    Components.CreateToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu chế mồi, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
+
+    Components.CreateCategoryHeader(parent, "🪱 Tự Động Chế Mồi & Mua Mồi")
     local cardBait = Components.CreateCardGroup(parent)
 
     Components.CreateToggleRow(cardBait, "Tự Động Chế Mồi", "Tự động chế mồi khi đủ nguyên liệu", Config.AutoCraftBait, function(v) Config.AutoCraftBait = v end)
@@ -4202,24 +6486,80 @@ end
 __modules["ui.tabs.tab_than_linh"] = function()
 --[[
     v2/ui/tabs/tab_than_linh.lua
-    Exact Tab Thần Linh from backup.lua (God Spirit, Taoist, Maoshan Pray & Server Hop)
+    God Spirit, Taoist, Maoshan Pray, Server Hop & Teleport Controls
 --]]
 
 local Components = __require("ui.components")
 local ConfigModule = __require("core.config")
 local Config = ConfigModule.Config
+local Spirits = __require("features.spirits")
+local Utils = __require("core.utils")
 
 local TabThanLinh = {}
 
 function TabThanLinh.Render(parent)
-    Components.CreateCategoryHeader(parent, "Cúng Bái & Đổi Server Thần Linh")
+    Components.CreateCategoryHeader(parent, "🙏 Cúng Bái & Đổi Server Thần Linh")
     local cardGod = Components.CreateCardGroup(parent)
 
     Components.CreateToggleRow(cardGod, "Tự Động Quét Trạng Thái Thần Linh", "Liên tục kiểm tra Thần Linh xuất hiện trong game", Config.AutoGodSpiritCheck, function(v) Config.AutoGodSpiritCheck = v end)
     Components.CreateToggleRow(cardGod, "Tự Động Cầu Nguyện Thần Linh", "Tự động gửi yêu cầu cầu nguyện khi đứng gần", Config.AutoPrayGodSpirit, function(v) Config.AutoPrayGodSpirit = v end)
-    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Thần Linh", "Tự động đổi máy chủ nếu chưa có Thần Linh", Config.AutoServerHopGod, function(v) Config.AutoServerHopGod = v end)
-    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Maoshan", "Tự đổi máy chủ săn NPC Mao Sơn", Config.AutoServerHopMaoshan, function(v) Config.AutoServerHopMaoshan = v end)
-    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Đạo Sĩ (Taoist)", "Tự đổi máy chủ săn NPC Đạo Sĩ", Config.AutoServerHopTaoist, function(v) Config.AutoServerHopTaoist = v end)
+    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Thần Linh", "Tự động đổi máy chủ nếu chưa có Thần Linh", Config.AutoServerHopGod, function(v)
+        Config.AutoServerHopGod = v
+        Spirits.SaveNPCHopState(Config)
+    end)
+    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Maoshan", "Tự đổi máy chủ săn NPC Mao Sơn", Config.AutoServerHopMaoshan, function(v)
+        Config.AutoServerHopMaoshan = v
+        Spirits.SaveNPCHopState(Config)
+    end)
+    Components.CreateToggleRow(cardGod, "Đổi Server Tìm Đạo Sĩ (Taoist)", "Tự đổi máy chủ săn NPC Đạo Sĩ", Config.AutoServerHopTaoist, function(v)
+        Config.AutoServerHopTaoist = v
+        Spirits.SaveNPCHopState(Config)
+    end)
+
+    Components.CreateCategoryHeader(parent, "📜 Dịch Chuyển Tức Thì Đến NPC")
+    local cardTele = Components.CreateCardGroup(parent)
+
+    Components.CreateButtonRow(cardTele, "📜 Bay Đến Đạo Sĩ (Taoist)", "Dịch chuyển tức thì đến NPC Đạo Sĩ nếu có trong server", "Bay Đến", function()
+        local tInst, tName = Spirits.ScanForTaoistNPC()
+        if tInst then
+            local ok = Spirits.TeleportToNPC(tInst)
+            if ok then
+                Utils.ShowNotification("Đạo Sĩ (Taoist)", "Đã dịch chuyển đến vị trí " .. tostring(tName) .. "!", "SUCCESS", 5)
+            else
+                Utils.ShowNotification("Đạo Sĩ (Taoist)", "Không lấy được tọa độ Đạo Sĩ.", "WARN")
+            end
+        else
+            Utils.ShowNotification("Đạo Sĩ (Taoist)", "Server này hiện chưa có Đạo Sĩ (Taoist)! Hãy bật 'Đổi Server Tìm Taoist'.", "WARN", 6)
+        end
+    end)
+
+    Components.CreateButtonRow(cardTele, "✨ Bay Đến Đạo Sĩ Mao Sơn", "Dịch chuyển tức thì đến NPC Mao Sơn nếu có trong server", "Bay Đến", function()
+        local mInst, mName = Spirits.ScanForMaoshanNPC()
+        if mInst then
+            local ok = Spirits.TeleportToNPC(mInst)
+            if ok then
+                Utils.ShowNotification("Đạo Sĩ Mao Sơn", "Đã dịch chuyển đến vị trí " .. tostring(mName) .. "!", "SUCCESS", 5)
+            else
+                Utils.ShowNotification("Đạo Sĩ Mao Sơn", "Không lấy được tọa độ Mao Sơn.", "WARN")
+            end
+        else
+            Utils.ShowNotification("Đạo Sĩ Mao Sơn", "Server này hiện chưa có Mao Sơn! Hãy bật 'Đổi Server Tìm Maoshan'.", "WARN", 6)
+        end
+    end)
+
+    Components.CreateButtonRow(cardTele, "⚡ Bay Đến Thần Linh (God Spirit)", "Dịch chuyển tức thì đến Thần Linh nếu có trong server", "Bay Đến", function()
+        local sp = Spirits.ScanForGodSpirit()
+        if sp then
+            local ok = Spirits.TeleportToNPC(sp)
+            if ok then
+                Utils.ShowNotification("Thần Linh", "Đã dịch chuyển đến Thần Linh thành công!", "SUCCESS", 5)
+            else
+                Utils.ShowNotification("Thần Linh", "Không lấy được tọa độ Thần Linh.", "WARN")
+            end
+        else
+            Utils.ShowNotification("Thần Linh", "Server này hiện chưa có Thần Linh!", "WARN", 5)
+        end
+    end)
 end
 
 return TabThanLinh
@@ -4664,7 +7004,7 @@ end
 --[[
     v2/main.lua
     Identical Hub V2 - Heavyweight Fishing
-    Rebuilt from backup.lua • 100% Original UI • Modular Architecture • Strict Sequential Combo
+    100% Feature Parity with Modular V2 Architecture • Strict Sequential Combo
 --]]
 
 local Services = __require("core.services")
@@ -4683,11 +7023,13 @@ local BossDps = __require("features.boss_dps")
 local Quest = __require("features.quest")
 local Spirits = __require("features.spirits")
 local Shop = __require("features.shop")
+local Weather = __require("features.weather")
+local Spoof = __require("features.spoof")
 local Teleport = __require("features.teleport")
 local Visuals = __require("features.visuals")
 local Character = __require("features.character")
 
--- UI Tabs (Exact tabs from backup.lua - Wiki Tab Omitted!)
+-- UI Tabs
 local TabCauCa = __require("ui.tabs.tab_cau_ca")
 local TabSanBoss = __require("ui.tabs.tab_san_boss")
 local TabThanLinh = __require("ui.tabs.tab_than_linh")
@@ -4702,7 +7044,7 @@ local TabThuNghiem = __require("ui.tabs.tab_thu_nghiem")
 -- 1. Dọn dẹp bản cũ
 Services.CleanOldInstances()
 
--- 2. Khởi tạo Giao diện chính (Exact Floating Avatar, TitleBar, Sidebar from backup.lua)
+-- 2. Khởi tạo Giao diện chính
 Window.Init(ConfigModule.SCRIPT_BUILD_COMMIT, function()
     Utils.ShowNotification("Diệt Script", "Đang đóng script hoàn toàn...", "WARN", 2)
     task.wait(0.2)
@@ -4712,7 +7054,7 @@ end)
 -- Khởi tạo Widget Sát Thương Boss (% HP)
 BossDps.Init(Window.screenGui)
 
--- 3. Tạo các Tab chức năng (Không có Tab Wiki!)
+-- 3. Tạo các Tab chức năng
 local tabFishing      = Window.CreateTab("Câu Cá")
 local tabBoss         = Window.CreateTab("Săn Boss")
 local tabGod          = Window.CreateTab("Thần Linh")
@@ -4739,9 +7081,41 @@ TabThuNghiem.Render(tabExperimental)
 -- Mặc định hiển thị Tab Câu Cá
 Window.SwitchTab("Câu Cá")
 
--- 5. Nạp cấu hình đã lưu (SmartCombo & Boss Targets)
+-- 5. Nạp cấu hình đã lưu
 ConfigModule.LoadSmartComboAndSyncUI(State.UIControllers)
 ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
+
+-- 6. Khởi động các Watcher & Trình nạp phục hồi khi chuyển server (Hop Recovery)
+Shop.InitInventoryWatcher(Config)
+Weather.CheckWeatherHopOnJoin(Config)
+Spirits.CheckNPCHopOnJoin(Config)
+
+-- Lắng nghe tin nhắn chat để săn Secret Boss
+pcall(function()
+    local TextChatService = game:GetService("TextChatService")
+    if TextChatService and TextChatService:FindFirstChild("MessageReceived") then
+        local conn = TextChatService.MessageReceived:Connect(function(textChatMessage)
+            if not State.isRunning then return end
+            if textChatMessage and textChatMessage.Text then
+                Boss.HandleChatMessage(textChatMessage.Text, Config)
+            end
+        end)
+        State.AddConnection(conn)
+    end
+end)
+
+pcall(function()
+    local chatEvents = Services.ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+    if chatEvents and chatEvents:FindFirstChild("OnMessageDoneFiltering") then
+        local conn = chatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
+            if not State.isRunning then return end
+            if data and data.Message then
+                Boss.HandleChatMessage(tostring(data.Message), Config)
+            end
+        end)
+        State.AddConnection(conn)
+    end
+end)
 
 -- Vòng lặp cập nhật Widget Sát Thương Boss (% HP)
 task.spawn(function()
@@ -4751,7 +7125,16 @@ task.spawn(function()
     end
 end)
 
--- 6. Core Heartbeat Runtime Loop
+-- Vòng lặp kiểm tra định kỳ (Spirits, Weather, Quests, Auto-Hop)
+task.spawn(function()
+    while State.isRunning do
+        task.wait(1.5)
+        pcall(function() Spirits.Tick(Config) end)
+        pcall(function() Weather.Tick(Config) end)
+    end
+end)
+
+-- 7. Core Heartbeat Runtime Loop
 local wasMinigame = false
 local wasFishing = false
 
@@ -4805,7 +7188,7 @@ end)
 
 State.AddConnection(heartbeatConn)
 
--- 7. Keybinds & Anti-AFK
+-- 8. Keybinds & Anti-AFK
 Character.SetupAntiAFK()
 
 local inputConn = Services.UserInputService.InputBegan:Connect(function(input, gpe)
@@ -4818,11 +7201,11 @@ local inputConn = Services.UserInputService.InputBegan:Connect(function(input, g
 end)
 State.AddConnection(inputConn)
 
--- 8. Global Unload Hooks
+-- 9. Global Unload Hooks
 local gEnv = (getgenv and getgenv()) or _G or shared
 if gEnv then
     gEnv.HeavyweightFishingKill = function() State.UnloadScript() end
     gEnv.IdenticalHeavyweightFishingUnload = function() State.UnloadScript() end
 end
 
-Utils.ShowNotification("CÂU CÁ PRO", "Khởi động thành công! Nhấn [Right-Control] hoặc Avatar để ẩn/hiện menu.", "SUCCESS", 4)
+Utils.ShowNotification("CÂU CÁ PRO", "Khởi động thành công V2! Nhấn [Right-Control] hoặc Avatar để ẩn/hiện menu.", "SUCCESS", 4)

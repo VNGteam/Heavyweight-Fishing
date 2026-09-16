@@ -1,7 +1,7 @@
 --[[
     v2/main.lua
     Identical Hub V2 - Heavyweight Fishing
-    Rebuilt from backup.lua • 100% Original UI • Modular Architecture • Strict Sequential Combo
+    100% Feature Parity with Modular V2 Architecture • Strict Sequential Combo
 --]]
 
 local Services = require(script.core.services)
@@ -20,11 +20,13 @@ local BossDps = require(script.features.boss_dps)
 local Quest = require(script.features.quest)
 local Spirits = require(script.features.spirits)
 local Shop = require(script.features.shop)
+local Weather = require(script.features.weather)
+local Spoof = require(script.features.spoof)
 local Teleport = require(script.features.teleport)
 local Visuals = require(script.features.visuals)
 local Character = require(script.features.character)
 
--- UI Tabs (Exact tabs from backup.lua - Wiki Tab Omitted!)
+-- UI Tabs
 local TabCauCa = require(script.ui.tabs.tab_cau_ca)
 local TabSanBoss = require(script.ui.tabs.tab_san_boss)
 local TabThanLinh = require(script.ui.tabs.tab_than_linh)
@@ -39,7 +41,7 @@ local TabThuNghiem = require(script.ui.tabs.tab_thu_nghiem)
 -- 1. Dọn dẹp bản cũ
 Services.CleanOldInstances()
 
--- 2. Khởi tạo Giao diện chính (Exact Floating Avatar, TitleBar, Sidebar from backup.lua)
+-- 2. Khởi tạo Giao diện chính
 Window.Init(ConfigModule.SCRIPT_BUILD_COMMIT, function()
     Utils.ShowNotification("Diệt Script", "Đang đóng script hoàn toàn...", "WARN", 2)
     task.wait(0.2)
@@ -49,7 +51,7 @@ end)
 -- Khởi tạo Widget Sát Thương Boss (% HP)
 BossDps.Init(Window.screenGui)
 
--- 3. Tạo các Tab chức năng (Không có Tab Wiki!)
+-- 3. Tạo các Tab chức năng
 local tabFishing      = Window.CreateTab("Câu Cá")
 local tabBoss         = Window.CreateTab("Săn Boss")
 local tabGod          = Window.CreateTab("Thần Linh")
@@ -76,9 +78,41 @@ TabThuNghiem.Render(tabExperimental)
 -- Mặc định hiển thị Tab Câu Cá
 Window.SwitchTab("Câu Cá")
 
--- 5. Nạp cấu hình đã lưu (SmartCombo & Boss Targets)
+-- 5. Nạp cấu hình đã lưu
 ConfigModule.LoadSmartComboAndSyncUI(State.UIControllers)
 ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
+
+-- 6. Khởi động các Watcher & Trình nạp phục hồi khi chuyển server (Hop Recovery)
+Shop.InitInventoryWatcher(Config)
+Weather.CheckWeatherHopOnJoin(Config)
+Spirits.CheckNPCHopOnJoin(Config)
+
+-- Lắng nghe tin nhắn chat để săn Secret Boss
+pcall(function()
+    local TextChatService = game:GetService("TextChatService")
+    if TextChatService and TextChatService:FindFirstChild("MessageReceived") then
+        local conn = TextChatService.MessageReceived:Connect(function(textChatMessage)
+            if not State.isRunning then return end
+            if textChatMessage and textChatMessage.Text then
+                Boss.HandleChatMessage(textChatMessage.Text, Config)
+            end
+        end)
+        State.AddConnection(conn)
+    end
+end)
+
+pcall(function()
+    local chatEvents = Services.ReplicatedStorage:FindFirstChild("DefaultChatSystemChatEvents")
+    if chatEvents and chatEvents:FindFirstChild("OnMessageDoneFiltering") then
+        local conn = chatEvents.OnMessageDoneFiltering.OnClientEvent:Connect(function(data)
+            if not State.isRunning then return end
+            if data and data.Message then
+                Boss.HandleChatMessage(tostring(data.Message), Config)
+            end
+        end)
+        State.AddConnection(conn)
+    end
+end)
 
 -- Vòng lặp cập nhật Widget Sát Thương Boss (% HP)
 task.spawn(function()
@@ -88,7 +122,16 @@ task.spawn(function()
     end
 end)
 
--- 6. Core Heartbeat Runtime Loop
+-- Vòng lặp kiểm tra định kỳ (Spirits, Weather, Quests, Auto-Hop)
+task.spawn(function()
+    while State.isRunning do
+        task.wait(1.5)
+        pcall(function() Spirits.Tick(Config) end)
+        pcall(function() Weather.Tick(Config) end)
+    end
+end)
+
+-- 7. Core Heartbeat Runtime Loop
 local wasMinigame = false
 local wasFishing = false
 
@@ -142,7 +185,7 @@ end)
 
 State.AddConnection(heartbeatConn)
 
--- 7. Keybinds & Anti-AFK
+-- 8. Keybinds & Anti-AFK
 Character.SetupAntiAFK()
 
 local inputConn = Services.UserInputService.InputBegan:Connect(function(input, gpe)
@@ -155,11 +198,11 @@ local inputConn = Services.UserInputService.InputBegan:Connect(function(input, g
 end)
 State.AddConnection(inputConn)
 
--- 8. Global Unload Hooks
+-- 9. Global Unload Hooks
 local gEnv = (getgenv and getgenv()) or _G or shared
 if gEnv then
     gEnv.HeavyweightFishingKill = function() State.UnloadScript() end
     gEnv.IdenticalHeavyweightFishingUnload = function() State.UnloadScript() end
 end
 
-Utils.ShowNotification("CÂU CÁ PRO", "Khởi động thành công! Nhấn [Right-Control] hoặc Avatar để ẩn/hiện menu.", "SUCCESS", 4)
+Utils.ShowNotification("CÂU CÁ PRO", "Khởi động thành công V2! Nhấn [Right-Control] hoặc Avatar để ẩn/hiện menu.", "SUCCESS", 4)

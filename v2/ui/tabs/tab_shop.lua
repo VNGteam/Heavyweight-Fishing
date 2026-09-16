@@ -1,17 +1,57 @@
 --[[
     v2/ui/tabs/tab_shop.lua
-    Exact Tab Shop & Chế Mồi from backup.lua (Bait crafting/buying & Rod Shop)
+    Auto Sell with Advanced Protection Filters, Bait Crafting/Buying & Rod Shop
 --]]
 
 local Components = require(script.Parent.Parent.components)
 local ConfigModule = require(script.Parent.Parent.Parent.core.config)
 local Config = ConfigModule.Config
 local Shop = require(script.Parent.Parent.Parent.features.shop)
+local Services = require(script.Parent.Parent.Parent.core.services)
+local LocalPlayer = Services.LocalPlayer
+local Events = Services.Events
+local Utils = require(script.Parent.Parent.Parent.core.utils)
 
 local TabShop = {}
 
 function TabShop.Render(parent)
-    Components.CreateCategoryHeader(parent, "Tự Động Chế Mồi & Mua Mồi")
+    Components.CreateCategoryHeader(parent, "💰 Kinh Tế & Tự Động Bán Cá")
+    local sellCard = Components.CreateCardGroup(parent)
+
+    Components.CreateToggleRow(sellCard, "Tự Động Bán Cá (Auto Sell)", "Tự động bán toàn bộ cá trong balo theo chu kỳ", Config.AutoSell, function(v) Config.AutoSell = v end)
+    Components.CreateSliderRow(sellCard, "Thời Gian Giãn Cách Bán", "Chu kỳ số giây tự động bán cá 1 lần", 10, 300, Config.SellInterval, false, "s", function(v) Config.SellInterval = v end)
+
+    Components.CreateButtonRow(sellCard, "Bán Ngay & Bay Đến Nana", "Dịch chuyển tức thì đến NPC Nana và bán cá an toàn", "Bán Ngay", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.CFrame = CFrame.new(-203.5, 7.3, 107.1)
+            task.wait(0.3)
+            Shop.ProtectAllInventoryItems(Config, false)
+            if Events and Events:FindFirstChild("SellFish") then
+                Events.SellFish:FireServer("All")
+                Utils.ShowNotification("Bán Cá", "Đã bán cá cho NPC Nana thành công!", "SUCCESS", 4)
+            end
+        end
+    end)
+
+    local fishList = {
+        "Verdant Alligator Gar", "Verdant Grouper", "Verdant Bonefang", "Crimson Bonefang",
+        "Scarlet Fish", "Elder Scarlet Fish", "Crimson Electric Eel", "Golden Dragonfish", "Rainbow Dragonfish",
+        "Flying Fish Emperor", "Flying Fish Empress", "Draconic Koi", "Sanguine Fish",
+        "Tigerfang Whale", "Heavenpiercer Turtle", "Reborn Puffer Beast", "Frost Kingfish", "Frost Queenfish",
+        "Mountain Dragonwhale", "Mirage Lanternfish", "Nameless Octoparasite"
+    }
+
+    Components.CreateToggleRow(sellCard, "Tự Động Khóa Cá Đột Biến", "Khóa mọi cá Shiny, Giant, Golden, Albino, Corrupted...", Config.AutoProtectMutations, function(v) Config.AutoProtectMutations = v end)
+    Components.CreateToggleRow(sellCard, "Giữ Cá Theo Trọng Lượng", "Giữ lại mọi con cá có cân nặng vượt ngưỡng", Config.KeepFishOverWeight, function(v) Config.KeepFishOverWeight = v end)
+    Components.CreateSliderRow(sellCard, "Ngưỡng Cân Nặng Giữ (kg)", "Mức cân nặng tối thiểu để giữ cá lại không bán", 100, 1000000, Config.MinWeightToKeep or 1000, true, " kg", function(v) Config.MinWeightToKeep = v end)
+    Components.CreateToggleRow(sellCard, "Khóa Cá Quý (Auto Favourite)", "Bảo vệ cá quý hiếm đã chọn, không bao giờ bị bán nhầm", Config.AutoFavouriteFish, function(v) Config.AutoFavouriteFish = v end)
+    Components.CreateDropdownRow(sellCard, "Chọn Cá Cần Khóa", "Loại cá cần bảo vệ không bán", fishList, Config.FavouriteFishName or fishList[1], function(v) Config.FavouriteFishName = v end)
+    Components.CreateToggleRow(sellCard, "Chế Độ Cày Nguyên Liệu", "Giữ lại cá làm nguyên liệu chế mồi, không bán", Config.MaterialFarming, function(v) Config.MaterialFarming = v end)
+
+    Components.CreateCategoryHeader(parent, "🪱 Tự Động Chế Mồi & Mua Mồi")
     local cardBait = Components.CreateCardGroup(parent)
 
     Components.CreateToggleRow(cardBait, "Tự Động Chế Mồi", "Tự động chế mồi khi đủ nguyên liệu", Config.AutoCraftBait, function(v) Config.AutoCraftBait = v end)

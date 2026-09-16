@@ -212,4 +212,140 @@ function Utils.SendDiscordWebhook(title, description, color, fields, webhookUrl)
     end
 end
 
+-- 5. Telegram Bot Sender
+function Utils.SendTelegramMessage(token, chatId, text)
+    if not token or token == "" or not chatId or chatId == "" or not text or text == "" then return end
+    pcall(function()
+        local url = "https://api.telegram.org/bot" .. token .. "/sendMessage"
+        local payload = {
+            chat_id = chatId,
+            text = text,
+            parse_mode = "Markdown"
+        }
+        local body = HttpService:JSONEncode(payload)
+        local headers = { ["Content-Type"] = "application/json" }
+        local req = (syn and syn.request) or (http and http.request) or http_request or (fluxus and fluxus.request) or request
+        if req then
+            task.spawn(function()
+                pcall(req, {
+                    Url = url,
+                    Method = "POST",
+                    Headers = headers,
+                    Body = body
+                })
+            end)
+        end
+    end)
+end
+
+-- 6. NPC Detection Alert (Discord + Telegram with Anti-Spam)
+local npcAlertsSent = {}
+function Utils.SendNPCDetectionAlert(npcType, npcName, npcInst, config)
+    if not config then return end
+    local alertKey = tostring(game.JobId or "local") .. "_" .. tostring(npcType)
+    if npcAlertsSent[alertKey] then return end
+    npcAlertsSent[alertKey] = true
+
+    local posStr = "Không xác định"
+    if npcInst then
+        local root = npcInst:FindFirstChild("HumanoidRootPart") or npcInst.PrimaryPart or npcInst:FindFirstChild("Head") or npcInst:FindFirstChildWhichIsA("BasePart")
+        if root then
+            local p = root.Position
+            posStr = string.format("X: %.1f, Y: %.1f, Z: %.1f", p.X, p.Y, p.Z)
+        end
+    end
+
+    local jobId = tostring(game.JobId or "")
+    local placeId = tostring(game.PlaceId or "0")
+    local playerName = (LocalPlayer and LocalPlayer.Name) or "Unknown"
+    local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
+
+    -- Discord Webhook
+    if config.WebhookEnabled and config.WebhookNotifyNPC and config.WebhookUrl and #config.WebhookUrl > 0 then
+        local fields = {
+            { name = "🎯 NPC Phát Hiện", value = "**" .. tostring(npcName) .. "**", inline = true },
+            { name = "👤 Người Tìm Thấy", value = playerName, inline = true },
+            { name = "📍 Tọa Độ Đứng", value = posStr, inline = true },
+            { name = "🔑 Job ID Server", value = "```" .. (jobId ~= "" and jobId or "N/A (Chơi 1 mình)") .. "```", inline = false },
+            { name = "⚡ Lệnh Vào Server Nhanh", value = "```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)\n```", inline = false },
+            { name = "⏰ Thời Gian", value = timeStr, inline = true }
+        }
+        Utils.SendDiscordWebhook("📜 PHÁT HIỆN " .. tostring(npcName):upper() .. " TRONG SERVER!", "Bot đã tìm thấy **" .. tostring(npcName) .. "** tại server hiện tại!", 16753920, fields, config.WebhookUrl)
+    end
+
+    -- Telegram Bot
+    if config.TelegramEnabled and config.TelegramNotifyNPC and config.TelegramBotToken and #config.TelegramBotToken > 0 and config.TelegramChatId and #config.TelegramChatId > 0 then
+        local teleText = "📜 *PHÁT HIỆN " .. tostring(npcName):upper() .. "!*\n\n"
+            .. "🎯 *NPC:* " .. tostring(npcName) .. "\n"
+            .. "👤 *Người tìm thấy:* " .. playerName .. "\n"
+            .. "📍 *Tọa độ:* " .. posStr .. "\n"
+            .. "🔑 *Job ID:* `" .. (jobId ~= "" and jobId or "N/A") .. "`\n"
+            .. "⏰ *Thời gian:* " .. timeStr .. "\n\n"
+            .. "⚡ *Code vào server:*\n`game:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)`"
+        Utils.SendTelegramMessage(config.TelegramBotToken, config.TelegramChatId, teleText)
+    end
+end
+
+-- 7. Queue Script On Teleport & ServerHop
+function Utils.QueueScriptOnTeleport()
+    local qot = queue_on_teleport or (syn and syn.queue_on_teleport) or (fluxus and fluxus.queue_on_teleport)
+    if qot then
+        pcall(function()
+            qot([[loadstring(game:HttpGet("https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/loader_v2.lua"))()]])
+        end)
+    end
+end
+
+function Utils.ServerHop(avoidServers)
+    Utils.ShowNotification("Đổi Server", "Đang tìm kiếm server phù hợp...", "WARN")
+    Utils.QueueScriptOnTeleport()
+    task.spawn(function()
+        local placeId = game.PlaceId
+        local avoidMap = {}
+        if avoidServers and type(avoidServers) == "table" then
+            for _, sid in ipairs(avoidServers) do avoidMap[sid] = true end
+        end
+        avoidMap[game.JobId] = true
+
+        local cursor = ""
+        local candidates = {}
+        for page = 1, 4 do
+            local url = string.format("https://games.roblox.com/v1/games/%d/servers/Public?sortOrder=Desc&limit=100%s", placeId, cursor ~= "" and ("&cursor=" .. cursor) or "")
+            local ok, res = pcall(function() return game:HttpGet(url) end)
+            if ok and res then
+                local bOk, body = pcall(function() return HttpService:JSONDecode(res) end)
+                if bOk and body and body.data then
+                    for _, s in ipairs(body.data) do
+                        if s.playing and s.maxPlayers and s.id and not avoidMap[s.id] then
+                            local free = s.maxPlayers - s.playing
+                            if free >= 2 then
+                                table.insert(candidates, s.id)
+                            end
+                        end
+                    end
+                    if #candidates >= 5 then break end
+                    cursor = body.nextPageCursor or ""
+                    if not cursor or cursor == "" then break end
+                end
+            end
+            task.wait(0.15)
+        end
+
+        local TeleportService = Services.TeleportService
+        local chosen = (#candidates > 0 and candidates[math.random(1, #candidates)]) or nil
+        if chosen then
+            Utils.ShowNotification("Đổi Server", "Đã tìm thấy server mới! Đang chuyển...", "SUCCESS", 3)
+            task.wait(0.5)
+            local ok, err = pcall(function() TeleportService:TeleportToPlaceInstance(placeId, chosen, LocalPlayer) end)
+            if not ok then
+                pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
+            end
+            return
+        end
+        Utils.ShowNotification("Đổi Server", "Đang chuyển sang server ngẫu nhiên...", "INFO", 3)
+        task.wait(0.5)
+        pcall(function() TeleportService:Teleport(placeId, LocalPlayer) end)
+    end)
+end
+
 return Utils
