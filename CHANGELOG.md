@@ -2,6 +2,44 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.0] - 2026-09-16
+### 🎨 Đại Tu Giao Diện Tab Quản Lý Cá (Visual 4-Slot Grid & Smart Bag Manager):
+1. **Khung 4 Ô Ảnh Nguyên Liệu Trực Quan Cho Từng Cần Câu & Mồi Câu (Visual 4-Slot Grid)**:
+   - **Tự động trích xuất icon cá thật từ Game**: Hệ thống tự động quét và cache hình ảnh cá trực tiếp từ `CraftRod.List`, `CraftBait.List`, và `Inventory.Main.List.ScrollingFrame`.
+   - **Hiển thị đầy đủ cả 3 Cần Câu tối thượng**:
+     - `Heavenpiercer Rod` (Cần Xuyên Thiên)
+     - `Sacred Bamboo Rod` (Cần Trúc Thánh)
+     - `Pure Diamond Rod` (Cần Kim Cương Thuần Khiết)
+   - Mỗi Cần sở hữu 1 Card độc lập gồm:
+     - Huy hiệu sở hữu rõ ràng: `✅ ĐÃ CÓ CẦN (Đã sở hữu X cây)` / `❌ CHƯA CÓ CẦN (Đang thu thập NL)`.
+     - Thanh tiến độ nguyên liệu: `X/4 nguyên liệu (Y%)`.
+     - **Khung 4 ô ảnh cá nằm ngang phong cách Dark Glass**: Hiển thị ảnh con cá (hoặc fallback emoji 🐟), tên cá, viền phát sáng xanh lá nếu đủ (`✅`) hoặc viền đỏ nếu thiếu (`❌`), và nhãn số lượng to rõ `x3` / `x0` bên dưới mỗi ô.
+     - 2 Nút thao tác: `[🔒 Khóa 4 NL]` và `[🔓 Mở Khóa An Toàn]` (Tự động giữ lại cá trùng với mồi thần thoại).
+   - **Khung 4 ô ảnh cá tương tự cho cả 3 loại Mồi Thần Thoại**:
+     - `Nameless Bait`, `Frost Bait`, `Rainbow Bait`.
+     - Hiển thị công suất chế mồi tối đa `Có thể chế tối đa: X viên mồi ✅` kèm 4 ô ảnh nguyên liệu và nút khóa/mở an toàn.
+
+2. **Đưa Khối Quản Lý Túi Cá Rác Lên Đầu Tab (Top of Tab)**:
+   - Thống kê tổng quan số cá trong Balo: Tổng số cá, Cá quý đang bảo vệ, Cá rác an toàn có thể dọn.
+   - 3 Nút thao tác nhanh 1-click: `[🔒 Khóa Toàn Bộ Cá Quý]`, `[🔓 Mở Khóa Riêng Cá Rác]`, `[💰 Bán Sạch Cá Rác An Toàn]`.
+
+3. **Thanh Tìm Kiếm Cá Thông Minh & Bán Theo Số Lượng Tùy Chọn (Search & Custom Sell)**:
+   - **Thanh tìm kiếm trực quan**: Gõ tìm theo tên (VD: `Carp`, `Crimson`, `Koi`, `Sovereign`...).
+   - **Card hiển thị con cá tìm được**:
+     - Khung ảnh con cá (52x52 px) + Tên cá vàng nổi bật.
+     - Trạng thái balo trực tiếp: `Balo: Có X con • 🔒 Đã khóa: Y • 🔓 Đang mở: Z`.
+   - **Thao tác độc lập**:
+     - Nút `[🔒 Khóa Loài Cá Này]` & Nút `[🔓 Mở Khóa Loài Cá Này]`.
+     - **Ô Nhập Số Lượng Muốn Bán (Custom Sell)**: Mặc định `0` (Nhập `0` là bán tất cả con cá này đang mở), hoặc nhập số cụ thể (VD: `1`, `5`, `10`). Bấm nút `[💰 Bán Cá Này]`, script sẽ tự động khóa toàn bộ cá khác, mở đúng số lượng cá này, gọi lệnh bán an toàn và khôi phục bảo vệ.
+
+4. **Tối Ưu Hóa Bộ Nhớ & Phạm Vi Biến (Lua 200 Local Limit Fix)**:
+   - Sử dụng bảng điều khiển `FM` và các hàm tạo UI tiện ích (`MakeCorner`, `MakeStroke`) cùng các khối `do ... end` con, giải quyết triệt để giới hạn 200 biến cục bộ của Lua 5.1/Luau.
+
+5. **Đồng Bộ Phiên Bản Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.5.0** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua)).
+
+---
+
 ## [v2.4.1] - 2026-09-16
 ### 🛠️ Sửa Lỗi Biên Dịch & Chạy Script (Fix "invalid argument #2 to 'format'"):
 1. **Khắc Phục Triệt Để Lỗi Chạy Script V2 (`line 6014`)**:
