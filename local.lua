@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.3.0"
+local SCRIPT_BUILD_COMMIT = "v2.3.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -5137,6 +5137,60 @@ function secretBossState.GetChosenSpotForPlayer(islandName)
     return cf, chosen.slot, #spots
 end
 
+secretBossState.cachedWeatherLabel = nil
+
+function secretBossState.GetWeatherLabel()
+    if secretBossState.cachedWeatherLabel and secretBossState.cachedWeatherLabel.Parent then
+        return secretBossState.cachedWeatherLabel
+    end
+    local pg = LocalPlayer:FindFirstChild("PlayerGui")
+    if not pg then return nil end
+    local mainGui = pg:FindFirstChild("MainGui")
+    if not mainGui then return nil end
+
+    -- 1. Ưu tiên đường dẫn trực tiếp cực chuẩn từ Game: MainGui.Info.Info.Weather.Value
+    local info1 = mainGui:FindFirstChild("Info")
+    if info1 then
+        local subInfo = info1:FindFirstChild("Info") or info1
+        local wFrame = subInfo:FindFirstChild("Weather")
+        if wFrame then
+            local val = wFrame:FindFirstChild("Value")
+            if val and val:IsA("TextLabel") then
+                secretBossState.cachedWeatherLabel = val
+                return val
+            end
+        end
+    end
+
+    -- 2. Quét nhanh trong cụm Info (không quét cả 20,000 descendants MainGui)
+    if info1 then
+        for _, d in ipairs(info1:GetDescendants()) do
+            if d:IsA("TextLabel") and d.Parent and d.Parent.Name:lower():find("weather") then
+                secretBossState.cachedWeatherLabel = d
+                return d
+            end
+        end
+    end
+
+    -- 3. Quét dự phòng toàn bộ MainGui (chỉ lấy đúng nhãn thời tiết, bỏ qua nhãn cá/nhiệm vụ/shop)
+    for _, d in ipairs(mainGui:GetDescendants()) do
+        if d:IsA("TextLabel") then
+            local pName = d.Parent and d.Parent.Name:lower() or ""
+            local dName = d.Name:lower()
+            if (pName:find("weather") or dName:find("weather"))
+                and not pName:find("island") and not dName:find("island")
+                and not pName:find("fish") and not dName:find("fish")
+                and not pName:find("shop") and not dName:find("shop")
+                and not pName:find("craft") and not dName:find("craft") then
+                secretBossState.cachedWeatherLabel = d
+                return d
+            end
+        end
+    end
+
+    return nil
+end
+
 function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
     if not matchedIsland or not matchedIsland.pos then return false end
 
@@ -5152,10 +5206,27 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
 
     -- Kiểm tra nếu người chơi có chọn săn ít nhất 1 boss ở đảo này không
     local hasTargetInIsland = false
-    for _, b in ipairs(matchedIsland.bosses) do
-        if Config.SecretBossTargets[b.name] then
-            hasTargetInIsland = true
+    local hasAnyBossConfigured = false
+    for _, isTarget in pairs(Config.SecretBossTargets or {}) do
+        if isTarget == true then
+            hasAnyBossConfigured = true
             break
+        end
+    end
+
+    -- Nếu không có boss nào được bật (chưa chọn gì hoặc cấu hình trống), mặc định cho phép săn tất cả
+    if not hasAnyBossConfigured then
+        hasTargetInIsland = true
+    else
+        for _, b in ipairs(matchedIsland.bosses or {}) do
+            local bNameLow = b.name:lower()
+            for tName, isTgt in pairs(Config.SecretBossTargets or {}) do
+                if isTgt and (tName:lower() == bNameLow or bNameLow:find(tName:lower(), 1, true) or tName:lower():find(bNameLow, 1, true)) then
+                    hasTargetInIsland = true
+                    break
+                end
+            end
+            if hasTargetInIsland then break end
         end
     end
 
@@ -5192,11 +5263,11 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
         local standPos = nil
         local waterY = nil
 
+        local targetCFrame = nil
         if customCf then
             -- 1. Ưu tiên số 1: Tọa độ tùy chọn đã cài đặt (có áp dụng xê dịch trái/phải né người)
-            local finalCf = secretBossState.ApplyJitter(customCf)
-            root.CFrame = finalCf
-            standPos = root.Position
+            targetCFrame = secretBossState.ApplyJitter(customCf)
+            standPos = targetCFrame.Position
             waterY = standPos.Y - 2.5
             local jitterTag = Config.BossTeleportJitter and " (+ xê dịch)" or ""
             ShowNotification("VỊ TRÍ TÙY CHỌN", string.format("Đã vào [Vị Trí %d/%d]%s tại %s!", chosenSlot or 1, totalSpots or 1, jitterTag, matchedIsland.islandName), "SUCCESS", 5)
@@ -5205,9 +5276,8 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
             local lookTarget, foundWater
             standPos, lookTarget, waterY, foundWater = secretBossState.FindWaterSpot(matchedIsland.pos, matchedIsland.lookAt)
             local baseCf = CFrame.lookAt(standPos, lookTarget)
-            local finalCf = secretBossState.ApplyJitter(baseCf)
-            root.CFrame = finalCf
-            standPos = root.Position
+            targetCFrame = secretBossState.ApplyJitter(baseCf)
+            standPos = targetCFrame.Position
             if foundWater then
                 ShowNotification("MÉP NƯỚC CÂU CÁ", string.format("Đã dò thấy vùng nước! Nhân vật đã vào vị trí mép bờ tại %s.", matchedIsland.islandName), "SUCCESS", 5)
             end
@@ -5220,17 +5290,48 @@ function secretBossState.Teleport(matchedIsland, detectedName, reqPower)
             wp.CanCollide = true
         end
 
-        secretBossState.standPos = standPos
+        -- Triệt tiêu hoàn toàn vận tốc để chống văng / giật lùi anti-cheat
+        pcall(function()
+            root.AssemblyLinearVelocity = Vector3.zero
+            root.AssemblyAngularVelocity = Vector3.zero
+        end)
 
-        -- Khởi động quăng cần câu sau 2.5s hạ cánh
-        lastCastTime = tick() + 2.5
+        root.CFrame = targetCFrame
+        secretBossState.standPos = targetCFrame.Position
+
+        -- Giữ CFrame ổn định trong 3 nhịp đầu (chống giật lại vị trí cũ bởi physics engine)
+        task.spawn(function()
+            for _ = 1, 3 do
+                task.wait(0.1)
+                if root and root.Parent and secretBossState.active and secretBossState.standPos then
+                    root.AssemblyLinearVelocity = Vector3.zero
+                    root.CFrame = targetCFrame
+                end
+            end
+        end)
+
+        -- Khởi động quăng cần câu sau 1.8s hạ cánh
+        lastCastTime = tick() + 1.8
         CancelAndRecastRod()
     end
     return true
 end
 
 function secretBossState.DetectWeather()
-    -- 1. Quét Workspace Attributes hoặc Objects
+    -- 1. ƯU TIÊN CAO NHẤT & CHÍNH XÁC 100%: Đọc nhãn thời tiết trực tiếp từ PlayerGui (HUD game)
+    -- Bỏ qua kiểm tra d.Visible để tránh bị lỗi khi người chơi mở túi đồ, menu shop, hoặc giao diện giật cần!
+    local wLabel = secretBossState.GetWeatherLabel()
+    if wLabel and wLabel.Text and #wLabel.Text > 0 then
+        local rawText = wLabel.Text
+        local matched, wName = secretBossState.DetectWeatherPattern(rawText)
+        if wName == "Clear" then
+            return nil, "Clear"
+        elseif matched then
+            return matched, wName or rawText
+        end
+    end
+
+    -- 2. Quét Workspace Attributes hoặc Objects
     local wsWeather = Workspace:GetAttribute("Weather") or Workspace:GetAttribute("CurrentWeather") or Workspace:GetAttribute("ActiveWeather")
     if typeof(wsWeather) == "string" and #wsWeather > 0 then
         local matched, wName = secretBossState.DetectWeatherPattern(wsWeather)
@@ -5252,7 +5353,7 @@ function secretBossState.DetectWeather()
         end
     end
 
-    -- 2. Quét ReplicatedStorage
+    -- 3. Quét ReplicatedStorage Attributes
     if ReplicatedStorage then
         local rsWeather = ReplicatedStorage:GetAttribute("Weather") or ReplicatedStorage:GetAttribute("CurrentWeather")
         if typeof(rsWeather) == "string" and #rsWeather > 0 then
@@ -5271,30 +5372,6 @@ function secretBossState.DetectWeather()
                     return nil, "Clear"
                 elseif matched then
                     return matched, wName or rwObj.Value
-                end
-            end
-        end
-    end
-
-    -- 3. Quét PlayerGui (HUD thời tiết trên màn hình game)
-    -- CHÚ Ý: CHỈ quét nhãn có tên thực sự là thời tiết (weather/climate/season)
-    -- TUYỆT ĐỐI KHÔNG quét "island" hoặc "map" để tránh nhầm nhãn bản đồ ("Frost Isle") thành thời tiết!
-    local pg = LocalPlayer:FindFirstChild("PlayerGui")
-    if pg and pg:FindFirstChild("MainGui") then
-        for _, d in ipairs(pg.MainGui:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text >= 3 and #d.Text <= 45 then
-                local dName = d.Name:lower()
-                local pName = d.Parent and d.Parent.Name:lower() or ""
-                if (dName:find("weather") or dName:find("climate") or dName:find("season")
-                    or pName:find("weather") or pName:find("climate") or pName:find("season"))
-                    and not dName:find("island") and not dName:find("map")
-                    and not pName:find("island") and not pName:find("map") then
-                    local matched, wName = secretBossState.DetectWeatherPattern(d.Text)
-                    if wName == "Clear" then
-                        return nil, "Clear"
-                    elseif matched then
-                        return matched, wName or d.Text
-                    end
                 end
             end
         end
@@ -7899,6 +7976,13 @@ function PriorityManager.IsTaskActive(taskId)
         end
         if secretBossState and secretBossState.standPos then
             return true
+        end
+        -- Nếu đang có thời tiết Boss diễn ra thực tế trong game, SecretBoss lập tức được kích hoạt quyền ưu tiên!
+        if secretBossState and secretBossState.DetectWeather then
+            local wIsland, wName = secretBossState.DetectWeather()
+            if wIsland and wName ~= "Clear" then
+                return true
+            end
         end
         return false
     elseif taskId == "TicketQuest" then
@@ -13733,36 +13817,127 @@ pcall(function()
     end
 end)
 
--- TỰ ĐỘNG QUÉT THỜI TIẾT & CHAT ĐỊNH KỲ (MỖI 2 GIÂY) ĐỂ SĂN BOSS
+-- ===============================================================
+-- ⚡ LẮNG NGHE SỰ KIỆN THỜI TIẾT TỨC THÌ & SĂN BOSS LIÊN TỤC
+-- ===============================================================
+
+-- Lắng nghe trực tiếp khi TextLabel thời tiết thay đổi Text (0ms phản hồi ngay khi thời tiết xuất hiện)
 task.spawn(function()
-    while isRunning do
-        task.wait(2.0)
-        if (Config.AutoChatSecretBoss or Config.AutoHuntBoss) and isRunning then
-            pcall(function()
-                -- KIỂM TRA PHÂN CẤP ĐỘ ƯU TIÊN (PRIORITY MANAGER)
-                if Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
-                    local curTask = PriorityManager.GetActiveTask()
-                    local bossPri = PriorityManager.GetTaskPriority("SecretBoss")
-                    if curTask ~= "None" and curTask ~= "SecretBoss" and PriorityManager.GetTaskPriority(curTask) < bossPri then
-                        return
+    local wLabel = nil
+    for _ = 1, 30 do
+        if not isRunning then return end
+        wLabel = secretBossState.GetWeatherLabel()
+        if wLabel then break end
+        task.wait(1.0)
+    end
+
+    if wLabel and isRunning then
+        local function onWeatherChanged()
+            if not isRunning then return end
+            if not (Config.AutoChatSecretBoss or Config.AutoHuntBoss) then return end
+
+            task.wait(0.15)
+            local wIsland, wName = secretBossState.DetectWeather()
+            if wIsland and wName ~= "Clear" then
+                -- Kiểm tra danh sách boss mục tiêu (hỗ trợ case-insensitive và fallback toàn bộ)
+                local targetBossInWeather = false
+                local hasAnyBossConfigured = false
+                for _, isTarget in pairs(Config.SecretBossTargets or {}) do
+                    if isTarget == true then
+                        hasAnyBossConfigured = true
+                        break
                     end
                 end
 
-                -- 1. Ưu tiên quét Thời tiết thực tế trong Game (Workspace, ReplicatedStorage, UI)
+                if not hasAnyBossConfigured then
+                    targetBossInWeather = true
+                else
+                    for _, b in ipairs(wIsland.bosses or {}) do
+                        local bNameLow = b.name:lower()
+                        for tName, isTgt in pairs(Config.SecretBossTargets or {}) do
+                            if isTgt and (tName:lower() == bNameLow or bNameLow:find(tName:lower(), 1, true) or tName:lower():find(bNameLow, 1, true)) then
+                                targetBossInWeather = true
+                                break
+                            end
+                        end
+                        if targetBossInWeather then break end
+                    end
+                end
+
+                if targetBossInWeather then
+                    -- Kiểm tra quyền ưu tiên
+                    if Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
+                        local curTask = PriorityManager.GetActiveTask()
+                        local bossPri = PriorityManager.GetTaskPriority("SecretBoss")
+                        if curTask ~= "None" and curTask ~= "SecretBoss" and PriorityManager.GetTaskPriority(curTask) < bossPri then
+                            if curTask == "TicketQuest" and ticketQuestState and (ticketQuestState.isInteracting or (ticketQuestState.IsFishingActive and ticketQuestState.IsFishingActive())) then
+                                return
+                            end
+                        end
+                    end
+
+                    local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    local targetPos = secretBossState.standPos or wIsland.pos
+                    local dist = root and (root.Position - targetPos).Magnitude or 9999
+                    if secretBossState.currentMap ~= wIsland.islandName or dist > 150 then
+                        secretBossState.Teleport(wIsland, wName)
+                    end
+                end
+            end
+        end
+
+        table.insert(activeConnections, wLabel:GetPropertyChangedSignal("Text"):Connect(onWeatherChanged))
+    end
+end)
+
+-- TỰ ĐỘNG QUÉT THỜI TIẾT & CHAT ĐỊNH KỲ (MỖI 1.5 GIÂY) ĐỂ SĂN BOSS
+task.spawn(function()
+    while isRunning do
+        task.wait(1.5)
+        if (Config.AutoChatSecretBoss or Config.AutoHuntBoss) and isRunning then
+            pcall(function()
+                -- 1. Ưu tiên quét Thời tiết thực tế trong Game (HUD UI, Workspace, ReplicatedStorage)
                 local wIsland, wName = secretBossState.DetectWeather()
                 local isWeatherClear = (wIsland == nil) or (wName == "Clear")
 
                 local targetBossInWeather = false
                 if wIsland and not isWeatherClear then
-                    for _, b in ipairs(wIsland.bosses) do
-                        if Config.SecretBossTargets[b.name] then
-                            targetBossInWeather = true
+                    local hasAnyBossConfigured = false
+                    for _, isTarget in pairs(Config.SecretBossTargets or {}) do
+                        if isTarget == true then
+                            hasAnyBossConfigured = true
                             break
+                        end
+                    end
+
+                    if not hasAnyBossConfigured then
+                        targetBossInWeather = true
+                    else
+                        for _, b in ipairs(wIsland.bosses or {}) do
+                            local bNameLow = b.name:lower()
+                            for tName, isTgt in pairs(Config.SecretBossTargets or {}) do
+                                if isTgt and (tName:lower() == bNameLow or bNameLow:find(tName:lower(), 1, true) or tName:lower():find(bNameLow, 1, true)) then
+                                    targetBossInWeather = true
+                                    break
+                                end
+                            end
+                            if targetBossInWeather then break end
                         end
                     end
                 end
 
                 if wIsland and targetBossInWeather and not isWeatherClear then
+                    -- KIỂM TRA PHÂN CẤP ĐỘ ƯU TIÊN (PRIORITY MANAGER)
+                    if Config.PrioritySystemEnabled and PriorityManager and PriorityManager.GetActiveTask then
+                        local curTask = PriorityManager.GetActiveTask()
+                        local bossPri = PriorityManager.GetTaskPriority("SecretBoss")
+                        if curTask ~= "None" and curTask ~= "SecretBoss" and PriorityManager.GetTaskPriority(curTask) < bossPri then
+                            if curTask == "TicketQuest" and ticketQuestState and (ticketQuestState.isInteracting or (ticketQuestState.IsFishingActive and ticketQuestState.IsFishingActive())) then
+                                return
+                            end
+                        end
+                    end
+
                     -- Có Boss mục tiêu đang diễn ra theo thời tiết -> Bay qua đảo săn boss
                     local root = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
                     local targetPos = secretBossState.standPos or wIsland.pos

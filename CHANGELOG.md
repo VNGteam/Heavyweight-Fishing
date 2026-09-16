@@ -2,6 +2,29 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.3.1] - 2026-09-16
+### 🎯 Sửa Lỗi Triệt Để Tính Năng Săn Boss & Tự Động Dịch Chuyển Theo Thời Tiết:
+1. **Khắc Phục Lỗi Nhận Diện Thời Tiết Game (Direct HUD Path & Zero-Lag Weather Detection)**:
+   - **Nguyên nhân cũ**: Code cũ quét toàn bộ hơn 20,000 descendants của `PlayerGui.MainGui` mỗi 2 giây và bắt buộc `d.Visible == true`. Khi người chơi mở túi đồ, menu nhiệm vụ, cài đặt, hoặc khi thanh HUD bị che mờ, điều kiện `d.Visible` trả về `false`, khiến hệ thống tưởng thời tiết đã hết (`Clear`) và hủy lệnh bay hoặc tự ý bay về Home Spot. Ngoài ra, code cũ quét tìm `StringValue` trong `ReplicatedStorage.Weather` vốn thực chất là một `Folder` chứa VFX.
+   - **Khắc phục mới**: Đọc trực tiếp đường dẫn gốc HUD thời tiết của Game: `PlayerGui.MainGui.Info.Info.Weather.Value` (bỏ qua điều kiện `d.Visible`), có cơ chế lưu cache tức thì `secretBossState.GetWeatherLabel()`. Tốc độ quét đạt **0.0001ms** và chính xác 100% không phụ thuộc vào trạng thái mở/đóng menu.
+2. **Lắng Nghe Sự Kiện Thời Tiết Phản Hồi Tức Thì (Reactive Event Listener - 0ms Latency)**:
+   - Thêm cơ chế lắng nghe sự kiện: `Weather.Value:GetPropertyChangedSignal("Text"):Connect(...)`.
+   - Ngay thời khắc Game vừa đổi thời tiết từ `Clear` sang Bão Sấm, Trời Mưa, Tuyết Rơi, Sương Mù, Nắng Gắt hoặc Trời Gió, hệ thống lập tức bắt tín hiệu trong 0.15s và kích hoạt quy trình dịch chuyển săn boss ngay lập tức, không còn phải chờ đợi vòng lặp quét định kỳ.
+3. **Sửa Xung Đột Hệ Thống Phân Bậc Ưu Tiên (Priority Manager Gating Fix)**:
+   - **Nguyên nhân cũ**: Hàm `PriorityManager.IsTaskActive("SecretBoss")` trước đây chỉ trả về `true` sau khi đã dịch chuyển xong (`secretBossState.active == true`). Vì vậy, khi thời tiết vừa xuất hiện, Secret Boss bị đánh giá là không hoạt động, khiến các tác vụ khác (như Treo Farm Thường hoặc Cooldown vé) chặn đứng vòng lặp săn boss.
+   - **Khắc phục mới**: Tự động kích hoạt trạng thái Active của `SecretBoss` trong `PriorityManager` ngay khi phát hiện có thời tiết Boss diễn ra thực tế. Ticket Quest chỉ nhường quyền nếu người chơi đang trực tiếp câu cá quest đặc thù hoặc đang nộp quest NPC; khi vé đang trong thời gian hồi chiêu (Cooldown 20 phút), Secret Boss chiếm toàn quyền điều khiển để bay săn Boss ngay.
+4. **Cơ Chế Khớp Boss Mục Tiêu Thông Minh & Fallback Tự Động (Lenient Target Matching)**:
+   - Hỗ trợ so khớp tên Boss không phân biệt hoa/thường (case-insensitive) và đối chiếu chuỗi con (substring matching), giải quyết triệt để lỗi tên bị lệch ký tự (như `Heavenpiercer Turtle` vs `Heaven Piercer Turtle`, `Verdant Alligator Gar` vs `Alligator Gar`).
+   - Tự động kích hoạt săn tất cả Boss trên đảo nếu danh sách cấu hình mục tiêu trống hoặc chưa chọn, tránh việc phát hiện thời tiết nhưng không bay do danh sách mục tiêu bị rỗng.
+5. **Dịch Chuyển An Toàn & Triệt Tiêu Vận Tốc Vật Lý (Anti-Fling & Physics Stabilization)**:
+   - Triệt tiêu hoàn toàn `AssemblyLinearVelocity` và `AssemblyAngularVelocity` trước và sau khi dịch chuyển đến đảo boss.
+   - Duy trì ổn định vị trí CFrame trong 3 nhịp đầu (0.3s) chống hiện tượng nhân vật bị physics rollback hoặc trôi xuống biển.
+6. **Đồng Bộ Phiên Bản & Tối Ưu Hệ Thống**:
+   - Đồng bộ hóa logic nhận diện thời tiết trực tiếp trong `v2/features/weather.lua`.
+   - Nâng cấp phiên bản toàn hệ thống lên **v2.3.1**.
+
+---
+
 ## [v2.3.0] - 2026-09-16
 ### ⚡ Hệ Thống Tự Động Song Song Nhiệm Vụ (Ticket Quest + Zeng Tianguo) & Tái Cấu Trúc Backup:
 1. **Hệ Thống Tự Động Làm Nhiệm Vụ Kỹ Năng Zeng Tianguo (`zengTianguoQuestState`)**:

@@ -99,16 +99,28 @@ function Weather.DetectWeather()
         end
     end
 
-    -- 3. PlayerGui
+    -- 1. Ưu tiên đọc trực tiếp từ HUD thời tiết game (MainGui.Info.Info.Weather.Value)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg and pg:FindFirstChild("MainGui") then
-        for _, d in ipairs(pg.MainGui:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text >= 3 and #d.Text <= 45 then
-                local dName = d.Name:lower()
-                local pName = d.Parent and d.Parent.Name:lower() or ""
-                if (dName:find("weather") or dName:find("climate") or dName:find("season")
-                    or pName:find("weather") or pName:find("climate") or pName:find("season"))
-                    and not dName:find("island") and not dName:find("map") then
+        local mainGui = pg.MainGui
+        local direct = mainGui:FindFirstChild("Info")
+        local wLabel = nil
+        if direct then
+            local subInfo = direct:FindFirstChild("Info") or direct
+            local wFrame = subInfo:FindFirstChild("Weather")
+            if wFrame and wFrame:FindFirstChild("Value") and wFrame.Value:IsA("TextLabel") then
+                wLabel = wFrame.Value
+            end
+        end
+        if wLabel and wLabel.Text and #wLabel.Text > 0 then
+            local _, wName = Weather.DetectWeatherPattern(wLabel.Text)
+            if wName then return wName end
+        end
+
+        -- Fallback quét trong Info
+        if direct then
+            for _, d in ipairs(direct:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Parent and d.Parent.Name:lower():find("weather") then
                     local _, wName = Weather.DetectWeatherPattern(d.Text)
                     if wName then return wName end
                 end
