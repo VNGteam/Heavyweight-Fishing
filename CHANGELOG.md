@@ -2,6 +2,33 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.3.0] - 2026-09-16
+### ⚡ Hệ Thống Tự Động Song Song Nhiệm Vụ (Ticket Quest + Zeng Tianguo) & Tái Cấu Trúc Backup:
+1. **Hệ Thống Tự Động Làm Nhiệm Vụ Kỹ Năng Zeng Tianguo (`zengTianguoQuestState`)**:
+   - Tự động nhận diện chuỗi nhiệm vụ `Zeng Tianguo Quest` / `Tang Thien Quoc Quest` từ Server Data (`pData.Quest.Main`).
+   - Phân tích mục tiêu động: Số lần câu tại đảo chỉ định (Bamboo Isle, Frost Isle), dùng kỹ năng (`UseSkillForTimes`), câu Boss (`FishAtZoneForTimesBoss`).
+   - Tự động bay đến NPC Zeng Tianguo (Skill Upgrade), kích hoạt ProximityPrompt và nộp trả nhiệm vụ khi hoàn thành.
+2. **Chế Độ Song Song Thông Minh (Hybrid Parallel Mode - Ưu Tiên Vé)**:
+   - **Tối ưu vị trí bãi câu**: Khi Ticket Quest yêu cầu 100 Cá, 100 Chiêu, hoặc 100 Mồi (không kén vị trí), bot tự động chuyển bãi câu sang đảo yêu cầu của Zeng Tianguo (Bamboo Isle, Frost Isle) để **cả 2 nhiệm vụ cùng tăng tiến độ đồng thời**, tiết kiệm hơn 50% thời gian cày.
+   - **Ưu tiên số 1 cho Vé (Ticket Quest)**:
+     - Nếu vé yêu cầu bãi đặc biệt (cá to 15m), bot giữ nguyên bãi 15m để hoàn thành vé trước.
+     - Ngay khi vé đạt 100%, bot lập tức ngưng câu bay về nộp vé để nhận thưởng giá trị cao và kích hoạt đếm ngược Cooldown.
+   - **Tận dụng thời gian Cooldown vé ("Thời Gian Vàng")**: Trong lúc chờ hồi chiêu vé (20 phút) hoặc khi đã hết vé hôm nay, bot tự động bay đến đảo của Zeng Tianguo tiếp tục câu dồn tiến độ thay vì chỉ đứng AFK ở Home Spot.
+   - **Tự động trả Zeng Tianguo**: Khi Zeng Tianguo xong, bot tranh thủ lúc vé đang Cooldown hoặc đang rảnh để bay về NPC nộp quest mở khóa cấp kỹ năng mới.
+   - **Hỗ trợ chế độ độc lập**: Có thể chạy Song Song (bật cả 2), chỉ chạy Vé (bật Vé), hoặc chỉ chạy Zeng Tianguo (bật Zeng Tianguo).
+3. **Giao Diện Điều Khiển Mới Trong Tab Nhiệm Vụ (`tabQuests`)**:
+   - Thẻ điều khiển riêng: **Nhiệm Vụ Kỹ Năng Zeng Tianguo & Chế Độ Song Song**.
+   - Huy hiệu trực quan hiển thị chế độ vận hành: `⚡ SONG SONG (Ưu Tiên Vé)`, `🎫 Chỉ Chạy Vé NV`, `⚡ Chỉ Chạy Zeng Tianguo`.
+   - Hiển thị tiến độ thời gian thực của cả 2 bên (Vé NV: x/100 • Kỹ năng: y/200).
+   - Nút tìm & bay tức thì đến NPC Zeng Tianguo, nút tương tác nhanh nhận/nộp bằng tay.
+4. **Tái Cấu Trúc Thư Mục Backup Gọn Gàng**:
+   - Tạo thư mục `backup/` với 2 nhánh con:
+     - `backup/goc/`: Chứa bản backup file monolithic gốc (`backup.lua`, `loader_backup.lua`).
+     - `backup/module/`: Chứa toàn bộ các gói zip module theo phiên bản (`backup_full_project_v*.zip`, `backup_module*.zip`).
+   - Xóa bỏ các bản zip tạm dư thừa.
+
+---
+
 ## [v2.2.9] - 2026-09-16
 ### 🌟 Đồng Bộ Toàn Diện 100% Chức Năng Từ Bản Gốc Sang Module V2 (Full Parity Update):
 1. **Bổ Sung 100% Nội Dung Tab Thử Nghiệm (`tab_thu_nghiem.lua`)**:
