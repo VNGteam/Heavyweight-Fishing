@@ -88,20 +88,14 @@ if not LocalPlayer then
 end
 local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildWhichIsA("Camera")
 
-pcall(function()
-    local gs = game:GetService("GuiService")
-    if gs then
-        gs.SelectedObject = nil
-        gs.GuiNavigationEnabled = false
-    end
-end)
+-- Không can thiệp GuiNavigationEnabled toàn cục để bảo đảm người chơi thao tác UI game bình thường
 
 local isRunning = true
 local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.5"
+local SCRIPT_BUILD_COMMIT = "v2.5.6"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -10154,122 +10148,90 @@ do
         return nil
     end
 
-    -- Hàm quét và nạp ảnh cá trực tiếp từ ReplicatedStorage.Info.Inventory (chính thức 100%), CraftRod, CraftBait và Balo
+    local isPreloadingImages = false
+    local lastPreloadTime = 0
+
+    -- Hàm quét và nạp ảnh cá nhẹ nhàng ngầm, không block thread và chỉ chạy tối đa 1 lần / 4 giây
     local function PreloadFishImages()
-        -- 1. Nguồn chính thức & Chuẩn xác nhất: ReplicatedStorage.Info.Inventory (Data Module của từng loài cá)
-        pcall(function()
-            local infoInv = ReplicatedStorage:FindFirstChild("Info") and ReplicatedStorage.Info:FindFirstChild("Inventory")
-            if infoInv and typeof(require) == "function" then
-                for _, mod in ipairs(infoInv:GetChildren()) do
-                    if mod:IsA("ModuleScript") then
-                        local ok, data = pcall(require, mod)
-                        if ok and type(data) == "table" then
-                            local targetImg = nil
-                            for _, key in ipairs({"Image", "Icon", "Texture", "Thumbnail", "image", "icon", "texture", "assetId", "AssetId", "Img", "img"}) do
-                                if data[key] and type(data[key]) == "string" and data[key] ~= "" and not data[key]:find("10709791437") then
-                                    targetImg = data[key]
-                                    break
-                                end
-                            end
-                            if not targetImg then
-                                for _, v in pairs(data) do
-                                    if type(v) == "string" and v:find("rbxassetid") and not v:find("10709791437") then
-                                        targetImg = v
-                                        break
+        if isPreloadingImages or (tick() - lastPreloadTime < 4) then return end
+        isPreloadingImages = true
+        lastPreloadTime = tick()
+
+        task.spawn(function()
+            pcall(function()
+                local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+                local mainGui = pGui and pGui:FindFirstChild("MainGui")
+                if not mainGui then return end
+
+                -- 1. Tìm trong Menu Chế Cần (CraftRod.List)
+                local craftRodList = mainGui:FindFirstChild("Menu")
+                    and mainGui.Menu:FindFirstChild("CraftRod")
+                    and mainGui.Menu.CraftRod:FindFirstChild("List")
+                if craftRodList then
+                    for _, rFrame in ipairs(craftRodList:GetChildren()) do
+                        local ingFrame = rFrame:FindFirstChild("Ingredient")
+                        if ingFrame then
+                            for _, slot in ipairs(ingFrame:GetChildren()) do
+                                local btn = slot:FindFirstChild("Button") or (slot:IsA("TextButton") and slot)
+                                local titleLbl = btn and btn:FindFirstChild("Title") or slot:FindFirstChild("Title")
+                                local fishImg = ExtractFishImageFromButton(btn)
+                                if titleLbl and fishImg and fishImg ~= "" then
+                                    local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
+                                    if k ~= "" and (not FM.FishImageCache[k] or FM.FishImageCache[k] == "") then
+                                        FM.FishImageCache[k] = fishImg
                                     end
                                 end
                             end
-                            if targetImg then
-                                if tonumber(targetImg) then
-                                    targetImg = "rbxassetid://" .. targetImg
-                                end
-                                local fishName = data.Name or data.name or mod.Name
-                                local clean = fishName:lower():gsub("[%s%-_]+", "")
-                                if clean ~= "" and (not FM.FishImageCache[clean] or FM.FishImageCache[clean] == "") then
-                                    FM.FishImageCache[clean] = targetImg
-                                end
-                            end
                         end
                     end
                 end
-            end
-        end)
 
-        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-        local mainGui = pGui and pGui:FindFirstChild("MainGui")
-        if not mainGui then return end
-
-        -- 2. Tìm trong Menu Chế Cần (CraftRod.List)
-        pcall(function()
-            local craftRodList = mainGui:FindFirstChild("Menu")
-                and mainGui.Menu:FindFirstChild("CraftRod")
-                and mainGui.Menu.CraftRod:FindFirstChild("List")
-            if craftRodList then
-                for _, rFrame in ipairs(craftRodList:GetChildren()) do
-                    local ingFrame = rFrame:FindFirstChild("Ingredient")
-                    if ingFrame then
-                        for _, slot in ipairs(ingFrame:GetChildren()) do
-                            local btn = slot:FindFirstChild("Button") or (slot:IsA("TextButton") and slot)
-                            local titleLbl = btn and btn:FindFirstChild("Title") or slot:FindFirstChild("Title")
-                            local fishImg = ExtractFishImageFromButton(btn)
-                            if titleLbl and fishImg and fishImg ~= "" then
-                                local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
-                                if k ~= "" and (not FM.FishImageCache[k] or FM.FishImageCache[k] == "") then
-                                    FM.FishImageCache[k] = fishImg
+                -- 2. Tìm trong Menu Chế Mồi (CraftBait.List)
+                local craftBaitList = mainGui:FindFirstChild("Menu")
+                    and mainGui.Menu:FindFirstChild("CraftBait")
+                    and mainGui.Menu.CraftBait:FindFirstChild("List")
+                if craftBaitList then
+                    for _, bFrame in ipairs(craftBaitList:GetChildren()) do
+                        local ingFrame = bFrame:FindFirstChild("Ingredient")
+                        if ingFrame then
+                            for _, slot in ipairs(ingFrame:GetChildren()) do
+                                local btn = slot:FindFirstChild("Button") or (slot:IsA("TextButton") and slot)
+                                local titleLbl = btn and btn:FindFirstChild("Title") or slot:FindFirstChild("Title")
+                                local fishImg = ExtractFishImageFromButton(btn)
+                                if titleLbl and fishImg and fishImg ~= "" then
+                                    local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
+                                    if k ~= "" and (not FM.FishImageCache[k] or FM.FishImageCache[k] == "") then
+                                        FM.FishImageCache[k] = fishImg
+                                    end
                                 end
                             end
                         end
                     end
                 end
-            end
-        end)
 
-        -- 3. Tìm trong Menu Chế Mồi (CraftBait.List)
-        pcall(function()
-            local craftBaitList = mainGui:FindFirstChild("Menu")
-                and mainGui.Menu:FindFirstChild("CraftBait")
-                and mainGui.Menu.CraftBait:FindFirstChild("List")
-            if craftBaitList then
-                for _, bFrame in ipairs(craftBaitList:GetChildren()) do
-                    local ingFrame = bFrame:FindFirstChild("Ingredient")
-                    if ingFrame then
-                        for _, slot in ipairs(ingFrame:GetChildren()) do
-                            local btn = slot:FindFirstChild("Button") or (slot:IsA("TextButton") and slot)
-                            local titleLbl = btn and btn:FindFirstChild("Title") or slot:FindFirstChild("Title")
-                            local fishImg = ExtractFishImageFromButton(btn)
-                            if titleLbl and fishImg and fishImg ~= "" then
-                                local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
-                                if k ~= "" and (not FM.FishImageCache[k] or FM.FishImageCache[k] == "") then
-                                    FM.FishImageCache[k] = fishImg
-                                end
+                -- 3. Tìm trong Balo người chơi (Main.Inventory.Main.List.ScrollingFrame)
+                local scroll = mainGui:FindFirstChild("Main", true)
+                    and mainGui.Main:FindFirstChild("Inventory", true)
+                    and mainGui.Main.Inventory:FindFirstChild("ScrollingFrame", true)
+                if scroll then
+                    for _, slot in ipairs(scroll:GetChildren()) do
+                        local btn = slot:FindFirstChild("Button")
+                        if not btn and slot:IsA("Folder") and #slot:GetChildren() > 0 then
+                            btn = slot:GetChildren()[1]:FindFirstChild("Button")
+                        end
+                        local fishImg = ExtractFishImageFromButton(btn)
+                        if fishImg and fishImg ~= "" then
+                            local rawName = Wiki.GetItemRawName(slot)
+                            local k = rawName:lower():gsub("[%s%-_]+", "")
+                            if k ~= "" and (not FM.FishImageCache[k] or FM.FishImageCache[k] == "") then
+                                FM.FishImageCache[k] = fishImg
                             end
                         end
                     end
                 end
-            end
-        end)
+            end)
 
-        -- 4. Tìm trong Balo người chơi (Main.Inventory.Main.List.ScrollingFrame)
-        pcall(function()
-            local scroll = mainGui:FindFirstChild("Main", true)
-                and mainGui.Main:FindFirstChild("Inventory", true)
-                and mainGui.Main.Inventory:FindFirstChild("ScrollingFrame", true)
-            if scroll then
-                for _, slot in ipairs(scroll:GetChildren()) do
-                    local btn = slot:FindFirstChild("Button")
-                    if not btn and slot:IsA("Folder") and #slot:GetChildren() > 0 then
-                        btn = slot:GetChildren()[1]:FindFirstChild("Button")
-                    end
-                    local fishImg = ExtractFishImageFromButton(btn)
-                    if fishImg and fishImg ~= "" then
-                        local rawName = Wiki.GetItemRawName(slot)
-                        local k = rawName:lower():gsub("[%s%-_]+", "")
-                        if k ~= "" and (not FM.FishImageCache[k] or FM.FishImageCache[k] == "") then
-                            FM.FishImageCache[k] = fishImg
-                        end
-                    end
-                end
-            end
+            isPreloadingImages = false
         end)
     end
 
@@ -10282,11 +10244,7 @@ do
         end
 
         PreloadFishImages()
-        cached = FM.FishImageCache[clean] or ""
-        if cached:find("10709791437") then
-            return ""
-        end
-        return cached
+        return ""
     end
 
     -- Bảng dữ liệu công thức Chế Cần

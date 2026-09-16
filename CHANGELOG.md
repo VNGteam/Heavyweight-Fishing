@@ -2,6 +2,20 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.6] - 2026-09-16
+### 🛠️ Sửa Lỗi Không Thao Tác Được Nút Game (Kho Đồ, Balo) & Tối Ưu Hóa Tuyệt Đối Hiển Thị Ảnh Cá:
+1. **Khắc Phục Lỗi Liệt Nút / Không Mở Được Kho Đồ & Tính Năng Game**:
+   - **Nguyên nhân 1 (GuiNavigation toàn cục)**: Ở dòng 91 của `local.lua` có dòng lệnh `gs.GuiNavigationEnabled = false`. Lệnh này vô hiệu hóa hệ thống điều hướng GUI mặc định của Roblox, khiến người chơi không thể click hoặc mở được một số menu/nút giao diện mặc định của game (như kho đồ, balo, cài đặt...).
+   - **Nguyên nhân 2 (Treo main thread do require 500+ ModuleScript đồng bộ)**: Ở bản v2.5.5, hàm `PreloadFishImages()` thực hiện duyệt và gọi `require(mod)` trên toàn bộ 500+ ModuleScript trong `ReplicatedStorage.Info.Inventory` ngay trên luồng chính (synchronously). Khi `FetchGameFishImage()` được gọi liên tục cho 24 ô nguyên liệu, nó gây lag nghẽn CPU và đóng băng hàng đợi sự kiện chuột/chạm của game!
+   - **Khắc phục triệt để**:
+     - Loại bỏ hoàn toàn dòng can thiệp `GuiNavigationEnabled = false`, trả lại 100% quyền điều hướng và thao tác giao diện tự nhiên cho game.
+     - Loại bỏ toàn bộ vòng lặp `require()` 500+ module trong `ReplicatedStorage.Info.Inventory`.
+     - Chuyển `PreloadFishImages()` sang chạy bất đồng bộ hoàn toàn bên trong `task.spawn()`, áp dụng cơ chế bướm ga (throttle/cooldown) tối thiểu 4 giây mới quét lại 1 lần, tuyệt đối không bao giờ làm khựng hoặc nghẽn luồng xử lý của game.
+2. **Đồng Bộ Phiên Bản v2.5.6 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.6` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.5] - 2026-09-16
 ### 🐟 Nạp Ảnh Cá Trực Tiếp Từ ReplicatedStorage.Info.Inventory & Loại Bỏ Stencil UIGradient:
 1. **Khắc Phục Lỗi Toàn Bộ Ô Nguyên Liệu Hiện Cùng Một Hình Trắng (Gradient Stencil)**:
