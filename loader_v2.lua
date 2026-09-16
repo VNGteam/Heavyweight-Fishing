@@ -1,13 +1,10 @@
 --[[
     ==================================================================
-    🚀 IDENTICAL LOADER V2 - BẢN MODULE ĐỘC LẬP (MODULAR EDITION)
+    🚀 IDENTICAL LOADER V2 - SIÊU TỐC & CHỐNG CACHE 100% (ULTRA-FAST)
     ==================================================================
-    Tính năng:
-    - Nạp trực tiếp bản kiến trúc Module V2 (v2_bundle.lua).
-    - Đa tầng CDN (GitHub Raw, jsDelivr Edge CDN, Fastly) chống nghẽn / ISP chặn.
-    - Bộ lọc kiểm tra tính toàn vẹn (Validation) loại bỏ phản hồi rác / "Timeout".
-    - Tối ưu hóa mã nguồn trong bộ nhớ (In-Memory Shrink) giúp Executor biên dịch siêu nhanh.
-    - Tự động thử lại biên dịch đa tầng (Auto-Retry Compiler) chống rớt kết nối.
+    - Tự động bỏ qua Cache của Executor và GitHub CDN (Anti-Cache Query + Headers).
+    - Biên dịch trực tiếp 0ms (Zero latency compile), không delay xử lý chuỗi.
+    - Đa tầng CDN dự phòng (GitHub Raw, jsDelivr, Fastly).
 --]]
 
 local function Notify(title, text, duration)
@@ -20,26 +17,26 @@ local function Notify(title, text, duration)
     end)
 end
 
--- Danh sách các nguồn CDN uy tín nạp bản Modular v2_bundle.lua
+local antiCacheKey = tostring(math.floor(tick())) .. "_" .. tostring(math.random(10000, 99999))
+
 local SCRIPT_SOURCES = {
-    -- Nguồn 1: GitHub Raw kèm anti-cache query
+    -- Nguồn 1: GitHub Raw kèm Anti-Cache dynamic parameter
     {
-        name = "GitHub Raw",
-        url = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/v2_bundle.lua?t=" .. tostring(tick())
+        name = "GitHub Raw (Mới Nhất)",
+        url = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/v2_bundle.lua?t=" .. antiCacheKey
     },
-    -- Nguồn 2: jsDelivr Edge CDN (Server CDN quốc tế có điểm biên VN & ĐNÁ)
+    -- Nguồn 2: jsDelivr Edge CDN (kèm purge timestamp)
     {
-        name = "jsDelivr Edge CDN",
-        url = "https://cdn.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/v2_bundle.lua"
+        name = "jsDelivr CDN",
+        url = "https://cdn.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/v2_bundle.lua?t=" .. antiCacheKey
     },
-    -- Nguồn 3: Fastly CDN
+    -- Nguồn 3: Fastly Edge CDN
     {
         name = "Fastly CDN",
-        url = "https://fastly.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/v2_bundle.lua"
+        url = "https://fastly.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/v2_bundle.lua?t=" .. antiCacheKey
     }
 }
 
--- Xác thực script hợp lệ (loại bỏ chuỗi lỗi "Timeout", HTML 403 hoặc rate limit)
 local function IsValidLuaScript(content)
     if not content or type(content) ~= "string" then return false end
     if #content < 20000 then return false end
@@ -48,33 +45,49 @@ local function IsValidLuaScript(content)
     return true
 end
 
--- Rút gọn mã nguồn trong bộ nhớ (~0.02s) giúp Executor biên dịch siêu nhanh và không bao giờ bị Timeout
-local function OptimizeScript(src)
-    local lines = {}
-    for line in src:gmatch("([^\r\n]*)\r?\n?") do
-        local trimmed = line:match("^%s*(.-)%s*$")
-        if trimmed ~= "" and not trimmed:match("^%-%-[^%[]") and not trimmed:match("^%-%-$") then
-            table.insert(lines, trimmed)
+-- Tải mã nguồn với hỗ trợ Header chống Cache chuyên sâu của Executor
+local function HttpGetNoCache(url)
+    local req = (syn and syn.request) or (http and http.request) or http_request or request
+    if req then
+        local ok, res = pcall(function()
+            return req({
+                Url = url,
+                Method = "GET",
+                Headers = {
+                    ["Cache-Control"] = "no-cache, no-store, must-revalidate",
+                    ["Pragma"] = "no-cache",
+                    ["Expires"] = "0"
+                }
+            })
+        end)
+        if ok and res and res.Body and IsValidLuaScript(res.Body) then
+            return true, res.Body
         end
     end
-    return table.concat(lines, "\n")
+
+    -- Fallback sang game:HttpGet chuẩn
+    local ok, res = pcall(function()
+        return game:HttpGet(url, true)
+    end)
+    if ok and IsValidLuaScript(res) then
+        return true, res
+    end
+
+    return false, nil
 end
 
--- Cơ chế nạp code đa nguồn với khả năng tự chuyển đổi nếu có sự cố
 local function FetchScript()
-    for idx, source in ipairs(SCRIPT_SOURCES) do
-        local ok, result = pcall(function()
-            return game:HttpGet(source.url, true)
-        end)
-        if ok and IsValidLuaScript(result) then
-            return true, result, source.name
+    for _, source in ipairs(SCRIPT_SOURCES) do
+        local ok, content = HttpGetNoCache(source.url)
+        if ok and content then
+            return true, content, source.name
         end
-        task.wait(0.2)
+        task.wait(0.1)
     end
 
-    -- Dự phòng cuối cùng: GitHub REST API
+    -- Fallback cuối cùng: GitHub REST API
     local apiOk, apiResult = pcall(function()
-        return game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/v2_bundle.lua?t=" .. tostring(tick()), true)
+        return game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/v2_bundle.lua?t=" .. antiCacheKey, true)
     end)
     if apiOk and apiResult and #apiResult > 1000 then
         local decOk, decoded = pcall(function()
@@ -106,61 +119,27 @@ local function FetchScript()
         end
     end
 
-    return false, "Không thể tải mã nguồn V2 từ bất kỳ máy chủ nào! Vui lòng kiểm tra lại kết nối mạng hoặc VPN."
+    return false, "Không thể tải mã nguồn V2! Vui lòng kiểm tra lại kết nối mạng."
 end
 
--- Bộ biên dịch tự động thử lại nhiều lần (Anti-Timeout Compiler)
-local function CompileWithRetry(code, maxAttempts)
-    maxAttempts = maxAttempts or 3
-    local optCode = nil
-    pcall(function()
-        optCode = OptimizeScript(code)
-    end)
-    
-    local variants = {}
-    if optCode and #optCode > 20000 then
-        table.insert(variants, { name = "bản tối ưu tốc độ", code = optCode })
-    end
-    table.insert(variants, { name = "bản gốc", code = code })
-
-    local lastErr = nil
-    for attempt = 1, maxAttempts do
-        for _, variant in ipairs(variants) do
-            local compileOk, compileResult = pcall(function()
-                return loadstring(variant.code)
-            end)
-            if compileOk and type(compileResult) == "function" then
-                return compileResult
-            end
-            lastErr = compileResult or "Không xác định"
-        end
-
-        if attempt < maxAttempts then
-            Notify("Identical V2", "Biên dịch chậm, đang tự động thử lại (" .. (attempt + 1) .. "/" .. maxAttempts .. ")...", 2)
-            task.wait(0.8)
-        end
-    end
-
-    return nil, lastErr
-end
-
--- Tiến trình chạy chính
-Notify("Identical V2", "Đang nạp bản Modular V2...", 3)
+-- Khởi động nạp siêu tốc
+Notify("Identical V2", "⚡ Đang nạp bản V2 mới nhất (Chống Cache)...", 3)
 
 local ok, content, sourceName = FetchScript()
 if ok and content then
-    local fn, compileErr = CompileWithRetry(content, 3)
+    -- Biên dịch trực tiếp 0ms không qua loop xử lý chuỗi
+    local fn, compileErr = loadstring(content)
     if fn then
         local runOk, runErr = pcall(fn)
         if not runOk then
-            warn("[Identical V2 Loader] Lỗi thực thi code:", runErr)
-            Notify("❌ Lỗi Chạy Script V2!", tostring(runErr):sub(1, 100), 15)
+            warn("[Identical V2] Lỗi chạy code:", runErr)
+            Notify("❌ Lỗi Chạy Script V2!", tostring(runErr):sub(1, 100), 12)
         end
     else
-        warn("[Identical V2 Loader] Lỗi biên dịch sau nhiều lần thử:", compileErr)
-        Notify("❌ Lỗi Biên Dịch V2!", tostring(compileErr):sub(1, 100), 15)
+        warn("[Identical V2] Lỗi biên dịch code:", compileErr)
+        Notify("❌ Lỗi Biên Dịch V2!", tostring(compileErr):sub(1, 100), 12)
     end
 else
-    warn("[Identical V2 Loader] Thất bại khi nạp code:", content)
+    warn("[Identical V2] Thất bại khi nạp code:", content)
     Notify("❌ Lỗi Mạng V2!", tostring(content):sub(1, 100), 8)
 end
