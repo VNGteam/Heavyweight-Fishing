@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.2"
+local SCRIPT_BUILD_COMMIT = "v2.5.3"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -10111,6 +10111,86 @@ do
     end
 
     -- Hàm tự động trích xuất icon cá trực tiếp từ hệ thống giao diện của Game
+    -- Hàm quét và nạp ảnh cá trực tiếp từ Menu Chế Cần, Chế Mồi và Balo của Game
+    local function PreloadFishImages()
+        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
+        local mainGui = pGui and pGui:FindFirstChild("MainGui")
+        if not mainGui then return end
+
+        -- 1. Tìm trong Menu Chế Cần (CraftRod.List)
+        pcall(function()
+            local craftRodList = mainGui:FindFirstChild("Menu")
+                and mainGui.Menu:FindFirstChild("CraftRod")
+                and mainGui.Menu.CraftRod:FindFirstChild("List")
+            if craftRodList then
+                for _, rFrame in ipairs(craftRodList:GetChildren()) do
+                    local ingFrame = rFrame:FindFirstChild("Ingredient")
+                    if ingFrame then
+                        for _, slot in ipairs(ingFrame:GetChildren()) do
+                            local btn = slot:FindFirstChild("Button")
+                            local titleLbl = btn and btn:FindFirstChild("Title")
+                            local imgLbl = btn and btn:FindFirstChild("Image")
+                            if titleLbl and imgLbl and imgLbl:IsA("ImageLabel") and imgLbl.Image ~= "" then
+                                local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
+                                if k ~= "" then
+                                    FM.FishImageCache[k] = imgLbl.Image
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        -- 2. Tìm trong Menu Chế Mồi (CraftBait.List)
+        pcall(function()
+            local craftBaitList = mainGui:FindFirstChild("Menu")
+                and mainGui.Menu:FindFirstChild("CraftBait")
+                and mainGui.Menu.CraftBait:FindFirstChild("List")
+            if craftBaitList then
+                for _, bFrame in ipairs(craftBaitList:GetChildren()) do
+                    local ingFrame = bFrame:FindFirstChild("Ingredient")
+                    if ingFrame then
+                        for _, slot in ipairs(ingFrame:GetChildren()) do
+                            local btn = slot:FindFirstChild("Button")
+                            local titleLbl = btn and btn:FindFirstChild("Title")
+                            local imgLbl = btn and btn:FindFirstChild("Image")
+                            if titleLbl and imgLbl and imgLbl:IsA("ImageLabel") and imgLbl.Image ~= "" then
+                                local k = titleLbl.Text:lower():gsub("[%s%-_]+", "")
+                                if k ~= "" then
+                                    FM.FishImageCache[k] = imgLbl.Image
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end)
+
+        -- 3. Tìm trong Balo người chơi (Main.Inventory.Main.List.ScrollingFrame)
+        pcall(function()
+            local scroll = mainGui:FindFirstChild("Main", true)
+                and mainGui.Main:FindFirstChild("Inventory", true)
+                and mainGui.Main.Inventory:FindFirstChild("ScrollingFrame", true)
+            if scroll then
+                for _, slot in ipairs(scroll:GetChildren()) do
+                    local btn = slot:FindFirstChild("Button")
+                    if not btn and slot:IsA("Folder") and #slot:GetChildren() > 0 then
+                        btn = slot:GetChildren()[1]:FindFirstChild("Button")
+                    end
+                    local imgLbl = btn and (btn:FindFirstChild("Image") or (btn:FindFirstChild("Detail") and btn.Detail:FindFirstChild("Image")))
+                    if imgLbl and imgLbl:IsA("ImageLabel") and imgLbl.Image ~= "" then
+                        local rawName = Wiki.GetItemRawName(slot)
+                        local k = rawName:lower():gsub("[%s%-_]+", "")
+                        if k ~= "" then
+                            FM.FishImageCache[k] = imgLbl.Image
+                        end
+                    end
+                end
+            end
+        end)
+    end
+
     local function FetchGameFishImage(fishName)
         if not fishName or fishName == "" then return "" end
         local clean = fishName:lower():gsub("[%s%-_]+", "")
@@ -10118,40 +10198,7 @@ do
             return FM.FishImageCache[clean]
         end
 
-        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-        if not pGui then return "" end
-
-        -- Quét toàn diện tìm kiếm ImageLabel thuộc con cá này
-        pcall(function()
-            for _, obj in ipairs(pGui:GetDescendants()) do
-                if obj:IsA("ImageLabel") and obj.Image ~= "" and not obj.Image:find("Star") and not obj.Image:find("star") then
-                    -- Kiểm tra xem ancestor hoặc Title có khớp tên cá không
-                    local parent = obj.Parent
-                    local matched = false
-                    while parent and parent ~= pGui do
-                        local pName = parent.Name:lower():gsub("[%s%-_]+", "")
-                        if pName:find(clean, 1, true) then
-                            matched = true
-                            break
-                        end
-                        local title = parent:FindFirstChild("Title")
-                        if title and title:IsA("TextLabel") then
-                            local tName = title.Text:lower():gsub("[%s%-_]+", "")
-                            if tName:find(clean, 1, true) then
-                                matched = true
-                                break
-                            end
-                        end
-                        parent = parent.Parent
-                    end
-                    if matched then
-                        FM.FishImageCache[clean] = obj.Image
-                        return
-                    end
-                end
-            end
-        end)
-
+        PreloadFishImages()
         return FM.FishImageCache[clean] or ""
     end
 
@@ -11312,6 +11359,7 @@ do
 
     -- Hàm cập nhật toàn bộ Tab Quản Lý Cá
     local function RefreshAllSections()
+        PreloadFishImages()
         local protList, junkList, counts = ScanAndClassifyInventory()
 
         if FM.rowBagTotal and FM.rowBagTotal.Set then
@@ -11350,8 +11398,10 @@ do
         end
     end)
 
-    -- Khởi tạo đếm lần đầu
-    task.delay(2, function()
+    -- Khởi tạo đếm và nạp ảnh lần đầu
+    task.spawn(function()
+        task.wait(0.5)
+        PreloadFishImages()
         RefreshAllSections()
     end)
 end

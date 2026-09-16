@@ -2,6 +2,23 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.3] - 2026-09-16
+### 🐟 Khắc Phục Triệt Để Hiển Thị Ảnh Cá Chế Cần & Chế Mồi (Preload Targeted Craft Images):
+1. **Khắc Phục Lỗi Mất Ảnh Ở Khung Chế Cần & Chế Mồi**:
+   - **Nguyên nhân**: Ở bản v2.5.2, khi cải thiện tìm kiếm ảnh cá, hàm `FetchGameFishImage` bị thay đổi thành quét đệ quy `PlayerGui:GetDescendants()`. Với hơn 50.000 GUI objects trong cây phân cấp game, việc quét đệ quy cho từng ô trong lưới 4-slot gây nghẽn luồng xử lý và không định vị được cấu trúc lồng sâu đặc thù của menu chế tạo, dẫn đến các ô nguyên liệu cần và mồi bị trắng/trống ảnh.
+   - **Khắc phục**:
+     - Phục hồi và tối ưu hóa hàm `PreloadFishImages()` quét đích danh (Targeted Deep Traversal):
+       - Menu Chế Cần: `PlayerGui.MainGui.Menu.CraftRod.List[Rod].Ingredient.Slot.Button.Image` (hỗ trợ cả các biến thể folder con).
+       - Menu Chế Mồi: `PlayerGui.MainGui.Menu.CraftBait.List[Bait].Ingredient.Slot.Button.Image`.
+       - Balo Game: `PlayerGui.MainGui.Main.Inventory.Main.List.ScrollingFrame`.
+     - Lưu trữ trực tiếp Asset ID vào `FM.FishImageCache[fishName]`.
+     - Hàm `FetchGameFishImage(fishName)` truy xuất bộ nhớ đệm 0ms (Instant Cache Hit) với cơ chế tự động quét lại có định hướng nếu chưa có sẵn.
+     - Gọi `PreloadFishImages()` tự động ngay khi khởi tạo tab và trong mỗi chu kỳ `RefreshAllSections()`.
+2. **Đồng Bộ Phiên Bản v2.5.3 Toàn Diện**:
+   - Cập nhật số phiên bản `v2.5.3` trên toàn bộ hệ thống: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.2] - 2026-09-16
 ### ⚡ Khôi Phục Cơ Chế Khóa/Mở Cá Mượt Mà Như Bản Đầu, Sửa Nhận Diện Khóa & Quét Ảnh Sâu:
 1. **Khôi Phục Cơ Chế Kích Hoạt GUI Trực Tiếp (Direct GUI Trigger) - Mượt Mà Như Bản Đầu**:
