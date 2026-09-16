@@ -2,6 +2,26 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.4] - 2026-09-16
+### 🖼️ Khắc Phục Triệt Để Lỗi "Hiện Hình Ổ Khóa Khung Màu Xanh" Thay Vì Ảnh Cá Thật:
+1. **Sửa Tận Gốc Lỗi Hiển Thị Ổ Khóa (Padlock Icon Bug)**:
+   - **Nguyên nhân**:
+     - Trong hệ thống giao diện chuẩn của game *Heavyweight Fishing*, mỗi ô thẻ cá (`Button`) chứa 2 `ImageLabel` khác nhau:
+       1. `Button.Image`: Là lớp phủ viền trạng thái và **icon ổ khóa màu xanh** (Lock Status Overlay) để hiển thị thẻ có đang khóa hay không.
+       2. `Button.Detail.Image`: Mới chính là **ảnh thật của con cá** (Fish Thumbnail Asset).
+     - Ở bản v2.5.3, lệnh quét ảnh gọi `btn:FindFirstChild("Image")` hoặc `(btn:FindFirstChild("Image") or ...)` nên đã lấy nhầm `Button.Image` (icon ổ khóa), dẫn tới việc toàn bộ khung nguyên liệu và ô tìm kiếm hiển thị icon ổ khóa khung xanh!
+   - **Khắc phục**:
+     - Viết hàm `ExtractFishImageFromButton(btn)` chuyên dụng:
+       - Ưu tiên số 1: Trích xuất trực tiếp từ `btn.Detail.Image` và `btn.Detail.Detail`.
+       - Ưu tiên số 2: Quét mọi `ImageLabel` con nằm trong thư mục `Detail`.
+       - Loại trừ triệt để `Button.Image` (ổ khóa trực tiếp) và mã Asset ổ khóa Roblox `10709791437`.
+     - Tích hợp thêm nguồn quét Sách Cá toàn thư của Game: `PlayerGui.MainGui.Menu.Index.IndexFrame.Indexlist` (chứa đầy đủ 100% tất cả các loài cá trong game).
+     - Hàm `FetchGameFishImage` có cơ chế chốt chặn tự động từ chối hiển thị asset ổ khóa `10709791437`, đảm bảo hiển thị đúng ảnh cá thật hoặc biểu tượng 🐟 fallback.
+2. **Đồng Bộ Phiên Bản v2.5.4 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.4` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.3] - 2026-09-16
 ### 🐟 Khắc Phục Triệt Để Hiển Thị Ảnh Cá Chế Cần & Chế Mồi (Preload Targeted Craft Images):
 1. **Khắc Phục Lỗi Mất Ảnh Ở Khung Chế Cần & Chế Mồi**:
