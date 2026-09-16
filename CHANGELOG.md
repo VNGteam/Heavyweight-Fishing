@@ -2,6 +2,48 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.4.0] - 2026-09-16
+### 🎣 Hệ Thống Quản Lý Cá Toàn Diện (Fish Manager Pro) - Chế Cần, Chế Mồi & Dọn Cá Rác An Toàn:
+1. **Theo Dõi Tiến Độ Chế Cần Câu & Nhận Diện Cần Đã Sở Hữu (Rod Crafting Tracker)**:
+   - **Tự động nhận diện đã có cần**: Quét trực tiếp `FishingRodInventory[rod].Owned` và `RodSkinCount[rod]`. Hiển thị badge trạng thái trực quan:
+     - `✅ ĐÃ SỞ HỮU (ĐÃ CHẾ X CÂY)` nếu đã có cần trong kho.
+     - `❌ CHƯA CÓ CẦN (ĐANG THU THẬP NGUYÊN LIỆU)` nếu chưa sở hữu.
+   - **Thống kê 4 loại cá nguyên liệu theo dữ liệu gốc game**:
+     - **Heavenpiercer Rod**: `Flying Fish Emperor` (1), `Flying Fish Empress` (1), `Heavenpiercer Turtle` (1), `Rainbow Dragonfish` (1).
+     - **Sacred Bamboo Rod**: `Nameless Octoparasite` (1), `Reborn Puffer Beast` (1), `Ascended Perch` (1), `Mountain Fish` (1).
+     - **Pure Diamond Rod**: `Frost Kingfish` (1), `Frost Queenfish` (1), `Sanguine Fish` (1), `Draconic Koi` (1).
+   - **Chi tiết từng loại cá**: Hiển thị số lượng sở hữu / số lượng yêu cầu, trạng thái `✅ ĐỦ` / `❌ THIẾU`, xuất xứ đảo câu và điều kiện thời tiết chuẩn.
+   - **Điều khiển nguyên liệu cần**: Nút **🔒 Khóa Nguyên Liệu Cần** (khóa tất cả cá làm cần) và **🔓 Mở Khóa An Toàn** (mở khóa khi cần thiết nhưng tự động giữ lại cá trùng nguyên liệu mồi thần thoại).
+
+2. **Hệ Thống Quản Lý Chế Mồi Thần Thoại (Mythic Bait Crafting Tracker)**:
+   - **Theo dõi 3 loại mồi thần thoại**:
+     - **Nameless Bait**: Yêu cầu 1 `Flying Fish Emperor` + 1 `Nameless Octoparasite`.
+     - **Frost Bait**: Yêu cầu 1 `Frost Kingfish` + 1 `Frost Queenfish`.
+     - **Rainbow Bait**: Yêu cầu 1 `Rainbow Dragonfish` + 1 `Draconic Koi`.
+   - **Tự động tính toán công suất chế mồi (Craftable Capacity)**: Hiển thị ngay số mồi tối đa có thể chế được từ số cá đang có trong balo.
+   - **Thao tác nhanh**: Nút **🔒 Khóa Mồi** và **🔓 Mở Khóa Mồi** kèm cờ bypass AutoProtect, tránh bị script tự khóa lại khi đang chế mồi tại NPC.
+
+3. **Phân Loại Thông Minh & Dọn Cá Rác An Toàn (Safe Junk Cleaner & Auto-Sell Protection)**:
+   - **Bộ lọc bảo vệ đa tầng chống bán nhầm cá quý**:
+     - Cá Boss & Secret Boss (Crimson Bream Sovereign, Heavenpiercer Turtle, v.v.).
+     - Cá nguyên liệu chế 3 loại cần câu tối thượng.
+     - Cá nguyên liệu chế 3 loại mồi thần thoại.
+     - Cá làm nhiệm vụ có trọng lượng cao (Quest VIP $\ge 5,000,000$ KG).
+     - Cá siêu nặng giá trị cao ($\ge 1,000,000$ KG).
+     - Cá đột biến đặc biệt (Mutation: Shiny, Albino, Gold, Neon, Dark, Electric...).
+   - **Thống kê Balo trực quan**: Đếm số cá quý được bảo vệ vs. số lượng cá rác thực tế có thể dọn.
+   - **Nút 🔒 Khóa Toàn Bộ Cá Quý**: 1-click khóa sạch toàn bộ cá có giá trị trong túi đồ.
+   - **Nút 🔓 Mở Khóa Riêng Cá Rác**: Chỉ mở khóa các con cá rác thông thường.
+   - **Nút 💰 Bán Sạch Cá Rác An Toàn**: Kiểm tra an toàn 100% trước khi gọi `Events.SellFish:FireServer("All")`; đảm bảo toàn bộ cá quý đã khóa trước khi bán, tuyệt đối không làm mất cá nguyên liệu hay cá hiếm.
+
+4. **Công Cụ Thử Nghiệm Từng Con & Spy Bắt Remote**:
+   - Duy trì bảng test riêng cho loài `Crimson Bream Sovereign` và công cụ **🔍 Bật Spy Bắt Remote** để giám sát gói tin mạng của game.
+
+5. **Đồng Bộ Phiên Bản Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.4.0** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua)).
+
+---
+
 ## [v2.3.3] - 2026-09-16
 ### 🛠️ Nâng Cấp Toàn Diện Cơ Chế Khóa & Mở Khóa Cá (Tab Quản Lý Cá):
 1. **Khắc Phục Hiện Tượng Bấm Nút Không Đổi Trạng Thái**:
