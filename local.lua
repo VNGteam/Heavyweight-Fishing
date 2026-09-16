@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.0"
+local SCRIPT_BUILD_COMMIT = "v2.5.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -2942,6 +2942,51 @@ Wiki.allBaitFishSet = {
     ["crimson electric eel"] = true,
     ["golden guardian fish"] = true,
 }
+
+Wiki.allRodFishSet = {
+    ["flying fish emperor"] = true,
+    ["flying fish empress"] = true,
+    ["heavenpiercer turtle"] = true,
+    ["rainbow dragonfish"] = true,
+    ["nameless octoparasite"] = true,
+    ["reborn puffer beast"] = true,
+    ["ascended perch"] = true,
+    ["mountain fish"] = true,
+    ["frost kingfish"] = true,
+    ["frost queenfish"] = true,
+    ["sanguine fish"] = true,
+    ["draconic koi"] = true,
+}
+
+function Wiki.IsProtectedFish(item)
+    if not item then return false, "Không xác định" end
+    local cleanName = Wiki.GetItemRawName(item)
+    local cleanLower = cleanName:lower()
+    local weight = (item:FindFirstChild("Weight") and item.Weight.Value) or 0
+
+    if Wiki.allRodFishSet and Wiki.allRodFishSet[cleanLower] then
+        return true, "Cá Chế Cần"
+    end
+    if Wiki.allBaitFishSet and Wiki.allBaitFishSet[cleanLower] then
+        return true, "Cá Chế Mồi"
+    end
+    if Wiki.IsSecretBossFish(item) or (Wiki.secretBossSet and Wiki.secretBossSet[cleanLower]) then
+        return true, "Cá Secret Boss"
+    end
+    if Wiki.IsMutatedFish(item) then
+        return true, "Cá Đột Biến"
+    end
+    if Wiki.vipQuestFishSet and Wiki.vipQuestFishSet[cleanLower] and weight >= 5000000 then
+        return true, "Cá Quest VIP"
+    end
+    if weight >= 1000000 then
+        return true, "Cá Siêu Nặng (≥1M KG)"
+    end
+    if Wiki.IsEssentialKeepItem(item) then
+        return true, "Cá Cần Giữ"
+    end
+    return false, "Cá Thường (Rác)"
+end
 
 Wiki.temporarilyUnlockedBaitFish = {}
 
@@ -10249,108 +10294,10 @@ do
         return isOwned, count
     end
 
-    -- Helper trigger button trong UI balo của game
-    local function ClickButton(btn)
-        if not btn then return false end
-        local triggered = false
-        if typeof(firesignal) == "function" then
-            pcall(function() firesignal(btn.MouseButton1Click); triggered = true end)
-            pcall(function() firesignal(btn.MouseButton1Down) end)
-            pcall(function() firesignal(btn.MouseButton1Up) end)
-            pcall(function() firesignal(btn.Activated); triggered = true end)
-        end
-        if typeof(getconnections) == "function" then
-            local ok1, conns1 = pcall(getconnections, btn.MouseButton1Click)
-            if ok1 and type(conns1) == "table" then
-                for _, c in ipairs(conns1) do pcall(function() c:Fire(); triggered = true end) end
-            end
-            local ok2, conns2 = pcall(getconnections, btn.Activated)
-            if ok2 and type(conns2) == "table" then
-                for _, c in ipairs(conns2) do pcall(function() c:Fire(); triggered = true end) end
-            end
-        end
-        return triggered
-    end
-
-    -- Tìm danh sách items trong GUI balo
-    local function GetGuiItemsMap()
-        local guiMap = {}
-        local pGui = LocalPlayer:FindFirstChild("PlayerGui")
-        local mainGui = pGui and pGui:FindFirstChild("MainGui")
-
-        pcall(function()
-            local invList = mainGui and mainGui:FindFirstChild("Main")
-                and mainGui.Main:FindFirstChild("Inventory")
-                and mainGui.Main.Inventory:FindFirstChild("Main")
-                and mainGui.Main.Inventory.Main:FindFirstChild("List")
-                and mainGui.Main.Inventory.Main.List:FindFirstChild("ScrollingFrame")
-            if invList then
-                for _, slot in ipairs(invList:GetChildren()) do
-                    if slot:IsA("Frame") or slot:IsA("TextButton") then
-                        local btn = slot:FindFirstChild("Button") or (slot:IsA("TextButton") and slot)
-                        local favBtn = btn and (btn:FindFirstChild("Favorite") and btn.Favorite:FindFirstChildWhichIsA("TextButton"))
-                        local star = btn and btn:FindFirstChild("Star", true)
-                        local isLocked = (slot:GetAttribute("IsFavorite") == true)
-                            or (slot.Name:find("Favorite", 1, true) ~= nil)
-                            or (star and star.Visible == true)
-
-                        local rawName = slot.Name:split("|")[1] or slot.Name
-                        local cleanName = rawName:match("^%s*(.-)%s*$"):lower()
-                        local weightInt = slot.Name:match("|%s*(%d+)")
-
-                        table.insert(guiMap, {
-                            folder = slot,
-                            sub = btn or slot,
-                            btn = favBtn or btn,
-                            isLocked = isLocked,
-                            weightInt = weightInt,
-                            folderName = cleanName
-                        })
-                    end
-                end
-            end
-        end)
-
-        pcall(function()
-            local fisherInv = mainGui and mainGui:FindFirstChild("Fisher_Inventory")
-            local scrollFrame = fisherInv and fisherInv:FindFirstChild("Drop")
-                and fisherInv.Drop:FindFirstChild("List")
-                and fisherInv.Drop.List:FindFirstChild("ScrollingFrame")
-
-            if scrollFrame then
-                for _, folder in ipairs(scrollFrame:GetChildren()) do
-                    if folder:IsA("Folder") then
-                        local weightInt = folder.Name:match("|%s*(%d+)")
-                        for _, sub in ipairs(folder:GetChildren()) do
-                            local favFrame = sub:FindFirstChild("Favorite", true)
-                            local btn = favFrame and (favFrame:FindFirstChildWhichIsA("TextButton") or (favFrame:IsA("TextButton") and favFrame))
-                            local star = favFrame and favFrame:FindFirstChild("Star", true)
-                            local isLocked = (sub:GetAttribute("IsFavorite") == true)
-                                or (sub.Name:find("Favorite", 1, true) ~= nil)
-                                or (star and star.Visible == true)
-
-                            table.insert(guiMap, {
-                                folder = folder,
-                                sub = sub,
-                                btn = btn,
-                                isLocked = isLocked,
-                                weightInt = weightInt,
-                                folderName = folder.Name:lower()
-                            })
-                        end
-                    end
-                end
-            end
-        end)
-
-        return guiMap
-    end
-
-    -- Quét và phân loại toàn diện túi cá
+    -- Quét và phân loại toàn diện túi cá (chuẩn theo contract của game)
     local function ScanAndClassifyInventory()
         local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
         local inv = pData and pData:FindFirstChild("Inventory")
-        local guiMap = GetGuiItemsMap()
 
         local protectedList = {}
         local junkList = {}
@@ -10361,56 +10308,39 @@ do
         end
 
         for _, item in ipairs(inv:GetChildren()) do
-            local rawName = item.Name
-            local rawLower = rawName:lower()
+            local cleanName = Wiki.GetItemRawName(item)
+            local cleanLower = cleanName:lower()
             local weight = (item:FindFirstChild("Weight") and item.Weight.Value) or 0
-            local isFav = (item:FindFirstChild("IsFavorite") and item.IsFavorite.Value == true)
-                or (item:FindFirstChild("Favorite") and item.Favorite.Value == true)
-
-            local matchedGui = nil
-            local itemWeightInt = tostring(math.floor(weight))
-            for _, g in ipairs(guiMap) do
-                if g.folderName:find(rawLower, 1, true) then
-                    if not g.weightInt or g.weightInt == itemWeightInt then
-                        matchedGui = g
-                        if g.isLocked ~= nil then isFav = g.isLocked end
-                        break
-                    end
-                end
-            end
+            local isFav = Wiki.IsItemFavorited(item)
 
             local entry = {
                 data = item,
-                gui = matchedGui,
-                name = rawName,
-                rawLower = rawLower,
+                name = cleanName,
+                rawLower = cleanLower,
                 weight = weight,
                 isLocked = isFav
             }
 
-            if not countsByName[rawName] then
-                countsByName[rawName] = { total = 0, locked = 0, unlocked = 0, items = {}, sample = entry }
+            if not countsByName[cleanName] then
+                countsByName[cleanName] = {
+                    name = cleanName,
+                    total = 0,
+                    locked = 0,
+                    unlocked = 0,
+                    items = {}
+                }
             end
-            countsByName[rawName].total = countsByName[rawName].total + 1
+            countsByName[cleanName].total = countsByName[cleanName].total + 1
             if isFav then
-                countsByName[rawName].locked = countsByName[rawName].locked + 1
+                countsByName[cleanName].locked = countsByName[cleanName].locked + 1
             else
-                countsByName[rawName].unlocked = countsByName[rawName].unlocked + 1
+                countsByName[cleanName].unlocked = countsByName[cleanName].unlocked + 1
             end
-            table.insert(countsByName[rawName].items, entry)
+            table.insert(countsByName[cleanName].items, entry)
 
-            local isSecretBoss = (Wiki and Wiki.secretBossSet and Wiki.secretBossSet[rawLower] ~= nil)
-                or rawLower:find("crimson bream sovereign")
-                or rawLower:find("primordial kunfish")
-                or rawLower:find("sovereign")
-
-            local isRodFish = (Wiki and Wiki.allRodFishSet and Wiki.allRodFishSet[rawLower] ~= nil)
-            local isBaitFish = (Wiki and Wiki.allBaitFishSet and Wiki.allBaitFishSet[rawLower] ~= nil)
-            local isSpecialQuest = (Wiki and Wiki.vipQuestFishSet and Wiki.vipQuestFishSet[rawLower] ~= nil) and (weight >= 5000000)
-            local isHeavyweight = (weight >= 1000000)
-            local isMutation = (item:FindFirstChild("Mutation") and item.Mutation.Value ~= "" and item.Mutation.Value ~= "None")
-
-            if isSecretBoss or isRodFish or isBaitFish or isSpecialQuest or isHeavyweight or isMutation then
+            local isProtected, reason = Wiki.IsProtectedFish(item)
+            entry.category = reason
+            if isProtected then
                 table.insert(protectedList, entry)
             else
                 table.insert(junkList, entry)
@@ -10420,17 +10350,27 @@ do
         return protectedList, junkList, countsByName
     end
 
-    -- Thao tác Lock hoặc Unlock một danh sách item
+    -- Thao tác Lock hoặc Unlock một danh sách item (Gọi Remote trực tiếp chuẩn xác 100%)
     local function ProcessBatchItems(items, targetLock, notifyTitle)
         if FM.isProcessing then
             ShowNotification("Quản Lý Cá", "Đang trong tiến trình xử lý, vui lòng đợi!", "WARN", 3)
             return
         end
 
+        local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+        if not favEvent then
+            ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 4)
+            return
+        end
+
         local filtered = {}
         for _, e in ipairs(items) do
-            if e.isLocked ~= targetLock then
-                table.insert(filtered, e)
+            local item = e.data or e
+            if item and item.Parent then
+                local curFav = Wiki.IsItemFavorited(item)
+                if curFav ~= targetLock then
+                    table.insert(filtered, item)
+                end
             end
         end
 
@@ -10444,39 +10384,34 @@ do
         ShowNotification(notifyTitle or "Quản Lý Cá", string.format("Bắt đầu %s %d con cá...", actionText, #filtered), "INFO", 3)
 
         if not targetLock and Wiki and Wiki.temporarilyUnlockedBaitFish then
-            for _, e in ipairs(filtered) do Wiki.temporarilyUnlockedBaitFish[e.rawLower] = true end
+            for _, it in ipairs(filtered) do
+                local rawName = Wiki.GetItemRawName(it):lower()
+                Wiki.temporarilyUnlockedBaitFish[rawName] = true
+            end
         elseif targetLock and Wiki and Wiki.temporarilyUnlockedBaitFish then
-            for _, e in ipairs(filtered) do Wiki.temporarilyUnlockedBaitFish[e.rawLower] = nil end
+            for _, it in ipairs(filtered) do
+                local rawName = Wiki.GetItemRawName(it):lower()
+                Wiki.temporarilyUnlockedBaitFish[rawName] = nil
+            end
         end
 
         task.spawn(function()
             local successCount = 0
-            local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
-
-            for _, entry in ipairs(filtered) do
-                local done = false
-                if entry.gui and entry.gui.btn then
-                    done = ClickButton(entry.gui.btn)
-                end
-                if favEvent then
-                    if entry.data and entry.data.Parent then
-                        pcall(function() favEvent:FireServer(entry.data) end)
-                        pcall(function() favEvent:FireServer(entry.data.Name) end)
+            for _, item in ipairs(filtered) do
+                if item and item.Parent then
+                    local curFav = Wiki.IsItemFavorited(item)
+                    if curFav ~= targetLock then
+                        pcall(function() favEvent:FireServer(item) end)
+                        successCount = successCount + 1
+                        task.wait(0.08)
                     end
-                    if entry.gui then
-                        if entry.gui.sub then pcall(function() favEvent:FireServer(entry.gui.sub) end) end
-                        if entry.gui.folder then pcall(function() favEvent:FireServer(entry.gui.folder) end) end
-                    end
-                    done = true
                 end
-                if done then successCount = successCount + 1 end
-                task.wait(0.06)
             end
 
             task.wait(0.5)
             if UpdateCrimsonBreamUI then UpdateCrimsonBreamUI() end
             FM.isProcessing = false
-            ShowNotification("Hoàn Tất", string.format("Đã %s thành công %d con cá!", actionText, successCount), "SUCCESS", 5)
+            ShowNotification("Hoàn Tất", string.format("Đã %s thành công %d/%d con cá!", actionText, successCount, #filtered), "SUCCESS", 5)
         end)
     end
 
@@ -10490,7 +10425,7 @@ do
         local protList, junkList, counts = ScanAndClassifyInventory()
         local cData = counts[targetFishName]
         if not cData or #cData.items == 0 then
-            ShowNotification("Bán Cá", "Không tìm thấy con [" .. targetFishName .. "] nào trong balo!", "WARN", 4)
+            ShowNotification("Bán Cá", "Không tìm thấy con [" .. tostring(targetFishName) .. "] nào trong balo!", "WARN", 4)
             return
         end
 
@@ -10509,37 +10444,49 @@ do
         ShowNotification("Bán Cá An Toàn", string.format("Đang chuẩn bị bán %d con [%s]...", #targetItems, targetFishName), "INFO", 3)
 
         task.spawn(function()
-            local allOtherItems = {}
+            local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+
+            -- 1. Khóa tất cả cá KHÁC loài này
             for name, data in pairs(counts) do
                 if name ~= targetFishName then
                     for _, it in ipairs(data.items) do
-                        if not it.isLocked then table.insert(allOtherItems, it) end
+                        if it.data and it.data.Parent and not Wiki.IsItemFavorited(it.data) and favEvent then
+                            pcall(function() favEvent:FireServer(it.data) end)
+                            task.wait(0.05)
+                        end
                     end
                 end
             end
 
-            local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
-            for _, o in ipairs(allOtherItems) do
-                if o.gui and o.gui.btn then ClickButton(o.gui.btn) end
-                if favEvent and o.data then pcall(function() favEvent:FireServer(o.data) end) end
-            end
-            task.wait(0.2)
-
+            -- 2. Mở khóa đúng số lượng cá muốn bán
             if Wiki and Wiki.temporarilyUnlockedBaitFish then
                 Wiki.temporarilyUnlockedBaitFish[targetFishName:lower()] = true
             end
             for _, t in ipairs(targetItems) do
-                if t.isLocked then
-                    if t.gui and t.gui.btn then ClickButton(t.gui.btn) end
-                    if favEvent and t.data then pcall(function() favEvent:FireServer(t.data) end) end
+                if t.data and t.data.Parent and Wiki.IsItemFavorited(t.data) and favEvent then
+                    pcall(function() favEvent:FireServer(t.data) end)
+                    task.wait(0.05)
                 end
             end
-            task.wait(0.4)
 
+            -- Khóa lại các con còn lại của loài này nếu bán một phần
+            if #targetItems < #cData.items then
+                for i = #targetItems + 1, #cData.items do
+                    local remain = cData.items[i]
+                    if remain.data and remain.data.Parent and not Wiki.IsItemFavorited(remain.data) and favEvent then
+                        pcall(function() favEvent:FireServer(remain.data) end)
+                        task.wait(0.05)
+                    end
+                end
+            end
+
+            task.wait(0.3)
+
+            -- 3. Gọi lệnh bán cá
             local sellEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("SellFish")
             if sellEvent then
                 sellEvent:FireServer("All")
-                ShowNotification("Bán Cá Thành Công", string.format("Đã bán %d con [%s]! Các cá khác giữ nguyên 100%%!", #targetItems, targetFishName), "SUCCESS", 5)
+                ShowNotification("Bán Cá Thành Công", string.format("Đã bán %d con [%s]! Cá khác được giữ an toàn 100%%!", #targetItems, targetFishName), "SUCCESS", 5)
             else
                 ShowNotification("Lỗi Bán Cá", "Không tìm thấy Remote SellFish!", "ERROR", 4)
             end
@@ -10640,9 +10587,18 @@ do
         local gridObj = {}
         function gridObj.Update(countsByName)
             for _, s in ipairs(slots) do
-                local cData = countsByName[s.ing.name] or { total = 0 }
-                local isEnough = cData.total >= 1
-                s.countLbl.Text = "x" .. tostring(cData.total)
+                -- Tìm đếm khớp tên không phân biệt hoa thường
+                local foundCount = 0
+                local ingLower = s.ing.name:lower():gsub("[%s%-_]+", "")
+                for name, cData in pairs(countsByName) do
+                    if name:lower():gsub("[%s%-_]+", "") == ingLower then
+                        foundCount = cData.total
+                        break
+                    end
+                end
+
+                local isEnough = foundCount >= 1
+                s.countLbl.Text = "x" .. tostring(foundCount)
                 if isEnough then
                     s.countLbl.TextColor3 = Color3.fromRGB(46, 204, 113)
                     s.stroke.Color = Color3.fromRGB(46, 204, 113)
@@ -10702,26 +10658,27 @@ do
             ShowNotification("Dọn Rác", string.format("Đang dọn dẹp %d con cá rác an toàn...", #junkList), "INFO", 4)
 
             task.spawn(function()
+                local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+
+                -- 1. Khóa toàn bộ cá quý nếu chưa khóa
                 for _, p in ipairs(protList) do
-                    if not p.isLocked then
-                        if p.gui and p.gui.btn then ClickButton(p.gui.btn) end
-                        if Events and Events:FindFirstChild("FavoriteItem") then
-                            pcall(function() Events.FavoriteItem:FireServer(p.data) end)
-                        end
+                    if p.data and p.data.Parent and not Wiki.IsItemFavorited(p.data) and favEvent then
+                        pcall(function() favEvent:FireServer(p.data) end)
+                        task.wait(0.05)
                     end
                 end
                 task.wait(0.2)
 
+                -- 2. Mở khóa cá rác nếu đang khóa
                 for _, j in ipairs(junkList) do
-                    if j.isLocked then
-                        if j.gui and j.gui.btn then ClickButton(j.gui.btn) end
-                        if Events and Events:FindFirstChild("FavoriteItem") then
-                            pcall(function() Events.FavoriteItem:FireServer(j.data) end)
-                        end
+                    if j.data and j.data.Parent and Wiki.IsItemFavorited(j.data) and favEvent then
+                        pcall(function() favEvent:FireServer(j.data) end)
+                        task.wait(0.05)
                     end
                 end
-                task.wait(0.5)
+                task.wait(0.4)
 
+                -- 3. Bán
                 local sellEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("SellFish")
                 if sellEvent then
                     sellEvent:FireServer("All")
@@ -10738,12 +10695,13 @@ do
     end
 
     ---------------------------------------------------------------------
-    -- KHỐI 1B: BỘ TÌM KIẾM CÁ & BÁN THEO SỐ LƯỢNG TÙY CHỌN
+    -- KHỐI 1B: BỘ TÌM KIẾM CÁ & GỢI Ý ĐẦY ĐỦ + BÁN TÙY CHỌN
     ---------------------------------------------------------------------
     do
         createCategoryHeader(tabFishManager, "🔍 TÌM KIẾM & THAO TÁC CÁ TRONG TÚI")
         local searchCard = createCardGroup(tabFishManager)
 
+        -- Thanh tìm kiếm
         local searchBarContainer = Instance.new("Frame")
         searchBarContainer.Name = "SearchBarContainer"
         searchBarContainer.Size = UDim2.new(1, 0, 0, 36)
@@ -10766,7 +10724,7 @@ do
         searchTextBox.Size = UDim2.new(1, -40, 1, 0)
         searchTextBox.Position = UDim2.new(0, 34, 0, 0)
         searchTextBox.BackgroundTransparency = 1
-        searchTextBox.PlaceholderText = "Gõ tên cá cần tìm (VD: Carp, Crimson, Draconic, Sovereign...)"
+        searchTextBox.PlaceholderText = "Gõ tên cá cần tìm (VD: crim, carp, koi, eel, catfish...)"
         searchTextBox.PlaceholderColor3 = Color3.fromRGB(120, 125, 140)
         searchTextBox.Text = ""
         searchTextBox.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -10776,9 +10734,27 @@ do
         searchTextBox.Parent = searchBarContainer
         FM.searchTextBox = searchTextBox
 
+        -- Khung hiển thị danh sách gợi ý các loài cá khớp từ khóa
+        local suggestionScroll = Instance.new("ScrollingFrame")
+        suggestionScroll.Name = "SuggestionScroll"
+        suggestionScroll.Size = UDim2.new(1, 0, 0, 34)
+        suggestionScroll.BackgroundTransparency = 1
+        suggestionScroll.BorderSizePixel = 0
+        suggestionScroll.ScrollBarThickness = 2
+        suggestionScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+        suggestionScroll.AutomaticCanvasSize = Enum.AutomaticSize.X
+        suggestionScroll.Parent = searchCard
+
+        local suggLayout = Instance.new("UIListLayout")
+        suggLayout.FillDirection = Enum.FillDirection.Horizontal
+        suggLayout.Padding = UDim.new(0, 6)
+        suggLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+        suggLayout.Parent = suggestionScroll
+
+        -- Card hiển thị chi tiết con cá đang chọn
         local fishDetailFrame = Instance.new("Frame")
         fishDetailFrame.Name = "FishDetailFrame"
-        fishDetailFrame.Size = UDim2.new(1, 0, 0, 74)
+        fishDetailFrame.Size = UDim2.new(1, 0, 0, 76)
         fishDetailFrame.BackgroundColor3 = Color3.fromRGB(24, 26, 36)
         fishDetailFrame.BorderSizePixel = 0
         fishDetailFrame.Parent = searchCard
@@ -10787,7 +10763,7 @@ do
 
         local fishImgIcon = Instance.new("ImageLabel")
         fishImgIcon.Name = "FishIcon"
-        fishImgIcon.Size = UDim2.new(0, 52, 0, 52)
+        fishImgIcon.Size = UDim2.new(0, 54, 0, 54)
         fishImgIcon.Position = UDim2.new(0, 10, 0, 11)
         fishImgIcon.BackgroundTransparency = 1
         fishImgIcon.ScaleType = Enum.ScaleType.Fit
@@ -10795,7 +10771,7 @@ do
 
         local fishEmojiIcon = Instance.new("TextLabel")
         fishEmojiIcon.Name = "EmojiIcon"
-        fishEmojiIcon.Size = UDim2.new(0, 52, 0, 52)
+        fishEmojiIcon.Size = UDim2.new(0, 54, 0, 54)
         fishEmojiIcon.Position = UDim2.new(0, 10, 0, 11)
         fishEmojiIcon.BackgroundTransparency = 1
         fishEmojiIcon.Text = "🐟"
@@ -10804,8 +10780,8 @@ do
 
         local fishTitleLbl = Instance.new("TextLabel")
         fishTitleLbl.Name = "FishTitle"
-        fishTitleLbl.Size = UDim2.new(1, -75, 0, 22)
-        fishTitleLbl.Position = UDim2.new(0, 70, 0, 8)
+        fishTitleLbl.Size = UDim2.new(1, -78, 0, 22)
+        fishTitleLbl.Position = UDim2.new(0, 72, 0, 8)
         fishTitleLbl.BackgroundTransparency = 1
         fishTitleLbl.Text = "Gõ tên cá vào ô tìm kiếm..."
         fishTitleLbl.TextColor3 = Color3.fromRGB(255, 215, 0)
@@ -10816,10 +10792,10 @@ do
 
         local fishStatusLbl = Instance.new("TextLabel")
         fishStatusLbl.Name = "FishStatus"
-        fishStatusLbl.Size = UDim2.new(1, -75, 0, 38)
-        fishStatusLbl.Position = UDim2.new(0, 70, 0, 30)
+        fishStatusLbl.Size = UDim2.new(1, -78, 0, 40)
+        fishStatusLbl.Position = UDim2.new(0, 72, 0, 30)
         fishStatusLbl.BackgroundTransparency = 1
-        fishStatusLbl.Text = "Hệ thống sẽ gợi ý tên, ảnh con cá và số lượng hiện có trong balo."
+        fishStatusLbl.Text = "Gợi ý toàn bộ loài cá khớp từ khóa sẽ hiển thị phía trên để bạn bấm chọn."
         fishStatusLbl.TextColor3 = Color3.fromRGB(180, 185, 200)
         fishStatusLbl.Font = Enum.Font.Gotham
         fishStatusLbl.TextSize = 11
@@ -10827,47 +10803,7 @@ do
         fishStatusLbl.TextXAlignment = Enum.TextXAlignment.Left
         fishStatusLbl.Parent = fishDetailFrame
 
-        function FM.UpdateSearchedFishUI(targetName)
-            local _, _, counts = ScanAndClassifyInventory()
-            local bestMatchName = nil
-
-            if targetName and targetName ~= "" then
-                local query = targetName:lower():gsub("[%s%-_]+", "")
-                for name, _ in pairs(counts) do
-                    local clean = name:lower():gsub("[%s%-_]+", "")
-                    if clean:find(query, 1, true) then
-                        bestMatchName = name
-                        break
-                    end
-                end
-            end
-
-            FM.currentSelectedFish = bestMatchName
-            if bestMatchName and counts[bestMatchName] then
-                local cData = counts[bestMatchName]
-                fishTitleLbl.Text = bestMatchName
-                fishStatusLbl.Text = string.format("Balo: Có %d con • 🔒 Đã khóa: %d • 🔓 Đang mở: %d", cData.total, cData.locked, cData.unlocked)
-
-                local imgUrl = FetchGameFishImage(bestMatchName)
-                if imgUrl ~= "" then
-                    fishImgIcon.Image = imgUrl
-                    fishEmojiIcon.Visible = false
-                else
-                    fishImgIcon.Image = ""
-                    fishEmojiIcon.Visible = true
-                end
-            else
-                fishTitleLbl.Text = targetName ~= "" and ("Không tìm thấy: " .. targetName) or "Gõ tên cá vào ô tìm kiếm..."
-                fishStatusLbl.Text = targetName ~= "" and "Không có con cá nào khớp với tên bạn vừa nhập trong balo." or "Hệ thống sẽ gợi ý tên, ảnh con cá và số lượng hiện có trong balo."
-                fishImgIcon.Image = ""
-                fishEmojiIcon.Visible = true
-            end
-        end
-
-        searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
-            FM.UpdateSearchedFishUI(searchTextBox.Text)
-        end)
-
+        -- Hàng 2 Nút Khóa / Mở Khóa loài cá đang chọn
         local actionRowContainer = Instance.new("Frame")
         actionRowContainer.Name = "ActionRowContainer"
         actionRowContainer.Size = UDim2.new(1, 0, 0, 36)
@@ -10883,7 +10819,7 @@ do
         local btnLockThis = Instance.new("TextButton")
         btnLockThis.Size = UDim2.new(0.5, -4, 1, 0)
         btnLockThis.BackgroundColor3 = Color3.fromRGB(30, 42, 60)
-        btnLockThis.Text = "🔒 Khóa Loài Cá Này"
+        btnLockThis.Text = "🔒 Khóa Loài Này"
         btnLockThis.TextColor3 = Color3.fromRGB(240, 240, 255)
         btnLockThis.Font = Enum.Font.GothamBold
         btnLockThis.TextSize = 12
@@ -10893,16 +10829,105 @@ do
         local btnUnlockThis = Instance.new("TextButton")
         btnUnlockThis.Size = UDim2.new(0.5, -4, 1, 0)
         btnUnlockThis.BackgroundColor3 = Color3.fromRGB(45, 32, 40)
-        btnUnlockThis.Text = "🔓 Mở Khóa Loài Cá Này"
+        btnUnlockThis.Text = "🔓 Mở Khóa Loài Này"
         btnUnlockThis.TextColor3 = Color3.fromRGB(255, 200, 200)
         btnUnlockThis.Font = Enum.Font.GothamBold
         btnUnlockThis.TextSize = 12
         btnUnlockThis.Parent = actionRowContainer
         MakeCorner(btnUnlockThis, 8)
 
+        local function SetCurrentFish(name)
+            FM.currentSelectedFish = name
+            local _, _, counts = ScanAndClassifyInventory()
+            local cData = counts[name]
+
+            if cData then
+                fishTitleLbl.Text = name
+                local category = cData.items[1] and cData.items[1].category or "Cá"
+                fishStatusLbl.Text = string.format("[%s] • Có: %d con • 🔒 Đã khóa: %d • 🔓 Đang mở: %d", category, cData.total, cData.locked, cData.unlocked)
+
+                local imgUrl = FetchGameFishImage(name)
+                if imgUrl ~= "" then
+                    fishImgIcon.Image = imgUrl
+                    fishEmojiIcon.Visible = false
+                else
+                    fishImgIcon.Image = ""
+                    fishEmojiIcon.Visible = true
+                end
+
+                btnLockThis.Text = string.format("🔒 Khóa Toàn Bộ (%d con)", cData.total)
+                btnUnlockThis.Text = string.format("🔓 Mở Khóa Toàn Bộ (%d con)", cData.total)
+            else
+                fishTitleLbl.Text = "Gõ tên cá vào ô tìm kiếm..."
+                fishStatusLbl.Text = "Gợi ý toàn bộ loài cá khớp từ khóa sẽ hiển thị phía trên để bạn bấm chọn."
+                fishImgIcon.Image = ""
+                fishEmojiIcon.Visible = true
+                btnLockThis.Text = "🔒 Khóa Loài Này"
+                btnUnlockThis.Text = "🔓 Mở Khóa Loài Này"
+            end
+        end
+
+        function FM.UpdateSearchedFishUI(targetQuery)
+            local _, _, counts = ScanAndClassifyInventory()
+
+            -- Dọn sạch suggestion chips cũ
+            for _, ch in ipairs(suggestionScroll:GetChildren()) do
+                if ch:IsA("TextButton") then ch:Destroy() end
+            end
+
+            local matchedNames = {}
+            local query = (targetQuery or ""):lower():gsub("[%s%-_]+", "")
+
+            for name, cData in pairs(counts) do
+                local clean = name:lower():gsub("[%s%-_]+", "")
+                if query == "" or clean:find(query, 1, true) then
+                    table.insert(matchedNames, { name = name, count = cData.total })
+                end
+            end
+
+            table.sort(matchedNames, function(a, b) return a.count > b.count end)
+
+            -- Tạo chips gợi ý
+            for idx, m in ipairs(matchedNames) do
+                if idx <= 10 then
+                    local chip = Instance.new("TextButton")
+                    chip.Name = "Chip_" .. idx
+                    chip.Size = UDim2.new(0, 0, 0, 26)
+                    chip.AutomaticSize = Enum.AutomaticSize.X
+                    chip.BackgroundColor3 = Color3.fromRGB(30, 34, 48)
+                    chip.Text = string.format(" %s (%d) ", m.name, m.count)
+                    chip.TextColor3 = Color3.fromRGB(220, 225, 240)
+                    chip.Font = Enum.Font.GothamMedium
+                    chip.TextSize = 11
+                    chip.Parent = suggestionScroll
+                    MakeCorner(chip, 6)
+                    MakeStroke(chip, Color3.fromRGB(55, 60, 75), 1)
+
+                    chip.MouseButton1Click:Connect(function()
+                        SetCurrentFish(m.name)
+                    end)
+                end
+            end
+
+            -- Chọn con đầu tiên nếu có
+            if #matchedNames > 0 then
+                SetCurrentFish(matchedNames[1].name)
+            else
+                FM.currentSelectedFish = nil
+                fishTitleLbl.Text = targetQuery ~= "" and ("Không tìm thấy: " .. targetQuery) or "Gõ tên cá vào ô tìm kiếm..."
+                fishStatusLbl.Text = "Không có loài cá nào trong Balo khớp với từ khóa vừa nhập."
+                fishImgIcon.Image = ""
+                fishEmojiIcon.Visible = true
+            end
+        end
+
+        searchTextBox:GetPropertyChangedSignal("Text"):Connect(function()
+            FM.UpdateSearchedFishUI(searchTextBox.Text)
+        end)
+
         btnLockThis.MouseButton1Click:Connect(function()
             if not FM.currentSelectedFish then
-                ShowNotification("Tìm Kiếm", "Vui lòng nhập tìm loài cá hợp lệ trước!", "WARN", 3)
+                ShowNotification("Tìm Kiếm", "Vui lòng chọn một loài cá hợp lệ trước!", "WARN", 3)
                 return
             end
             local _, _, counts = ScanAndClassifyInventory()
@@ -10914,7 +10939,7 @@ do
 
         btnUnlockThis.MouseButton1Click:Connect(function()
             if not FM.currentSelectedFish then
-                ShowNotification("Tìm Kiếm", "Vui lòng nhập tìm loài cá hợp lệ trước!", "WARN", 3)
+                ShowNotification("Tìm Kiếm", "Vui lòng chọn một loài cá hợp lệ trước!", "WARN", 3)
                 return
             end
             local _, _, counts = ScanAndClassifyInventory()
@@ -10924,6 +10949,7 @@ do
             end
         end)
 
+        -- Hàng bán theo số lượng tùy chọn
         local sellCustomRow = Instance.new("Frame")
         sellCustomRow.Name = "SellCustomRow"
         sellCustomRow.Size = UDim2.new(1, 0, 0, 38)
@@ -10994,9 +11020,12 @@ do
                 local _, _, counts = ScanAndClassifyInventory()
                 local toLock = {}
                 for _, ing in ipairs(rDef.ingredients) do
-                    local cData = counts[ing.name]
-                    if cData and #cData.items > 0 then
-                        for _, e in ipairs(cData.items) do table.insert(toLock, e) end
+                    local ingLower = ing.name:lower():gsub("[%s%-_]+", "")
+                    for name, cData in pairs(counts) do
+                        if name:lower():gsub("[%s%-_]+", "") == ingLower then
+                            for _, e in ipairs(cData.items) do table.insert(toLock, e) end
+                            break
+                        end
                     end
                 end
                 ProcessBatchItems(toLock, true, "Khóa NL " .. rDef.key)
@@ -11012,9 +11041,12 @@ do
                 for _, ing in ipairs(rDef.ingredients) do
                     local rawLower = ing.name:lower()
                     if not (Wiki and Wiki.allBaitFishSet and Wiki.allBaitFishSet[rawLower]) then
-                        local cData = counts[ing.name]
-                        if cData and #cData.items > 0 then
-                            for _, e in ipairs(cData.items) do table.insert(toUnlock, e) end
+                        local ingLower = ing.name:lower():gsub("[%s%-_]+", "")
+                        for name, cData in pairs(counts) do
+                            if name:lower():gsub("[%s%-_]+", "") == ingLower then
+                                for _, e in ipairs(cData.items) do table.insert(toUnlock, e) end
+                                break
+                            end
                         end
                     end
                 end
@@ -11042,8 +11074,13 @@ do
 
                 local completed = 0
                 for _, ing in ipairs(ctrl.def.ingredients) do
-                    local c = countsByName[ing.name]
-                    if c and c.total >= 1 then completed = completed + 1 end
+                    local ingLower = ing.name:lower():gsub("[%s%-_]+", "")
+                    for name, cData in pairs(countsByName) do
+                        if name:lower():gsub("[%s%-_]+", "") == ingLower and cData.total >= 1 then
+                            completed = completed + 1
+                            break
+                        end
+                    end
                 end
 
                 if ctrl.progress and ctrl.progress.Set then
@@ -11072,9 +11109,12 @@ do
                 local _, _, counts = ScanAndClassifyInventory()
                 local toLock = {}
                 for _, ing in ipairs(bDef.ingredients) do
-                    local cData = counts[ing.name]
-                    if cData and #cData.items > 0 then
-                        for _, e in ipairs(cData.items) do table.insert(toLock, e) end
+                    local ingLower = ing.name:lower():gsub("[%s%-_]+", "")
+                    for name, cData in pairs(counts) do
+                        if name:lower():gsub("[%s%-_]+", "") == ingLower then
+                            for _, e in ipairs(cData.items) do table.insert(toLock, e) end
+                            break
+                        end
                     end
                 end
                 ProcessBatchItems(toLock, true, "Khóa Mồi " .. bDef.key)
@@ -11084,9 +11124,12 @@ do
                 local _, _, counts = ScanAndClassifyInventory()
                 local toUnlock = {}
                 for _, ing in ipairs(bDef.ingredients) do
-                    local cData = counts[ing.name]
-                    if cData and #cData.items > 0 then
-                        for _, e in ipairs(cData.items) do table.insert(toUnlock, e) end
+                    local ingLower = ing.name:lower():gsub("[%s%-_]+", "")
+                    for name, cData in pairs(counts) do
+                        if name:lower():gsub("[%s%-_]+", "") == ingLower then
+                            for _, e in ipairs(cData.items) do table.insert(toUnlock, e) end
+                            break
+                        end
                     end
                 end
                 ProcessBatchItems(toUnlock, false, "Mở Khóa Mồi " .. bDef.key)
@@ -11103,8 +11146,15 @@ do
             for _, ctrl in ipairs(FM.baitControllers) do
                 local minCount = 999999
                 for _, ing in ipairs(ctrl.def.ingredients) do
-                    local c = countsByName[ing.name] or { total = 0 }
-                    if c.total < minCount then minCount = c.total end
+                    local ingLower = ing.name:lower():gsub("[%s%-_]+", "")
+                    local cTotal = 0
+                    for name, cData in pairs(countsByName) do
+                        if name:lower():gsub("[%s%-_]+", "") == ingLower then
+                            cTotal = cData.total
+                            break
+                        end
+                    end
+                    if cTotal < minCount then minCount = cTotal end
                 end
                 if minCount == 999999 then minCount = 0 end
 

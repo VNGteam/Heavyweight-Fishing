@@ -2,6 +2,32 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.1] - 2026-09-16
+### 🛡️ Khắc Phục Triệt Để Phân Loại Cá, Sửa Khóa/Mở Cá Toàn Diện & Gợi Ý Tìm Kiếm Thông Minh:
+1. **Sửa Lỗi "Mở Khóa Rác Mở Luôn Cá Quý Chế Cần Mồi"**:
+   - **Nguyên nhân**: Tên item cá trong balo Roblox chứa cả cân nặng (VD: `"Crimson Bream Sovereign | 1541348.67"`). Trước đó so sánh chuỗi trực tiếp khiến cá nguyên liệu không khớp với danh sách bảo vệ, dẫn tới việc hệ thống tưởng nhầm là rác và đưa vào danh sách mở khóa!
+   - **Khắc phục**:
+     - Áp dụng triệt để `Wiki.GetItemRawName(item)` để bóc tách chính xác tên gốc của cá trước khi phân loại.
+     - Thiết lập bộ dữ liệu bảo vệ thép `Wiki.allRodFishSet` và hàm kiểm tra `Wiki.IsProtectedFish(item)`: Bảo vệ 100% không bao giờ cho phép cá chế cần (Heavenpiercer, Sacred Bamboo, Pure Diamond), cá chế mồi thần thoại, boss bí mật, cá đột biến, hoặc cá có cân nặng $\ge 1.000.000$ KG lọt vào danh sách cá rác (`junkList`).
+2. **Sửa Lỗi "Khóa Cá Quý Không Khóa Lại Được / Ấn Vào Chỉ Khóa 1 Con"**:
+   - **Nguyên nhân**: 
+     - Remote `FavoriteItem:FireServer(item)` trong game là dạng **TOGGLE** (chuyển đổi qua lại). Việc vừa click nút GUI vừa bắn Remote khiến trạng thái bị đảo 2 lần (khóa xong lại mở về như cũ).
+     - Vòng lặp dừng lại sớm hoặc không cập nhật đúng con trỏ duyệt.
+   - **Khắc phục**:
+     - Kiểm tra trạng thái khóa thực tế của từng con qua `Wiki.IsItemFavorited(item)`: Khi khóa thì chỉ bắn Remote nếu cá **CHƯA** khóa (`not isFav`); khi mở khóa thì chỉ bắn Remote nếu cá **ĐANG** khóa (`isFav`). Tuyệt đối không click trùng GUI.
+     - Lặp bất đồng bộ an toàn qua TOÀN BỘ số lượng cá trong danh sách với delay chuẩn `0.08s`, đảm bảo khóa sạch 100% tất cả con cá của loài đó mà không bị sót hay nghẽn mạng.
+3. **Sửa Lỗi "Tiến Độ Nguyên Liệu Có Ảnh Nhưng Không Đếm Được Số Lượng (Luôn x0)"**:
+   - **Nguyên nhân**: Bảng đếm số lượng trước đó lưu theo key `item.Name` (có chứa cân nặng), trong khi bảng nguyên liệu truy vấn theo tên sạch (`"Crimson Bream Sovereign"`).
+   - **Khắc phục**: Chuẩn hóa toàn bộ hệ thống đếm trong `ScanAndClassifyInventory()` và `CreateVisualIngredientGrid`: đếm theo tên sạch `Wiki.GetItemRawName(item)` và so sánh chuẩn `string.lower()`, hiển thị chính xác 100% số lượng sở hữu thực tế trong balo (VD: `x3`, `x1`).
+4. **Đại Tu Thanh Tìm Kiếm (Gợi Ý Danh Sách Cá Khớp Từ Khóa & Đầy Đủ Nút Khóa/Mở/Bán)**:
+   - Khi nhập từ khóa tìm kiếm (VD: `crim`), hệ thống tự động quét và sinh các **Thẻ Gợi Ý (Suggestion Chips)** cho TẤT CẢ các loài cá khớp từ khóa (`Crimson Bream Sovereign`, `Crimson Electric Eel`, `Crimson Catfish`...) kèm số lượng đang có trong balo.
+   - Bấm vào thẻ bất kỳ để xem chi tiết: ảnh cá kích thước lớn, huy hiệu phân loại (Cá Chế Cần / Mồi / Boss / Rác), số lượng tổng, số con đã khóa, số con đang mở.
+   - Trang bị đầy đủ 2 nút độc lập: `[🔒 Khóa Toàn Bộ Loài Này]` và `[🔓 Mở Khóa Toàn Bộ Loài Này]` cùng ô nhập số lượng bán tùy chọn (nhập `0` để bán tất cả cá mở, hoặc số lượng tùy ý).
+5. **Đồng Bộ Phiên Bản v2.5.1 Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.5.1** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua)).
+
+---
+
 ## [v2.5.0] - 2026-09-16
 ### 🎨 Đại Tu Giao Diện Tab Quản Lý Cá (Visual 4-Slot Grid & Smart Bag Manager):
 1. **Khung 4 Ô Ảnh Nguyên Liệu Trực Quan Cho Từng Cần Câu & Mồi Câu (Visual 4-Slot Grid)**:
