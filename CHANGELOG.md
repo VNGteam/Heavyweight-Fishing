@@ -2,6 +2,24 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.7] - 2026-09-16
+### 🐟 Khắc Phục Triệt Để Vệt Sáng Tròn (White Glow Aura) & Hiển Thị Chuẩn 100% Sprite Cá:
+1. **Sửa Tận Gốc Lỗi Toàn Bộ Ô Nguyên Liệu Hiển Thị Đốm Tròn Phát Sáng Trắng**:
+   - **Phát hiện chính xác từ ảnh chụp màn hình game**:
+     - Người dùng gửi ảnh trong đó các ô nguyên liệu (`Flying Fish Emperor`, `Flying Fish Empress`, `Rainbow Dragonfish`, `Mountain Fish`...) đều hiển thị một đốm sáng tròn mờ màu trắng trên nền tối.
+     - **Nguyên nhân kỹ thuật**:
+       - Trong cấu trúc GUI của game, mỗi nút `Button` chứa thư mục `Detail`. Bên trong `Detail` có một đối tượng `ImageLabel` tên là `Detail.Detail` (có gắn `UICorner`) — đây chính là **vầng hào quang tròn phát sáng (Rarity Glow Aura)** nằm sau lưng con cá!
+       - Trong khi đó, **Sprite cá thật** được đặt trực tiếp tại `Button.Image` (có gắn `UIAspectRatioConstraint`).
+       - Ở bản v2.5.6, hàm `ExtractFishImageFromButton` đã ưu tiên lấy `Detail.Detail` trước, và cố tình bỏ qua `Button.Image` vì nghĩ nhầm đó là icon ổ khóa! Kết quả là toàn bộ các ô nguyên liệu đều bị gán hình đốm sáng tròn thay vì ảnh con cá!
+   - **Khắc phục toàn diện**:
+     - Đảo ngược ưu tiên: **Ưu tiên số 1 là `Button.Image`** (chính là Sprite cá thật của game, chỉ cần lọc không chứa ID ổ khóa `10709791437` và không chứa `UIGradient`).
+     - **Chặn triệt để `Detail.Detail`** (loại bỏ hoàn toàn đốm sáng hào quang tròn).
+     - Trong `FetchGameFishImage`, tích hợp cơ chế nạp trực tiếp O(1) từ `ReplicatedStorage.Info.Inventory[fishName]` để lấy ngay Asset ID gốc của loài cá đó mà không cần duyệt lặp.
+2. **Đồng Bộ Phiên Bản v2.5.7 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.7` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.6] - 2026-09-16
 ### 🛠️ Sửa Lỗi Không Thao Tác Được Nút Game (Kho Đồ, Balo) & Tối Ưu Hóa Tuyệt Đối Hiển Thị Ảnh Cá:
 1. **Khắc Phục Lỗi Liệt Nút / Không Mở Được Kho Đồ & Tính Năng Game**:

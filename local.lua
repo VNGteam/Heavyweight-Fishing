@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.6"
+local SCRIPT_BUILD_COMMIT = "v2.5.7"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -10104,43 +10104,54 @@ do
         return s
     end
 
-    -- Helper trích xuất icon cá thật từ Button, tuyệt đối tránh nhầm vào icon ổ khóa hoặc stencil gradient
+    -- Helper trích xuất icon cá thật từ Button, tuyệt đối tránh nhầm vào icon ổ khóa, hào quang trắng (Detail.Detail) hoặc stencil gradient
     local function ExtractFishImageFromButton(btn)
         if not btn then return nil end
 
-        local detail = btn:FindFirstChild("Detail")
-        if detail then
-            -- 1. Ưu tiên hàng đầu: Detail.Detail (đây là Sprite cá thật không chứa UIGradient)
-            local dSub = detail:FindFirstChild("Detail")
-            if dSub and dSub:IsA("ImageLabel") and dSub.Image ~= "" and not dSub:FindFirstChildOfClass("UIGradient") and not dSub.Image:find("10709791437") and not dSub.Image:find("Star") and not dSub.Image:find("star") then
-                return dSub.Image
-            end
-
-            -- 2. Detail.Image nếu và chỉ nếu nó KHÔNG có UIGradient (tránh hình hoa văn gradient xoáy trắng)
-            local dImg = detail:FindFirstChild("Image")
-            if dImg and dImg:IsA("ImageLabel") and dImg.Image ~= "" and not dImg:FindFirstChildOfClass("UIGradient") and not dImg.Image:find("10709791437") then
-                return dImg.Image
+        -- 1. Ưu tiên số 1: btn:FindFirstChild("Image") - Đây là Sprite cá chuẩn trong CraftRod, CraftBait và Inventory
+        local directImg = btn:FindFirstChild("Image")
+        if directImg and directImg:IsA("ImageLabel") and directImg.Image ~= "" then
+            local imgUrl = directImg.Image
+            if not imgUrl:find("10709791437") 
+                and not imgUrl:lower():find("lock") 
+                and not directImg:FindFirstChildOfClass("UIGradient") then
+                return imgUrl
             end
         end
 
-        -- 3. Quét các ImageLabel khác nhưng TUYỆT ĐỐI KHÔNG LẤY:
-        -- - btn:FindFirstChild("Image") (ổ khóa trạng thái)
-        -- - Bất kỳ Image nào có UIGradient bên trong (hoa văn/stencil)
-        -- - Icon ổ khóa Roblox 10709791437 hoặc Star/Shine
-        local directLockImg = btn:FindFirstChild("Image")
+        -- 2. Ưu tiên số 2: btn:FindFirstChild("Icon") nếu có
+        local directIcon = btn:FindFirstChild("Icon")
+        if directIcon and directIcon:IsA("ImageLabel") and directIcon.Image ~= "" then
+            local imgUrl = directIcon.Image
+            if not imgUrl:find("10709791437") 
+                and not imgUrl:lower():find("lock") 
+                and not directIcon:FindFirstChildOfClass("UIGradient") then
+                return imgUrl
+            end
+        end
+
+        -- 3. Quét các ImageLabel con khác trong btn nhưng TUYỆT ĐỐI KHÔNG LẤY:
+        -- - Detail.Detail (vầng hào quang tròn / white glow circle)
+        -- - Bất kỳ ảnh nào có UIGradient (hoa văn lượn sóng shimmer)
+        -- - Icon ổ khóa 10709791437
+        -- - Icon ngôi sao yêu thích Star / Shine / Favorite
         for _, desc in ipairs(btn:GetDescendants()) do
-            if desc:IsA("ImageLabel") and desc ~= directLockImg and desc.Image ~= "" then
+            if desc:IsA("ImageLabel") and desc.Image ~= "" then
                 local n = desc.Name:lower()
                 local pName = desc.Parent and desc.Parent.Name:lower() or ""
                 local hasGradient = desc:FindFirstChildOfClass("UIGradient") ~= nil
+                local imgUrl = desc.Image
+
+                -- Loại trừ vầng hào quang tròn màu trắng Detail.Detail
+                local isDetailGlow = (n == "detail" and pName == "detail") or (n == "detail" and desc:FindFirstChildOfClass("UICorner") ~= nil)
+                local isLock = imgUrl:find("10709791437") or n:find("lock")
+                local isStarOrShine = n:find("star") or n:find("shine") or n:find("fav") or pName:find("fav")
+
                 if not hasGradient
-                    and not n:find("star")
-                    and not n:find("shine")
-                    and not n:find("lock")
-                    and not n:find("fav")
-                    and not pName:find("fav")
-                    and not desc.Image:find("10709791437") then
-                    return desc.Image
+                    and not isDetailGlow
+                    and not isLock
+                    and not isStarOrShine then
+                    return imgUrl
                 end
             end
         end
@@ -10243,8 +10254,36 @@ do
             return cached
         end
 
+        -- 1. Tìm trực tiếp ModuleScript tương ứng loài cá trong ReplicatedStorage.Info.Inventory (O(1), 0.001ms)
+        local infoInv = ReplicatedStorage:FindFirstChild("Info") and ReplicatedStorage.Info:FindFirstChild("Inventory")
+        if infoInv then
+            local mod = infoInv:FindFirstChild(fishName)
+            if not mod then
+                for _, m in ipairs(infoInv:GetChildren()) do
+                    if m.Name:lower():gsub("[%s%-_]+", "") == clean then
+                        mod = m
+                        break
+                    end
+                end
+            end
+            if mod and mod:IsA("ModuleScript") then
+                local s, data = pcall(require, mod)
+                if s and type(data) == "table" then
+                    local targetImg = data.Image or data.Icon or data.Thumbnail or data.image or data.icon
+                    if targetImg then
+                        if tonumber(targetImg) then
+                            targetImg = "rbxassetid://" .. targetImg
+                        end
+                        FM.FishImageCache[clean] = targetImg
+                        return targetImg
+                    end
+                end
+            end
+        end
+
+        -- 2. Kích hoạt quét nền GUI nếu chưa có
         PreloadFishImages()
-        return ""
+        return FM.FishImageCache[clean] or ""
     end
 
     -- Bảng dữ liệu công thức Chế Cần
