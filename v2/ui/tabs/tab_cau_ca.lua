@@ -274,7 +274,7 @@ function TabCauCa.Render(parent)
     -- Section 5: Auto Luyện Chiêu
     Components.CreateCategoryHeader(parent, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
     local trainCard = Components.CreateCardGroup(parent)
-    local infoTrainProgress = Components.CreateInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+    local infoTrainProgress = Components.CreateInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", tonumber(Config.TrainCurrentCount) or 0, tonumber(Config.TrainTargetCount) or 100))
 
     Components.CreateToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
     Components.CreateDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy nhất muốn luyện", {"Z", "X", "C", "V"}, Config.TrainSkill or "Z", function(v) Config.TrainSkill = v end)
@@ -282,7 +282,7 @@ function TabCauCa.Render(parent)
     Components.CreateSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
         Config.TrainTargetCount = v
         if infoTrainProgress and infoTrainProgress.Set then
-            infoTrainProgress.Set(string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+            infoTrainProgress.Set(string.format("%d / %d lần", tonumber(Config.TrainCurrentCount) or 0, tonumber(Config.TrainTargetCount) or 100))
         end
     end)
 

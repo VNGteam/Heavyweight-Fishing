@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.4.0"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.4.1"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -59,6 +59,7 @@ ConfigModule.Config = {
     AutoTrainSkill = false,
     TrainSkill = "Chiêu Z",
     TrainCancelDelay = 0.3,
+    TrainCurrentCount = 0,
     TrainTargetCount = 100,
     TrainSkillCooldown = 6.0,
     TrainDelayCatch = true,

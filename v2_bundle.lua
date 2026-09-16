@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.2.9"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.4.1"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -452,6 +452,7 @@ ConfigModule.Config = {
     AutoTrainSkill = false,
     TrainSkill = "Chiêu Z",
     TrainCancelDelay = 0.3,
+    TrainCurrentCount = 0,
     TrainTargetCount = 100,
     TrainSkillCooldown = 6.0,
     TrainDelayCatch = true,
@@ -4812,16 +4813,28 @@ function Weather.DetectWeather()
         end
     end
 
-    -- 3. PlayerGui
+    -- 1. Ưu tiên đọc trực tiếp từ HUD thời tiết game (MainGui.Info.Info.Weather.Value)
     local pg = LocalPlayer:FindFirstChild("PlayerGui")
     if pg and pg:FindFirstChild("MainGui") then
-        for _, d in ipairs(pg.MainGui:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Visible and d.Text ~= "" and #d.Text >= 3 and #d.Text <= 45 then
-                local dName = d.Name:lower()
-                local pName = d.Parent and d.Parent.Name:lower() or ""
-                if (dName:find("weather") or dName:find("climate") or dName:find("season")
-                    or pName:find("weather") or pName:find("climate") or pName:find("season"))
-                    and not dName:find("island") and not dName:find("map") then
+        local mainGui = pg.MainGui
+        local direct = mainGui:FindFirstChild("Info")
+        local wLabel = nil
+        if direct then
+            local subInfo = direct:FindFirstChild("Info") or direct
+            local wFrame = subInfo:FindFirstChild("Weather")
+            if wFrame and wFrame:FindFirstChild("Value") and wFrame.Value:IsA("TextLabel") then
+                wLabel = wFrame.Value
+            end
+        end
+        if wLabel and wLabel.Text and #wLabel.Text > 0 then
+            local _, wName = Weather.DetectWeatherPattern(wLabel.Text)
+            if wName then return wName end
+        end
+
+        -- Fallback quét trong Info
+        if direct then
+            for _, d in ipairs(direct:GetDescendants()) do
+                if d:IsA("TextLabel") and d.Parent and d.Parent.Name:lower():find("weather") then
                     local _, wName = Weather.DetectWeatherPattern(d.Text)
                     if wName then return wName end
                 end
@@ -6011,7 +6024,7 @@ function TabCauCa.Render(parent)
     -- Section 5: Auto Luyện Chiêu
     Components.CreateCategoryHeader(parent, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
     local trainCard = Components.CreateCardGroup(parent)
-    local infoTrainProgress = Components.CreateInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+    local infoTrainProgress = Components.CreateInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", tonumber(Config.TrainCurrentCount) or 0, tonumber(Config.TrainTargetCount) or 100))
 
     Components.CreateToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
     Components.CreateDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy nhất muốn luyện", {"Z", "X", "C", "V"}, Config.TrainSkill or "Z", function(v) Config.TrainSkill = v end)
@@ -6019,7 +6032,7 @@ function TabCauCa.Render(parent)
     Components.CreateSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
         Config.TrainTargetCount = v
         if infoTrainProgress and infoTrainProgress.Set then
-            infoTrainProgress.Set(string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+            infoTrainProgress.Set(string.format("%d / %d lần", tonumber(Config.TrainCurrentCount) or 0, tonumber(Config.TrainTargetCount) or 100))
         end
     end)
 

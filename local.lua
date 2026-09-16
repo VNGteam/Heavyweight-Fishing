@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.4.0"
+local SCRIPT_BUILD_COMMIT = "v2.4.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -8510,7 +8510,7 @@ end)
 
 createCategoryHeader(tabFishing, "🎯 Auto Luyện Chiêu Nhanh (Fast Cancel)")
 local trainCard = createCardGroup(tabFishing)
-local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+local infoTrainProgress = createInfoRow(trainCard, "Tiến Độ Luyện Chiêu", string.format("%d / %d lần", tonumber(Config.TrainCurrentCount) or 0, tonumber(Config.TrainTargetCount) or 100))
 createToggleRow(trainCard, "Bật Auto Luyện Chiêu", "Cá cắn kéo là dùng chiêu -> cất cần hủy cá -> thả cần lại ngay", Config.AutoTrainSkill, function(v) Config.AutoTrainSkill = v end)
 createDropdownRow(trainCard, "Chọn Chiêu Cần Luyện", "Chọn 1 chiêu duy nhất muốn luyện (Z, X, C, V)", {"Z", "X", "C", "V"}, Config.TrainSkill or "Z", function(v) Config.TrainSkill = v end)
 createSliderRow(trainCard, "Nhịp Chờ Xuất Chiêu (Cancel Delay)", "Thời gian chờ nhân vật bắt đầu xuất chiêu trước khi cất cần (0.2s - 1.2s)", 0.2, 1.2, Config.TrainCancelDelay or 0.45, true, "s", function(v)
@@ -8519,7 +8519,7 @@ end)
 createSliderRow(trainCard, "Mục Tiêu Số Lần Dùng", "Số lần cần dùng để đạt yêu cầu tiến hóa (mặc định 100 lần)", 10, 500, Config.TrainTargetCount, false, " lần", function(v)
     Config.TrainTargetCount = v
     if infoTrainProgress and infoTrainProgress.Set then
-        infoTrainProgress.Set(string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount))
+        infoTrainProgress.Set(string.format("%d / %d lần", tonumber(Config.TrainCurrentCount) or 0, tonumber(Config.TrainTargetCount) or 100))
     end
 end)
 

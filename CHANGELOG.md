@@ -2,6 +2,21 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.4.1] - 2026-09-16
+### 🛠️ Sửa Lỗi Biên Dịch & Chạy Script (Fix "invalid argument #2 to 'format'"):
+1. **Khắc Phục Triệt Để Lỗi Chạy Script V2 (`line 6014`)**:
+   - **Nguyên nhân**:
+     - Khi chạy `v2_bundle.lua` qua `loader_v2.lua` (hoặc executor nạp bundle), tại giao diện Luyện Chiêu Nhanh (`v2/ui/tabs/tab_cau_ca.lua`), mã nguồn gọi `string.format("%d / %d lần", Config.TrainCurrentCount, Config.TrainTargetCount)`.
+     - Do biến `TrainCurrentCount` bị thiếu trong bảng cấu hình mặc định `ConfigModule.Config` ([v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua)), `Config.TrainCurrentCount` mang giá trị `nil`, dẫn đến lỗi văng script: `invalid argument #2 to 'format' (number expected, got nil)`.
+   - **Khắc phục**:
+     - Khởi tạo giá trị mặc định `TrainCurrentCount = 0` trong [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua).
+     - Bọc lớp bảo vệ phòng thủ `tonumber(Config.TrainCurrentCount) or 0` và `tonumber(Config.TrainTargetCount) or 100` trên toàn bộ các vị trí gọi `string.format` trong [v2/ui/tabs/tab_cau_ca.lua](file:///Users/vonguyengiap/Documents/script/v2/ui/tabs/tab_cau_ca.lua) và [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua).
+     - Biên dịch lại toàn bộ gói [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua) bằng `build.py`, đảm bảo 100% không còn lỗi cú pháp hay thiếu biến.
+2. **Đồng Bộ Phiên Bản Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.4.1** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua)).
+
+---
+
 ## [v2.4.0] - 2026-09-16
 ### 🎣 Hệ Thống Quản Lý Cá Toàn Diện (Fish Manager Pro) - Chế Cần, Chế Mồi & Dọn Cá Rác An Toàn:
 1. **Theo Dõi Tiến Độ Chế Cần Câu & Nhận Diện Cần Đã Sở Hữu (Rod Crafting Tracker)**:
