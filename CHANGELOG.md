@@ -2,6 +2,27 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.3.2] - 2026-09-16
+### 🐟 Tab Mới: Quản Lý Cá (Fish Manager) - Tính Năng Thử Nghiệm Khóa & Mở Khóa Cá:
+1. **Thêm Tab Riêng "Quản Lý Cá" Trên Menu Điều Khiển**:
+   - Tích hợp tab điều hướng mới nằm ngay cạnh tab **Câu Cá** và **Săn Boss** để người dùng tiện theo dõi và thao tác trực quan.
+   - Giao diện thiết kế theo chuẩn Dark Glassmorphism thống nhất của Identical Hub.
+2. **Chức Năng Duy Nhất: Khóa & Mở Khóa Thử Nghiệm Loài Cá `Crimson Bream Sovereign`**:
+   - Thống kê chi tiết số lượng cá `Crimson Bream Sovereign` trong túi đồ (Inventory & Hotbar):
+     - Dòng 1: **Loài cá thử nghiệm**: `Crimson Bream Sovereign`.
+     - Dòng 2: **Tổng số lượng trong balo**: Hiển thị tổng số cá tìm thấy.
+     - Dòng 3: **Đang Khóa (🔒 Favorite)**: Đếm số lượng cá đã được khóa an toàn (chống bán/chống xóa).
+     - Dòng 4: **Chưa Khóa (🔓 Mở)**: Đếm số lượng cá chưa khóa.
+3. **Bộ Điều Khiển Thao Tác An Toàn & Tự Động**:
+   - **Nút 🔒 Khóa Cá (Lock)**: Lọc toàn bộ các con `Crimson Bream Sovereign` chưa khóa và gửi lệnh qua Remote Event `ReplicatedStorage.Events.FavoriteItem:FireServer(item)`. Có thời gian nghỉ chống spam (anti-rate-limit 50ms) giúp máy chủ xử lý mượt mà và an toàn 100%.
+   - **Nút 🔓 Mở Khóa Cá (Unlock)**: Lọc toàn bộ các con `Crimson Bream Sovereign` đang bị khóa và gửi lệnh mở khóa tương ứng.
+   - **Nút 🔄 Quét Lại Balo**: Quét và cập nhật số lượng tức thì.
+   - **Tự Động Cập Nhật Thời Gian Thực (Auto-Sync)**: Lắng nghe sự kiện `ChildAdded` / `ChildRemoved` từ `ReplicatedStorage.Data[UserId].Inventory` và tự động cập nhật số lượng ngay khi người chơi vừa câu được hoặc chuyển tab sang "Quản Lý Cá".
+4. **Đồng Bộ Phiên Bản Toàn Hệ Thống**:
+   - Nâng cấp `SCRIPT_BUILD_COMMIT` lên **v2.3.2** trên toàn bộ file lõi ([local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua)).
+
+---
+
 ## [v2.3.1] - 2026-09-16
 ### 🎯 Sửa Lỗi Triệt Để Tính Năng Săn Boss & Tự Động Dịch Chuyển Theo Thời Tiết:
 1. **Khắc Phục Lỗi Nhận Diện Thời Tiết Game (Direct HUD Path & Zero-Lag Weather Detection)**:

@@ -101,7 +101,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.3.1"
+local SCRIPT_BUILD_COMMIT = "v2.3.2"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -1907,6 +1907,8 @@ local contentArea = Instance.new("Frame"); contentArea.Name = "ContentArea"; con
 local tabFrames = {}
 local tabButtons = {}
 
+local UpdateCrimsonBreamUI = nil
+
 local function SwitchTab(tabName)
     for name, frame in pairs(tabFrames) do frame.Visible = (name == tabName) end
     for name, btn in pairs(tabButtons) do
@@ -1920,6 +1922,9 @@ local function SwitchTab(tabName)
     end
     if tabName == "Nhiệm Vụ" and ticketQuestState and ticketQuestState.ScanAndUpdateStatus then
         task.spawn(ticketQuestState.ScanAndUpdateStatus)
+    end
+    if tabName == "Quản Lý Cá" and UpdateCrimsonBreamUI then
+        task.spawn(UpdateCrimsonBreamUI)
     end
 end
 
@@ -8077,7 +8082,7 @@ end
 
 local tabFishing   = CreateTab("Câu Cá")
 local tabBoss      = CreateTab("Săn Boss")
--- [Tab Wiki Đã Được Lược Bỏ]
+local tabFishManager = CreateTab("Quản Lý Cá")
 local tabGod       = CreateTab("Thần Linh")
 local tabQuests    = CreateTab("Nhiệm Vụ")
 local tabShop      = CreateTab("Shop & Chế Mồi")
@@ -10026,7 +10031,189 @@ createButtonRow(bossFarmCard, "Bay Đến Boss Enzo", "Dịch chuyển trực ti
     end
 end)
 
--- [initWikiTab Đã Được Lược Bỏ]
+-------------------------------------------------------------------------
+-- TAB QUẢN LÝ CÁ (FISH MANAGER) - THỬ NGHIỆM KHÓA / MỞ KHÓA
+-------------------------------------------------------------------------
+do
+    createCategoryHeader(tabFishManager, "Quản Lý Cá - Thử Nghiệm Khóa & Mở Khóa")
+    local fishCard = createCardGroup(tabFishManager)
+
+    local TARGET_FISH_NAME = "Crimson Bream Sovereign"
+    local isProcessing = false
+
+    -- Helper tìm kiếm cá Crimson Bream Sovereign trong Inventory & Hotbar
+    local function GetCrimsonBreamItems()
+        local lockedItems = {}
+        local unlockedItems = {}
+        local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        if not pData then return lockedItems, unlockedItems end
+
+        local containers = {}
+        if pData:FindFirstChild("Inventory") then table.insert(containers, pData.Inventory) end
+        if pData:FindFirstChild("Hotbar") then table.insert(containers, pData.Hotbar) end
+
+        for _, container in ipairs(containers) do
+            for _, item in ipairs(container:GetChildren()) do
+                local rawName = (Wiki and Wiki.GetItemRawName) and Wiki.GetItemRawName(item) or ""
+                local itemName = item.Name
+                -- Kiểm tra tên cá theo raw name hoặc tên item chứa chuỗi
+                if rawName == TARGET_FISH_NAME or itemName:lower():find(TARGET_FISH_NAME:lower(), 1, true) then
+                    local isLocked = false
+                    if Wiki and Wiki.IsItemFavorited then
+                        isLocked = Wiki.IsItemFavorited(item)
+                    end
+                    if not isLocked then
+                        isLocked = (itemName:find("Favorite", 1, true) ~= nil) or (item:GetAttribute("IsFavorite") == true)
+                    end
+
+                    if isLocked then
+                        table.insert(lockedItems, item)
+                    else
+                        table.insert(unlockedItems, item)
+                    end
+                end
+            end
+        end
+
+        return lockedItems, unlockedItems
+    end
+
+    local statusLabel = createInfoRow(fishCard, "Loài cá thử nghiệm", TARGET_FISH_NAME)
+    local totalLabel = createInfoRow(fishCard, "Tổng số lượng trong balo", "0 con")
+    local lockedLabel = createInfoRow(fishCard, "Đang Khóa (🔒 Favorite)", "0 con")
+    local unlockedLabel = createInfoRow(fishCard, "Chưa Khóa (🔓 Mở)", "0 con")
+
+    local function RefreshCounts()
+        local locked, unlocked = GetCrimsonBreamItems()
+        local total = #locked + #unlocked
+        if totalLabel and totalLabel.Set then
+            totalLabel.Set(string.format("%d con", total))
+        end
+        if lockedLabel and lockedLabel.Set then
+            lockedLabel.Set(string.format("%d con (🔒 Đã Khóa)", #locked))
+        end
+        if unlockedLabel and unlockedLabel.Set then
+            unlockedLabel.Set(string.format("%d con (🔓 Mở Khóa)", #unlocked))
+        end
+        return locked, unlocked
+    end
+
+    UpdateCrimsonBreamUI = RefreshCounts
+
+    -- Lắng nghe thay đổi balo để tự động cập nhật số lượng
+    task.spawn(function()
+        local pData = ReplicatedStorage:WaitForChild("Data", 10)
+        local userFolder = pData and pData:WaitForChild(tostring(LocalPlayer.UserId), 10)
+        if userFolder then
+            local inv = userFolder:WaitForChild("Inventory", 10)
+            if inv then
+                inv.ChildAdded:Connect(function()
+                    task.wait(0.3)
+                    RefreshCounts()
+                end)
+                inv.ChildRemoved:Connect(function()
+                    task.wait(0.3)
+                    RefreshCounts()
+                end)
+            end
+        end
+    end)
+
+    -- Nút 1: Khóa cá Crimson Bream Sovereign
+    createButtonRow(fishCard, "Khóa Cá (Lock)", "Khóa toàn bộ " .. TARGET_FISH_NAME .. " đang mở", "🔒 Khóa Cá", function()
+        if isProcessing then
+            ShowNotification("Quản Lý Cá", "Đang trong tiến trình xử lý, vui lòng đợi!", "WARN", 3)
+            return
+        end
+
+        local locked, unlocked = GetCrimsonBreamItems()
+        if #unlocked == 0 then
+            ShowNotification("Khóa Cá", "Không có cá " .. TARGET_FISH_NAME .. " nào chưa khóa!", "INFO", 3)
+            return
+        end
+
+        isProcessing = true
+        ShowNotification("Khóa Cá", string.format("Bắt đầu khóa %d con %s...", #unlocked, TARGET_FISH_NAME), "INFO", 3)
+
+        task.spawn(function()
+            local successCount = 0
+            local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+            if not favEvent then
+                ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 4)
+                isProcessing = false
+                return
+            end
+
+            for _, item in ipairs(unlocked) do
+                if item and item.Parent then
+                    pcall(function()
+                        favEvent:FireServer(item)
+                    end)
+                    successCount = successCount + 1
+                    task.wait(0.05) -- Nghỉ 50ms tránh rate-limit
+                end
+            end
+
+            task.wait(0.5)
+            RefreshCounts()
+            isProcessing = false
+            ShowNotification("Thành Công", string.format("Đã gửi yêu cầu khóa %d con %s!", successCount, TARGET_FISH_NAME), "SUCCESS", 5)
+        end)
+    end)
+
+    -- Nút 2: Mở Khóa cá Crimson Bream Sovereign
+    createButtonRow(fishCard, "Mở Khóa Cá (Unlock)", "Mở khóa toàn bộ " .. TARGET_FISH_NAME .. " đang bị khóa", "🔓 Mở Khóa", function()
+        if isProcessing then
+            ShowNotification("Quản Lý Cá", "Đang trong tiến trình xử lý, vui lòng đợi!", "WARN", 3)
+            return
+        end
+
+        local locked, unlocked = GetCrimsonBreamItems()
+        if #locked == 0 then
+            ShowNotification("Mở Khóa Cá", "Không có cá " .. TARGET_FISH_NAME .. " nào đang bị khóa!", "INFO", 3)
+            return
+        end
+
+        isProcessing = true
+        ShowNotification("Mở Khóa Cá", string.format("Bắt đầu mở khóa %d con %s...", #locked, TARGET_FISH_NAME), "INFO", 3)
+
+        task.spawn(function()
+            local successCount = 0
+            local favEvent = ReplicatedStorage:FindFirstChild("Events") and ReplicatedStorage.Events:FindFirstChild("FavoriteItem")
+            if not favEvent then
+                ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 4)
+                isProcessing = false
+                return
+            end
+
+            for _, item in ipairs(locked) do
+                if item and item.Parent then
+                    pcall(function()
+                        favEvent:FireServer(item)
+                    end)
+                    successCount = successCount + 1
+                    task.wait(0.05)
+                end
+            end
+
+            task.wait(0.5)
+            RefreshCounts()
+            isProcessing = false
+            ShowNotification("Thành Công", string.format("Đã gửi yêu cầu mở khóa %d con %s!", successCount, TARGET_FISH_NAME), "SUCCESS", 5)
+        end)
+    end)
+
+    -- Nút 3: Làm mới / Đếm lại
+    createButtonRow(fishCard, "Quét Lại Balo", "Đếm lại số lượng cá " .. TARGET_FISH_NAME .. " trong balo", "🔄 Quét Lại", function()
+        local locked, unlocked = RefreshCounts()
+        ShowNotification("Quét Hoàn Tất", string.format("Tìm thấy %d con (🔒 %d khóa, 🔓 %d mở)", #locked + #unlocked, #locked, #unlocked), "SUCCESS", 4)
+    end)
+
+    -- Khởi tạo đếm lần đầu
+    task.delay(2, function()
+        RefreshCounts()
+    end)
+end
 
 
 do
