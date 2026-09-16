@@ -2,6 +2,21 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.5] - 2026-09-16
+### 🐟 Nạp Ảnh Cá Trực Tiếp Từ ReplicatedStorage.Info.Inventory & Loại Bỏ Stencil UIGradient:
+1. **Khắc Phục Lỗi Toàn Bộ Ô Nguyên Liệu Hiện Cùng Một Hình Trắng (Gradient Stencil)**:
+   - **Nguyên nhân chính xác từ hình ảnh người dùng phản ánh**:
+     - Trong thẻ item của game, `Detail.Image` đi kèm một đối tượng `UIGradient` con: Đây là hoa văn stencil/shimmer viền xoáy trắng trang trí dùng chung cho mọi thẻ.
+     - Ngoài ra, Menu `Indexlist` (Sách Cá) chứa các hình placeholder câu hỏi/chưa mở khóa. Khi quét `Indexlist` đầu tiên, các ô nguyên liệu đã bị nạp đè bằng hình hoa văn xoáy trắng này!
+   - **Khắc phục triệt để**:
+     - **Tận dụng nguồn dữ liệu gốc chính thức của Game**: Quét trực tiếp thư mục `ReplicatedStorage.Info.Inventory`: Mỗi loài cá đều có 1 `ModuleScript` riêng biệt (`Flying Fish Emperor`, `Heavenpiercer Turtle`, `Rainbow Dragonfish`, `Mountain Fish`, `Ascended Perch`, v.v.). Gọi `require(mod)` để lấy trực tiếp thuộc tính `Image`/`Icon` Asset ID nguyên bản 100% của nhà phát triển game, không phụ thuộc vào GUI.
+     - **Bổ sung bộ lọc UIGradient trong `ExtractFishImageFromButton`**: Tự động bỏ qua bất kỳ `ImageLabel` nào có chứa `UIGradient` con (loại bỏ dứt điểm hoa văn xoáy trắng), ưu tiên lấy `Detail.Detail` (Sprite cá thật).
+     - **Loại bỏ hoàn toàn nguồn `Indexlist`** để chống nhiễm bẩn bộ nhớ đệm.
+2. **Đồng Bộ Phiên Bản v2.5.5 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.5` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.4] - 2026-09-16
 ### 🖼️ Khắc Phục Triệt Để Lỗi "Hiện Hình Ổ Khóa Khung Màu Xanh" Thay Vì Ảnh Cá Thật:
 1. **Sửa Tận Gốc Lỗi Hiển Thị Ổ Khóa (Padlock Icon Bug)**:
