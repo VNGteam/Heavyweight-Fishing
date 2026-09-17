@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.6.1"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.6.2"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -651,6 +651,8 @@ ConfigModule.Config = {
     NtfyAlertWeatherChange = true,
     NtfyAlertWeatherHop = true,
     NtfyNotifyBoss = true,
+    NtfyNotifyTicketQuest = true,
+    NtfyRemoteCommandEnabled = true,
 
     -- Keybinds
     UIKeybind = Enum.KeyCode.RightControl,
@@ -797,6 +799,8 @@ ConfigModule.ConfigLabelMap = {
     ["Thông Báo Đổi Thời Tiết (ntfy)"] = "NtfyAlertWeatherChange",
     ["Thông Báo Tìm Server Thời Tiết (ntfy)"] = "NtfyAlertWeatherHop",
     ["Thông Báo Boss & NPC (ntfy)"] = "NtfyNotifyBoss",
+    ["Thông Báo Xong Vé (ntfy)"] = "NtfyNotifyTicketQuest",
+    ["Nhận Lệnh Từ Xa (ntfy Remote)"] = "NtfyRemoteCommandEnabled",
 
     ["Giữ Cá Đột Biến"] = "KeepMutations",
     ["Giữ Cá Nặng Kg"] = "KeepHeavyFish",

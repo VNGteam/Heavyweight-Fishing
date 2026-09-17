@@ -2,6 +2,34 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.2] - 2026-09-17
+### 📜 Báo Cáo Hoàn Thành Nhiệm Vụ Vé & Ra Lệnh Lấy Thông Tin Server Từ Xa Qua ntfy:
+1. **Thông Báo Hoàn Thành Nhiệm Vụ Vé (Ticket Quest Alert) Về Điện Thoại**:
+   - Tự động bắt sự kiện nộp vé thành công từ NPC và kiểm tra dữ liệu tài khoản (`pData`).
+   - Đẩy thông báo tức thì lên màn hình điện thoại với đầy đủ các chỉ số:
+     - **Tiến độ nhiệm vụ ngày**: Số nhiệm vụ đã xong dạng `<qCount>/20 NV`.
+     - **Số vé đang sở hữu**: Số lượng vé hiện tại trong túi đồ (kèm dấu phân cách hàng nghìn dễ đọc).
+     - **Số Gem nhận được**: Tính toán chính xác lượng Gem vừa được cộng thêm từ nhiệm vụ (`+<gemsGained> Gems`).
+     - **Tổng số Gems hiện có**: Tổng tài sản Gems của tài khoản sau nhiệm vụ.
+     - **Thời gian hồi chiêu**: Báo rõ số phút cần chờ đến lần nộp vé tiếp theo.
+2. **Cơ Chế Ra Lệnh Từ Xa 2 Chiều (2-Way Remote Command Qua ntfy)**:
+   - **Nút Hành Động 1 Chạm Trên Thông Báo (Action Button)**: Tất cả thông báo đẩy ntfy từ game gửi về điện thoại hiện được đính kèm sẵn nút bấm **`📊 Lấy Báo Cáo Server`**. Người chơi chỉ cần chạm nút này ngay trên thông báo điện thoại là bot trong game sẽ tự động phản hồi!
+   - **Kênh Điều Khiển Riêng Biệt (`<Topic>_cmd`)**: Bot tự động lắng nghe lệnh từ topic điều khiển (ví dụ kênh của bạn là `ThongBaoThoiTiet` thì kênh lệnh là `ThongBaoThoiTiet_cmd`). Người dùng có thể nhắn các từ khóa như `status`, `info`, `check`, `server`, `baocao`, `thoitiet`, `nv` từ app điện thoại.
+   - **Báo Cáo Tình Hình Toàn Diện Về Điện Thoại**: Khi nhận được lệnh, bot lập tức tổng hợp và gửi về:
+     - Tên nhân vật đang treo máy.
+     - Thời tiết hiện tại và hòn đảo đang diễn ra.
+     - Tiến độ nhiệm vụ vé (`X/20 NV`, số vé đang có, trạng thái bot: đang câu / trả quest / chờ hồi chiêu).
+     - Số lượng Gem hiện có.
+     - Job ID server kèm cú pháp lệnh Teleport 1 chạm.
+     - Thời điểm báo cáo.
+3. **Cập Nhật Giao Diện & Tự Động Lưu Trữ Cấu Hình**:
+   - Thêm công tắc **"Thông Báo Xong Vé (ntfy)"** và **"Nhận Lệnh Từ Xa (ntfy Remote)"** trong thẻ ntfy tại Tab Profiles.
+   - Toàn bộ cài đặt được lưu bền vững vào file `HeavyweightFishing_Notifications.json` và `essential_config.json`, không bao giờ bị mất khi khởi động lại game.
+4. **Đồng Bộ Phiên Bản v2.6.2 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.2` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.1] - 2026-09-17
 ### 🎨 Sửa Lỗi ntfy Hiển Thị Mã JSON Thô Rối Mắt - Tối Ưu Thông Báo Đẩy Đẹp, Chuẩn Mobile:
 1. **Khắc Phục Tận Gốc Lỗi Hiển Thị Chuỗi JSON `{...}` Trên Ứng Dụng ntfy**:
