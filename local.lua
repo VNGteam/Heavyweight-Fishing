@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.8.5"
+local SCRIPT_BUILD_COMMIT = "v2.8.6"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -105,6 +105,7 @@ if not Events then
 end
 
 local Config = {
+    AutoMinigame = true,
     AutoCast = false,
     CastDelay = 1.0,
     CastPower = 100,
@@ -8939,6 +8940,13 @@ end)
 createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
 local fishCard = createCardGroup(tabFishing)
 
+createToggleRow(fishCard, "Tự Động Chơi Mini Game (Auto Minigame)", "Tự động thắng 100% mọi minigame (Kéo cần, Perfect Slam, Max Charge & Rhythm Boss Bạch Tuộc)", Config.AutoMinigame, function(v)
+    Config.AutoMinigame = v
+    Config.AnchorBar = v
+    Config.AutoSlam = v
+    Config.AutoCharge = v
+    Config.OctoAutoMinigame = v
+end)
 createToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
 createSliderRow(fishCard, "Độ Trễ Quăng Cần", "Thời gian giãn cách giữa các lần quăng", 0.0, 5.0, Config.CastDelay, true, "s", function(v) Config.CastDelay = v end)
 createToggleRow(fishCard, "Giữ Thanh Minigame (Anchor Bar)", "Tự động giữ thanh kéo ở giữa để bắt cá 100%", Config.AnchorBar, function(v) Config.AnchorBar = v end)
@@ -15261,7 +15269,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
 
                     -- Tự động giữ thanh cân bằng minigame (Anchor Bar)
                     local isHomeFishing = Config.AutoTicketQuest and ticketQuestState and ticketQuestState.isCooldown and ticketQuestState.isAtHomeSpot and Config.TicketAutoCastAtHome
-                    if (Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss or isHomeFishing or is15mQuest) then
+                    if (Config.AutoMinigame or Config.AnchorBar or (Config.AutoChatSecretBoss and secretBossState.active) or Config.AutoHuntBoss or isHomeFishing or is15mQuest) then
                         local barFrame = fUI:FindFirstChild("BarFrame")
                         if barFrame and barFrame:FindFirstChild("Bar") then
                             barFrame.Bar:TweenPosition(UDim2.new(0.5, 0, 0.5, 0), Enum.EasingDirection.InOut, Enum.EasingStyle.Linear, 0, true)
@@ -15269,19 +15277,19 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                     end
 
-                    if (Config.AutoSlam or is15mQuest) and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
+                    if (Config.AutoMinigame or Config.AutoSlam or is15mQuest) and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
                         if Events:FindFirstChild("Slam") then
                             Events.Slam:FireServer("Perfect")
                         end
                     end
 
-                    if (Config.AutoCharge or is15mQuest) and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
+                    if (Config.AutoMinigame or Config.AutoCharge or is15mQuest) and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
                         if Events:FindFirstChild("Charge") then
                             Events.Charge:FireServer(100)
                         end
                     end
 
-                    if (Config.AnchorBar or is15mQuest) and (now - lastProgressionTime >= 0.08) then
+                    if (Config.AutoMinigame or Config.AnchorBar or is15mQuest) and (now - lastProgressionTime >= 0.08) then
                         if Events and Events:FindFirstChild("UpdateFishProgression") then
                             Events.UpdateFishProgression:FireServer()
                         end
@@ -15738,9 +15746,21 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
         end
 
-        if Config.OctoAutoMinigame then
+        if Config.AutoMinigame or Config.OctoAutoMinigame then
             if Events and Events:FindFirstChild("RhythmHit") then
                 Events.RhythmHit:FireServer(true, 100)
+            end
+            local pg = LocalPlayer:FindFirstChild("PlayerGui")
+            local fUI = pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing")
+            if fUI and fUI.Visible and fUI:FindFirstChild("RhythmFrame") then
+                local rFrame = fUI.RhythmFrame
+                if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
+                    for _, hitNote in ipairs(rFrame:GetChildren()) do
+                        if hitNote.Name:find("Note") and hitNote.Visible then
+                            Events.RhythmHit:FireServer(hitNote.Name)
+                        end
+                    end
+                end
             end
         end
     end)
@@ -15806,7 +15826,7 @@ end))
 table.insert(activeConnections, RunService.RenderStepped:Connect(function()
     if not isRunning then return end
     pcall(function()
-        if Config.AnchorBar then
+        if Config.AutoMinigame or Config.AnchorBar then
             local pg = LocalPlayer:FindFirstChild("PlayerGui")
             if pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing") and pg.MainGui.Fishing.Visible then
                 local fUI = pg.MainGui.Fishing
@@ -15846,7 +15866,7 @@ end))
 
 if Events and Events:FindFirstChild("Slam") then
     table.insert(activeConnections, Events.Slam.OnClientEvent:Connect(function(slamEvent)
-        if isRunning and Config.AnchorBar and typeof(slamEvent) == "Instance" then
+        if isRunning and (Config.AutoMinigame or Config.AnchorBar) and typeof(slamEvent) == "Instance" then
             pcall(function() slamEvent:FireServer("Perfect") end)
         end
     end))
@@ -15854,7 +15874,7 @@ end
 
 if Events and Events:FindFirstChild("Charge") then
     table.insert(activeConnections, Events.Charge.OnClientEvent:Connect(function(chargeEvent)
-        if isRunning and Config.AnchorBar and typeof(chargeEvent) == "Instance" then
+        if isRunning and (Config.AutoMinigame or Config.AnchorBar) and typeof(chargeEvent) == "Instance" then
             pcall(function() chargeEvent:FireServer(100) end)
         end
     end))

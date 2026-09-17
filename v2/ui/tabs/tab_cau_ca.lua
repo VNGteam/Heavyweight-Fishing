@@ -83,6 +83,13 @@ function TabCauCa.Render(parent)
     Components.CreateCategoryHeader(parent, "Tự Động Câu Cá Cốt Lõi")
     local fishCard = Components.CreateCardGroup(parent)
 
+    Components.CreateToggleRow(fishCard, "Tự Động Chơi Mini Game (Auto Minigame)", "Tự động thắng 100% mọi minigame (Kéo cần, Perfect Slam, Max Charge & Rhythm Boss Bạch Tuộc)", Config.AutoMinigame, function(v)
+        Config.AutoMinigame = v
+        Config.AnchorBar = v
+        Config.AutoSlam = v
+        Config.AutoCharge = v
+        Config.OctoAutoMinigame = v
+    end)
     Components.CreateToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
     Components.CreateSliderRow(fishCard, "Độ Trễ Quăng Cần", "Thời gian giãn cách giữa các lần quăng", 0.0, 5.0, Config.CastDelay, true, "s", function(v) Config.CastDelay = v end)
     Components.CreateToggleRow(fishCard, "Giữ Thanh Minigame (Anchor Bar)", "Tự động giữ thanh kéo ở giữa để bắt cá 100%", Config.AnchorBar, function(v) Config.AnchorBar = v end)

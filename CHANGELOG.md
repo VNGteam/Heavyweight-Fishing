@@ -2,6 +2,18 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.8.6] - 2026-09-18
+### 🎮 Bổ Sung Tính Năng Tổng "Tự Động Chơi Mini Game (Auto Minigame)" & Hoàn Thiện Rhythm Bot:
+1. **Nút Bật Tắt Tổng "Tự Động Chơi Mini Game" Tại Tab Câu Cá**:
+   - Thêm toggle **Tự Động Chơi Mini Game (Auto Minigame)** ngay tại đầu thẻ Tự Động Câu Cá Cốt Lõi.
+   - Khi bật, tự động kích hoạt đồng bộ và xử lý mọi cơ chế minigame bắt cá trong game:
+     - 🎯 **Giữ Thanh Kéo Cân Bằng (Anchor Bar)**: Cố định vị trí thanh kéo ở giữa và bám sát tâm Hitbox của BossFightBar.
+     - ⚡ **Tự Động Đập Cần (Auto Slam)**: Tự bấm Perfect ngay lập tức khi xuất hiện nút Slam hoặc nhận OnClientEvent.
+     - 🔋 **Tự Động Sạc Dây (Auto Charge)**: Tự động sạc tối đa 100% độ bền dây câu.
+     - ⏩ **Rút Máu Cá Tốc Độ Cao (UpdateFishProgression)**: Gửi gói tiến trình kéo cá liên tục mỗi 0.08s.
+     - 🐙 **Tự Động Thắng Minigame Nhịp Điệu Của Boss Bạch Tuộc (Octoparasite - Rhythm Minigame)**: Tự động gõ nhịp 100% Perfect cả 2 cơ chế (gửi điểm số 100 và quét nốt `Note` trong `RhythmFrame`).
+2. **Mã Phiên Bản**: Đặt `SCRIPT_BUILD_COMMIT = "v2.8.6"` trên toàn bộ hệ thống (`local.lua`, `v2/core/config.lua`, `loader.lua`, `v2_bundle.lua`).
+
 ## [v2.8.5] - 2026-09-18
 ### 🎯 Tối Giản Tab Thử Nghiệm - Chỉ Giữ Lại Tự Động Tẩy Luyện Trait:
 1. **Dọn Dẹp Toàn Bộ Tab Thử Nghiệm (Experimental Tab)**:

@@ -81,29 +81,33 @@ function Fishing.HandleMinigame(config, fUI)
     local now = tick()
 
     -- Anchor Bar (Giữ thanh cân bằng ở giữa)
-    if config.AnchorBar then
+    if config.AutoMinigame or config.AnchorBar then
         local barFrame = fUI:FindFirstChild("BarFrame")
         if barFrame and barFrame:FindFirstChild("Bar") then
             barFrame.Bar.Position = UDim2.new(0.5, 0, 0.5, 0)
         end
+        local bossBar = fUI:FindFirstChild("BossFightBar")
+        if bossBar and bossBar.Visible and bossBar:FindFirstChild("Bar") and bossBar:FindFirstChild("Hitbox") then
+            bossBar.Bar.Position = bossBar.Hitbox.Position
+        end
     end
 
     -- Auto Slam ("Perfect")
-    if config.AutoSlam and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
+    if (config.AutoMinigame or config.AutoSlam) and fUI:FindFirstChild("PerfectButton") and fUI.PerfectButton.Visible then
         if Events and Events:FindFirstChild("Slam") then
             Events.Slam:FireServer("Perfect")
         end
     end
 
     -- Auto Charge (100)
-    if config.AutoCharge and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
+    if (config.AutoMinigame or config.AutoCharge) and fUI:FindFirstChild("Charge") and fUI.Charge.Visible then
         if Events and Events:FindFirstChild("Charge") then
             Events.Charge:FireServer(100)
         end
     end
 
     -- Update Fish Progression
-    if config.AnchorBar and (now - Fishing.lastProgressionTime >= 0.08) then
+    if (config.AutoMinigame or config.AnchorBar) and (now - Fishing.lastProgressionTime >= 0.08) then
         if Events and Events:FindFirstChild("UpdateFishProgression") then
             Events.UpdateFishProgression:FireServer()
         end
@@ -111,12 +115,17 @@ function Fishing.HandleMinigame(config, fUI)
     end
 
     -- Rhythm Hit (Octo minigame)
-    if config.AutoRhythmHit and fUI:FindFirstChild("RhythmFrame") then
-        local rFrame = fUI.RhythmFrame
-        if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
-            for _, hitNote in ipairs(rFrame:GetChildren()) do
-                if hitNote.Name:find("Note") and hitNote.Visible then
-                    Events.RhythmHit:FireServer(hitNote.Name)
+    if config.AutoMinigame or config.AutoRhythmHit or config.OctoAutoMinigame then
+        if Events and Events:FindFirstChild("RhythmHit") then
+            Events.RhythmHit:FireServer(true, 100)
+        end
+        if fUI:FindFirstChild("RhythmFrame") then
+            local rFrame = fUI.RhythmFrame
+            if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
+                for _, hitNote in ipairs(rFrame:GetChildren()) do
+                    if hitNote.Name:find("Note") and hitNote.Visible then
+                        Events.RhythmHit:FireServer(hitNote.Name)
+                    end
                 end
             end
         end
