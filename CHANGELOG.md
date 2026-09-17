@@ -2,6 +2,18 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.7.0] - 2026-09-17
+### 💎 Khôi Phục Toàn Diện Cấu Trúc Gốc v2.6.3 & Khắc Phục Lỗi Lấy Gems:
+1. **Khôi Phục Toàn Bộ Hệ Thống ntfy Về Chuẩn Gốc v2.6.3 (Hoạt Động Ổn Định 100%)**:
+   - Theo phản hồi chuẩn xác từ người dùng, phiên bản v2.6.3 là phiên bản gửi và nhận thông báo mượt mà nhất.
+   - Toàn bộ cơ chế gửi request, headers, giao diện và luồng xử lý được hoàn nguyên về chính xác phiên bản v2.6.3, xóa bỏ hoàn toàn các thay đổi gây xung đột ở các bản 2.6.4 - 2.6.8.
+2. **Khắc Phục Duy Nhất 1 Lỗi Của Bản v2.6.3 (Lỗi Không Trả Báo Cáo Server)**:
+   - Bổ sung hàm `secretBossState.GetPlayerGems()` để khi người dùng ấn nút **`📊 Lấy Báo Cáo Server`** trên điện thoại, bot không bị dừng khẩn cấp ở dòng tính Gems mà sẽ tổng hợp đầy đủ và gửi ngược báo cáo server về điện thoại ngay lập tức!
+3. **Đồng Bộ Phiên Bản v2.7.0 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.7.0` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.8] - 2026-09-17
 ### 🛑 Khắc Phục Triệt Để Giới Hạn Tốc Độ (Rate Limit 429) & Khôi Phục Thông Báo:
 1. **Phát Hiện Nguyên Nhân Gốc (Tại Sao Không Nhận Được Tin Nhắn Từ Sau 14h34)**:
