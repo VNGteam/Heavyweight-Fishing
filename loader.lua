@@ -1,6 +1,6 @@
 --[[
     ==================================================================
-    🚀 IDENTICAL LOADER V2.5.8 - TẢI & BIÊN DỊCH SIÊU TỐC (CHỐNG TIMEOUT)
+    🚀 IDENTICAL LOADER V2.6.0 - TẢI & BIÊN DỊCH SIÊU TỐC (CHỐNG TIMEOUT)
     ==================================================================
     Tính năng:
     - Đa tầng CDN (GitHub Raw, jsDelivr Edge, Fastly) chống nghẽn mạng / ISP chặn.

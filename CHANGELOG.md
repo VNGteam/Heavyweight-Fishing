@@ -2,6 +2,55 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.0] - 2026-09-17
+### ⚔️ Khắc Phục Lỗi Không Xài Skill Khi Gặp Boss Trong Nhiệm Vụ Vé (Ticket Quest Boss Skill Fix):
+1. **Phát Hiện Nguyên Nhân Gốc Rễ (Root Cause Analysis)**:
+   - Trong chu trình nhiệm vụ `fish_100` ("Câu 100 lần"), trước đây code chỉ cài đặt duy nhất 1 phím skill phụ (mặc định là `V`) vào danh sách combo và chỉ kích hoạt 1 lần duy nhất ở Bước 3.
+   - Đối với cá con/cá thường: Máu ít (vài chục đến vài trăm HP) nên chỉ cần 1 phát skill `V` là cá chết ngay lập tức, khiến người dùng thấy script vẫn xài skill bình thường.
+   - Đối với Boss: Máu Boss lên đến hàng chục nghìn / hàng triệu HP. Phát skill `V` duy nhất chỉ gãi ngứa. Sau đó bước vào Bước 4 (vòng lặp kéo cá kéo dài tối đa 25s), code cũ chỉ spam `Slam`, `Charge` và `UpdateFishProgression` mà **hoàn toàn KHÔNG xài thêm bất kỳ chiêu skill nào**, khiến Boss không chết và người chơi thấy như script không chịu xài skill.
+2. **Cơ Chế Nhận Diện Boss Thông Minh Tự Động (Smart Boss Detection)**:
+   - Tích hợp kiểm tra Boss toàn diện: `GetCurrentHookedFishName()`, tra cứu `Wiki.IsSecretBossFish`, `secretBossLookup`, `Config.SecretBossTargets`, nhận diện thanh máu `BossFightBar`, `BossBar`, `BossUI`, `BossHealth`, và ngưỡng máu `curHp >= 1500`.
+   - Ngay khi nhận diện là Boss: Tự động chuyển đổi danh sách chiêu thức từ 1 phím nhanh sang **Toàn Bộ Bộ Kỹ Năng Combo (Z, X, C, V)** từ `LoopSkills`.
+3. **Bổ Sung Vòng Lặp Xả Chiêu Liên Tục Trong Khi Kéo Cá (Continuous Pulling Skill Loop)**:
+   - Trong suốt thời gian kéo cá (Bước 4), hệ thống tự động kiểm tra cooldown và xả skill liên tục mỗi 0.15s.
+   - Tích hợp kỹ năng tự hồi máu khẩn cấp (`EmergencyHealSkill`) khi máu người chơi giảm thấp trong lúc giao tranh với Boss.
+   - Áp dụng đồng bộ cho cả 2 loại nhiệm vụ: `fish_100` (Câu 100 lần) và `skill_100` (Xài 100 lần skill).
+4. **Đồng Bộ Phiên Bản v2.6.0**:
+   - Cập nhật phiên bản lên `v2.6.0` trong [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua).
+
+---
+
+## [v2.5.9] - 2026-09-17
+### 📋 Ra Mắt Bảng Điều Khiển & Tra Cứu Toàn Bộ Cá Game (All Fish Master Controller & Encyclopedia):
+1. **Bảng Danh Mục Đầy Đủ 100% Các Loài Cá Trong Game (Toàn bộ 48+ Loài Từ Album/Index & Boss Realm)**:
+   - Tích hợp ngay đầu Tab **Quản Lý Cá** (`tabFishManager`) với giao diện cuộn hiện đại, sang trọng và mượt mà.
+   - Hiển thị đầy đủ mọi thông tin cho từng loài:
+     - **Tên cá & Phân hạng độ hiếm**: Màu sắc trực quan theo từng bậc (Thần Thoại, Huyền Thoại, Sử Thi, Hiếm, Phổ Thông).
+     - **Huy hiệu Khuyến nghị**: `[🛡️ NÊN GIỮ]` (đúc cần, mồi, trả quest) hoặc `[💰 NÊN BÁN]` (giá trị kinh tế, dọn balo).
+     - **Công dụng chi tiết**: Nêu rõ đúc cần gì, làm mồi gì, trả quest nào.
+     - **Tra cứu Rơi Đồ Thời Gian Thực (Live Drop Tracker)**: Kiểm tra trực tiếp dữ liệu người chơi xem `[ĐÃ CÓ]` hay `[CHƯA CÓ]` kèm tỷ lệ rơi (VD: `Trueform Jiaolongfish` ➔ `Skill Rolling Twin Dragons (50%): [ĐÃ CÓ]` / `[CHƯA CÓ]`).
+     - **Số lượng cá trong Balo**: Hiển thị số con hiện có, số con đã khóa và số con đang mở.
+2. **Bộ Công Tắc & Phím Tương Tác Cho Từng Loài Cá**:
+   - **Tích CÂU (Auto Catch/Skip)**: Bật/Tắt có câu loại cá này hay không. Nếu tắt, khi cá cắn câu script sẽ tự động bỏ qua (Skip Hook / Recast) để tiết kiệm thời gian.
+   - **Tích BÁN (Auto Sell)**: Bật/Tắt cho phép Auto Sell bán loại cá này khi dọn balo. Nếu tắt, script bảo vệ an toàn 100%, tuyệt đối không bao giờ bán nhầm.
+   - **Nút Khóa (🔒)**: Khóa toàn bộ con cá loại này đang có trong balo.
+   - **Nút Mở (🔓)**: Mở khóa toàn bộ con cá loại này đang có trong balo.
+   - **Nút Bán Ngay (💰)**: Bán sạch toàn bộ cá loại này trong balo ngay lập tức.
+3. **Thanh Công Cụ Tìm Kiếm & Lọc Thông Minh (Toolbar & Filter Chips)**:
+   - **Ô tìm kiếm realtime**: Gõ tìm theo tên tiếng Anh hoặc tên tiếng Việt.
+   - **Chip lọc nhanh**: `Tất Cả`, `Nên Giữ 🛡️`, `Nên Bán 💰`, `Thần Thoại`, `Huyền Thoại`, `Sử Thi`, `Hiếm`, `Phổ Thông`.
+   - **Nút 1-chạm**:
+     - `⚙️ Mặc Định Chuẩn`: Khôi phục cài đặt tối ưu cho toàn bộ cá (Cá quý: Giữ, Cá rác: Bán).
+     - `🎣 Bật Hết Câu`: Bật câu toàn bộ cá.
+     - `💰 Bật Hết Bán Rác`: Bật bán cho toàn bộ cá rác phổ thông.
+4. **Lưu Trữ Cấu Hình Cục Bộ (Local Persistence)**:
+   - Tự động lưu cấu hình Tích Câu và Tích Bán vào file `HeavyweightFishing_FishSettings.json` qua `writefile`.
+   - Tự động nạp lại cấu hình khi vào game qua `LoadFishMasterSettingsAndSyncUI()`.
+5. **Đồng Bộ Phiên Bản v2.5.9 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.9` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua).
+
+---
+
 ## [v2.5.8] - 2026-09-16
 ### 🎯 Phân Rõ Cá Secret & Cá Thường Có Ích Kèm Caption Trạng Thái Sở Hữu (Skill, Thuyền, Orb, Chế Cần/Mồi):
 1. **Phân Tách Rõ Ràng 2 Nhóm Cá Cho Từng Đảo Trong Tab Săn Boss (Boss Hunter)**:
