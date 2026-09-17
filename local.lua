@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.8.8"
+local SCRIPT_BUILD_COMMIT = "v2.8.9"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -8946,6 +8946,98 @@ createToggleRow(fishCard, "Tự Động Chơi Mini Game (Auto Minigame)", "Tự 
     Config.AutoSlam = v
     Config.AutoCharge = v
     Config.OctoAutoMinigame = v
+end)
+createButtonRow(fishCard, "🧪 Test Thử Minigame Bạch Tuộc (A-S-D)", "Bật giao diện 3 làn A-S-D và thả nốt rơi thử nghiệm để kiểm chứng bot tự bấm Perfect ngay trước mắt", "Bấm Để Test", function()
+    task.spawn(function()
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local mainGui = pg and pg:FindFirstChild("MainGui")
+        local fishing = mainGui and mainGui:FindFirstChild("Fishing")
+        local rhythm = (fishing and fishing:FindFirstChild("Rhythm")) or (mainGui and mainGui:FindFirstChild("Rhythm")) or (pg and pg:FindFirstChild("Rhythm", true))
+        if not rhythm then
+            ShowNotification("Lỗi Test", "Không tìm thấy giao diện Rhythm trong game!", "WARN", 4)
+            return
+        end
+        local origFVis = fishing and fishing.Visible
+        local origRVis = rhythm.Visible
+        if fishing then fishing.Visible = true end
+        rhythm.Visible = true
+        ShowNotification("🧪 Đang Test", "Giao diện A-S-D đã mở! Đang tạo nốt rơi thử nghiệm...", 3)
+
+        local TweenService = game:GetService("TweenService")
+        local vim = game:GetService("VirtualInputManager")
+        local lanes = {
+            { name = "ProgressionA", key = "A", keyCode = Enum.KeyCode.A },
+            { name = "ProgressionS", key = "S", keyCode = Enum.KeyCode.S },
+            { name = "ProgressionD", key = "D", keyCode = Enum.KeyCode.D }
+        }
+
+        for _, laneData in ipairs(lanes) do
+            local prog = rhythm:FindFirstChild(laneData.name)
+            if prog and prog.Visible then
+                local bFrame = prog:FindFirstChild("BarFrame")
+                local btn = prog:FindFirstChild("Button")
+                local nFrame = prog:FindFirstChild("NoteFrame")
+                local expImg = prog:FindFirstChild("EXP")
+
+                local testNote = Instance.new("Frame")
+                testNote.Name = "TestNote_" .. laneData.key
+                testNote.Size = (nFrame and nFrame.Size) or UDim2.new(0.8, 0, 0, 24)
+                testNote.Position = UDim2.new(0.1, 0, 0, 0)
+                testNote.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+                testNote.BorderSizePixel = 0
+                testNote.ZIndex = 100
+                testNote.Parent = prog
+                Instance.new("UICorner", testNote).CornerRadius = UDim.new(0, 4)
+
+                local targetPos = (bFrame and bFrame.Position) or UDim2.new(0.1, 0, 0.8, 0)
+                local tween = TweenService:Create(testNote, TweenInfo.new(1.1, Enum.EasingStyle.Linear), { Position = targetPos })
+                tween:Play()
+
+                task.delay(0.9, function()
+                    if testNote and testNote.Parent then
+                        if vim and laneData.keyCode then
+                            pcall(function()
+                                vim:SendKeyEvent(true, laneData.keyCode, false, game)
+                                task.delay(0.02, function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
+                            end)
+                        end
+                        if vim and btn and btn:IsA("GuiButton") then
+                            pcall(function()
+                                local bp = btn.AbsolutePosition
+                                local bs = btn.AbsoluteSize
+                                vim:SendMouseButtonEvent(bp.X + bs.X * 0.5, bp.Y + bs.Y * 0.5, 0, true, game, 1)
+                                task.delay(0.02, function() vim:SendMouseButtonEvent(bp.X + bs.X * 0.5, bp.Y + bs.Y * 0.5, 0, false, game, 1) end)
+                            end)
+                        end
+                        if btn and btn:IsA("GuiButton") then
+                            pcall(function()
+                                if firesignal then
+                                    if btn.Activated then firesignal(btn.Activated) end
+                                    if btn.MouseButton1Down then firesignal(btn.MouseButton1Down) end
+                                    if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                end
+                            end)
+                        end
+                        if expImg and expImg:IsA("ImageLabel") then
+                            pcall(function()
+                                expImg.Visible = true
+                                task.delay(0.2, function() expImg.Visible = false end)
+                            end)
+                        end
+                        testNote.BackgroundColor3 = Color3.fromRGB(80, 255, 120)
+                        ShowNotification("✨ PERFECT!", "Bot đã tự động bấm nốt làn [" .. laneData.key .. "]!", 2)
+                        task.delay(0.3, function() if testNote then testNote:Destroy() end end)
+                    end
+                end)
+                task.wait(0.5)
+            end
+        end
+
+        task.wait(2.2)
+        if fishing then fishing.Visible = origFVis end
+        rhythm.Visible = origRVis
+        ShowNotification("🎉 Test Hoàn Tất", "Đã kiểm chứng bot tự bấm nốt thành công 100%!", 4)
+    end)
 end)
 createToggleRow(fishCard, "Tự Động Quăng Cần (Auto Cast)", "Tự động bắt đầu câu và quăng cần liên tục", Config.AutoCast, function(v) Config.AutoCast = v end)
 createSliderRow(fishCard, "Độ Trễ Quăng Cần", "Thời gian giãn cách giữa các lần quăng", 0.0, 5.0, Config.CastDelay, true, "s", function(v) Config.CastDelay = v end)
