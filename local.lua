@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.7.0"
+local SCRIPT_BUILD_COMMIT = "v2.7.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -324,8 +324,6 @@ local Config = {
     NtfyAlertWeatherChange = true,
     NtfyAlertWeatherHop = true,
     NtfyNotifyBoss = true,
-    NtfyNotifyTicketQuest = true,
-    NtfyRemoteCommandEnabled = true,
     ShowBossDpsMeter = true,
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End,
@@ -569,8 +567,6 @@ local ConfigLabelMap = {
     ["Thông Báo Đổi Thời Tiết (ntfy)"] = "NtfyAlertWeatherChange",
     ["Thông Báo Tìm Server Thời Tiết (ntfy)"] = "NtfyAlertWeatherHop",
     ["Thông Báo Boss & NPC (ntfy)"] = "NtfyNotifyBoss",
-    ["Thông Báo Xong Vé (ntfy)"] = "NtfyNotifyTicketQuest",
-    ["Nhận Lệnh Từ Xa (ntfy Remote)"] = "NtfyRemoteCommandEnabled",
 
     -- Săn Boss DPS Meter
     ["Hiện Bảng Sát Thương Boss (% HP)"] = "ShowBossDpsMeter"
@@ -786,8 +782,6 @@ Config._essentialKeys = {
     ["NtfyAlertWeatherChange"] = true,
     ["NtfyAlertWeatherHop"] = true,
     ["NtfyNotifyBoss"] = true,
-    ["NtfyNotifyTicketQuest"] = true,
-    ["NtfyRemoteCommandEnabled"] = true,
 
     -- Săn Boss
     ["ShowBossDpsMeter"] = true,
@@ -1004,8 +998,7 @@ Config._notificationsFile = "HeavyweightFishing_Notifications.json"
 Config._notificationKeys = {
     "WebhookUrl", "WebhookEnabled", "WebhookNotifyBoss", "WebhookNotifyNPC", "WebhookHourlyStats", "WebhookStatsInterval",
     "TelegramEnabled", "TelegramBotToken", "TelegramChatId", "TelegramNotifyBoss", "TelegramNotifyNPC",
-    "NtfyEnabled", "NtfyTopic", "NtfyAlertWeatherChange", "NtfyAlertWeatherHop", "NtfyNotifyBoss",
-    "NtfyNotifyTicketQuest", "NtfyRemoteCommandEnabled"
+    "NtfyEnabled", "NtfyTopic", "NtfyAlertWeatherChange", "NtfyAlertWeatherHop", "NtfyNotifyBoss"
 }
 
 Config._notifSavePending = false
@@ -4303,7 +4296,7 @@ local function SendTelegramMessage(text)
     end)
 end
 
-function SendNtfyNotification(title, message, priorityLevel, tagList, customActions)
+function SendNtfyNotification(title, message, priorityLevel, tagList)
     if not Config.NtfyEnabled or not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
     pcall(function()
         local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
@@ -4325,27 +4318,12 @@ function SendNtfyNotification(title, message, priorityLevel, tagList, customActi
             cleanTopic = rawTopic
         end
 
-        local actionList = customActions
-        if actionList == nil and Config.NtfyRemoteCommandEnabled then
-            actionList = {
-                {
-                    action = "http",
-                    label = "📊 Lấy Báo Cáo Server",
-                    url = targetHost .. "/" .. cleanTopic .. "_cmd",
-                    method = "POST",
-                    body = "status",
-                    clear = false
-                }
-            }
-        end
-
         local payload = {
             topic = cleanTopic,
             title = tostring(title or "Heavyweight Fishing"),
             message = tostring(message or ""),
             priority = priorityLevel or 3,
-            tags = tagList or {"fishing_pole_and_fish"},
-            actions = actionList
+            tags = tagList or {"fishing_pole_and_fish"}
         }
 
         local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
@@ -4437,231 +4415,6 @@ function secretBossState.SendWeatherNtfyAlert(weatherName, matchedIsland, isInit
     end)
 end
 
-function secretBossState.GetPlayerGems()
-    local val = 0
-    pcall(function()
-        local pData = (ticketQuestState and ticketQuestState.GetPlayerDataFolder and ticketQuestState.GetPlayerDataFolder())
-            or (ReplicatedStorage:FindFirstChild("Data") and LocalPlayer and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId))
-        if pData then
-            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
-                local gObj = pData:FindFirstChild(gName)
-                if gObj and gObj:IsA("ValueBase") and tonumber(gObj.Value) then
-                    val = tonumber(gObj.Value)
-                    return
-                end
-            end
-        end
-        local ls = LocalPlayer and LocalPlayer:FindFirstChild("leaderstats")
-        if ls then
-            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
-                local gObj = ls:FindFirstChild(gName)
-                if gObj and gObj:IsA("ValueBase") and tonumber(gObj.Value) then
-                    val = tonumber(gObj.Value)
-                    return
-                end
-            end
-        end
-    end)
-    return val
-end
-
-function secretBossState.SendTicketQuestNtfyAlert(qCount, ticketCount, gemsGained, totalGems, cooldownMins)
-    if not Config.NtfyEnabled or not Config.NtfyNotifyTicketQuest then return end
-    pcall(function()
-        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local title = string.format("🎫 HOÀN THÀNH NHIỆM VỤ VÉ [%d/20]", qCount or 0)
-
-        local gemText = ""
-        if gemsGained and gemsGained > 0 then
-            gemText = string.format("💎 Thưởng NV: +%s Gems (Hiện có: %s Gems)", FormatWithSpaces(gemsGained), FormatWithSpaces(totalGems or 0))
-        elseif totalGems and totalGems > 0 then
-            gemText = string.format("💎 Tổng Gems hiện có: %s Gems", FormatWithSpaces(totalGems))
-        end
-
-        local msgParts = {
-            "✅ Đã nộp vé thành công!",
-            string.format("📜 Tiến độ: %d/20 Nhiệm Vụ hôm nay", qCount or 0),
-            string.format("🎫 Số vé đang có: %s Vé", FormatWithSpaces(ticketCount or 0))
-        }
-        if gemText ~= "" then
-            table.insert(msgParts, gemText)
-        end
-        if cooldownMins and cooldownMins > 0 then
-            table.insert(msgParts, string.format("⏳ Chờ hồi chiêu: %d phút", cooldownMins))
-        end
-        table.insert(msgParts, string.format("👤 Tài khoản: %s", playerName))
-        table.insert(msgParts, string.format("⏰ Thời gian: %s", timeStr))
-
-        local fullMsg = table.concat(msgParts, "\n")
-        SendNtfyNotification(title, fullMsg, 4, {"ticket", "white_check_mark", "gem"})
-    end)
-end
-
-function secretBossState.SendServerStatusNtfyAlert()
-    if not Config.NtfyEnabled then return end
-    pcall(function()
-        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local jobId = tostring(game.JobId or "N/A")
-        local placeId = tostring(game.PlaceId or "18779600655")
-
-        local wIsland, wName = secretBossState.DetectWeather()
-        local curWeather = (wName and wName ~= "" and wName ~= "Clear") and wName or "Clear (Trời Quang)"
-        local islandStr = wIsland and wIsland.islandName or "Không có bão"
-
-        local pData = ticketQuestState and ticketQuestState.GetPlayerDataFolder and ticketQuestState.GetPlayerDataFolder()
-        local qCount = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
-        local ticketCount = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-        local curGems = secretBossState.GetPlayerGems()
-        local questStatus = ticketQuestState and ticketQuestState.statusText or "Đang hoạt động"
-
-        local title = "📊 BÁO CÁO TÌNH HÌNH SERVER"
-        local msgParts = {
-            string.format("👤 Tài khoản: %s", playerName),
-            string.format("🌦️ Thời tiết: %s [%s]", curWeather, islandStr),
-            string.format("📜 Tiến độ vé: %d/20 NV (Có %s Vé)", qCount, FormatWithSpaces(ticketCount)),
-            string.format("📌 Trạng thái: %s", questStatus),
-            string.format("💎 Số Gems: %s Gems", FormatWithSpaces(curGems)),
-            string.format("🔑 Job ID: %s", jobId),
-            string.format("⚡ Teleport:\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)", placeId, jobId),
-            string.format("⏰ Cập nhật lúc: %s", timeStr)
-        }
-
-        local fullMsg = table.concat(msgParts, "\n")
-        SendNtfyNotification(title, fullMsg, 4, {"bar_chart", "clipboard", "partly_sunny"})
-    end)
-end
-
-secretBossState.remoteCommandStarted = false
-secretBossState.remoteProcessedIds = {}
-secretBossState.lastRemoteCmdId = nil
-secretBossState.lastRemoteMainId = nil
-
-local function SafeHttpGet(url)
-    local ok, res
-    if game and game.HttpGet then
-        ok, res = pcall(function() return game:HttpGet(url) end)
-        if ok and res and type(res) == "string" and #res > 0 then
-            return res
-        end
-    end
-    local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
-    if reqFunc then
-        local rOk, rRes = pcall(function()
-            return reqFunc({
-                Url = url,
-                Method = "GET"
-            })
-        end)
-        if rOk and rRes then
-            if type(rRes) == "table" and rRes.Body and #rRes.Body > 0 then
-                return rRes.Body
-            elseif type(rRes) == "string" and #rRes > 0 then
-                return rRes
-            end
-        end
-    end
-    return nil
-end
-
-function secretBossState.StartRemoteCommandListener()
-    if secretBossState.remoteCommandStarted then return end
-    secretBossState.remoteCommandStarted = true
-
-    task.spawn(function()
-        task.wait(2.0)
-
-        -- 1. Khởi tạo: Nạp sẵn các ID tin nhắn cũ trong 2 phút qua để tránh tự kích hoạt lệnh cũ
-        pcall(function()
-            if not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
-            local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
-            local cleanTopic = rawTopic:gsub("^https?://[^/]+/?", ""):gsub("^/+", ""):gsub("/+$", "")
-            if #cleanTopic == 0 then return end
-
-            local initUrl = "https://ntfy.sh/" .. cleanTopic .. "_cmd/json?poll=1&since=2m"
-            local raw = SafeHttpGet(initUrl)
-            if raw and #raw > 0 then
-                for line in string.gmatch(raw, "[^\r\n]+") do
-                    local ok, entry = pcall(function() return HttpService:JSONDecode(line) end)
-                    if ok and type(entry) == "table" and entry.id then
-                        secretBossState.remoteProcessedIds[entry.id] = true
-                        secretBossState.lastRemoteCmdId = entry.id
-                    end
-                end
-            end
-        end)
-
-        while isRunning do
-            task.wait(2.5)
-            if isRunning and Config.NtfyEnabled and Config.NtfyRemoteCommandEnabled and Config.NtfyTopic and #tostring(Config.NtfyTopic):gsub("%s+", "") > 0 then
-                pcall(function()
-                    local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
-                    local cleanTopic = rawTopic:gsub("^https?://[^/]+/?", ""):gsub("^/+", ""):gsub("/+$", "")
-                    if #cleanTopic == 0 then return end
-
-                    -- Kênh 1: Kênh lệnh chuyên dụng (<topic>_cmd) nhận tín hiệu từ nút bấm Action Button hoặc tin nhắn lệnh
-                    local cmdTopic = cleanTopic .. "_cmd"
-                    local pollCmdUrl = "https://ntfy.sh/" .. cmdTopic .. "/json?poll=1"
-                    if secretBossState.lastRemoteCmdId then
-                        pollCmdUrl = pollCmdUrl .. "&since=" .. tostring(secretBossState.lastRemoteCmdId)
-                    else
-                        pollCmdUrl = pollCmdUrl .. "&since=30s"
-                    end
-
-                    local resCmd = SafeHttpGet(pollCmdUrl)
-                    if resCmd and #resCmd > 0 then
-                        for line in string.gmatch(resCmd, "[^\r\n]+") do
-                            local ok, entry = pcall(function() return HttpService:JSONDecode(line) end)
-                            if ok and type(entry) == "table" and entry.event == "message" and entry.id then
-                                if not secretBossState.remoteProcessedIds[entry.id] then
-                                    secretBossState.remoteProcessedIds[entry.id] = true
-                                    secretBossState.lastRemoteCmdId = entry.id
-
-                                    ShowNotification("ntfy Remote", "Đã nhận lệnh từ điện thoại: Báo cáo server!", "INFO", 4)
-                                    secretBossState.SendServerStatusNtfyAlert()
-                                end
-                            end
-                        end
-                    end
-
-                    -- Kênh 2: Kênh chính (<topic>) khi người dùng gõ tin nhắn trực tiếp trong màn hình app ntfy
-                    local pollMainUrl = "https://ntfy.sh/" .. cleanTopic .. "/json?poll=1"
-                    if secretBossState.lastRemoteMainId then
-                        pollMainUrl = pollMainUrl .. "&since=" .. tostring(secretBossState.lastRemoteMainId)
-                    else
-                        pollMainUrl = pollMainUrl .. "&since=20s"
-                    end
-
-                    local resMain = SafeHttpGet(pollMainUrl)
-                    if resMain and #resMain > 0 then
-                        for line in string.gmatch(resMain, "[^\r\n]+") do
-                            local ok, entry = pcall(function() return HttpService:JSONDecode(line) end)
-                            if ok and type(entry) == "table" and entry.event == "message" and entry.id then
-                                if not secretBossState.remoteProcessedIds[entry.id] then
-                                    secretBossState.remoteProcessedIds[entry.id] = true
-                                    secretBossState.lastRemoteMainId = entry.id
-
-                                    local titleLower = tostring(entry.title or ""):lower()
-                                    local msgLower = tostring(entry.message or ""):lower():gsub("%s+", "")
-                                    local isBotSent = titleLower:find("báo cáo") or titleLower:find("thời tiết") or titleLower:find("nhiệm vụ vé") or titleLower:find("test ntfy") or titleLower:find("secret boss") or titleLower:find("đạo sĩ")
-
-                                    if not isBotSent and #msgLower > 0 and #msgLower <= 50 then
-                                        if msgLower:find("status") or msgLower:find("info") or msgLower:find("check") or msgLower:find("thoitiet") or msgLower:find("nv") or msgLower:find("server") or msgLower:find("baocao") then
-                                            ShowNotification("ntfy Remote", "Đã nhận lệnh từ app: Báo cáo server!", "INFO", 4)
-                                            secretBossState.SendServerStatusNtfyAlert()
-                                        end
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-        end
-    end)
-end
-
 local npcAlertsSent = {}
 
 function secretBossState.SendNPCDetectionAlert(npcType, npcName, npcInst)
@@ -4715,6 +4468,90 @@ function secretBossState.SendNPCDetectionAlert(npcType, npcName, npcInst)
             tostring(npcName), playerName, posStr, (jobId ~= "" and jobId or "N/A"), placeId, jobId, timeStr)
         SendNtfyNotification(ntfyTitle, ntfyMsg, 5, {"scroll", "eyes", "star"})
     end
+end
+
+-- Lấy số Gems của người chơi từ DataStore an toàn
+function secretBossState.GetPlayerGems()
+    local val = 0
+    pcall(function()
+        local pData = ReplicatedStorage:FindFirstChild("Data") and LocalPlayer and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
+        if pData then
+            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+                local gObj = pData:FindFirstChild(gName)
+                if gObj and gObj:IsA("ValueBase") and tonumber(gObj.Value) then
+                    val = tonumber(gObj.Value)
+                    return
+                end
+            end
+        end
+        local ls = LocalPlayer and LocalPlayer:FindFirstChild("leaderstats")
+        if ls then
+            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+                local gObj = ls:FindFirstChild(gName)
+                if gObj and gObj:IsA("ValueBase") and tonumber(gObj.Value) then
+                    val = tonumber(gObj.Value)
+                    return
+                end
+            end
+        end
+    end)
+    return val
+end
+
+-- Gửi báo cáo trạng thái server về điện thoại (dùng cho nút Báo Cáo Server)
+function secretBossState.SendServerStatusNtfyAlert()
+    if not Config.NtfyEnabled then return end
+    pcall(function()
+        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
+        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
+        local jobId = tostring(game.JobId or "N/A")
+        local placeId = tostring(game.PlaceId or "18779600655")
+
+        local curWeather = "Clear (Trời Quang)"
+        local islandStr = "Không có bão"
+        if secretBossState and secretBossState.DetectWeather then
+            pcall(function()
+                local wIsland, wName = secretBossState.DetectWeather()
+                if wName and wName ~= "" and wName ~= "Clear" then
+                    curWeather = wName
+                end
+                if wIsland and wIsland.islandName then
+                    islandStr = wIsland.islandName
+                end
+            end)
+        end
+
+        local qCount = 0
+        local ticketCount = 0
+        pcall(function()
+            local pData = ticketQuestState and ticketQuestState.GetPlayerDataFolder and ticketQuestState.GetPlayerDataFolder()
+            if pData then
+                if pData:FindFirstChild("TicketQuestDailyCount") then
+                    qCount = tonumber(pData.TicketQuestDailyCount.Value) or 0
+                end
+                if pData:FindFirstChild("Ticket") then
+                    ticketCount = tonumber(pData.Ticket.Value) or 0
+                end
+            end
+        end)
+
+        local curGems = secretBossState.GetPlayerGems()
+        local questStatus = (ticketQuestState and ticketQuestState.statusText) or "Đang hoạt động"
+
+        local title = "📊 BÁO CÁO TÌNH HÌNH SERVER"
+        local msgParts = {
+            string.format("👤 Tài khoản: %s", playerName),
+            string.format("🌦️ Thời tiết: %s [%s]", curWeather, islandStr),
+            string.format("📜 Tiến độ vé: %d/20 NV (Có %s Vé)", qCount, FormatWithSpaces(ticketCount)),
+            string.format("📌 Trạng thái: %s", questStatus),
+            string.format("💎 Số Gems: %s Gems", FormatWithSpaces(curGems)),
+            string.format("🔑 Job ID: %s", jobId),
+            string.format("⚡ Teleport:\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)", placeId, jobId),
+            string.format("⏰ Cập nhật lúc: %s", timeStr)
+        }
+        local fullMsg = table.concat(msgParts, "\n")
+        SendNtfyNotification(title, fullMsg, 4, {"bar_chart", "clipboard", "partly_sunny"})
+    end)
 end
 
 local function GetPlayerRodPower()
@@ -8415,7 +8252,6 @@ function ticketQuestState.Tick()
                 pcall(function() Events.CancelCast:FireServer() end)
             end
 
-            local gemsBefore = secretBossState.GetPlayerGems()
             local claimSuccess = ticketQuestState.InteractNPC(true)
             ticketQuestState.ClearUINavigation()
             task.delay(0.3, ticketQuestState.ClearUINavigation)
@@ -8429,7 +8265,6 @@ function ticketQuestState.Tick()
 
             if questCleared or (serverCd > nowServer) or claimSuccess then
                 local setCooldown = (serverCd > nowServer) and (serverCd - nowServer) or (20 * 60)
-                local cdMins = math.ceil(setCooldown / 60)
                 ticketQuestState.cooldownEnd = now + setCooldown
                 ticketQuestState.isCooldown = true
                 ticketQuestState.isCompleted = false
@@ -8437,22 +8272,10 @@ function ticketQuestState.Tick()
                 ticketQuestState.currentQuestType = "none"
                 ticketQuestState.currentProgress = 0
                 ticketQuestState.active = false
-                ticketQuestState.statusText = string.format("Đã nộp vé Hard! Đang chờ hồi chiêu (%d phút)", cdMins)
+                ticketQuestState.statusText = string.format("Đã nộp vé Hard! Đang chờ hồi chiêu (%d phút)", math.ceil(setCooldown / 60))
                 ticketQuestState.SaveSpots()
                 ticketQuestState.UpdateUI()
-                ShowNotification("Nhiệm Vụ Vé", string.format("Đã nộp vé Hard! Đang chờ hồi chiêu (%d phút).", cdMins), "SUCCESS", 8)
-
-                -- Tự động gửi thông báo hoàn thành nhiệm vụ vé về ntfy / điện thoại
-                task.delay(1.2, function()
-                    local gemsAfter = secretBossState.GetPlayerGems()
-                    local gemsGained = math.max(0, gemsAfter - gemsBefore)
-                    local curPData = ticketQuestState.GetPlayerDataFolder()
-                    local qCount = curPData and curPData:FindFirstChild("TicketQuestDailyCount") and tonumber(curPData.TicketQuestDailyCount.Value) or 0
-                    local ticketCount = curPData and curPData:FindFirstChild("Ticket") and tonumber(curPData.Ticket.Value) or 0
-                    if secretBossState and secretBossState.SendTicketQuestNtfyAlert then
-                        secretBossState.SendTicketQuestNtfyAlert(qCount, ticketCount, gemsGained, gemsAfter, cdMins)
-                    end
-                end)
+                ShowNotification("Nhiệm Vụ Vé", string.format("Đã nộp vé Hard! Đang chờ hồi chiêu (%d phút).", math.ceil(setCooldown / 60)), "SUCCESS", 8)
             else
                 ticketQuestState.statusText = "Đã xong! Đang tiếp tục tương tác NPC để nộp vé..."
                 ticketQuestState.UpdateUI()
@@ -14137,23 +13960,21 @@ createToggleRow(ntfyCard, "Thông Báo Boss & NPC (ntfy)", "Gửi thông báo kh
     SaveNotificationsConfig()
 end)
 
-createToggleRow(ntfyCard, "Thông Báo Xong Vé (ntfy)", "Gửi thông báo khi nộp vé thành công (kèm số nv/20, vé và gems nhận được)", Config.NtfyNotifyTicketQuest, function(v)
-    Config.NtfyNotifyTicketQuest = v
-    SaveNotificationsConfig()
-end)
-
-createToggleRow(ntfyCard, "Nhận Lệnh Từ Xa (ntfy Remote)", "Bấm nút trên thông báo hoặc nhắn 'status' từ app để bot gửi báo cáo server", Config.NtfyRemoteCommandEnabled, function(v)
-    Config.NtfyRemoteCommandEnabled = v
-    SaveNotificationsConfig()
-end)
-
 createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo đẩy mẫu về app ntfy trên điện thoại ngay lập tức", "Gửi Test", function()
     local clean = tostring(Config.NtfyTopic or ""):gsub("%s+", "")
     if clean == "" then
         ShowNotification("ntfy", "Vui lòng nhập ntfy Topic trước!", "WARN")
         return
     end
-    ShowNotification("ntfy", "Đang gửi thông báo test đến điện thoại...", "INFO")
+    -- Tự động bật ntfy nếu người dùng chưa bật để test được ngay
+    if not Config.NtfyEnabled then
+        Config.NtfyEnabled = true
+        if UIControllers.NtfyEnabled and UIControllers.NtfyEnabled.Set then
+            pcall(function() UIControllers.NtfyEnabled.Set(true, true) end)
+        end
+        SaveNotificationsConfig()
+    end
+    ShowNotification("ntfy", "Đang gửi thông báo test đến kênh: " .. clean .. "...", "INFO", 4)
     task.spawn(function()
         local _, curWeather = secretBossState.DetectWeather()
         local testWeather = (curWeather and curWeather ~= "" and curWeather ~= "Clear") and curWeather or "Clear (Trời Quang)"
@@ -17101,10 +16922,6 @@ end
 
 if secretBossState.StartWeatherMonitor then
     task.spawn(secretBossState.StartWeatherMonitor)
-end
-
-if secretBossState.StartRemoteCommandListener then
-    task.spawn(secretBossState.StartRemoteCommandListener)
 end
 
 if secretBossState.CheckWeatherHopOnJoin then
