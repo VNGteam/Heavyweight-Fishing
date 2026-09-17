@@ -2,51 +2,6 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
-## [v2.6.0] - 2026-09-17
-### ⚡ Phát Hành Bản Ổn Định v2.6.0 (Tối Ưu Phím Chức Năng 1, 2, 3 & Toàn Diện Bảng Điều Khiển Cá):
-1. **Khôi Phục & Ổn Định Hệ Thống Minigame Cốt Lõi**:
-   - Hoàn tác toàn bộ các can thiệp bất đồng bộ gây lỗi trong các bản thử nghiệm trước.
-   - Giữ nguyên vẹn tính năng siêu cấp **Bảng Điều Khiển & Tra Cứu Toàn Bộ Cá Game (All Fish Master Controller & Encyclopedia)**: danh mục 48+ loài cá, nút toggle autoCatch/autoSell cho từng loài cá, tự lưu vào file json `HeavyweightFishing_FishSettings.json`.
-2. **Khắc Phục Triệt Để 100% Lỗi Không Dùng Được Phím Chức Năng (Hotbar 1, 2, 3 - Mở Túi Đồ / Chọn Cần)**:
-   - **Triệt tiêu kẹt UI Focus**: Xóa bỏ hoàn toàn mã gán `gs.SelectedObject = btn` trong `ClickButtonEntry`. Bổ sung reset `SelectedObject = nil` ngay tại thời điểm load script và bộ giám sát liên tục trong Heartbeat, trả lại quyền bàn phím cho engine game xử lý phím số 1, 2, 3.
-   - **Bảo vệ trạng thái mở Túi Đồ & Chọn Cần**: Bổ sung bộ kiểm tra thông minh `isInventoryOpen` trong vòng lặp AutoCast/AutoFish. Khi người chơi đang mở Túi đồ (`Inventory`), Chọn cần (`Fishing rod inventory`) hoặc Menu game, script tuyệt đối không ép đổi về cần câu (`ToggleHotbar("1")`), giúp người chơi thoải mái thao tác mở balo và chọn cần mà không bị script giật đóng menu lại.
-   - **Sửa lỗi AutoEquipBestRod**: Sửa lệnh trang bị cần câu tốt nhất gọi đúng remote `EquipFishingRod` thay vì gọi nhầm `ToggleHotbar("1")`.
-3. **Đồng Bộ Số Hiệu Phiên Bản Toàn Diện (Build v2.6.0)**:
-   - Đồng bộ `v2.6.0` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), và [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua).
-
----
-
-## [v2.5.9-alpha] - 2026-09-17
-### 📋 Ra Mắt Bảng Điều Khiển & Tra Cứu Toàn Bộ Cá Game (All Fish Master Controller & Encyclopedia):
-1. **Bảng Danh Mục Đầy Đủ 100% Các Loài Cá Trong Game (Toàn bộ 48+ Loài Từ Album/Index & Boss Realm)**:
-   - Tích hợp ngay đầu Tab **Quản Lý Cá** (`tabFishManager`) với giao diện cuộn hiện đại, sang trọng và mượt mà.
-   - Hiển thị đầy đủ mọi thông tin cho từng loài:
-     - **Tên cá & Phân hạng độ hiếm**: Màu sắc trực quan theo từng bậc (Thần Thoại, Huyền Thoại, Sử Thi, Hiếm, Phổ Thông).
-     - **Huy hiệu Khuyến nghị**: `[🛡️ NÊN GIỮ]` (đúc cần, mồi, trả quest) hoặc `[💰 NÊN BÁN]` (giá trị kinh tế, dọn balo).
-     - **Công dụng chi tiết**: Nêu rõ đúc cần gì, làm mồi gì, trả quest nào.
-     - **Tra cứu Rơi Đồ Thời Gian Thực (Live Drop Tracker)**: Kiểm tra trực tiếp dữ liệu người chơi xem `[ĐÃ CÓ]` hay `[CHƯA CÓ]` kèm tỷ lệ rơi (VD: `Trueform Jiaolongfish` ➔ `Skill Rolling Twin Dragons (50%): [ĐÃ CÓ]` / `[CHƯA CÓ]`).
-     - **Số lượng cá trong Balo**: Hiển thị số con hiện có, số con đã khóa và số con đang mở.
-2. **Bộ Công Tắc & Phím Tương Tác Cho Từng Loài Cá**:
-   - **Tích CÂU (Auto Catch/Skip)**: Bật/Tắt có câu loại cá này hay không. Nếu tắt, khi cá cắn câu script sẽ tự động bỏ qua (Skip Hook / Recast) để tiết kiệm thời gian.
-   - **Tích BÁN (Auto Sell)**: Bật/Tắt cho phép Auto Sell bán loại cá này khi dọn balo. Nếu tắt, script bảo vệ an toàn 100%, tuyệt đối không bao giờ bán nhầm.
-   - **Nút Khóa (🔒)**: Khóa toàn bộ con cá loại này đang có trong balo.
-   - **Nút Mở (🔓)**: Mở khóa toàn bộ con cá loại này đang có trong balo.
-   - **Nút Bán Ngay (💰)**: Bán sạch toàn bộ cá loại này trong balo ngay lập tức.
-3. **Thanh Công Cụ Tìm Kiếm & Lọc Thông Minh (Toolbar & Filter Chips)**:
-   - **Ô tìm kiếm realtime**: Gõ tìm theo tên tiếng Anh hoặc tên tiếng Việt.
-   - **Chip lọc nhanh**: `Tất Cả`, `Nên Giữ 🛡️`, `Nên Bán 💰`, `Thần Thoại`, `Huyền Thoại`, `Sử Thi`, `Hiếm`, `Phổ Thông`.
-   - **Nút 1-chạm**:
-     - `⚙️ Mặc Định Chuẩn`: Khôi phục cài đặt tối ưu cho toàn bộ cá (Cá quý: Giữ, Cá rác: Bán).
-     - `🎣 Bật Hết Câu`: Bật câu toàn bộ cá.
-     - `💰 Bật Hết Bán Rác`: Bật bán cho toàn bộ cá rác phổ thông.
-4. **Lưu Trữ Cấu Hình Cục Bộ (Local Persistence)**:
-   - Tự động lưu cấu hình Tích Câu và Tích Bán vào file `HeavyweightFishing_FishSettings.json` qua `writefile`.
-   - Tự động nạp lại cấu hình khi vào game qua `LoadFishMasterSettingsAndSyncUI()`.
-5. **Đồng Bộ Phiên Bản v2.5.9 Toàn Hệ Thống**:
-   - Cập nhật số phiên bản `v2.5.9` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua).
-
----
-
 ## [v2.5.8] - 2026-09-16
 ### 🎯 Phân Rõ Cá Secret & Cá Thường Có Ích Kèm Caption Trạng Thái Sở Hữu (Skill, Thuyền, Orb, Chế Cần/Mồi):
 1. **Phân Tách Rõ Ràng 2 Nhóm Cá Cho Từng Đảo Trong Tab Săn Boss (Boss Hunter)**:

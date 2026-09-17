@@ -88,20 +88,14 @@ if not LocalPlayer then
 end
 local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildWhichIsA("Camera")
 
--- Giải phóng trạng thái UI Navigation / Focus để bảo đảm các phím số 1, 2, 3 và UI game hoạt động bình thường 100%
-pcall(function()
-    local gs = game:GetService("GuiService")
-    if gs then
-        gs.SelectedObject = nil
-    end
-end)
+-- Không can thiệp GuiNavigationEnabled toàn cục để bảo đảm người chơi thao tác UI game bình thường
 
 local isRunning = true
 local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.0"
+local SCRIPT_BUILD_COMMIT = "v2.5.8"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -210,7 +204,6 @@ local Config = {
         ["Octoparasitic Fish"] = true,
         ["Dreadmare Eel"] = false,
     },
-    FishMasterSettings = {},
     CustomBossSpots = {},
     SelectedCustomSpotIsland = "Đảo Tre (Bamboo Isle)",
     SelectedCustomSpotSlot = 1,
@@ -975,67 +968,6 @@ local function LoadBossTargetsAndSyncUI()
             end
         end
     end)
-end
-
--- ============================================================
--- FISH MASTER CONTROLLER PERSISTENCE (HeavyweightFishing_FishSettings.json)
--- Lưu/nạp cấu hình Tích Câu, Tích Bán cho từng loài cá toàn game.
--- ============================================================
-do
-    local FISH_MASTER_SETTINGS_FILE = "HeavyweightFishing_FishSettings.json"
-    local _fishMasterSavePending = false
-    _G._FishMasterCardsMap = _G._FishMasterCardsMap or {}
-
-    function SaveFishMasterSettings()
-        if not writefile then return end
-        if _fishMasterSavePending then return end
-        _fishMasterSavePending = true
-        task.delay(0.3, function()
-            _fishMasterSavePending = false
-            local data = {}
-            for k, v in pairs(Config.FishMasterSettings or {}) do
-                data[k] = {
-                    autoCatch = v.autoCatch,
-                    autoSell = v.autoSell
-                }
-            end
-            local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
-            if ok and encoded then
-                pcall(function() writefile(FISH_MASTER_SETTINGS_FILE, encoded) end)
-            end
-        end)
-    end
-
-    function LoadFishMasterSettingsAndSyncUI()
-        if not isfile or not isfile(FISH_MASTER_SETTINGS_FILE) or not readfile then return end
-        local ok, content = pcall(function() return readfile(FISH_MASTER_SETTINGS_FILE) end)
-        if not ok or not content or #content == 0 then return end
-        local decOk, data = pcall(function() return HttpService:JSONDecode(content) end)
-        if not decOk or type(data) ~= "table" then return end
-
-        Config.FishMasterSettings = Config.FishMasterSettings or {}
-        for k, v in pairs(data) do
-            if Config.FishMasterSettings[k] and type(v) == "table" then
-                if v.autoCatch ~= nil then Config.FishMasterSettings[k].autoCatch = v.autoCatch end
-                if v.autoSell ~= nil then Config.FishMasterSettings[k].autoSell = v.autoSell end
-            end
-        end
-
-        task.spawn(function()
-            task.wait(0.15)
-            for fName, entry in pairs(_G._FishMasterCardsMap) do
-                local s = Config.FishMasterSettings[fName]
-                if s then
-                    if entry.toggleCatch and entry.toggleCatch.Set then
-                        pcall(function() entry.toggleCatch.Set(s.autoCatch, true) end)
-                    end
-                    if entry.toggleSell and entry.toggleSell.Set then
-                        pcall(function() entry.toggleSell.Set(s.autoSell, true) end)
-                    end
-                end
-            end
-        end)
-    end
 end
 
 local Colors = {
@@ -3251,12 +3183,6 @@ function Wiki.IsProtectedFish(item)
     local cleanName = Wiki.GetItemRawName(item)
     local cleanLower = cleanName:lower()
     local weight = (item:FindFirstChild("Weight") and item.Weight.Value) or 0
-
-    if Config.FishMasterSettings and Config.FishMasterSettings[cleanName] then
-        if Config.FishMasterSettings[cleanName].autoSell == false then
-            return true, "Người Dùng Khóa (Không Bán)"
-        end
-    end
 
     if Wiki.allRodFishSet and Wiki.allRodFishSet[cleanLower] then
         return true, "Cá Chế Cần"
@@ -6736,6 +6662,7 @@ function ticketQuestState.ClearUINavigation()
         local gs = game:GetService("GuiService")
         if gs then
             gs.SelectedObject = nil
+            gs.GuiNavigationEnabled = false
         end
     end)
 end
@@ -6793,18 +6720,18 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
         end
     end)
 
-    -- 3. Giả lập phím Enter để kích hoạt lựa chọn hội thoại
+    -- 3. Chọn đối tượng UI qua GuiService và bấm Enter để kích hoạt lựa chọn hội thoại
     pcall(function()
+        local gs = game:GetService("GuiService")
         local vim = game:GetService("VirtualInputManager")
+        if gs then
+            gs.SelectedObject = btn
+        end
         if vim then
             task.wait(0.04)
             vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
             task.wait(0.06)
             vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
-        end
-        local gs = game:GetService("GuiService")
-        if gs then
-            gs.SelectedObject = nil
         end
     end)
 
@@ -11158,599 +11085,6 @@ do
     end
 
     ---------------------------------------------------------------------
-    -- KHỐI 0: BẢNG ĐIỀU KHIỂN & BỘ LỌC TOÀN BỘ CÁ (ALL FISH CONTROLLER)
-    ---------------------------------------------------------------------
-    local function BuildMasterFishController(parentTab)
-        createCategoryHeader(parentTab, "📋 BẢNG ĐIỀU KHIỂN & BỘ LỌC TOÀN BỘ CÁ (ALL FISH CONTROLLER)")
-        local masterCard = createCardGroup(parentTab)
-
-        local FISH_DROPS_LOOKUP = {
-            ["Trueform Jiaolongfish"]   = { type = "Skill", name = "Rolling Twin Dragons", rate = "50%" },
-            ["Verdant Alligator Gar"]   = { type = "Skill", name = "Beastbreaker Cleave", rate = "25%" },
-            ["Verdant Grouper"]         = { type = "Skill", name = "Cyclone Hook", rate = "25%" },
-            ["Verdant Bonefang"]        = { type = "Skill", name = "River Suppression", rate = "5%" },
-            ["Crimson Bonefang"]        = { type = "Skill", name = "Seven Wounds Fusion", rate = "10%" },
-            ["Flying Fish Emperor"]     = { type = "Skill", name = "Skybreaker Technique", rate = "10%" },
-            ["Flying Fish Empress"]     = { type = "Skill", name = "Skybreaker Technique", rate = "10%" },
-            ["Frost Kingfish"]          = { type = "Skill", name = "Pure Yang Wuji", rate = "10%" },
-            ["Trueform Perch"]          = { type = "Skill", name = "River Suppression", rate = "20%" },
-            ["Tigerfang Whale"]         = { type = "Skill", name = "Rooster Strike", rate = "10%" },
-            ["Mountain Dragonwhale"]    = { type = "Skill", name = "Mountain Flip", rate = "5%" },
-            ["Ascended Perch"]          = { type = "Boat",  name = "Ascended Perch", rate = "5%" },
-            ["Rainbow Dragonfish"]      = { type = "Rod",   name = "Heavenpiercer Rod" },
-            ["Reborn Puffer Beast"]     = { type = "Rod",   name = "Sacred Bamboo Rod" },
-            ["Mountain Fish"]           = { type = "Rod",   name = "Sacred Bamboo Rod" },
-            ["Frost Queenfish"]         = { type = "Rod",   name = "Pure Diamond Rod" },
-            ["Draconic Koi"]            = { type = "Rod",   name = "Pure Diamond Rod" },
-            ["Sanguine Fish"]           = { type = "Rod",   name = "Pure Diamond Rod" },
-            ["Crimson Catfish"]         = { type = "Rod",   name = "Blood Dragon Rod" },
-            ["Elder Scarlet Fish"]      = { type = "Rod",   name = "Blood Dragon Rod" },
-            ["Scarlet Fish"]            = { type = "Rod",   name = "Blood Dragon Rod" },
-        }
-
-        local function GetFishDropCaption(fName)
-            local drop = FISH_DROPS_LOOKUP[fName]
-            if not drop then return nil, false end
-            if drop.type == "Skill" then
-                local has = FishRewardHelper.HasPlayerSkill(drop.name)
-                local status = has and "[ĐÃ CÓ]" or "[CHƯA CÓ]"
-                return string.format("Skill %s (%s): %s", drop.name, drop.rate or "10%", status), has
-            elseif drop.type == "Boat" then
-                local has = FishRewardHelper.HasPlayerBoat(drop.name)
-                local status = has and "[ĐÃ CÓ]" or "[CHƯA CÓ]"
-                return string.format("Thuyền %s (%s): %s", drop.name, drop.rate or "5%", status), has
-            elseif drop.type == "Rod" then
-                local has, count = CheckRodOwnership(drop.name)
-                local status = has and string.format("[ĐÃ CÓ x%d]", count) or "[CHƯA CÓ]"
-                return string.format("Đúc Cần %s: %s", drop.name, status), has
-            end
-            return nil, false
-        end
-
-        local masterSummaryRow = createInfoRow(masterCard, "Tổng Danh Mục Toàn Game", string.format("%d Loài Cá • Đã kích hoạt lưu cục bộ", #Wiki.wikiFishData))
-
-        -- Thanh Tìm kiếm
-        local searchContainer = Instance.new("Frame")
-        searchContainer.Name = "MasterSearchContainer"
-        searchContainer.Size = UDim2.new(1, 0, 0, 36)
-        searchContainer.BackgroundColor3 = Color3.fromRGB(18, 20, 28)
-        searchContainer.BorderSizePixel = 0
-        searchContainer.Parent = masterCard
-        MakeCorner(searchContainer, 8)
-        MakeStroke(searchContainer, Color3.fromRGB(60, 65, 80), 1)
-
-        local searchIcon = Instance.new("TextLabel")
-        searchIcon.Size = UDim2.new(0, 32, 1, 0)
-        searchIcon.BackgroundTransparency = 1
-        searchIcon.Text = "🔍"
-        searchIcon.TextSize = 14
-        searchIcon.TextColor3 = Color3.fromRGB(180, 185, 200)
-        searchIcon.Parent = searchContainer
-
-        local masterSearchInput = Instance.new("TextBox")
-        masterSearchInput.Name = "MasterSearchInput"
-        masterSearchInput.Size = UDim2.new(1, -40, 1, 0)
-        masterSearchInput.Position = UDim2.new(0, 34, 0, 0)
-        masterSearchInput.BackgroundTransparency = 1
-        masterSearchInput.PlaceholderText = "Tìm tên cá (VD: Jiaolong, Carp, Perch, Shark, Trout...)"
-        masterSearchInput.PlaceholderColor3 = Color3.fromRGB(120, 125, 140)
-        masterSearchInput.Text = ""
-        masterSearchInput.TextColor3 = Color3.fromRGB(255, 255, 255)
-        masterSearchInput.Font = Enum.Font.GothamMedium
-        masterSearchInput.TextSize = 12
-        masterSearchInput.ClearTextOnFocus = false
-        masterSearchInput.Parent = searchContainer
-
-        -- Hàng Bộ Lọc Nhanh (Filter Chips)
-        local filterBar = Instance.new("ScrollingFrame")
-        filterBar.Name = "FilterBar"
-        filterBar.Size = UDim2.new(1, 0, 0, 32)
-        filterBar.BackgroundTransparency = 1
-        filterBar.BorderSizePixel = 0
-        filterBar.ScrollBarThickness = 2
-        filterBar.CanvasSize = UDim2.new(0, 0, 0, 0)
-        filterBar.AutomaticCanvasSize = Enum.AutomaticSize.X
-        filterBar.Parent = masterCard
-
-        local filterLayout = Instance.new("UIListLayout")
-        filterLayout.FillDirection = Enum.FillDirection.Horizontal
-        filterLayout.Padding = UDim.new(0, 6)
-        filterLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-        filterLayout.Parent = filterBar
-
-        local curFilterRarity = "ALL"
-        local curFilterRec = "ALL"
-        local filterButtons = {}
-
-        local filterChipsDef = {
-            { key = "ALL_ALL", label = "Tất Cả", r = "ALL", rec = "ALL" },
-            { key = "REC_KEEP", label = "🛡️ Nên Giữ", r = "ALL", rec = "KEEP" },
-            { key = "REC_SELL", label = "💰 Nên Bán", r = "ALL", rec = "SELL" },
-            { key = "R_MYTHIC", label = "🔴 Thần Thoại", r = "Mythic", rec = "ALL" },
-            { key = "R_LEGEND", label = "🟡 Huyền Thoại", r = "Legendary", rec = "ALL" },
-            { key = "R_EPIC",   label = "🟣 Sử Thi", r = "Epic", rec = "ALL" },
-            { key = "R_RARE",   label = "🔵 Hiếm", r = "Rare", rec = "ALL" },
-            { key = "R_COMMON", label = "⚪ Phổ Thông", r = "Common", rec = "ALL" },
-        }
-
-        local cardItems = {}
-
-        local function UpdateCardVisibilities()
-            local q = (masterSearchInput.Text or ""):lower():gsub("[%s%-_]+", "")
-            local visibleCount = 0
-            for _, item in ipairs(cardItems) do
-                local f = item.fishData
-                local matchQuery = (q == "") or item.searchKey:find(q, 1, true)
-                local matchRarity = (curFilterRarity == "ALL")
-                    or (f.rarity == curFilterRarity)
-                    or (curFilterRarity == "Common" and (f.rarity == "Common" or f.rarity == "Uncommon"))
-                local matchRec = (curFilterRec == "ALL")
-                    or (curFilterRec == "KEEP" and f.keep)
-                    or (curFilterRec == "SELL" and not f.keep)
-
-                local show = matchQuery and matchRarity and matchRec
-                item.card.Visible = show
-                if show then visibleCount = visibleCount + 1 end
-            end
-            if masterSummaryRow and masterSummaryRow.Set then
-                masterSummaryRow.Set(string.format("Hiển thị %d/%d Loài Cá • Đã lưu máy", visibleCount, #Wiki.wikiFishData))
-            end
-        end
-
-        for _, chip in ipairs(filterChipsDef) do
-            local chipBtn = Instance.new("TextButton")
-            chipBtn.Name = "Chip_" .. chip.key
-            chipBtn.Size = UDim2.new(0, 0, 0, 26)
-            chipBtn.AutomaticSize = Enum.AutomaticSize.X
-            chipBtn.BackgroundColor3 = (chip.key == "ALL_ALL") and Color3.fromRGB(80, 50, 130) or Color3.fromRGB(26, 28, 38)
-            chipBtn.Text = "  " .. chip.label .. "  "
-            chipBtn.TextColor3 = (chip.key == "ALL_ALL") and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 185, 200)
-            chipBtn.Font = Enum.Font.GothamMedium
-            chipBtn.TextSize = 11
-            chipBtn.Parent = filterBar
-            MakeCorner(chipBtn, 6)
-            local chipStroke = MakeStroke(chipBtn, (chip.key == "ALL_ALL") and Color3.fromRGB(168, 85, 247) or Color3.fromRGB(50, 55, 70), 1)
-
-            filterButtons[chip.key] = { btn = chipBtn, stroke = chipStroke, chip = chip }
-
-            chipBtn.MouseButton1Click:Connect(function()
-                curFilterRarity = chip.r
-                curFilterRec = chip.rec
-                for k, fb in pairs(filterButtons) do
-                    local isSelected = (k == chip.key)
-                    fb.btn.BackgroundColor3 = isSelected and Color3.fromRGB(80, 50, 130) or Color3.fromRGB(26, 28, 38)
-                    fb.btn.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 185, 200)
-                    fb.stroke.Color = isSelected and Color3.fromRGB(168, 85, 247) or Color3.fromRGB(50, 55, 70)
-                end
-                UpdateCardVisibilities()
-            end)
-        end
-
-        masterSearchInput:GetPropertyChangedSignal("Text"):Connect(function()
-            UpdateCardVisibilities()
-        end)
-
-        -- Hàng Nút Hành Động 1-Chạm
-        local quickActionsContainer = Instance.new("Frame")
-        quickActionsContainer.Name = "QuickActionsContainer"
-        quickActionsContainer.Size = UDim2.new(1, 0, 0, 32)
-        quickActionsContainer.BackgroundTransparency = 1
-        quickActionsContainer.Parent = masterCard
-
-        local qaLayout = Instance.new("UIListLayout")
-        qaLayout.FillDirection = Enum.FillDirection.Horizontal
-        qaLayout.Padding = UDim.new(0, 6)
-        qaLayout.Parent = quickActionsContainer
-
-        local btnResetDefaults = Instance.new("TextButton")
-        btnResetDefaults.Size = UDim2.new(0.34, -4, 1, 0)
-        btnResetDefaults.BackgroundColor3 = Color3.fromRGB(30, 45, 65)
-        btnResetDefaults.Text = "⚙️ Mặc Định Chuẩn"
-        btnResetDefaults.TextColor3 = Color3.fromRGB(220, 235, 255)
-        btnResetDefaults.Font = Enum.Font.GothamBold
-        btnResetDefaults.TextSize = 11
-        btnResetDefaults.Parent = quickActionsContainer
-        MakeCorner(btnResetDefaults, 6)
-
-        local btnCatchAll = Instance.new("TextButton")
-        btnCatchAll.Size = UDim2.new(0.33, -4, 1, 0)
-        btnCatchAll.BackgroundColor3 = Color3.fromRGB(25, 55, 35)
-        btnCatchAll.Text = "🎣 Bật Hết Câu"
-        btnCatchAll.TextColor3 = Color3.fromRGB(200, 255, 210)
-        btnCatchAll.Font = Enum.Font.GothamBold
-        btnCatchAll.TextSize = 11
-        btnCatchAll.Parent = quickActionsContainer
-        MakeCorner(btnCatchAll, 6)
-
-        local btnSellAllJunk = Instance.new("TextButton")
-        btnSellAllJunk.Size = UDim2.new(0.33, -4, 1, 0)
-        btnSellAllJunk.BackgroundColor3 = Color3.fromRGB(55, 35, 25)
-        btnSellAllJunk.Text = "💰 Bật Hết Bán Rác"
-        btnSellAllJunk.TextColor3 = Color3.fromRGB(255, 210, 190)
-        btnSellAllJunk.Font = Enum.Font.GothamBold
-        btnSellAllJunk.TextSize = 11
-        btnSellAllJunk.Parent = quickActionsContainer
-        MakeCorner(btnSellAllJunk, 6)
-
-        btnResetDefaults.MouseButton1Click:Connect(function()
-            Config.FishMasterSettings = Config.FishMasterSettings or {}
-            for _, f in ipairs(Wiki.wikiFishData) do
-                Config.FishMasterSettings[f.name] = {
-                    autoCatch = true,
-                    autoSell = not f.keep
-                }
-                local cardItem = _G._FishMasterCardsMap[f.name]
-                if cardItem then
-                    if cardItem.toggleCatch and cardItem.toggleCatch.Set then cardItem.toggleCatch.Set(true, true) end
-                    if cardItem.toggleSell and cardItem.toggleSell.Set then cardItem.toggleSell.Set(not f.keep, true) end
-                end
-            end
-            SaveFishMasterSettings()
-            ShowNotification("Fish Master", "Đã khôi phục cài đặt mặc định tối ưu (Cá quý: Giữ, Cá rác: Bán)!", "SUCCESS", 4)
-        end)
-
-        btnCatchAll.MouseButton1Click:Connect(function()
-            Config.FishMasterSettings = Config.FishMasterSettings or {}
-            for _, f in ipairs(Wiki.wikiFishData) do
-                Config.FishMasterSettings[f.name] = Config.FishMasterSettings[f.name] or {}
-                Config.FishMasterSettings[f.name].autoCatch = true
-                local cardItem = _G._FishMasterCardsMap[f.name]
-                if cardItem and cardItem.toggleCatch and cardItem.toggleCatch.Set then
-                    cardItem.toggleCatch.Set(true, true)
-                end
-            end
-            SaveFishMasterSettings()
-            ShowNotification("Fish Master", "Đã BẬT câu tất cả loài cá trong game!", "SUCCESS", 3)
-        end)
-
-        btnSellAllJunk.MouseButton1Click:Connect(function()
-            Config.FishMasterSettings = Config.FishMasterSettings or {}
-            for _, f in ipairs(Wiki.wikiFishData) do
-                if not f.keep then
-                    Config.FishMasterSettings[f.name] = Config.FishMasterSettings[f.name] or {}
-                    Config.FishMasterSettings[f.name].autoSell = true
-                    local cardItem = _G._FishMasterCardsMap[f.name]
-                    if cardItem and cardItem.toggleSell and cardItem.toggleSell.Set then
-                        cardItem.toggleSell.Set(true, true)
-                    end
-                end
-            end
-            SaveFishMasterSettings()
-            ShowNotification("Fish Master", "Đã BẬT bán cho toàn bộ cá rác phổ thông!", "SUCCESS", 3)
-        end)
-
-        -- Danh Sách Cuộn Thẻ Cá (Matrix Scroll)
-        local matrixScroll = Instance.new("ScrollingFrame")
-        matrixScroll.Name = "MatrixScroll"
-        matrixScroll.Size = UDim2.new(1, 0, 0, 380)
-        matrixScroll.BackgroundTransparency = 1
-        matrixScroll.BorderSizePixel = 0
-        matrixScroll.ScrollBarThickness = 4
-        matrixScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-        matrixScroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
-        matrixScroll.Parent = masterCard
-
-        local msLayout = Instance.new("UIListLayout")
-        msLayout.SortOrder = Enum.SortOrder.LayoutOrder
-        msLayout.Padding = UDim.new(0, 6)
-        msLayout.Parent = matrixScroll
-
-        -- Khởi tạo danh sách cài đặt mặc định
-        Config.FishMasterSettings = Config.FishMasterSettings or {}
-
-        for idx, f in ipairs(Wiki.wikiFishData) do
-            if not Config.FishMasterSettings[f.name] then
-                Config.FishMasterSettings[f.name] = {
-                    autoCatch = true,
-                    autoSell = not f.keep
-                }
-            end
-            local curSet = Config.FishMasterSettings[f.name]
-
-            local fCard = Instance.new("Frame")
-            fCard.Name = "FishCard_" .. f.name
-            fCard.Size = UDim2.new(1, -6, 0, 78)
-            fCard.BackgroundColor3 = Color3.fromRGB(20, 22, 32)
-            fCard.BorderSizePixel = 0
-            fCard.LayoutOrder = idx
-            fCard.Parent = matrixScroll
-            MakeCorner(fCard, 8)
-
-            local rColor = Wiki.rarityColors[f.rarity] or Color3.fromRGB(150, 150, 150)
-            MakeStroke(fCard, Color3.fromRGB(45, 48, 62), 1)
-
-            -- Icon Trái
-            local img = Instance.new("ImageLabel")
-            img.Name = "FishImg"
-            img.Size = UDim2.new(0, 48, 0, 48)
-            img.Position = UDim2.new(0, 8, 0, 15)
-            img.BackgroundTransparency = 1
-            img.ScaleType = Enum.ScaleType.Fit
-            img.Image = FetchGameFishImage(f.name)
-            img.Parent = fCard
-
-            local fbEmoji = Instance.new("TextLabel")
-            fbEmoji.Name = "FallbackEmoji"
-            fbEmoji.Size = UDim2.new(0, 48, 0, 48)
-            fbEmoji.Position = UDim2.new(0, 8, 0, 15)
-            fbEmoji.BackgroundTransparency = 1
-            fbEmoji.Text = "🐟"
-            fbEmoji.TextSize = 26
-            fbEmoji.Visible = (img.Image == "" or img.Image == nil)
-            fbEmoji.Parent = fCard
-
-            -- Cột Giữa: Thông tin
-            local infoFrame = Instance.new("Frame")
-            infoFrame.Name = "InfoFrame"
-            infoFrame.Size = UDim2.new(1, -210, 1, -10)
-            infoFrame.Position = UDim2.new(0, 62, 0, 5)
-            infoFrame.BackgroundTransparency = 1
-            infoFrame.Parent = fCard
-
-            -- Hàng 1: Tên + Rarity + Khuyến nghị
-            local titleRow = Instance.new("Frame")
-            titleRow.Size = UDim2.new(1, 0, 0, 20)
-            titleRow.BackgroundTransparency = 1
-            titleRow.Parent = infoFrame
-
-            local trLayout = Instance.new("UIListLayout")
-            trLayout.FillDirection = Enum.FillDirection.Horizontal
-            trLayout.Padding = UDim.new(0, 6)
-            trLayout.VerticalAlignment = Enum.VerticalAlignment.Center
-            trLayout.Parent = titleRow
-
-            local nameLbl = Instance.new("TextLabel")
-            nameLbl.Size = UDim2.new(0, 0, 1, 0)
-            nameLbl.AutomaticSize = Enum.AutomaticSize.X
-            nameLbl.BackgroundTransparency = 1
-            nameLbl.Text = f.name
-            nameLbl.TextColor3 = Color3.fromRGB(245, 245, 255)
-            nameLbl.Font = Enum.Font.GothamBold
-            nameLbl.TextSize = 12
-            nameLbl.Parent = titleRow
-
-            local rarityTag = Instance.new("TextLabel")
-            rarityTag.Size = UDim2.new(0, 0, 0, 16)
-            rarityTag.AutomaticSize = Enum.AutomaticSize.X
-            rarityTag.BackgroundColor3 = Color3.fromRGB(15, 15, 22)
-            rarityTag.Text = " " .. f.rarity .. " "
-            rarityTag.TextColor3 = rColor
-            rarityTag.Font = Enum.Font.GothamMedium
-            rarityTag.TextSize = 9
-            rarityTag.Parent = titleRow
-            MakeCorner(rarityTag, 4)
-
-            local recTag = Instance.new("TextLabel")
-            recTag.Size = UDim2.new(0, 0, 0, 16)
-            recTag.AutomaticSize = Enum.AutomaticSize.X
-            recTag.BackgroundColor3 = f.keep and Color3.fromRGB(15, 38, 34) or Color3.fromRGB(42, 28, 18)
-            recTag.Text = f.keep and " 🛡️ NÊN GIỮ " or " 💰 NÊN BÁN "
-            recTag.TextColor3 = f.keep and Color3.fromRGB(45, 212, 191) or Color3.fromRGB(251, 146, 60)
-            recTag.Font = Enum.Font.GothamBold
-            recTag.TextSize = 9
-            recTag.Parent = titleRow
-            MakeCorner(recTag, 4)
-
-            -- Hàng 2: Công dụng / Mô tả
-            local useLbl = Instance.new("TextLabel")
-            useLbl.Size = UDim2.new(1, 0, 0, 16)
-            useLbl.Position = UDim2.new(0, 0, 0, 22)
-            useLbl.BackgroundTransparency = 1
-            useLbl.Text = f.use or "Cá trong thế giới game"
-            useLbl.TextColor3 = Color3.fromRGB(160, 165, 180)
-            useLbl.Font = Enum.Font.Gotham
-            useLbl.TextSize = 10
-            useLbl.TextTruncate = Enum.TextTruncate.AtEnd
-            useLbl.TextXAlignment = Enum.TextXAlignment.Left
-            useLbl.Parent = infoFrame
-
-            -- Hàng 3: Trạng thái Drop + Số lượng trong Balo
-            local statusLine = Instance.new("TextLabel")
-            statusLine.Size = UDim2.new(1, 0, 0, 16)
-            statusLine.Position = UDim2.new(0, 0, 0, 42)
-            statusLine.BackgroundTransparency = 1
-            statusLine.Text = "Đang quét trạng thái..."
-            statusLine.TextColor3 = Color3.fromRGB(140, 145, 160)
-            statusLine.Font = Enum.Font.GothamMedium
-            statusLine.TextSize = 10
-            statusLine.TextTruncate = Enum.TextTruncate.AtEnd
-            statusLine.TextXAlignment = Enum.TextXAlignment.Left
-            statusLine.Parent = infoFrame
-
-            -- Cột Phải: Bộ nút tương tác (Tích Câu, Tích Bán, Khóa, Mở, Bán)
-            local ctrlFrame = Instance.new("Frame")
-            ctrlFrame.Name = "CtrlFrame"
-            ctrlFrame.Size = UDim2.new(0, 140, 1, -10)
-            ctrlFrame.Position = UDim2.new(1, -145, 0, 5)
-            ctrlFrame.BackgroundTransparency = 1
-            ctrlFrame.Parent = fCard
-
-            -- Hàng trên: 2 Nút Tích Câu & Bán
-            local toggleRow = Instance.new("Frame")
-            toggleRow.Size = UDim2.new(1, 0, 0, 28)
-            toggleRow.BackgroundTransparency = 1
-            toggleRow.Parent = ctrlFrame
-
-            local btnToggleCatch = Instance.new("TextButton")
-            btnToggleCatch.Size = UDim2.new(0.5, -3, 1, 0)
-            btnToggleCatch.Position = UDim2.new(0, 0, 0, 0)
-            btnToggleCatch.BackgroundColor3 = curSet.autoCatch and Color3.fromRGB(34, 110, 55) or Color3.fromRGB(42, 45, 55)
-            btnToggleCatch.Text = curSet.autoCatch and "✓ CÂU" or "✗ CÂU"
-            btnToggleCatch.TextColor3 = curSet.autoCatch and Color3.fromRGB(220, 255, 225) or Color3.fromRGB(150, 155, 170)
-            btnToggleCatch.Font = Enum.Font.GothamBold
-            btnToggleCatch.TextSize = 10
-            btnToggleCatch.Parent = toggleRow
-            MakeCorner(btnToggleCatch, 6)
-
-            local btnToggleSell = Instance.new("TextButton")
-            btnToggleSell.Size = UDim2.new(0.5, -3, 1, 0)
-            btnToggleSell.Position = UDim2.new(0.5, 3, 0, 0)
-            btnToggleSell.BackgroundColor3 = curSet.autoSell and Color3.fromRGB(135, 50, 30) or Color3.fromRGB(42, 45, 55)
-            btnToggleSell.Text = curSet.autoSell and "✓ BÁN" or "✗ BÁN"
-            btnToggleSell.TextColor3 = curSet.autoSell and Color3.fromRGB(255, 215, 205) or Color3.fromRGB(150, 155, 170)
-            btnToggleSell.Font = Enum.Font.GothamBold
-            btnToggleSell.TextSize = 10
-            btnToggleSell.Parent = toggleRow
-            MakeCorner(btnToggleSell, 6)
-
-            -- Hàng dưới: 3 Nút nhỏ (Khóa, Mở, Bán Ngay)
-            local actionBtnsRow = Instance.new("Frame")
-            actionBtnsRow.Size = UDim2.new(1, 0, 0, 26)
-            actionBtnsRow.Position = UDim2.new(0, 0, 0, 36)
-            actionBtnsRow.BackgroundTransparency = 1
-            actionBtnsRow.Parent = ctrlFrame
-
-            local abLayout = Instance.new("UIListLayout")
-            abLayout.FillDirection = Enum.FillDirection.Horizontal
-            abLayout.Padding = UDim.new(0, 4)
-            abLayout.Parent = actionBtnsRow
-
-            local btnLockThis = Instance.new("TextButton")
-            btnLockThis.Size = UDim2.new(0.33, -3, 1, 0)
-            btnLockThis.BackgroundColor3 = Color3.fromRGB(28, 38, 55)
-            btnLockThis.Text = "🔒 Khóa"
-            btnLockThis.TextColor3 = Color3.fromRGB(220, 230, 255)
-            btnLockThis.Font = Enum.Font.GothamBold
-            btnLockThis.TextSize = 9
-            btnLockThis.Parent = actionBtnsRow
-            MakeCorner(btnLockThis, 5)
-
-            local btnUnlockThis = Instance.new("TextButton")
-            btnUnlockThis.Size = UDim2.new(0.33, -3, 1, 0)
-            btnUnlockThis.BackgroundColor3 = Color3.fromRGB(45, 30, 38)
-            btnUnlockThis.Text = "🔓 Mở"
-            btnUnlockThis.TextColor3 = Color3.fromRGB(255, 210, 210)
-            btnUnlockThis.Font = Enum.Font.GothamBold
-            btnUnlockThis.TextSize = 9
-            btnUnlockThis.Parent = actionBtnsRow
-            MakeCorner(btnUnlockThis, 5)
-
-            local btnQuickSell = Instance.new("TextButton")
-            btnQuickSell.Size = UDim2.new(0.34, -2, 1, 0)
-            btnQuickSell.BackgroundColor3 = Color3.fromRGB(60, 45, 20)
-            btnQuickSell.Text = "💰 Bán"
-            btnQuickSell.TextColor3 = Color3.fromRGB(255, 230, 180)
-            btnQuickSell.Font = Enum.Font.GothamBold
-            btnQuickSell.TextSize = 9
-            btnQuickSell.Parent = actionBtnsRow
-            MakeCorner(btnQuickSell, 5)
-
-            -- Callbacks
-            local catchController = {
-                Set = function(val, skipSave)
-                    Config.FishMasterSettings[f.name].autoCatch = (val == true)
-                    btnToggleCatch.BackgroundColor3 = val and Color3.fromRGB(34, 110, 55) or Color3.fromRGB(42, 45, 55)
-                    btnToggleCatch.Text = val and "✓ CÂU" or "✗ CÂU"
-                    btnToggleCatch.TextColor3 = val and Color3.fromRGB(220, 255, 225) or Color3.fromRGB(150, 155, 170)
-                    if not skipSave then SaveFishMasterSettings() end
-                end
-            }
-
-            local sellController = {
-                Set = function(val, skipSave)
-                    Config.FishMasterSettings[f.name].autoSell = (val == true)
-                    btnToggleSell.BackgroundColor3 = val and Color3.fromRGB(135, 50, 30) or Color3.fromRGB(42, 45, 55)
-                    btnToggleSell.Text = val and "✓ BÁN" or "✗ BÁN"
-                    btnToggleSell.TextColor3 = val and Color3.fromRGB(255, 215, 205) or Color3.fromRGB(150, 155, 170)
-                    if not skipSave then SaveFishMasterSettings() end
-                end
-            }
-
-            btnToggleCatch.MouseButton1Click:Connect(function()
-                local nv = not Config.FishMasterSettings[f.name].autoCatch
-                catchController.Set(nv, false)
-            end)
-
-            btnToggleSell.MouseButton1Click:Connect(function()
-                local nv = not Config.FishMasterSettings[f.name].autoSell
-                sellController.Set(nv, false)
-            end)
-
-            btnLockThis.MouseButton1Click:Connect(function()
-                local _, _, counts = ScanAndClassifyInventory()
-                local cData = counts[f.name]
-                if not cData or #cData.items == 0 then
-                    ShowNotification("Khóa Cá", "Không có con [" .. f.name .. "] nào trong balo!", "INFO", 3)
-                    return
-                end
-                ProcessBatchItems(cData.items, true, "Khóa " .. f.name)
-            end)
-
-            btnUnlockThis.MouseButton1Click:Connect(function()
-                local _, _, counts = ScanAndClassifyInventory()
-                local cData = counts[f.name]
-                if not cData or #cData.items == 0 then
-                    ShowNotification("Mở Khóa Cá", "Không có con [" .. f.name .. "] nào trong balo!", "INFO", 3)
-                    return
-                end
-                ProcessBatchItems(cData.items, false, "Mở Khóa " .. f.name)
-            end)
-
-            btnQuickSell.MouseButton1Click:Connect(function()
-                SellSpecificFish(f.name, 0)
-            end)
-
-            local itemObj = {
-                card = fCard,
-                fishData = f,
-                searchKey = f.name:lower():gsub("[%s%-_]+", "") .. (f.use and f.use:lower():gsub("[%s%-_]+", "") or ""),
-                statusLine = statusLine,
-                toggleCatch = catchController,
-                toggleSell = sellController,
-                img = img,
-                fbEmoji = fbEmoji
-            }
-
-            _G._FishMasterCardsMap[f.name] = itemObj
-            table.insert(cardItems, itemObj)
-        end
-
-        -- Hàm cập nhật dữ liệu thời gian thực (Trạng thái Rơi Đồ + Số lượng trong Balo)
-        local function RefreshAllMasterFishStatus()
-            local _, _, counts = ScanAndClassifyInventory()
-            for _, item in ipairs(cardItems) do
-                local f = item.fishData
-                local cData = counts[f.name]
-                local total = cData and cData.total or 0
-                local locked = cData and cData.locked or 0
-                local unlocked = cData and cData.unlocked or 0
-
-                local bagText = string.format("Trong túi: %d (🔒%d • 🔓%d)", total, locked, unlocked)
-                local dropText, hasDrop = GetFishDropCaption(f.name)
-
-                if dropText then
-                    item.statusLine.Text = string.format("%s • %s", dropText, bagText)
-                    if hasDrop then
-                        item.statusLine.TextColor3 = Color3.fromRGB(74, 222, 128)
-                    else
-                        item.statusLine.TextColor3 = Color3.fromRGB(248, 113, 113)
-                    end
-                else
-                    item.statusLine.Text = bagText
-                    item.statusLine.TextColor3 = (total > 0) and Color3.fromRGB(220, 225, 240) or Color3.fromRGB(130, 135, 150)
-                end
-
-                -- Cập nhật hình ảnh nếu có
-                local curImg = FetchGameFishImage(f.name)
-                if curImg ~= "" and curImg ~= item.img.Image then
-                    item.img.Image = curImg
-                    item.fbEmoji.Visible = false
-                elseif item.img.Image == "" then
-                    item.fbEmoji.Visible = true
-                end
-            end
-        end
-
-        task.spawn(function()
-            while true do
-                task.wait(3.5)
-                pcall(RefreshAllMasterFishStatus)
-            end
-        end)
-    end
-    BuildMasterFishController(tabFishManager)
-
-    ---------------------------------------------------------------------
     -- KHỐI 1 (ĐẦU TAB): QUẢN LÝ TÚI CÁ RÁC & TÌM KIẾM THAO TÁC TRỰC TIẾP
     ---------------------------------------------------------------------
     do
@@ -15048,14 +14382,6 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
 
-        -- Luôn giải phóng SelectedObject nếu bị kẹt để không bao giờ làm tê liệt phím 1, 2, 3 của game
-        pcall(function()
-            local gs = game:GetService("GuiService")
-            if gs and gs.SelectedObject ~= nil then
-                gs.SelectedObject = nil
-            end
-        end)
-
         if Config.WalkSpeedEnabled then
             hum.WalkSpeed = Config.WalkSpeedValue
         end
@@ -15095,32 +14421,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             if Events and Events:FindFirstChild("CancelCast") then Events.CancelCast:FireServer() end
         end
 
-        -- Kiểm tra người chơi có đang mở Túi đồ (Inventory), Chọn cần (Fishing rod inventory), hoặc Menu game không
-        local isInventoryOpen = false
-        pcall(function()
-            local cType = char:GetAttribute("Type")
-            if cType and tostring(cType):lower():find("inventory") then
-                isInventoryOpen = true
-            end
-            local mg = pg and pg:FindFirstChild("MainGui")
-            if mg then
-                local main = mg:FindFirstChild("Main")
-                if main then
-                    local inv = main:FindFirstChild("Inventory")
-                    if inv and inv.Visible then isInventoryOpen = true end
-                    local rodInv = main:FindFirstChild("Fishing rod inventory") or main:FindFirstChild("RodInventory")
-                    if rodInv and rodInv.Visible then isInventoryOpen = true end
-                end
-                local menu = mg:FindFirstChild("Menu")
-                if menu and menu.Visible then isInventoryOpen = true end
-            end
-        end)
-
-        if isInventoryOpen then
-            lastEquipRodTime = now
-        end
-
-        if shouldAutoFish and not isInventoryOpen and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
+        if shouldAutoFish and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
             lastEquipRodTime = now
             local rodSlot = "1"
             if pData and pData:FindFirstChild("Hotbar") then
@@ -15203,13 +14504,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 if hookedFish then
                     local cleanHooked = hookedFish:gsub("%s+", ""):lower()
                     local matchedBoss = secretBossLookup[hookedFish:lower()] or secretBossLookup[cleanHooked]
-                    local mSet = Config.FishMasterSettings and (Config.FishMasterSettings[hookedFish] or (matchedBoss and Config.FishMasterSettings[matchedBoss]))
-                    if mSet and mSet.autoCatch == false then
-                        isTargetBoss = false
-                    elseif mSet and mSet.autoCatch == true then
-                        isTargetBoss = true
-                        bossDisplay = hookedFish
-                    elseif Config.SecretBossTargets[hookedFish] == true
+                    if Config.SecretBossTargets[hookedFish] == true
                         or (matchedBoss and (Config.SecretBossTargets[matchedBoss] == true or Config.SecretBossTargets[matchedBoss:gsub("Heavenpiercer", "Heaven Piercer")] == true or Config.SecretBossTargets[matchedBoss:gsub("Heaven Piercer", "Heavenpiercer")] == true))
                         or (cleanHooked:find("heaven") and cleanHooked:find("turtle") and (Config.SecretBossTargets["Heavenpiercer Turtle"] == true or Config.SecretBossTargets["Heaven Piercer Turtle"] == true)) then
                         isTargetBoss = true
@@ -15478,7 +14773,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                         task.wait(0.05)
                                     end
 
-                                    -- 3. Lần lượt tung chuỗi combo (Z -> X -> V...)
+                                    -- 3. Lần lượt tung TOÀN BỘ chuỗi combo đã cài (Z -> X -> V...)
                                     for _, sk in ipairs(comboList) do
                                         if not isRunning or not (fUI and fUI.Visible) then break end
 
@@ -15765,7 +15060,7 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                         end
                         lastSkillTime = now
                     end
-                end
+            end
             end -- Kết thúc check not skipTriggered
         elseif isFishing then
             secretBossState.minigameStartTime = 0
@@ -15889,8 +15184,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
                 if bestRod and pData.FishingRod.Value ~= bestRod then
                     task.spawn(function()
-                        if Events and Events:FindFirstChild("EquipFishingRod") then
-                            Events.EquipFishingRod:InvokeServer(bestRod)
+                        if Events and Events:FindFirstChild("ToggleHotbar") then
+                            Events.ToggleHotbar:InvokeServer("1")
                         end
                     end)
                 end
@@ -17210,8 +16505,5 @@ pcall(LoadSmartComboAndSyncUI)
 
 -- Nạp trạng thái bật/tắt từng Secret Boss từ file local và đồng bộ UI toggle
 pcall(LoadBossTargetsAndSyncUI)
-
--- Nạp cấu hình toàn bộ cá game (Tích Câu / Tích Bán) từ file local và đồng bộ UI
-pcall(LoadFishMasterSettingsAndSyncUI)
 
 ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Tự Động Tìm Server Thời Tiết, Totem Thời Tiết & Webhook!", "SUCCESS", 6)
