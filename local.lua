@@ -88,7 +88,13 @@ if not LocalPlayer then
 end
 local Camera = Workspace.CurrentCamera or Workspace:FindFirstChildWhichIsA("Camera")
 
--- Không can thiệp GuiNavigationEnabled toàn cục để bảo đảm người chơi thao tác UI game bình thường
+-- Giải phóng trạng thái UI Navigation / Focus để bảo đảm các phím số 1, 2, 3 và UI game hoạt động bình thường 100%
+pcall(function()
+    local gs = game:GetService("GuiService")
+    if gs then
+        gs.SelectedObject = nil
+    end
+end)
 
 local isRunning = true
 local activeConnections = {}
@@ -6730,7 +6736,6 @@ function ticketQuestState.ClearUINavigation()
         local gs = game:GetService("GuiService")
         if gs then
             gs.SelectedObject = nil
-            gs.GuiNavigationEnabled = false
         end
     end)
 end
@@ -6788,18 +6793,18 @@ function ticketQuestState.ClickButtonEntry(entry, explicitActionId)
         end
     end)
 
-    -- 3. Chọn đối tượng UI qua GuiService và bấm Enter để kích hoạt lựa chọn hội thoại
+    -- 3. Giả lập phím Enter để kích hoạt lựa chọn hội thoại
     pcall(function()
-        local gs = game:GetService("GuiService")
         local vim = game:GetService("VirtualInputManager")
-        if gs then
-            gs.SelectedObject = btn
-        end
         if vim then
             task.wait(0.04)
             vim:SendKeyEvent(true, Enum.KeyCode.Return, false, game)
             task.wait(0.06)
             vim:SendKeyEvent(false, Enum.KeyCode.Return, false, game)
+        end
+        local gs = game:GetService("GuiService")
+        if gs then
+            gs.SelectedObject = nil
         end
     end)
 
@@ -15043,6 +15048,14 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
         local pg = LocalPlayer:FindFirstChild("PlayerGui")
         local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
 
+        -- Luôn giải phóng SelectedObject nếu bị kẹt để không bao giờ làm tê liệt phím 1, 2, 3 của game
+        pcall(function()
+            local gs = game:GetService("GuiService")
+            if gs and gs.SelectedObject ~= nil then
+                gs.SelectedObject = nil
+            end
+        end)
+
         if Config.WalkSpeedEnabled then
             hum.WalkSpeed = Config.WalkSpeedValue
         end
@@ -15082,7 +15095,32 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             if Events and Events:FindFirstChild("CancelCast") then Events.CancelCast:FireServer() end
         end
 
-        if shouldAutoFish and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
+        -- Kiểm tra người chơi có đang mở Túi đồ (Inventory), Chọn cần (Fishing rod inventory), hoặc Menu game không
+        local isInventoryOpen = false
+        pcall(function()
+            local cType = char:GetAttribute("Type")
+            if cType and tostring(cType):lower():find("inventory") then
+                isInventoryOpen = true
+            end
+            local mg = pg and pg:FindFirstChild("MainGui")
+            if mg then
+                local main = mg:FindFirstChild("Main")
+                if main then
+                    local inv = main:FindFirstChild("Inventory")
+                    if inv and inv.Visible then isInventoryOpen = true end
+                    local rodInv = main:FindFirstChild("Fishing rod inventory") or main:FindFirstChild("RodInventory")
+                    if rodInv and rodInv.Visible then isInventoryOpen = true end
+                end
+                local menu = mg:FindFirstChild("Menu")
+                if menu and menu.Visible then isInventoryOpen = true end
+            end
+        end)
+
+        if isInventoryOpen then
+            lastEquipRodTime = now
+        end
+
+        if shouldAutoFish and not isInventoryOpen and char:GetAttribute("Type") ~= "Fishing Rod" and (now - lastEquipRodTime >= 1.0) and not isTrainingBusy then
             lastEquipRodTime = now
             local rodSlot = "1"
             if pData and pData:FindFirstChild("Hotbar") then
@@ -15851,8 +15889,8 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                 end
                 if bestRod and pData.FishingRod.Value ~= bestRod then
                     task.spawn(function()
-                        if Events and Events:FindFirstChild("ToggleHotbar") then
-                            Events.ToggleHotbar:InvokeServer("1")
+                        if Events and Events:FindFirstChild("EquipFishingRod") then
+                            Events.EquipFishingRod:InvokeServer(bestRod)
                         end
                     end)
                 end

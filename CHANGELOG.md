@@ -7,9 +7,10 @@ Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đ�
 1. **Khôi Phục Bản Build Ổn Định v2.5.9**:
    - Hoàn tác toàn bộ các thay đổi minigame thử nghiệm của v2.6.0/v2.6.1.
    - Giữ nguyên vẹn tính năng siêu cấp **Bảng Điều Khiển & Tra Cứu Toàn Bộ Cá Game (All Fish Master Controller & Encyclopedia)** của v2.5.9: danh mục 48+ loài cá, nút toggle autoCatch/autoSell cho từng loài cá, tự lưu vào file json `HeavyweightFishing_FishSettings.json`.
-2. **Khắc Phục Hoàn Toàn Vấn Đề Khóa Phím Chức Năng (Hotbar 1, 2, 3)**:
-   - Reset ngay lập tức `gs.SelectedObject = nil` sau khi tương tác thoại, ngăn chặn việc Roblox rơi vào chế độ UI focus chiếm quyền bàn phím.
-   - Không can thiệp tắt `GuiNavigationEnabled` toàn cục để đảm bảo các phím mở túi đồ, chọn cần (1, 2, 3) và menu game luôn hoạt động bình thường.
+2. **Khắc Phục Triệt Để 100% Lỗi Không Dùng Được Phím Chức Năng (Hotbar 1, 2, 3 - Mở Túi Đồ / Chọn Cần)**:
+   - **Triệt tiêu kẹt UI Focus**: Xóa bỏ hoàn toàn mã gán `gs.SelectedObject = btn` trong `ClickButtonEntry`. Bổ sung reset `SelectedObject = nil` ngay tại thời điểm load script và bộ giám sát liên tục trong Heartbeat, trả lại quyền bàn phím cho engine game xử lý phím số 1, 2, 3.
+   - **Bảo vệ trạng thái mở Túi Đồ & Chọn Cần**: Bổ sung bộ kiểm tra thông minh `isInventoryOpen` trong vòng lặp AutoCast/AutoFish. Khi người chơi đang mở Túi đồ (`Inventory`), Chọn cần (`Fishing rod inventory`) hoặc Menu game, script tuyệt đối không ép đổi về cần câu (`ToggleHotbar("1")`), giúp người chơi thoải mái thao tác mở balo và chọn cần mà không bị script giật đóng menu lại.
+   - **Sửa lỗi AutoEquipBestRod**: Sửa lệnh trang bị cần câu tốt nhất gọi đúng remote `EquipFishingRod` thay vì gọi nhầm `ToggleHotbar("1")`.
 3. **Đồng Bộ Số Hiệu Phiên Bản Toàn Diện (Build v2.5.9)**:
    - Đồng bộ `v2.5.9` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), và [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua).
 
