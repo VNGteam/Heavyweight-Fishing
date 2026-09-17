@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.2"
+local SCRIPT_BUILD_COMMIT = "v2.6.3"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4303,7 +4303,7 @@ local function SendTelegramMessage(text)
     end)
 end
 
-function SendNtfyNotification(title, message, priorityLevel, tagList)
+function SendNtfyNotification(title, message, priorityLevel, tagList, customActions)
     if not Config.NtfyEnabled or not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
     pcall(function()
         local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
@@ -4332,7 +4332,9 @@ function SendNtfyNotification(title, message, priorityLevel, tagList)
                     action = "http",
                     label = "📊 Lấy Báo Cáo Server",
                     url = targetHost .. "/" .. cleanTopic .. "_cmd",
-                    body = "status"
+                    method = "POST",
+                    body = "status",
+                    clear = false
                 }
             }
         end
@@ -4504,46 +4506,124 @@ function secretBossState.SendServerStatusNtfyAlert()
 end
 
 secretBossState.remoteCommandStarted = false
-secretBossState.lastRemotePollTime = math.floor(tick())
+secretBossState.remoteProcessedIds = {}
+secretBossState.lastRemoteCmdId = nil
+secretBossState.lastRemoteMainId = nil
+
+local function SafeHttpGet(url)
+    local ok, res
+    if game and game.HttpGet then
+        ok, res = pcall(function() return game:HttpGet(url) end)
+        if ok and res and type(res) == "string" and #res > 0 then
+            return res
+        end
+    end
+    local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
+    if reqFunc then
+        local rOk, rRes = pcall(function()
+            return reqFunc({
+                Url = url,
+                Method = "GET"
+            })
+        end)
+        if rOk and rRes then
+            if type(rRes) == "table" and rRes.Body and #rRes.Body > 0 then
+                return rRes.Body
+            elseif type(rRes) == "string" and #rRes > 0 then
+                return rRes
+            end
+        end
+    end
+    return nil
+end
 
 function secretBossState.StartRemoteCommandListener()
     if secretBossState.remoteCommandStarted then return end
     secretBossState.remoteCommandStarted = true
 
     task.spawn(function()
-        task.wait(5.0)
+        task.wait(2.0)
+
+        -- 1. Khởi tạo: Nạp sẵn các ID tin nhắn cũ trong 2 phút qua để tránh tự kích hoạt lệnh cũ
+        pcall(function()
+            if not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
+            local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
+            local cleanTopic = rawTopic:gsub("^https?://[^/]+/?", ""):gsub("^/+", ""):gsub("/+$", "")
+            if #cleanTopic == 0 then return end
+
+            local initUrl = "https://ntfy.sh/" .. cleanTopic .. "_cmd/json?poll=1&since=2m"
+            local raw = SafeHttpGet(initUrl)
+            if raw and #raw > 0 then
+                for line in string.gmatch(raw, "[^\r\n]+") do
+                    local ok, entry = pcall(function() return HttpService:JSONDecode(line) end)
+                    if ok and type(entry) == "table" and entry.id then
+                        secretBossState.remoteProcessedIds[entry.id] = true
+                        secretBossState.lastRemoteCmdId = entry.id
+                    end
+                end
+            end
+        end)
+
         while isRunning do
-            task.wait(5.0)
+            task.wait(2.5)
             if isRunning and Config.NtfyEnabled and Config.NtfyRemoteCommandEnabled and Config.NtfyTopic and #tostring(Config.NtfyTopic):gsub("%s+", "") > 0 then
                 pcall(function()
                     local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
                     local cleanTopic = rawTopic:gsub("^https?://[^/]+/?", ""):gsub("^/+", ""):gsub("/+$", "")
                     if #cleanTopic == 0 then return end
 
+                    -- Kênh 1: Kênh lệnh chuyên dụng (<topic>_cmd) nhận tín hiệu từ nút bấm Action Button hoặc tin nhắn lệnh
                     local cmdTopic = cleanTopic .. "_cmd"
-                    local pollUrl = "https://ntfy.sh/" .. cmdTopic .. "/json?poll=1&since=" .. tostring(secretBossState.lastRemotePollTime + 1)
+                    local pollCmdUrl = "https://ntfy.sh/" .. cmdTopic .. "/json?poll=1"
+                    if secretBossState.lastRemoteCmdId then
+                        pollCmdUrl = pollCmdUrl .. "&since=" .. tostring(secretBossState.lastRemoteCmdId)
+                    else
+                        pollCmdUrl = pollCmdUrl .. "&since=30s"
+                    end
 
-                    local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
-                    if not reqFunc then return end
-
-                    local res = reqFunc({
-                        Url = pollUrl,
-                        Method = "GET"
-                    })
-
-                    if res and res.Body and #res.Body > 0 then
-                        for line in string.gmatch(res.Body, "[^\r\n]+") do
+                    local resCmd = SafeHttpGet(pollCmdUrl)
+                    if resCmd and #resCmd > 0 then
+                        for line in string.gmatch(resCmd, "[^\r\n]+") do
                             local ok, entry = pcall(function() return HttpService:JSONDecode(line) end)
-                            if ok and type(entry) == "table" and entry.event == "message" then
-                                local msgTime = tonumber(entry.time) or math.floor(tick())
-                                if msgTime > secretBossState.lastRemotePollTime then
-                                    secretBossState.lastRemotePollTime = msgTime
-                                end
+                            if ok and type(entry) == "table" and entry.event == "message" and entry.id then
+                                if not secretBossState.remoteProcessedIds[entry.id] then
+                                    secretBossState.remoteProcessedIds[entry.id] = true
+                                    secretBossState.lastRemoteCmdId = entry.id
 
-                                local cmdMsg = tostring(entry.message or entry.title or ""):lower():gsub("%s+", "")
-                                if cmdMsg:find("status") or cmdMsg:find("info") or cmdMsg:find("check") or cmdMsg:find("thoitiet") or cmdMsg:find("nv") or cmdMsg:find("server") or cmdMsg:find("baocao") then
-                                    ShowNotification("ntfy Remote", "Đã nhận lệnh từ điện thoại: Báo cáo tình hình server!", "INFO", 4)
+                                    ShowNotification("ntfy Remote", "Đã nhận lệnh từ điện thoại: Báo cáo server!", "INFO", 4)
                                     secretBossState.SendServerStatusNtfyAlert()
+                                end
+                            end
+                        end
+                    end
+
+                    -- Kênh 2: Kênh chính (<topic>) khi người dùng gõ tin nhắn trực tiếp trong màn hình app ntfy
+                    local pollMainUrl = "https://ntfy.sh/" .. cleanTopic .. "/json?poll=1"
+                    if secretBossState.lastRemoteMainId then
+                        pollMainUrl = pollMainUrl .. "&since=" .. tostring(secretBossState.lastRemoteMainId)
+                    else
+                        pollMainUrl = pollMainUrl .. "&since=20s"
+                    end
+
+                    local resMain = SafeHttpGet(pollMainUrl)
+                    if resMain and #resMain > 0 then
+                        for line in string.gmatch(resMain, "[^\r\n]+") do
+                            local ok, entry = pcall(function() return HttpService:JSONDecode(line) end)
+                            if ok and type(entry) == "table" and entry.event == "message" and entry.id then
+                                if not secretBossState.remoteProcessedIds[entry.id] then
+                                    secretBossState.remoteProcessedIds[entry.id] = true
+                                    secretBossState.lastRemoteMainId = entry.id
+
+                                    local titleLower = tostring(entry.title or ""):lower()
+                                    local msgLower = tostring(entry.message or ""):lower():gsub("%s+", "")
+                                    local isBotSent = titleLower:find("báo cáo") or titleLower:find("thời tiết") or titleLower:find("nhiệm vụ vé") or titleLower:find("test ntfy") or titleLower:find("secret boss") or titleLower:find("đạo sĩ")
+
+                                    if not isBotSent and #msgLower > 0 and #msgLower <= 50 then
+                                        if msgLower:find("status") or msgLower:find("info") or msgLower:find("check") or msgLower:find("thoitiet") or msgLower:find("nv") or msgLower:find("server") or msgLower:find("baocao") then
+                                            ShowNotification("ntfy Remote", "Đã nhận lệnh từ app: Báo cáo server!", "INFO", 4)
+                                            secretBossState.SendServerStatusNtfyAlert()
+                                        end
+                                    end
                                 end
                             end
                         end

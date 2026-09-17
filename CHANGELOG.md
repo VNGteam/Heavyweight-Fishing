@@ -2,6 +2,26 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.3] - 2026-09-17
+### ⚡ Sửa Lỗi Ấn Nút Trên Thông Báo Không Phản Hồi - Cơ Chế Nhận Lệnh Từ Xa ID-Based Siêu Nhạy:
+1. **Khắc Phục Tận Gốc Lỗi Ấn Nút Action Không Nhận Được Báo Cáo Acc**:
+   - **Nguyên nhân kỹ thuật**: 
+     - Lệnh `tick()` trong môi trường Roblox/Executor tại Việt Nam (GMT+7) trả về thời gian lệch trước +7 tiếng so với máy chủ quốc tế của ntfy (`tick() = UTC + 25,200s`).
+     - Khi bot gửi yêu cầu polling với `since = tick() + 1`, máy chủ ntfy hiểu là bot đang yêu cầu tìm tin nhắn trong... 7 tiếng tương lai! Vì thế ntfy lọc bỏ toàn bộ tin nhắn mới của người dùng và trả về danh sách rỗng (0 bytes).
+     - Ngoài ra, việc chỉ phụ thuộc vào 1 hàm request duy nhất có thể gây nghẽn trên một số executor di động.
+   - **Giải pháp toàn diện & Chuẩn xác 100%**:
+     - **Chuyển sang cơ chế Polling theo ID (`since=<lastMsgId>`)**: Hoàn toàn không phụ thuộc vào đồng hồ hệ thống, múi giờ hay độ trễ mạng. ntfy chỉ gửi về những tin nhắn phát sinh sau tin nhắn gần nhất.
+     - **Bộ nhớ đệm chống trùng lặp (`remoteProcessedIds`)**: Đảm bảo mỗi lệnh từ nút bấm hoặc tin nhắn chỉ được kích hoạt duy nhất một lần.
+     - **Bộ gửi/nhận đa tầng `SafeHttpGet`**: Tự động thử `game:HttpGet` trước (phương thức chuẩn hóa chạy được trên 100% executor Roblox), sau đó dự phòng `syn.request / http_request / request`.
+     - **Hỗ trợ 2 Kênh Nhận Lệnh Song Song**:
+       - *Kênh 1*: Kênh lệnh ngầm `<Topic>_cmd` (nơi nút Action Button `📊 Lấy Báo Cáo Server` tự động bắn lệnh vào).
+       - *Kênh 2*: Kênh chính `<Topic>` (nếu người dùng mở app ntfy và gõ chữ `status`, `info`, `server`, `nv`, `baocao`, bot cũng tự động nhận diện và trả kết quả ngay lập tức!).
+     - **Tối ưu độ trễ**: Rút ngắn chu kỳ quét xuống 2.5 giây giúp phản hồi về điện thoại gần như tức thì ngay sau khi chạm nút.
+2. **Đồng Bộ Phiên Bản v2.6.3 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.3` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.2] - 2026-09-17
 ### 📜 Báo Cáo Hoàn Thành Nhiệm Vụ Vé & Ra Lệnh Lấy Thông Tin Server Từ Xa Qua ntfy:
 1. **Thông Báo Hoàn Thành Nhiệm Vụ Vé (Ticket Quest Alert) Về Điện Thoại**:
