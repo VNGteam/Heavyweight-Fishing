@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.9.0"
+local SCRIPT_BUILD_COMMIT = "v2.9.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -106,6 +106,8 @@ end
 
 local Config = {
     AutoMinigame = true,
+    RhythmAccuracy = 95,
+    RhythmHumanizer = true,
     AutoCast = false,
     CastDelay = 1.0,
     CastPower = 100,
@@ -8940,12 +8942,18 @@ end)
 createCategoryHeader(tabFishing, "Tự Động Câu Cá Cốt Lõi")
 local fishCard = createCardGroup(tabFishing)
 
-createToggleRow(fishCard, "Tự Động Chơi Mini Game (Auto Minigame)", "Tự động thắng 100% mọi minigame (Kéo cần, Perfect Slam, Max Charge & Rhythm Boss Bạch Tuộc)", Config.AutoMinigame, function(v)
+createToggleRow(fishCard, "Tự Động Chơi Mini Game (Auto Minigame)", "Tự động thắng mọi minigame (Kéo cần, Perfect Slam, Max Charge & Rhythm Boss Bạch Tuộc)", Config.AutoMinigame, function(v)
     Config.AutoMinigame = v
     Config.AnchorBar = v
     Config.AutoSlam = v
     Config.AutoCharge = v
     Config.OctoAutoMinigame = v
+end)
+createSliderRow(fishCard, "Tỉ Lệ Trúng Minigame (Accuracy %)", "Độ chính xác khi gõ nhịp Boss (Khuyên dùng 92% - 96% để an toàn chống soi anti-cheat)", 70, 100, Config.RhythmAccuracy or 95, false, "%", function(v)
+    Config.RhythmAccuracy = v
+end)
+createToggleRow(fishCard, "Chế Độ Người Thật (Humanizer Timing)", "Giả lập độ trễ phản xạ 10-35ms và vị trí bấm lệch ngẫu nhiên như tay người thật", Config.RhythmHumanizer, function(v)
+    Config.RhythmHumanizer = v
 end)
 createButtonRow(fishCard, "🧪 Test Thử Minigame Bạch Tuộc (A-S-D)", "Bật giao diện 3 làn A-S-D và thả nốt rơi thử nghiệm để kiểm chứng bot tự bấm Perfect ngay trước mắt", "Bấm Để Test", function()
     task.spawn(function()
@@ -10324,7 +10332,13 @@ end)()
 createCategoryHeader(tabBoss, "Boss Bạch Tuộc Bí Mật (Octoparasite)")
 local octoCard = createCardGroup(tabBoss)
 
-createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp chuẩn Perfect 100%", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
+createToggleRow(octoCard, "Tự Chơi Minigame (Rhythm Bot)", "Bot tự động gõ nhịp an toàn", Config.OctoAutoMinigame, function(v) Config.OctoAutoMinigame = v end)
+createSliderRow(octoCard, "Tỉ Lệ Trúng Nhịp Điệu (Accuracy %)", "Độ chính xác khi gõ nhịp (92% - 96% giúp tài khoản an toàn tuyệt đối)", 70, 100, Config.RhythmAccuracy or 95, false, "%", function(v)
+    Config.RhythmAccuracy = v
+end)
+createToggleRow(octoCard, "Chế Độ Người Thật (Humanizer Timing)", "Giả lập độ trễ phản xạ tự nhiên 10-35ms", Config.RhythmHumanizer, function(v)
+    Config.RhythmHumanizer = v
+end)
 createButtonRow(octoCard, "Bay Đến Phao Boss Bạch Tuộc", "Dịch chuyển đến phao triệu hồi Secret Boss giữa biển", "Bay Đến", function()
     local char = LocalPlayer.Character
     local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -15967,38 +15981,53 @@ local function CheckAndPlayRhythm(pg)
                     local noteScaleY = child.Position.Y.Scale
                     local diff = math.abs(noteScaleY - targetScaleY)
 
-                    -- Vùng hit chuẩn: game dùng <= 0.22, ta dùng 0.16 để đạt Perfect 100%
-                    if diff <= 0.16 and not rhythmState.hitNotes[child] then
+                    -- Vùng hit chuẩn của game: diff <= 0.22
+                    -- Nếu bật Chế Độ Người Thật (Humanizer): ngẫu nhiên hóa thời điểm bấm từ 0.08 đến 0.19
+                    local triggerThreshold = 0.16
+                    if Config.RhythmHumanizer ~= false then
+                        triggerThreshold = math.random(8, 19) / 100
+                    end
+
+                    if diff <= triggerThreshold and not rhythmState.hitNotes[child] then
                         rhythmState.hitNotes[child] = true
 
-                        -- 1. Kích hoạt hàm TryHit của game qua Button click
-                        if btn and btn:IsA("GuiButton") then
-                            pcall(function()
-                                if firesignal then
-                                    if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
-                                    if btn.Activated then firesignal(btn.Activated) end
+                        -- Kiểm tra tỉ lệ trúng Accuracy (mặc định 95%)
+                        local accuracy = Config.RhythmAccuracy or 95
+                        local willHit = (math.random(1, 100) <= accuracy)
+
+                        if willHit then
+                            local delaySec = (Config.RhythmHumanizer ~= false) and (math.random(10, 35) / 1000) or 0
+                            task.delay(delaySec, function()
+                                -- 1. Kích hoạt hàm TryHit của game qua Button click
+                                if btn and btn:IsA("GuiButton") then
+                                    pcall(function()
+                                        if firesignal then
+                                            if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                            if btn.Activated then firesignal(btn.Activated) end
+                                        end
+                                        if getconnections then
+                                            for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
+                                                if c.Fire then c:Fire() elseif c.Function then c.Function() end
+                                            end
+                                        end
+                                    end)
                                 end
-                                if getconnections then
-                                    for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
-                                        if c.Fire then c:Fire() elseif c.Function then c.Function() end
-                                    end
+
+                                -- 2. Giả lập phím bấm bàn phím VIM (A, S, D)
+                                if vim and laneData.keyCode then
+                                    pcall(function()
+                                        vim:SendKeyEvent(true, laneData.keyCode, false, game)
+                                        task.delay(0.02, function()
+                                            pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
+                                        end)
+                                    end)
+                                end
+
+                                -- 3. Gửi RemoteEvent RhythmHit trực tiếp lên Server ("hit")
+                                if Events and Events:FindFirstChild("RhythmHit") then
+                                    pcall(function() Events.RhythmHit:FireServer("hit") end)
                                 end
                             end)
-                        end
-
-                        -- 2. Giả lập phím bấm bàn phím VIM (A, S, D)
-                        if vim and laneData.keyCode then
-                            pcall(function()
-                                vim:SendKeyEvent(true, laneData.keyCode, false, game)
-                                task.delay(0.02, function()
-                                    pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
-                                end)
-                            end)
-                        end
-
-                        -- 3. Gửi RemoteEvent RhythmHit trực tiếp lên Server ("hit")
-                        if Events and Events:FindFirstChild("RhythmHit") then
-                            pcall(function() Events.RhythmHit:FireServer("hit") end)
                         end
                     end
                 end

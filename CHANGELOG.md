@@ -2,7 +2,19 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
-## [v2.9.0] - 2026-09-18
+## [v2.9.1] - 2026-09-18
+### 🛡️ Bổ Sung Chế Độ Giả Lập Người Thật (Humanizer & Hit Accuracy Slider) Cho Rhythm Minigame:
+1. **Thanh Trượt Tỉ Lệ Trúng (Hit Accuracy Slider - 70% đến 100%)**:
+   - Thêm cấu hình `Config.RhythmAccuracy` (mặc định **95%**).
+   - Người chơi có thể tự do điều chỉnh độ chính xác từ 70% đến 100% ngay trong Menu (cả Tab Câu Cá và Tab Boss).
+   - Tỉ lệ 92% - 96% đảm bảo thắng minigame và câu cá 100% thành công, nhưng thỉnh thoảng sẽ giả vờ lỡ tay trượt 1 nốt nhẹ giống hệt thao tác tay người chơi thật, triệt tiêu nguy cơ bị máy chủ gắn cờ gian lận.
+2. **Cơ Chế Giả Lập Phản Xạ Người Thật (Humanizer Timing Jitter)**:
+   - Thêm toggle `Config.RhythmHumanizer` (mặc định BẬT).
+   - Ngẫu nhiên hóa vị trí kích hoạt nốt trong khoảng cách tự nhiên (`0.08` đến `0.19`) thay vì bấm cứng nhắc tại một tọa độ duy nhất.
+   - Thêm độ trễ phản xạ phản ứng ngẫu nhiên từ **10ms đến 35ms**, xóa bỏ hoàn toàn pattern "botting hoàn hảo".
+3. **Mã Phiên Bản**: Nâng lên `SCRIPT_BUILD_COMMIT = "v2.9.1"` trên `local.lua` và `v2/core/config.lua`.
+
+
 ### 🚀 Giải Mã 100% Mã Nguồn Game Gốc (ClientModule.Fishing) & Hoàn Thiện Auto Rhythm Minigame:
 1. **Khám Phá Cốt Lõi Từ Mã Decompile Gốc (`ClientModule.Fishing`)**:
    - **Tên nốt rơi thực tế**: Bản gốc nhân bản `NoteFrame` thành các object con tên chính xác là `Note_FX` trong `ProgressionA`, `ProgressionS`, `ProgressionD`.

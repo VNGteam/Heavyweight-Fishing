@@ -147,38 +147,53 @@ function Fishing.HandleMinigame(config, fUI)
                             local noteScaleY = child.Position.Y.Scale
                             local diff = math.abs(noteScaleY - targetScaleY)
 
-                            -- Vùng hit chuẩn của game: diff <= 0.22, ta lấy 0.16 để đạt Perfect 100%
-                            if diff <= 0.16 and not Fishing._rhythmSeenNotes[child] then
+                            -- Vùng hit chuẩn của game: diff <= 0.22
+                            -- Nếu bật Chế Độ Người Thật (Humanizer): ngẫu nhiên hóa thời điểm bấm từ 0.08 đến 0.19
+                            local triggerThreshold = 0.16
+                            if config.RhythmHumanizer ~= false then
+                                triggerThreshold = math.random(8, 19) / 100
+                            end
+
+                            if diff <= triggerThreshold and not Fishing._rhythmSeenNotes[child] then
                                 Fishing._rhythmSeenNotes[child] = true
 
-                                -- 1. Kích hoạt TryHit của game thông qua Button click
-                                if btn and btn:IsA("GuiButton") then
-                                    pcall(function()
-                                        if firesignal then
-                                            if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
-                                            if btn.Activated then firesignal(btn.Activated) end
+                                -- Kiểm tra tỉ lệ trúng Accuracy (mặc định 95%)
+                                local accuracy = config.RhythmAccuracy or 95
+                                local willHit = (math.random(1, 100) <= accuracy)
+
+                                if willHit then
+                                    local delaySec = (config.RhythmHumanizer ~= false) and (math.random(10, 35) / 1000) or 0
+                                    task.delay(delaySec, function()
+                                        -- 1. Kích hoạt TryHit của game thông qua Button click
+                                        if btn and btn:IsA("GuiButton") then
+                                            pcall(function()
+                                                if firesignal then
+                                                    if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                                    if btn.Activated then firesignal(btn.Activated) end
+                                                end
+                                                if getconnections then
+                                                    for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
+                                                        if c.Fire then c:Fire() elseif c.Function then c.Function() end
+                                                    end
+                                                end
+                                            end)
                                         end
-                                        if getconnections then
-                                            for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
-                                                if c.Fire then c:Fire() elseif c.Function then c.Function() end
-                                            end
+
+                                        -- 2. Giả lập phím bàn phím VIM (A, S, D)
+                                        if vim and laneData.keyCode then
+                                            pcall(function()
+                                                vim:SendKeyEvent(true, laneData.keyCode, false, game)
+                                                task.delay(0.02, function()
+                                                    pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
+                                                end)
+                                            end)
+                                        end
+
+                                        -- 3. Gửi RemoteEvent RhythmHit chuẩn xác lên Server ("hit")
+                                        if Events and Events:FindFirstChild("RhythmHit") then
+                                            pcall(function() Events.RhythmHit:FireServer("hit") end)
                                         end
                                     end)
-                                end
-
-                                -- 2. Giả lập phím bàn phím VIM (A, S, D)
-                                if vim and laneData.keyCode then
-                                    pcall(function()
-                                        vim:SendKeyEvent(true, laneData.keyCode, false, game)
-                                        task.delay(0.02, function()
-                                            pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
-                                        end)
-                                    end)
-                                end
-
-                                -- 3. Gửi RemoteEvent RhythmHit chuẩn xác lên Server ("hit")
-                                if Events and Events:FindFirstChild("RhythmHit") then
-                                    pcall(function() Events.RhythmHit:FireServer("hit") end)
                                 end
                             end
                         end

@@ -9,18 +9,19 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.9.0"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.9.1"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
-    -- Câu Cá Cốt Lõi
-    AutoMinigame = true,
-    AutoCast = false,
-    CastDelay = 1.0,
-    CastPower = 100,
+    AutoFishing = false,
+    CastDelay = 0.5,
+    FastPull = true,
     AnchorBar = true,
     AutoSlam = true,
     AutoCharge = true,
+    AutoMinigame = true,
+    RhythmAccuracy = 95,
+    RhythmHumanizer = true,
     AntiStuckEnabled = false,
 
     -- Smart Combo V2
