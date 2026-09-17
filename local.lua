@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.8.6"
+local SCRIPT_BUILD_COMMIT = "v2.8.7"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -15823,6 +15823,8 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
     end
 end))
 
+local rhythmState = { hitNotes = {}, lastClean = 0 }
+
 table.insert(activeConnections, RunService.RenderStepped:Connect(function()
     if not isRunning then return end
     pcall(function()
@@ -15858,6 +15860,81 @@ table.insert(activeConnections, RunService.RenderStepped:Connect(function()
                 local impactCutscene = pg:FindFirstChild("Impact") and pg.Impact:FindFirstChild("Cutscene")
                 if impactCutscene and impactCutscene:FindFirstChild("Hurt") then
                     impactCutscene.Hurt.ImageTransparency = 1
+                end
+
+                -- Xử lý Mini Game Nhịp Điệu 3 Phím A - S - D (Boss Bạch Tuộc - Nameless Octoparasite)
+                local rhythmGui = fUI:FindFirstChild("Rhythm")
+                if rhythmGui and rhythmGui.Visible then
+                    local nowTick = tick()
+                    if nowTick - rhythmState.lastClean > 3.5 then
+                        rhythmState.hitNotes = {}
+                        rhythmState.lastClean = nowTick
+                    end
+
+                    local vim = game:GetService("VirtualInputManager")
+                    local lanes = {
+                        { name = "ProgressionA", key = "A", keyCode = Enum.KeyCode.A },
+                        { name = "ProgressionS", key = "S", keyCode = Enum.KeyCode.S },
+                        { name = "ProgressionD", key = "D", keyCode = Enum.KeyCode.D }
+                    }
+
+                    for _, laneData in ipairs(lanes) do
+                        local prog = rhythmGui:FindFirstChild(laneData.name)
+                        if prog and prog.Visible then
+                            local bFrame = prog:FindFirstChild("BarFrame")
+                            local btn = prog:FindFirstChild("Button")
+                            local targetY = (bFrame and bFrame.AbsolutePosition.Y) or (btn and btn.AbsolutePosition.Y) or 0
+
+                            local noteFrame = prog:FindFirstChild("NoteFrame")
+                            local searchContainer = noteFrame or prog
+
+                            for _, child in ipairs(searchContainer:GetChildren()) do
+                                if child:IsA("GuiObject") and child ~= bFrame and child ~= btn and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" and child.Name ~= "EXP" then
+                                    if child.Visible and not rhythmState.hitNotes[child] then
+                                        local childY = child.AbsolutePosition.Y
+                                        local childH = child.AbsoluteSize.Y
+                                        local dist = targetY > 0 and (childY + childH * 0.5 - targetY) or 0
+
+                                        -- Note chạm vạch đích hoặc vào vùng Perfect
+                                        if targetY == 0 or (dist >= -45 and dist <= 35) or (childY >= targetY - 45 and childY <= targetY + 35) then
+                                            rhythmState.hitNotes[child] = true
+
+                                            -- 1. Giả lập phím bấm A, S, D chuẩn xác qua VirtualInputManager
+                                            if vim and laneData.keyCode then
+                                                pcall(function()
+                                                    vim:SendKeyEvent(true, laneData.keyCode, false, game)
+                                                    task.delay(0.02, function()
+                                                        pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
+                                                    end)
+                                                end)
+                                            end
+
+                                            -- 2. Giả lập click nút GUI (cho cả Mobile và PC)
+                                            if btn and btn:IsA("GuiButton") then
+                                                pcall(function()
+                                                    if firesignal then
+                                                        if btn.Activated then firesignal(btn.Activated) end
+                                                        if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                                    end
+                                                    if getconnections then
+                                                        for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end
+                                                        for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end
+                                                    end
+                                                end)
+                                            end
+
+                                            -- 3. Gửi RemoteEvent trực tiếp lên Server
+                                            if Events and Events:FindFirstChild("RhythmHit") then
+                                                pcall(function() Events.RhythmHit:FireServer(laneData.key) end)
+                                                pcall(function() Events.RhythmHit:FireServer(child.Name) end)
+                                                pcall(function() Events.RhythmHit:FireServer(true, 100) end)
+                                            end
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
                 end
             end
         end

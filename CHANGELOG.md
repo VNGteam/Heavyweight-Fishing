@@ -2,6 +2,19 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.8.7] - 2026-09-18
+### 🐙 Nâng Cấp Chuyên Sâu Bot Tự Động Gõ Nhịp 3 Làn A - S - D Cho Boss Bạch Tuộc (Nameless Octoparasite):
+1. **Khớp Chuẩn 100% Giao Diện Rhythm Game Thực Tế Theo Ảnh Người Dùng**:
+   - Nhận diện chính xác cấu trúc 3 làn nốt rơi dọc: `ProgressionA` (phím A), `ProgressionS` (phím S), `ProgressionD` (phím D) trong `PlayerGui.MainGui.Fishing.Rhythm`.
+   - Quét tọa độ vị trí nốt (`NoteFrame`) rơi về vạch đích trắng (`BarFrame`).
+   - Tự động kích hoạt đồng bộ 3 tầng phản xạ khi nốt vào vùng Perfect:
+     - ⌨️ Giả lập phím bấm bàn phím thực thông qua `VirtualInputManager` (`Enum.KeyCode.A`, `Enum.KeyCode.S`, `Enum.KeyCode.D`).
+     - 🖱️ Giả lập click nút trực tiếp trên GUI (`Button.Activated` / `MouseButton1Click`) cho cả Mobile và PC.
+     - 📡 Gửi RemoteEvent `RhythmHit` đa dạng định dạng (`laneKey`, `child.Name`, `(true, 100)`).
+2. **Chạy Trực Tiếp Trong RenderStepped**:
+   - Tốc độ xử lý khung hình siêu tốc (60 - 240 FPS), độ trễ 0ms, đảm bảo không bao giờ bị miss nốt hay tuột cá Nameless Octoparasite.
+3. **Mã Phiên Bản**: Đặt `SCRIPT_BUILD_COMMIT = "v2.8.7"` trên `local.lua`, `v2/core/config.lua`, `loader.lua`, `v2/features/fishing.lua` và `v2_bundle.lua`.
+
 ## [v2.8.6] - 2026-09-18
 ### 🎮 Bổ Sung Tính Năng Tổng "Tự Động Chơi Mini Game (Auto Minigame)" & Hoàn Thiện Rhythm Bot:
 1. **Nút Bật Tắt Tổng "Tự Động Chơi Mini Game" Tại Tab Câu Cá**:

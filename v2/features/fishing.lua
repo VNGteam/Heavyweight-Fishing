@@ -114,11 +114,81 @@ function Fishing.HandleMinigame(config, fUI)
         Fishing.lastProgressionTime = now
     end
 
-    -- Rhythm Hit (Octo minigame)
+    -- Rhythm Hit (Octo minigame: 3 lanes A, S, D for Nameless Octoparasite)
     if config.AutoMinigame or config.AutoRhythmHit or config.OctoAutoMinigame then
         if Events and Events:FindFirstChild("RhythmHit") then
             Events.RhythmHit:FireServer(true, 100)
         end
+
+        local rhythmGui = fUI:FindFirstChild("Rhythm")
+        if rhythmGui and rhythmGui.Visible then
+            if not Fishing._rhythmSeenNotes then
+                Fishing._rhythmSeenNotes = {}
+                Fishing._rhythmLastClean = now
+            end
+            if (now - Fishing._rhythmLastClean) > 3.5 then
+                Fishing._rhythmSeenNotes = {}
+                Fishing._rhythmLastClean = now
+            end
+
+            local vim = Services.VirtualInputManager or game:GetService("VirtualInputManager")
+            local lanes = {
+                { name = "ProgressionA", key = "A", keyCode = Enum.KeyCode.A },
+                { name = "ProgressionS", key = "S", keyCode = Enum.KeyCode.S },
+                { name = "ProgressionD", key = "D", keyCode = Enum.KeyCode.D }
+            }
+
+            for _, laneData in ipairs(lanes) do
+                local prog = rhythmGui:FindFirstChild(laneData.name)
+                if prog and prog.Visible then
+                    local bFrame = prog:FindFirstChild("BarFrame")
+                    local btn = prog:FindFirstChild("Button")
+                    local targetY = (bFrame and bFrame.AbsolutePosition.Y) or (btn and btn.AbsolutePosition.Y) or 0
+
+                    local noteFrame = prog:FindFirstChild("NoteFrame")
+                    local searchContainer = noteFrame or prog
+
+                    for _, child in ipairs(searchContainer:GetChildren()) do
+                        if child:IsA("GuiObject") and child ~= bFrame and child ~= btn and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" and child.Name ~= "EXP" then
+                            if child.Visible and not Fishing._rhythmSeenNotes[child] then
+                                local childY = child.AbsolutePosition.Y
+                                local childH = child.AbsoluteSize.Y
+                                local dist = targetY > 0 and (childY + childH * 0.5 - targetY) or 0
+
+                                if targetY == 0 or (dist >= -45 and dist <= 35) or (childY >= targetY - 45 and childY <= targetY + 35) then
+                                    Fishing._rhythmSeenNotes[child] = true
+
+                                    if vim and laneData.keyCode then
+                                        pcall(function()
+                                            vim:SendKeyEvent(true, laneData.keyCode, false, game)
+                                            task.delay(0.02, function()
+                                                pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
+                                            end)
+                                        end)
+                                    end
+
+                                    if btn and btn:IsA("GuiButton") then
+                                        pcall(function()
+                                            if firesignal then
+                                                if btn.Activated then firesignal(btn.Activated) end
+                                                if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                            end
+                                        end)
+                                    end
+
+                                    if Events and Events:FindFirstChild("RhythmHit") then
+                                        pcall(function() Events.RhythmHit:FireServer(laneData.key) end)
+                                        pcall(function() Events.RhythmHit:FireServer(child.Name) end)
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        -- Legacy / Fallback RhythmFrame (nếu có)
         if fUI:FindFirstChild("RhythmFrame") then
             local rFrame = fUI.RhythmFrame
             if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
