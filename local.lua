@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.8"
+local SCRIPT_BUILD_COMMIT = "v2.5.9"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -318,6 +318,12 @@ local Config = {
     TelegramChatId = "",
     TelegramNotifyBoss = true,
     TelegramNotifyNPC = true,
+    -- ntfy Push (Thông Báo Thời Tiết & Server Về Điện Thoại)
+    NtfyEnabled = false,
+    NtfyTopic = "",
+    NtfyAlertWeatherChange = true,
+    NtfyAlertWeatherHop = true,
+    NtfyNotifyBoss = true,
     ShowBossDpsMeter = true,
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End,
@@ -555,6 +561,13 @@ local ConfigLabelMap = {
     ["Telegram Báo Boss"] = "TelegramNotifyBoss",
     ["Telegram Báo Đạo Sĩ"] = "TelegramNotifyNPC",
 
+    -- ntfy Push (Thông Báo Về Điện Thoại)
+    ["Bật ntfy Push"] = "NtfyEnabled",
+    ["ntfy Topic"] = "NtfyTopic",
+    ["Thông Báo Đổi Thời Tiết (ntfy)"] = "NtfyAlertWeatherChange",
+    ["Thông Báo Tìm Server Thời Tiết (ntfy)"] = "NtfyAlertWeatherHop",
+    ["Thông Báo Boss & NPC (ntfy)"] = "NtfyNotifyBoss",
+
     -- Săn Boss DPS Meter
     ["Hiện Bảng Sát Thương Boss (% HP)"] = "ShowBossDpsMeter"
 }
@@ -762,6 +775,13 @@ Config._essentialKeys = {
     ["TelegramChatId"] = true,
     ["TelegramNotifyBoss"] = true,
     ["TelegramNotifyNPC"] = true,
+
+    -- ntfy Push (Thông Báo Về Điện Thoại)
+    ["NtfyEnabled"] = true,
+    ["NtfyTopic"] = true,
+    ["NtfyAlertWeatherChange"] = true,
+    ["NtfyAlertWeatherHop"] = true,
+    ["NtfyNotifyBoss"] = true,
 
     -- Săn Boss
     ["ShowBossDpsMeter"] = true,
@@ -4206,6 +4226,124 @@ local function SendTelegramMessage(text)
     end)
 end
 
+function SendNtfyNotification(title, message, priorityLevel, tagList)
+    if not Config.NtfyEnabled or not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
+    pcall(function()
+        local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
+        if #rawTopic == 0 then return end
+
+        local targetHost = "https://ntfy.sh"
+        local cleanTopic = rawTopic
+
+        if rawTopic:find("^https?://") then
+            local host, subTopic = rawTopic:match("^(https?://[^/]+)/?(.*)$")
+            if host and #host > 0 then
+                targetHost = host
+                cleanTopic = subTopic or ""
+            end
+        end
+
+        if #cleanTopic == 0 and not rawTopic:find("^https?://") then
+            cleanTopic = rawTopic
+        end
+
+        local payload = {
+            topic = cleanTopic ~= "" and cleanTopic or nil,
+            title = title or "Heavyweight Fishing Alert",
+            message = message or "",
+            priority = priorityLevel or 3,
+            tags = tagList or {"fishing_pole_and_fish"}
+        }
+
+        local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
+        if not reqFunc then return end
+
+        local body = HttpService:JSONEncode(payload)
+        local headers = {
+            ["Content-Type"] = "application/json; charset=utf-8"
+        }
+
+        local postUrl = targetHost
+        if cleanTopic ~= "" and not postUrl:find("/" .. cleanTopic .. "$") then
+            postUrl = targetHost .. "/" .. cleanTopic
+        end
+
+        reqFunc({
+            Url = postUrl,
+            Method = "POST",
+            Headers = headers,
+            Body = body
+        })
+    end)
+end
+
+function secretBossState.SendWeatherNtfyAlert(weatherName, matchedIsland, isInitial)
+    if not Config.NtfyEnabled or not Config.NtfyAlertWeatherChange then return end
+    pcall(function()
+        local jobId = tostring(game.JobId or "")
+        local placeId = tostring(game.PlaceId or "18779600655")
+        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
+        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
+
+        local isClear = (not weatherName or weatherName == "" or weatherName == "Clear")
+
+        if isClear then
+            local title = "☀️ THỜI TIẾT: TRỜI QUANG (CLEAR)"
+            local msg = string.format("Thời tiết tại server đã trở lại bình thường (Clear).\n👤 Người chơi: %s\n⏰ %s", playerName, timeStr)
+            SendNtfyNotification(title, msg, 2, {"sun_behind_cloud", "information_source"})
+            return
+        end
+
+        local islandName = matchedIsland and matchedIsland.islandName or "Chưa rõ đảo"
+        local bossListStr = ""
+        if matchedIsland and matchedIsland.bosses and #matchedIsland.bosses > 0 then
+            local bNames = {}
+            for _, b in ipairs(matchedIsland.bosses) do
+                table.insert(bNames, b.name)
+            end
+            bossListStr = table.concat(bNames, ", ")
+        end
+
+        local tagList = {"cloud", "fishing_pole_and_fish"}
+        local prio = 4
+        local wLower = tostring(weatherName):lower()
+        if wLower:find("thunder") or wLower:find("sấm") or wLower:find("bão") then
+            prio = 5
+            tagList = {"zap", "cloud_lightning", "fishing_pole_and_fish"}
+        elseif wLower:find("rain") or wLower:find("mưa") then
+            tagList = {"cloud_rain", "droplet"}
+        elseif wLower:find("snow") or wLower:find("tuyết") or wLower:find("frost") then
+            tagList = {"snowflake", "cold_face"}
+        elseif wLower:find("fog") or wLower:find("sương") then
+            tagList = {"fog", "eyes"}
+        elseif wLower:find("sun") or wLower:find("nắng") or wLower:find("blazing") then
+            tagList = {"sunny", "fire"}
+        elseif wLower:find("wind") or wLower:find("gió") then
+            tagList = {"dash", "wind_face"}
+        end
+
+        local headerPrefix = isInitial and "🌟 SERVER CÓ SẴN THỜI TIẾT: " or "⛈️ THỜI TIẾT SERVER: "
+        local title = headerPrefix .. tostring(weatherName):upper()
+
+        local msgParts = {
+            string.format("🎯 Thời tiết: %s", tostring(weatherName)),
+            string.format("📍 Đảo liên quan: %s", islandName)
+        }
+        if bossListStr ~= "" then
+            table.insert(msgParts, string.format("🐲 Boss có thể xuất hiện: %s", bossListStr))
+        end
+        table.insert(msgParts, string.format("👤 Nhân vật: %s", playerName))
+        if jobId ~= "" then
+            table.insert(msgParts, string.format("🔑 Job ID: %s", jobId))
+            table.insert(msgParts, string.format("⚡ Teleport:\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)", placeId, jobId))
+        end
+        table.insert(msgParts, string.format("⏰ Thời gian: %s", timeStr))
+
+        local fullMsg = table.concat(msgParts, "\n")
+        SendNtfyNotification(title, fullMsg, prio, tagList)
+    end)
+end
+
 local npcAlertsSent = {}
 
 function secretBossState.SendNPCDetectionAlert(npcType, npcName, npcInst)
@@ -4250,6 +4388,14 @@ function secretBossState.SendNPCDetectionAlert(npcType, npcName, npcInst)
             .. "⏰ *Thời gian:* " .. timeStr .. "\n\n"
             .. "⚡ *Code vào server:*\n`game:GetService(\"TeleportService\"):TeleportToPlaceInstance(" .. placeId .. ", \"" .. jobId .. "\", game.Players.LocalPlayer)`"
         SendTelegramMessage(teleText)
+    end
+
+    -- 3. Gửi qua ntfy Push nếu người dùng bật
+    if Config.NtfyEnabled and Config.NtfyNotifyBoss and Config.NtfyTopic and #tostring(Config.NtfyTopic):gsub("%s+", "") > 0 then
+        local ntfyTitle = "📜 PHÁT HIỆN " .. tostring(npcName):upper() .. "!"
+        local ntfyMsg = string.format("Phát hiện %s tại server!\n👤 Người tìm thấy: %s\n📍 Tọa độ: %s\n🔑 Job ID: %s\n⚡ Lệnh vào nhanh:\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n⏰ %s",
+            tostring(npcName), playerName, posStr, (jobId ~= "" and jobId or "N/A"), placeId, jobId, timeStr)
+        SendNtfyNotification(ntfyTitle, ntfyMsg, 5, {"scroll", "eyes", "star"})
     end
 end
 
@@ -4747,6 +4893,17 @@ function secretBossState.CheckWeatherHopOnJoin()
                         timestamp = DateTime.now():ToIsoDate()
                     }}
                 })
+            end
+
+            if Config.NtfyEnabled and Config.NtfyAlertWeatherHop then
+                pcall(function()
+                    local jobId = tostring(game.JobId or "")
+                    local placeId = tostring(game.PlaceId or "18779600655")
+                    local ntfyTitle = "🎉 TÌM THẤY SERVER: " .. tostring(dispName):upper()
+                    local ntfyMsg = string.format("Đã tìm thấy server thời tiết [%s] khớp mục tiêu [%s]!\n👤 Người chơi: %s\n🔑 Job ID: %s\n⚡ Lệnh vào nhanh:\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n⏰ %s",
+                        dispName, targetWeather, LocalPlayer.DisplayName or LocalPlayer.Name, (jobId ~= "" and jobId or "N/A"), placeId, jobId, os.date("%H:%M:%S - %d/%m/%Y"))
+                    SendNtfyNotification(ntfyTitle, ntfyMsg, 5, {"tada", "cloud", "white_check_mark"})
+                end)
             end
 
             if hopData.AutoFish then
@@ -13610,6 +13767,50 @@ createButtonRow(teleCard, "Kiểm Tra Telegram (Test)", "Gửi thử 1 tin nhắ
     end)
 end)
 
+createCategoryHeader(tabProfiles, "🔔 ntfy Push (Thông Báo Thời Tiết & Server Về Điện Thoại)")
+local ntfyCard = createCardGroup(tabProfiles)
+
+createInputRow(ntfyCard, "ntfy Topic", "Nhập tên Topic đã đăng ký trên app ntfy (Ví dụ: my_weather_alert_88)", Config.NtfyTopic or "", function(txt)
+    Config.NtfyTopic = txt
+end)
+
+createToggleRow(ntfyCard, "Bật ntfy Push", "Kích hoạt gửi thông báo đẩy đến điện thoại qua ntfy", Config.NtfyEnabled, function(v)
+    Config.NtfyEnabled = v
+end)
+
+createToggleRow(ntfyCard, "Thông Báo Đổi Thời Tiết (ntfy)", "Gửi thông báo ngay khi thời tiết server đổi (Mưa, Bão, Sương Mù, Tuyết...)", Config.NtfyAlertWeatherChange, function(v)
+    Config.NtfyAlertWeatherChange = v
+end)
+
+createToggleRow(ntfyCard, "Thông Báo Tìm Server Thời Tiết (ntfy)", "Gửi thông báo khi Weather Hop tìm được server có thời tiết mục tiêu", Config.NtfyAlertWeatherHop, function(v)
+    Config.NtfyAlertWeatherHop = v
+end)
+
+createToggleRow(ntfyCard, "Thông Báo Boss & NPC (ntfy)", "Gửi thông báo khi phát hiện Secret Boss hoặc Đạo Sĩ (Taoist & Maoshan)", Config.NtfyNotifyBoss, function(v)
+    Config.NtfyNotifyBoss = v
+end)
+
+createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo đẩy mẫu về app ntfy trên điện thoại ngay lập tức", "Gửi Test", function()
+    local clean = tostring(Config.NtfyTopic or ""):gsub("%s+", "")
+    if clean == "" then
+        ShowNotification("ntfy", "Vui lòng nhập ntfy Topic trước!", "WARN")
+        return
+    end
+    ShowNotification("ntfy", "Đang gửi thông báo test đến điện thoại...", "INFO")
+    task.spawn(function()
+        local _, curWeather = secretBossState.DetectWeather()
+        local testWeather = (curWeather and curWeather ~= "" and curWeather ~= "Clear") and curWeather or "Clear (Trời Quang)"
+        local testMsg = string.format("Kết nối ntfy thành công từ tài khoản: %s\nThời tiết server hiện tại: %s\nJobId: %s\nThời gian: %s",
+            (LocalPlayer and (LocalPlayer.DisplayName or LocalPlayer.Name)) or "Unknown",
+            testWeather,
+            tostring(game.JobId or "N/A"),
+            os.date("%H:%M:%S - %d/%m/%Y")
+        )
+        SendNtfyNotification("🔔 TEST NTFY - THỜI TIẾT SERVER", testMsg, 4, {"bell", "partly_sunny", "white_check_mark"})
+        ShowNotification("ntfy", "Đã gửi thông báo test! Hãy kiểm tra điện thoại của bạn.", "SUCCESS", 5)
+    end)
+end)
+
 createCategoryHeader(tabProfiles, "Tùy Chọn Khác")
 local credCard = createCardGroup(tabProfiles)
 createButtonRow(credCard, "🔴 Diệt Toàn Bộ Script (Kill Script)", "Ngắt kết nối mọi vòng lặp, xóa sạch giao diện và giải phóng bộ nhớ", "KILL SCRIPT", function()
@@ -14551,6 +14752,11 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
                                     .. "📍 *Vị trí:* " .. tostring(secretBossState.currentMap or "Đảo Hiện Tại") .. "\n"
                                     .. "⏰ *Thời gian:* " .. os.date("%H:%M:%S - %d/%m/%Y")
                                 SendTelegramMessage(teleBoss)
+                            end
+                            if Config.NtfyEnabled and Config.NtfyNotifyBoss then
+                                local ntfyBossMsg = string.format("Tài khoản %s đang câu trúng: %s tại %s!\n⏰ %s",
+                                    LocalPlayer.DisplayName or LocalPlayer.Name, tostring(displayBossName), tostring(secretBossState.currentMap or "Đảo Hiện Tại"), os.date("%H:%M:%S - %d/%m/%Y"))
+                                SendNtfyNotification("🚨 CÂU TRÚNG SECRET BOSS: " .. tostring(displayBossName):upper(), ntfyBossMsg, 5, {"trophy", "fire", "fishing_pole_and_fish"})
                             end
                         end
                     end
@@ -16491,6 +16697,54 @@ table.insert(activeConnections, UserInputService.InputBegan:Connect(function(inp
         UnloadScript()
     end
 end))
+
+secretBossState.lastTrackedWeather = nil
+secretBossState.weatherMonitorStarted = false
+
+function secretBossState.StartWeatherMonitor()
+    if secretBossState.weatherMonitorStarted then return end
+    secretBossState.weatherMonitorStarted = true
+
+    task.spawn(function()
+        task.wait(4.0)
+        local initEntry, initWeather = secretBossState.DetectWeather()
+        local initNorm = (initWeather and initWeather ~= "" and initWeather ~= "Clear") and initWeather or "Clear"
+        secretBossState.lastTrackedWeather = initNorm
+
+        if initNorm ~= "Clear" and Config.NtfyEnabled and Config.NtfyAlertWeatherChange then
+            secretBossState.SendWeatherNtfyAlert(initNorm, initEntry, true)
+        end
+
+        while isRunning do
+            task.wait(3.5)
+            if isRunning then
+                pcall(function()
+                    local detectedEntry, detectedWeather = secretBossState.DetectWeather()
+                    local currentNorm = (detectedWeather and detectedWeather ~= "" and detectedWeather ~= "Clear") and detectedWeather or "Clear"
+
+                    if secretBossState.lastTrackedWeather ~= nil and currentNorm ~= secretBossState.lastTrackedWeather then
+                        task.wait(1.5)
+                        local verifyEntry, verifyWeather = secretBossState.DetectWeather()
+                        local verifiedNorm = (verifyWeather and verifyWeather ~= "" and verifyWeather ~= "Clear") and verifyWeather or "Clear"
+
+                        if verifiedNorm == currentNorm and verifiedNorm ~= secretBossState.lastTrackedWeather then
+                            secretBossState.lastTrackedWeather = verifiedNorm
+                            if Config.NtfyEnabled and Config.NtfyAlertWeatherChange then
+                                secretBossState.SendWeatherNtfyAlert(verifiedNorm, verifyEntry, false)
+                            end
+                        end
+                    else
+                        secretBossState.lastTrackedWeather = currentNorm
+                    end
+                end)
+            end
+        end
+    end)
+end
+
+if secretBossState.StartWeatherMonitor then
+    task.spawn(secretBossState.StartWeatherMonitor)
+end
 
 if secretBossState.CheckWeatherHopOnJoin then
     task.spawn(secretBossState.CheckWeatherHopOnJoin)

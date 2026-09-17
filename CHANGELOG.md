@@ -2,6 +2,38 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.5.9] - 2026-09-17
+### 📱 Tích Hợp ntfy Push Notifications - Báo Cáo Thời Tiết & Server Trực Tiếp Về Điện Thoại:
+1. **Thông Báo Đẩy Thời Gian Thực Về Điện Thoại Qua App ntfy (iOS / Android)**:
+   - Tích hợp giao thức HTTP Push Notification qua nền tảng [ntfy.sh](https://ntfy.sh) siêu nhẹ, miễn phí 100%, không cần tài khoản, không trễ, đẩy thông báo tức thì lên màn hình khóa điện thoại.
+   - Gửi payload chuẩn JSON với định dạng UTF-8 tiếng Việt hoàn hảo kèm đầy đủ biểu tượng cảm xúc (Emoji) và tag hiển thị icon ntfy chuyên biệt theo từng loại thời tiết (`zap`, `cloud_lightning`, `cloud_rain`, `snowflake`, `fog`, `sunny`, `fire`, `dash`...).
+2. **Hệ Thống Cảnh Báo Thời Tiết Server Toàn Diện**:
+   - **Đổi Thời Tiết (Weather Change)**: Vòng lặp giám sát ngầm đa tầng liên tục theo dõi HUD UI và Server Data, gửi thông báo ngay khi thời tiết server chuyển biến (từ Trời Quang sang Bão Sấm, Mưa, Tuyết Rơi, Sương Mù, Nắng Gắt, Gió Mạnh...) hoặc khi bão tan quay về Trời Quang (Clear).
+   - **Quét Server Thời Tiết (Weather Hop Alert)**: Khi bot tự động nhảy server tìm thời tiết mục tiêu, ngay khi đáp trúng server hợp lệ, hệ thống sẽ đẩy thông báo khẩn cấp (Priority Max) về điện thoại người chơi.
+   - **Thời Tiết Sẵn Có Khi Join**: Nếu server vừa vào đã có sẵn thời tiết đặc biệt, hệ thống gửi thông báo chào đón ngay lập tức.
+   - **Nội dung thông báo bao gồm**:
+     - Tên thời tiết chuẩn xác và Đảo liên quan.
+     - Danh sách các loài Boss / Cá Thần Thoại có thể xuất hiện theo thời tiết đó.
+     - Tên nhân vật, thời gian phát hiện.
+     - **JobId Server** kèm đoạn code Lua Teleport 1 chạm: `game:GetService("TeleportService"):TeleportToPlaceInstance(PlaceId, JobId, LocalPlayer)` giúp người dùng dễ dàng copy vào điện thoại hoặc máy tính phụ để bay thẳng vào server!
+3. **Cảnh Báo Đạo Sĩ & Secret Boss Về Điện Thoại**:
+   - Khi phát hiện NPC Đạo Sĩ (Taoist) hoặc Mao Sơn (Maoshan) trên map, bot đẩy thông báo kèm tọa độ và JobId server để vào mua đồ/trả quest.
+   - Khi cần câu kéo trúng Secret Boss / Cá Thần Thoại, bot gửi tin nhắn cảnh báo ưu tiên cao.
+4. **Giao Diện Điều Khiển ntfy Trong Tab Profiles / Webhook**:
+   - Thêm cụm card **"🔔 ntfy Push (Thông Báo Thời Tiết & Server Về Điện Thoại)"**:
+     - Ô nhập **ntfy Topic** (tên kênh đã đăng ký trên app ntfy, hỗ trợ cả tên kênh hoặc URL đầy đủ).
+     - Công tắc Bật/Tắt ntfy Push tổng.
+     - Công tắc Bật/Tắt thông báo đổi thời tiết.
+     - Công tắc Bật/Tắt thông báo tìm server thời tiết.
+     - Công tắc Bật/Tắt thông báo Boss & NPC.
+     - Nút **"Kiểm Tra ntfy (Gửi Test)"**: Gửi tin nhắn mẫu kiểm tra kết nối ngay lập tức đến điện thoại.
+5. **Lưu Cấu Hình Tài Khoản Tự Động**:
+   - Tự động ghi nhớ `NtfyTopic`, `NtfyEnabled`, `NtfyAlertWeatherChange`, `NtfyAlertWeatherHop`, `NtfyNotifyBoss` vào file `essential_config.json` theo từng tài khoản, không bị mất khi thoát game hay nhảy server.
+6. **Đồng Bộ Phiên Bản v2.5.9 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.5.9` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.8] - 2026-09-16
 ### 🎯 Phân Rõ Cá Secret & Cá Thường Có Ích Kèm Caption Trạng Thái Sở Hữu (Skill, Thuyền, Orb, Chế Cần/Mồi):
 1. **Phân Tách Rõ Ràng 2 Nhóm Cá Cho Từng Đảo Trong Tab Săn Boss (Boss Hunter)**:

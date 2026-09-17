@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.5.8"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.5.9"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -645,6 +645,13 @@ ConfigModule.Config = {
     TelegramNotifyBoss = true,
     TelegramNotifyNPC = true,
 
+    -- ntfy Push (Thông Báo Thời Tiết & Server Về Điện Thoại)
+    NtfyEnabled = false,
+    NtfyTopic = "",
+    NtfyAlertWeatherChange = true,
+    NtfyAlertWeatherHop = true,
+    NtfyNotifyBoss = true,
+
     -- Keybinds
     UIKeybind = Enum.KeyCode.RightControl,
     StopKeybind = Enum.KeyCode.End
@@ -784,6 +791,12 @@ ConfigModule.ConfigLabelMap = {
     ["Telegram Chat ID"] = "TelegramChatId",
     ["Báo Boss Về Telegram"] = "TelegramNotifyBoss",
     ["Báo NPC Về Telegram"] = "TelegramNotifyNPC",
+
+    ["Bật ntfy Push"] = "NtfyEnabled",
+    ["ntfy Topic"] = "NtfyTopic",
+    ["Thông Báo Đổi Thời Tiết (ntfy)"] = "NtfyAlertWeatherChange",
+    ["Thông Báo Tìm Server Thời Tiết (ntfy)"] = "NtfyAlertWeatherHop",
+    ["Thông Báo Boss & NPC (ntfy)"] = "NtfyNotifyBoss",
 
     ["Giữ Cá Đột Biến"] = "KeepMutations",
     ["Giữ Cá Nặng Kg"] = "KeepHeavyFish",
