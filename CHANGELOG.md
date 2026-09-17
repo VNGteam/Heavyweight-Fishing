@@ -2,6 +2,23 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.8.5] - 2026-09-18
+### 🎯 Tối Giản Tab Thử Nghiệm - Chỉ Giữ Lại Tự Động Tẩy Luyện Trait:
+1. **Dọn Dẹp Toàn Bộ Tab Thử Nghiệm (Experimental Tab)**:
+   - Loại bỏ các tính năng không cần thiết:
+     - 👻 Chế độ tàng hình (Ghost / Invisibility Mode).
+     - 🚤 Triệu hồi thuyền & Mua thuyền từ xa (Instant Boat Spawner).
+     - 🔄 Cửa hàng trao đổi từ xa (Remote Exchange Shop).
+     - 🎨 Đổi màu sắc cần câu & Hiệu ứng RGB cầu vồng (Rod Color & Rainbow).
+     - 🏰 Bể nuôi cá & Nâng cấp gia viên (Fish Tank & Plot).
+2. **Giữ Lại Duy Nhất Tính Năng Tẩy Luyện Trait**:
+   - 🎯 **TỰ ĐỘNG TẨY LUYỆN TRAIT (AUTO REROLL & LOCK TRAIT)**:
+     - Chọn Trait mục tiêu muốn tẩy luyện.
+     - Hiển thị số lượng Vé Tẩy Luyện (Trait Reroll Ticket) trong kho đồ.
+     - Tự động quay/tẩy liên tục cho tới khi đạt đúng Trait mong muốn và tự động khóa bảo vệ.
+     - Nút Tẩy Luyện 1 Lần & Nút Khóa / Mở Khóa Trait cần câu.
+3. **Mã Phiên Bản**: Đặt `SCRIPT_BUILD_COMMIT = "v2.8.5"` trên `local.lua`, `v2/core/config.lua`, `loader.lua`, và `v2_bundle.lua`.
+
 ## [v2.8.4] - 2026-09-18
 ### ⏪ Hoàn Nguyên Về Bản Ổn Định v2.8.4 (Full 100% Tính Năng):
 1. **Phục Hồi Bản Gốc Cố Định Cực Kỳ Ổn Định**:
