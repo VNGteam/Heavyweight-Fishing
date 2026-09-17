@@ -94,29 +94,25 @@ if rhythmGui and rhythmGui.Visible then
             { name = "ProgressionD", key = "D" }
         }
 
-        for round = 1, 2 do
+        for round = 1, 4 do
             for _, laneData in ipairs(lanes) do
                 local prog = rhythmGui:FindFirstChild(laneData.name)
                 if prog and prog.Visible then
                     local bFrame = prog:FindFirstChild("BarFrame")
-                    local btn = prog:FindFirstChild("Button")
                     local nFrame = prog:FindFirstChild("NoteFrame")
 
-                    local testNote = Instance.new("Frame")
-                    testNote.Name = "TestNote_" .. laneData.key
-                    testNote.Size = (nFrame and nFrame.Size) or UDim2.new(0.8, 0, 0, 24)
-                    testNote.Position = UDim2.new(0.1, 0, 0, 0)
-                    testNote.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-                    testNote.BorderSizePixel = 0
-                    testNote.ZIndex = 200
+                    local testNote = (nFrame and nFrame:Clone()) or Instance.new("Frame")
+                    testNote.Name = "Note_FX"
+                    testNote.Visible = true
+                    testNote.Position = UDim2.new((nFrame and nFrame.Position.X.Scale) or 0.1, 0, -0.05, 0)
                     testNote.Parent = prog
-                    Instance.new("UICorner", testNote).CornerRadius = UDim.new(0, 4)
 
-                    local targetPos = (bFrame and bFrame.Position) or UDim2.new(0.1, 0, 0.8, 0)
-                    local tween = TweenService:Create(testNote, TweenInfo.new(1.3, Enum.EasingStyle.Linear), { Position = targetPos })
+                    local targetYScale = (bFrame and bFrame.Position.Y.Scale) or 0.85
+                    local tween = TweenService:Create(testNote, TweenInfo.new(1.3, Enum.EasingStyle.Linear), {
+                        Position = UDim2.new(testNote.Position.X.Scale, 0, targetYScale + 0.1, 0)
+                    })
                     tween:Play()
 
-                    -- Tự dọn sau khi rơi xong
                     task.delay(1.5, function()
                         if testNote and testNote.Parent then
                             testNote:Destroy()
@@ -125,7 +121,7 @@ if rhythmGui and rhythmGui.Visible then
                 end
                 task.wait(0.4)
             end
-            task.wait(0.8)
+            task.wait(0.6)
         end
     end)
 end

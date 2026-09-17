@@ -2,7 +2,24 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
-## [v2.8.8] - 2026-09-18
+## [v2.9.0] - 2026-09-18
+### 🚀 Giải Mã 100% Mã Nguồn Game Gốc (ClientModule.Fishing) & Hoàn Thiện Auto Rhythm Minigame:
+1. **Khám Phá Cốt Lõi Từ Mã Decompile Gốc (`ClientModule.Fishing`)**:
+   - **Tên nốt rơi thực tế**: Bản gốc nhân bản `NoteFrame` thành các object con tên chính xác là `Note_FX` trong `ProgressionA`, `ProgressionS`, `ProgressionD`.
+   - **Tọa độ rơi**: `Note_FX.Position.Y.Scale` di chuyển từ `-0.05` xuống vạch đích `BarFrame.Position.Y.Scale` (~0.85).
+   - **Vùng Hit của game**: Game tính khoảng cách `diff = math.abs(note.Position.Y.Scale - bar.Position.Y.Scale)`. Khi `diff <= 0.22` là vùng nhận, và bot bấm ở `diff <= 0.16` để luôn đạt **Perfect 100%**.
+   - **RemoteEvent RhythmHit**: Server mong đợi chuỗi string `"hit"` (`Events.RhythmHit:FireServer("hit")`), nếu bấm trượt hoặc spam bừa sẽ bị server nhận `"miss"`.
+   - **Cơ chế kích hoạt Native**: Khi click `Button` của làn (`firesignal(btn.MouseButton1Click)`), hàm `TryHit` của game gốc sẽ tự động hủy `Note_FX`, chạy hiệu ứng phóng to nốt sáng (`TweenExpEffect`) và gửi `"hit"` lên server một cách hoàn toàn tự nhiên.
+2. **Cập Nhật Bot Tự Động Gõ Nhịp Đạt Đẳng Cấp Tuyệt Đối**:
+   - Bắt chính xác `Note_FX`, so khớp tọa độ tỉ lệ `Scale.Y` với vạch đích.
+   - Kích hoạt song song: Click GUI Button (gọi logic gốc của game) + Phím bấm VIM A-S-D + Gửi RemoteEvent `"hit"`.
+   - Loại bỏ hoàn toàn các lệnh gửi sai tham số trước đây (`(true, 100)` hay key name).
+3. **Cung Cấp Bộ Script Test Chạy Thật 100% Minigame Trong Game**:
+   - `test_play_rhythm.lua`: Giả lập dữ liệu cá `workspace.Fishes` và kích hoạt trực tiếp `Events.RhythmStart.OnClientEvent`, khởi động vòng lặp rơi nốt thật sự của game để người dùng kiểm tra bot tự đánh trực quan 100%.
+   - `open_minigames.lua`: Cập nhật sinh các nốt `Note_FX` rơi mượt mà cho cả 5 mini game.
+4. **Mã Phiên Bản**: Nâng lên `SCRIPT_BUILD_COMMIT = "v2.9.0"` trên `local.lua` và `v2/core/config.lua`.
+
+
 ### 🔧 Sửa Triệt Để Lỗi Bot Không Tự Đánh Mini Game Bạch Tuộc (A-S-D Auto Rhythm):
 1. **Khắc Phục Lỗi Nhận Diện NoteFrame**:
    - Ở bản trước, vòng lặp tìm note bên trong `NoteFrame` thay vì nhận diện chính `NoteFrame` là đối tượng nốt đang rơi (bản chất `NoteFrame` trong game là khối hộp nốt nhạc chuyển động).

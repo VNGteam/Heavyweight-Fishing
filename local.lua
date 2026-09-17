@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.8.9"
+local SCRIPT_BUILD_COMMIT = "v2.9.0"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -15959,52 +15959,34 @@ local function CheckAndPlayRhythm(pg)
         if prog and prog.Visible then
             local bFrame = prog:FindFirstChild("BarFrame")
             local btn = prog:FindFirstChild("Button")
-            local targetY = (bFrame and bFrame.AbsolutePosition.Y) or (btn and btn.AbsolutePosition.Y) or 0
-            local targetH = (bFrame and bFrame.AbsoluteSize.Y) or 10
+            local targetScaleY = (bFrame and bFrame.Position.Y.Scale) or 0.85
 
-            -- Thu thập tất cả các đối tượng note có thể rơi (NoteFrame, các Frame clone, children...)
-            local candidateNotes = {}
-            local noteFrame = prog:FindFirstChild("NoteFrame")
-            if noteFrame and noteFrame:IsA("GuiObject") then
-                table.insert(candidateNotes, noteFrame)
-            end
-
+            -- Duyệt chính xác các nốt đang rơi Note_FX theo mã decompile của game
             for _, child in ipairs(prog:GetChildren()) do
-                if child:IsA("GuiObject") and child ~= bFrame and child ~= btn and child.Name ~= "EXP" and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" then
-                    if not table.find(candidateNotes, child) then
-                        table.insert(candidateNotes, child)
-                    end
-                end
-            end
+                if child.Name == "Note_FX" and child:IsA("GuiObject") and child.Visible then
+                    local noteScaleY = child.Position.Y.Scale
+                    local diff = math.abs(noteScaleY - targetScaleY)
 
-            if noteFrame then
-                for _, child in ipairs(noteFrame:GetChildren()) do
-                    if child:IsA("GuiObject") and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" then
-                        table.insert(candidateNotes, child)
-                    end
-                end
-            end
+                    -- Vùng hit chuẩn: game dùng <= 0.22, ta dùng 0.16 để đạt Perfect 100%
+                    if diff <= 0.16 and not rhythmState.hitNotes[child] then
+                        rhythmState.hitNotes[child] = true
 
-            for _, noteObj in ipairs(candidateNotes) do
-                if noteObj.Visible then
-                    local noteY = noteObj.AbsolutePosition.Y
-                    local noteH = noteObj.AbsoluteSize.Y
-                    local noteBottom = noteY + noteH
-                    local noteTop = noteY
+                        -- 1. Kích hoạt hàm TryHit của game qua Button click
+                        if btn and btn:IsA("GuiButton") then
+                            pcall(function()
+                                if firesignal then
+                                    if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                    if btn.Activated then firesignal(btn.Activated) end
+                                end
+                                if getconnections then
+                                    for _, c in ipairs(getconnections(btn.MouseButton1Click)) do
+                                        if c.Fire then c:Fire() elseif c.Function then c.Function() end
+                                    end
+                                end
+                            end)
+                        end
 
-                    -- Kiểm tra vùng hit: Khi note rơi chạm hoặc lướt qua vạch đích trắng
-                    local inHitZone = false
-                    if targetY == 0 then
-                        inHitZone = true
-                    else
-                        inHitZone = (noteBottom >= targetY - 25) and (noteTop <= targetY + targetH + 35)
-                    end
-
-                    local lastHit = rhythmState.lastLaneHit[laneData.key] or 0
-                    if inHitZone and (nowTick - lastHit >= 0.12) then
-                        rhythmState.lastLaneHit[laneData.key] = nowTick
-
-                        -- 1. Giả lập phím bấm bàn phím VIM (A, S, D)
+                        -- 2. Giả lập phím bấm bàn phím VIM (A, S, D)
                         if vim and laneData.keyCode then
                             pcall(function()
                                 vim:SendKeyEvent(true, laneData.keyCode, false, game)
@@ -16014,44 +15996,9 @@ local function CheckAndPlayRhythm(pg)
                             end)
                         end
 
-                        -- 2. Giả lập click chuột phần cứng vào tâm Button
-                        if vim and btn and btn:IsA("GuiButton") then
-                            pcall(function()
-                                local btnPos = btn.AbsolutePosition
-                                local btnSize = btn.AbsoluteSize
-                                local cx = btnPos.X + btnSize.X * 0.5
-                                local cy = btnPos.Y + btnSize.Y * 0.5
-                                vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-                                task.delay(0.02, function()
-                                    pcall(function() vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1) end)
-                                end)
-                            end)
-                        end
-
-                        -- 3. Giả lập click GUI (firesignal & getconnections)
-                        if btn and btn:IsA("GuiButton") then
-                            pcall(function()
-                                if firesignal then
-                                    if btn.Activated then firesignal(btn.Activated) end
-                                    if btn.MouseButton1Down then firesignal(btn.MouseButton1Down) end
-                                    if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
-                                end
-                                if getconnections then
-                                    for _, c in ipairs(getconnections(btn.Activated)) do c:Fire() end
-                                    for _, c in ipairs(getconnections(btn.MouseButton1Down)) do c:Fire() end
-                                    for _, c in ipairs(getconnections(btn.MouseButton1Click)) do c:Fire() end
-                                end
-                            end)
-                        end
-
-                        -- 4. Gửi RemoteEvent RhythmHit lên Server
+                        -- 3. Gửi RemoteEvent RhythmHit trực tiếp lên Server ("hit")
                         if Events and Events:FindFirstChild("RhythmHit") then
-                            pcall(function() Events.RhythmHit:FireServer(laneData.key) end)
-                            pcall(function() Events.RhythmHit:FireServer(laneData.key:lower()) end)
-                            if noteObj and noteObj.Name then
-                                pcall(function() Events.RhythmHit:FireServer(noteObj.Name) end)
-                            end
-                            pcall(function() Events.RhythmHit:FireServer(true, 100) end)
+                            pcall(function() Events.RhythmHit:FireServer("hit") end)
                         end
                     end
                 end
