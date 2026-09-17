@@ -84,6 +84,132 @@ function TabCaiDat.Render(parent)
         Utils.ShowNotification("Webhook", "Đã gửi tin nhắn test đến Discord!", "SUCCESS", 4)
     end)
 
+    Components.CreateButtonRow(cardWebhook, "Báo Cáo Toàn Diện Ngay", "Gửi bảng tổng kết 14 chỉ số đầy đủ về Discord ngay", "📊 Báo Cáo Ngay", function()
+        if not Config.WebhookUrl or Config.WebhookUrl == "" then
+            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
+            return
+        end
+        Utils.ShowNotification("Webhook", "Đang tổng hợp báo cáo toàn diện...", "INFO", 2)
+        local pData = game:GetService("ReplicatedStorage"):FindFirstChild("Data") and LocalPlayer and game:GetService("ReplicatedStorage").Data:FindFirstChild(LocalPlayer.UserId)
+        local fishCount = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
+        local cashVal = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
+        local ticketVal = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
+        local questDone = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
+        local essenceVal = pData and pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
+        local rerollVal = pData and pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
+        local curWeather = (State and State.CurrentWeather) or "Clear (Trời Quang)"
+        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
+        local jobId = tostring(game.JobId or "N/A")
+        local placeId = tostring(game.PlaceId or "18779600655")
+
+        Utils.SendDiscordWebhook(
+            "📊 BÁO CÁO TOÀN DIỆN (YÊU CẦU THỦ CÔNG)",
+            string.format("👤 **%s** — Server: `%s`", LocalPlayer and LocalPlayer.DisplayName or "User", jobId),
+            3447003,
+            {
+                { name = "🌦️ Thời Tiết", value = curWeather, inline = true },
+                { name = "🐟 Tổng Cá", value = tostring(fishCount) .. " con", inline = true },
+                { name = "💰 Tiền", value = "$" .. tostring(cashVal), inline = true },
+                { name = "🎫 Vé Nhiệm Vụ", value = tostring(ticketVal) .. " Vé", inline = true },
+                { name = "📜 NV Xong Hôm Nay", value = tostring(questDone) .. "/20 NV", inline = true },
+                { name = "🔮 Essence Orb", value = tostring(essenceVal) .. " Viên", inline = true },
+                { name = "🎲 Trait Reroll", value = tostring(rerollVal) .. " Vé", inline = true },
+                { name = "⚡ Code Vào Server", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
+                { name = "⏰ Cập nhật lúc", value = timeStr, inline = false }
+            },
+            Config.WebhookUrl
+        )
+        Utils.ShowNotification("Webhook", "Đã gửi báo cáo toàn diện!", "SUCCESS", 4)
+    end)
+
+    Components.CreateButtonRow(cardWebhook, "Báo Cáo Thời Tiết & Boss", "Gửi embed thời tiết và boss mục tiêu có thể ra", "🌦️ Thời Tiết", function()
+        if not Config.WebhookUrl or Config.WebhookUrl == "" then
+            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
+            return
+        end
+        local curWeather = (State and State.CurrentWeather) or "Clear (Trời Quang)"
+        local jobId = tostring(game.JobId or "N/A")
+        local placeId = tostring(game.PlaceId or "18779600655")
+        Utils.SendDiscordWebhook(
+            "🌦️ BÁO CÁO THỜI TIẾT & BOSS",
+            string.format("👤 **%s** — Server: `%s`", LocalPlayer and LocalPlayer.DisplayName or "User", jobId),
+            3447003,
+            {
+                { name = "🌦️ Thời Tiết", value = curWeather, inline = true },
+                { name = "⚡ Code Vào Server", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
+                { name = "⏰ Cập nhật lúc", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = false }
+            },
+            Config.WebhookUrl
+        )
+        Utils.ShowNotification("Webhook", "Đã gửi báo cáo Thời Tiết!", "SUCCESS", 4)
+    end)
+
+    Components.CreateButtonRow(cardWebhook, "Báo Cáo Tài Sản & Ba Lô", "Gửi embed tiền, gems, vé, essence, trait", "💰 Tài Sản", function()
+        if not Config.WebhookUrl or Config.WebhookUrl == "" then
+            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
+            return
+        end
+        local pData = game:GetService("ReplicatedStorage"):FindFirstChild("Data") and LocalPlayer and game:GetService("ReplicatedStorage").Data:FindFirstChild(LocalPlayer.UserId)
+        local fishCount = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
+        local cashVal = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
+        local ticketVal = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
+        local essenceVal = pData and pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
+        local rerollVal = pData and pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
+        Utils.SendDiscordWebhook(
+            "💰 BÁO CÁO TÀI SẢN & KHO ĐỒ",
+            string.format("👤 **%s** — Server: `%s`", LocalPlayer and LocalPlayer.DisplayName or "User", tostring(game.JobId or "N/A")),
+            16766720,
+            {
+                { name = "💰 Tiền", value = "$" .. tostring(cashVal), inline = true },
+                { name = "🐟 Tổng Cá", value = tostring(fishCount) .. " con", inline = true },
+                { name = "🎫 Vé", value = tostring(ticketVal) .. " Vé", inline = true },
+                { name = "🔮 Essence", value = tostring(essenceVal) .. " Viên", inline = true },
+                { name = "🎲 Trait", value = tostring(rerollVal) .. " Vé", inline = true },
+                { name = "⏰ Cập nhật lúc", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = false }
+            },
+            Config.WebhookUrl
+        )
+        Utils.ShowNotification("Webhook", "Đã gửi thông tin Tài Sản!", "SUCCESS", 4)
+    end)
+
+    Components.CreateButtonRow(cardWebhook, "Lấy Code Teleport Server", "Gửi embed chứa Server Job ID và script teleport", "⚡ Teleport", function()
+        if not Config.WebhookUrl or Config.WebhookUrl == "" then
+            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
+            return
+        end
+        local jobId = tostring(game.JobId or "N/A")
+        local placeId = tostring(game.PlaceId or "18779600655")
+        Utils.SendDiscordWebhook(
+            "⚡ THÔNG TIN SERVER & CODE TELEPORT",
+            string.format("👤 **%s** — Dùng code dưới đây để vào server:", LocalPlayer and LocalPlayer.DisplayName or "User"),
+            3447003,
+            {
+                { name = "🔑 Job ID", value = string.format("`%s`", jobId), inline = true },
+                { name = "⚡ Code Teleport", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
+                { name = "⏰ Cập nhật lúc", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = false }
+            },
+            Config.WebhookUrl
+        )
+        Utils.ShowNotification("Webhook", "Đã gửi mã Teleport!", "SUCCESS", 4)
+    end)
+
+    Components.CreateToggleRow(cardWebhook, "Bật Phím Tắt Báo Cáo (F4, F6, F7, F8)", "F4: Thời Tiết | F6: Tài Sản | F7: Nhiệm Vụ | F8: Teleport", Config.ReportKeybindsEnabled, function(v)
+        Config.ReportKeybindsEnabled = v
+    end)
+
+    -- Discord Remote Controls
+    Components.CreateCategoryHeader(parent, "🤖 Nhận Lệnh Điều Khiển Từ Xa (Discord Remote Commands)")
+    local cardRemote = Components.CreateCardGroup(parent)
+    Components.CreateToggleRow(cardRemote, "Bật Lắng Nghe Lệnh Discord", "Tự động nhận lệnh chat (!thoitiet, !kho, !ve, !tele, !baocao, !help)", Config.DiscordRemoteEnabled, function(v)
+        Config.DiscordRemoteEnabled = v
+    end)
+    Components.CreateInputRow(cardRemote, "Discord Bot Token", "Token Bot từ Discord Developer Portal", Config.DiscordBotToken or "", function(v)
+        Config.DiscordBotToken = v
+    end, nil, "MTIzNDU2Nzg5...")
+    Components.CreateInputRow(cardRemote, "Channel ID", "ID kênh Discord (tự phát hiện từ webhook nếu trống)", Config.DiscordChannelId or "", function(v)
+        Config.DiscordChannelId = v
+    end, nil, "1396490335269421238")
+
     -- Telegram Bot
     Components.CreateCategoryHeader(parent, "✈️ Thông Báo Telegram Bot")
     local cardTele = Components.CreateCardGroup(parent)

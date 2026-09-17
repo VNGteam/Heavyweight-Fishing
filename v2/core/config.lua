@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.7"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.8"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -176,6 +176,11 @@ ConfigModule.Config = {
     TicketAutoCastAtHome = true,
     TicketRemoteClaim = true,
     AutoBuyTickets = false,
+
+    -- Nhiệm Vụ Kỹ Năng Zeng Tianguo & Chế Độ Song Song (Parallel Quest Mode)
+    AutoZengTianguoQuest = false,
+    ParallelQuestMode = true,
+    ZengTianguoAutoClaim = true,
 
     -- Lọc Bán Cá & Kho Báu
     KeepMutations = true,
@@ -351,6 +356,10 @@ ConfigModule.ConfigLabelMap = {
     ["Đổi Server Tìm Taoist"] = "AutoServerHopTaoist",
 
     ["Tự Động Nộp Vé Nhiệm Vụ (Tickets)"] = "AutoTicketQuest",
+    ["Tự Động Làm Vé Nhiệm Vụ"] = "AutoTicketQuest",
+    ["Tự Động Nhiệm Vụ Zeng Tianguo"] = "AutoZengTianguoQuest",
+    ["Ưu Tiên Ghép Bãi Song Song"] = "ParallelQuestMode",
+    ["Tự Động Trả Quest Zeng Tianguo"] = "ZengTianguoAutoClaim",
     ["Chọn Độ Khó Vé Nhiệm Vụ"] = "TicketDifficulty",
     ["Chế Độ Nhiệm Vụ"] = "TicketQuestMode",
     ["Loại Mồi Làm Nhiệm Vụ 100 Mồi"] = "TicketBaitChoice",

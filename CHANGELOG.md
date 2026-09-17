@@ -2,6 +2,28 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.8.8] - 2026-09-18
+### 🎯 Sửa Lỗi Tọa Độ Tele Nhiệm Vụ & Bổ Sung 100% Tính Năng Thiếu Cho Bản V2 (Xeno Lite Bundle):
+1. **Sửa Lỗi Tọa Độ Teleport Nhiệm Vụ Vé (Ticket Quest Giver)**:
+   - **Nguyên nhân lỗi cũ**: `Quest.FindTicketNPC` trong `v2/features/quest.lua` chỉ tìm các Model nằm trực tiếp ở Workspace hoặc tìm folder cấp 1 không đệ quy. Trong game, NPC Ticket nằm trong `Workspace.NPC.Function["Ticket Quest Giver"]`. Do không tìm thấy Model thật, script rơi vào fallback teleport đến tọa độ cũ `(-200.7, 11.1, 35.9)` — nơi không có NPC.
+   - **Khắc phục**: 
+     - Quét chính xác cấu trúc game: `Workspace.NPC.Function["Ticket Quest Giver"]`.
+     - Tìm kiếm đệ quy toàn bộ thư mục con trong `Workspace.NPC` và Workspace.
+     - Lấy CFrame chuẩn xác từ `HumanoidRootPart` / `Torso` / `PrimaryPart` và đứng đối diện NPC 2.8 studs.
+2. **Tích Hợp Hệ Thống Nhiệm Vụ Kỹ Năng Zeng Tianguo (Skill Upgrade) & Chế Độ Song Song**:
+   - Thêm đầy đủ `Quest.zengState`, `DetectActiveZengQuest`, `TeleportToZengNPC`, `InteractZengNPC`, `GetTargetZengSpot`.
+   - Hỗ trợ chế độ chạy Solo Zeng Tianguo hoặc chạy Song Song cùng Vé Nhiệm Vụ (`ParallelQuestMode`).
+   - Khi hết vé hôm nay hoặc đang chờ hồi chiêu 20p, bot tự động đi cày tiếp nhiệm vụ Zeng Tianguo thay vì đứng im.
+3. **Phục Hồi Đầy Đủ Chi Tiết Tab Nhiệm Vụ (TabNhiemVu)**:
+   - Thêm đầy đủ 6 danh mục từ `local.lua`: Trạng thái vé, Nhiệm vụ Zeng Tianguo, Cài đặt vị trí 5 điểm câu (100 Cá, 100 Mồi, 100 Skill, 1.5M, NPC), Tùy chỉnh chiêu/mồi, Thao tác nhanh bằng tay (Nhận/Nộp Hard, Quét lại, Đặt lại hết vé), Điểm danh 7 ngày & Nhận thưởng nhiệm vụ ngày.
+4. **Bổ Sung Tab "Quản Lý Cá" (TabQuanLyCa) Hoàn Toàn Mới Vào V2**:
+   - Thêm tab `Quản Lý Cá` (vị trí thứ 3, ngay sau Săn Boss):
+     - Quản lý túi cá & dọn rác an toàn: Khóa toàn bộ cá quý, Mở khóa cá rác, Bán sạch cá rác an toàn.
+     - Bộ theo dõi tiến độ nguyên liệu chế Cần Câu (Sanguine, Dragon).
+     - Bộ theo dõi nguyên liệu chế Mồi Thần Thoại (Verdant Gar, Grouper, Eel...).
+5. **Smart Dual-Source Loader Hoàn Chỉnh**:
+   - Tự động nạp `local.lua` (Full). Nếu executor (như Xeno) bị giới hạn dung lượng tải file lớn thì tự động fallback mượt mà sang `v2_bundle.lua` (Lite Version - 396KB) với đầy đủ 100% tính năng và UI hoàn chỉnh.
+
 ## [v2.8.5] - 2026-09-17
 ### 🧠 Rhythm Hit Giống Người Thật (Human Emulation cho Octo Minigame):
 **Vấn đề cũ:**

@@ -73,7 +73,7 @@ local function TryCompile(code)
 end
 
 -- === MAIN ===
-Notify("Cau Ca Pro", "Dang tai script (v2.8.7)...", 3)
+Notify("Cau Ca Pro", "Dang tai script (v2.8.8)...", 3)
 
 -- Buoc 1: Thu local.lua (100% tinh nang)
 local full = Fetch(SOURCES_FULL, 50000)

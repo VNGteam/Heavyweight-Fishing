@@ -171,14 +171,53 @@ function Quest.FindTicketNPC()
         return Quest.state.cachedNPCModel, Quest.state.cachedNPCPos, Quest.state.cachedNPCPrompt, Quest.state.cachedNPCCFrame
     end
 
-    local function extractModelData(inst)
-        if not inst then return nil end
-        local cf = inst:IsA("Model") and inst:GetPivot() or (inst:IsA("BasePart") and inst.CFrame)
-        local prompt = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
-        return cf, prompt
+    local function extractModelData(model)
+        if not model then return nil, nil, nil end
+        local p = model:FindFirstChildWhichIsA("ProximityPrompt", true)
+        local hrp = (p and p.Parent:IsA("BasePart") and p.Parent)
+            or model:FindFirstChild("HumanoidRootPart")
+            or model:FindFirstChild("Torso")
+            or model:FindFirstChild("UpperTorso")
+            or model.PrimaryPart
+            or model:FindFirstChildWhichIsA("BasePart")
+        local cf = (hrp and hrp.CFrame) or (model:IsA("Model") and model:GetPivot()) or model.CFrame
+        return cf, p, hrp
     end
 
-    local directModel = Workspace:FindFirstChild("Ticket Quest") or Workspace:FindFirstChild("TicketNPC")
+    -- 1. Ưu tiên tìm đúng cấu trúc: Workspace.NPC.Function["Ticket Quest Giver"]
+    local directModel = nil
+    local npcFolder = Workspace:FindFirstChild("NPC")
+    if npcFolder then
+        local funcFolder = npcFolder:FindFirstChild("Function")
+        if funcFolder then
+            directModel = funcFolder:FindFirstChild("Ticket Quest Giver")
+        end
+        if not directModel then
+            for _, ch in ipairs(npcFolder:GetChildren()) do
+                local n = ch.Name:lower()
+                if ch:IsA("Model") and (n:find("ticket") or n:find("giver")) then
+                    directModel = ch
+                    break
+                elseif ch:IsA("Folder") then
+                    for _, sub in ipairs(ch:GetChildren()) do
+                        local sn = sub.Name:lower()
+                        if sub:IsA("Model") and (sn:find("ticket") or sn:find("giver")) then
+                            directModel = sub
+                            break
+                        end
+                    end
+                end
+                if directModel then break end
+            end
+        end
+    end
+
+    if not directModel then
+        directModel = Workspace:FindFirstChild("Ticket Quest Giver", true)
+            or Workspace:FindFirstChild("Ticket Quest", true)
+            or Workspace:FindFirstChild("TicketNPC", true)
+    end
+
     if directModel then
         local cf, p = extractModelData(directModel)
         if cf then
@@ -194,35 +233,20 @@ function Quest.FindTicketNPC()
     for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns"}) do
         local folder = Workspace:FindFirstChild(fName)
         if folder then
-            for _, inst in ipairs(folder:GetChildren()) do
-                local n = inst.Name:lower()
-                if n:find("ticket") or n:find("giver") then
-                    local cf, p = extractModelData(inst)
-                    if cf then
-                        Quest.state.cachedNPCModel = inst
-                        Quest.state.cachedNPCPos = cf.Position
-                        Quest.state.cachedNPCCFrame = cf
-                        Quest.state.cachedNPCPrompt = p
-                        Quest.state.spotNPC = cf.Position
-                        return inst, cf.Position, p, cf
+            for _, inst in ipairs(folder:GetDescendants()) do
+                if inst:IsA("Model") then
+                    local n = inst.Name:lower()
+                    if n:find("ticket") or n:find("giver") then
+                        local cf, p = extractModelData(inst)
+                        if cf then
+                            Quest.state.cachedNPCModel = inst
+                            Quest.state.cachedNPCPos = cf.Position
+                            Quest.state.cachedNPCCFrame = cf
+                            Quest.state.cachedNPCPrompt = p
+                            Quest.state.spotNPC = cf.Position
+                            return inst, cf.Position, p, cf
+                        end
                     end
-                end
-            end
-        end
-    end
-
-    for _, inst in ipairs(Workspace:GetChildren()) do
-        if inst:IsA("Model") then
-            local n = inst.Name:lower()
-            if n:find("ticket") and (n:find("quest") or n:find("giver") or n:find("npc")) then
-                local cf, p = extractModelData(inst)
-                if cf then
-                    Quest.state.cachedNPCModel = inst
-                    Quest.state.cachedNPCPos = cf.Position
-                    Quest.state.cachedNPCCFrame = cf
-                    Quest.state.cachedNPCPrompt = p
-                    Quest.state.spotNPC = cf.Position
-                    return inst, cf.Position, p, cf
                 end
             end
         end
@@ -438,6 +462,26 @@ function Quest.CloseDialogue()
         if dlg then dlg.Visible = false end
     end)
     Quest.ClearUINavigation()
+end
+
+function Quest.ClickQuestButton()
+    local buttons = Quest.GetDialogueButtons()
+    for _, b in ipairs(buttons) do
+        if b.clean == "quest" or (b.clean:find("quest") and not b.clean:find("accept") and not b.clean:find("nevermind")) then
+            return Quest.ClickButtonEntry(b, "Quest")
+        end
+    end
+    return false
+end
+
+function Quest.ClickLeaveOrClose()
+    local buttons = Quest.GetDialogueButtons()
+    for _, b in ipairs(buttons) do
+        if b.clean:find("leave") or b.clean:find("close") or b.clean:find("xong") then
+            return Quest.ClickButtonEntry(b, "Close")
+        end
+    end
+    return false
 end
 
 function Quest.CheckAllQuestsDoneToday()
@@ -733,6 +777,246 @@ function Quest.DetectActiveQuest()
     return nil, nil, 0, 0, false, nil
 end
 
+--// HỆ THỐNG NHIỆM VỤ ZENG TIANGUO (SKILL UPGRADE) & SONG SONG //--
+Quest.zengState = {
+    active = false,
+    currentQuestTitle = "Chưa nhận nhiệm vụ",
+    currentProgress = 0,
+    targetProgress = 0,
+    isCompleted = false,
+    objectiveCode = "none",
+    zoneTarget = "",
+    statusText = "Đang quét nhiệm vụ Zeng Tianguo...",
+    lastSyncTime = 0,
+    lastNpcInteract = 0,
+    lastClaimAttempt = 0,
+
+    spotBamboo = Vector3.new(-1223.0, 9.0, -24.1),
+    spotFrost = Vector3.new(-1366.0, 14.0, -1495.4),
+    spotSovereign = Vector3.new(-1276.4, 12.0, 1239.7),
+    spotFallout = Vector3.new(65.5, 12.0, 1181.3),
+    spotNPC = Vector3.new(65.5, 12.0, 1181.3),
+
+    uiStatus = nil,
+    uiProgress = nil,
+    uiParallelBadge = nil,
+}
+
+function Quest.DetectActiveZengQuest()
+    local pData = Quest.GetPlayerDataFolder()
+    if not pData then return nil, "Chưa nhận nhiệm vụ", 0, 0, false, nil end
+    local questFolder = pData:FindFirstChild("Quest")
+    if not questFolder then return nil, "Chưa nhận nhiệm vụ", 0, 0, false, nil end
+
+    local zq = questFolder:FindFirstChild("Zeng Tianguo Quest", true)
+        or questFolder:FindFirstChild("Tang Thien Quoc Quest", true)
+        or questFolder:FindFirstChild("Tang Thien Quoc", true)
+        or questFolder:FindFirstChild("Zeng Tianguo", true)
+
+    if not zq then
+        for _, ch in ipairs(questFolder:GetDescendants()) do
+            if ch:IsA("Folder") or ch:IsA("Configuration") then
+                local cn = ch.Name:lower()
+                if (cn:find("zeng") and cn:find("tianguo")) or (cn:find("tang") and cn:find("thien")) then
+                    zq = ch
+                    break
+                end
+            end
+        end
+    end
+
+    if not zq then
+        Quest.zengState.active = false
+        Quest.zengState.currentQuestTitle = "Chưa nhận nhiệm vụ"
+        Quest.zengState.currentProgress = 0
+        Quest.zengState.targetProgress = 0
+        Quest.zengState.isCompleted = false
+        Quest.zengState.objectiveCode = "none"
+        Quest.zengState.zoneTarget = ""
+        Quest.zengState.statusText = "Chưa nhận nhiệm vụ từ Zeng Tianguo"
+        return nil, "Chưa nhận nhiệm vụ", 0, 0, false, nil
+    end
+
+    local cur = 0
+    local curVal = zq:FindFirstChild("1")
+    if curVal and tonumber(curVal.Value) ~= nil then
+        cur = tonumber(curVal.Value)
+    end
+
+    local objFolder = zq:FindFirstChild("Objective")
+    local objVal = objFolder and objFolder:FindFirstChild("1")
+    local objStr = objVal and tostring(objVal.Value or "") or ""
+
+    local rawTitle, rawMax, rawCode, rawExtra = objStr:match("^([^,]+),([^,]+),([^,]+),?(.*)$")
+    if not rawTitle then
+        rawTitle, rawMax = objStr:match("^([^,]+),([^,]+)")
+    end
+
+    local max = tonumber(rawMax) or 100
+    local title = (rawTitle and #rawTitle > 0) and rawTitle or zq.Name
+    local code = rawCode or "none"
+    local extra = rawExtra or ""
+
+    local isDone = (max > 0 and cur >= max)
+
+    Quest.zengState.active = true
+    Quest.zengState.currentQuestTitle = title
+    Quest.zengState.currentProgress = cur
+    Quest.zengState.targetProgress = max
+    Quest.zengState.isCompleted = isDone
+    Quest.zengState.objectiveCode = code
+    Quest.zengState.zoneTarget = extra
+
+    if isDone then
+        Quest.zengState.statusText = string.format("Đã xong: %s (%d/%d) - Sẵn sàng nộp quest!", title, cur, max)
+    else
+        Quest.zengState.statusText = string.format("Đang làm: %s (%d/%d)", title, cur, max)
+    end
+
+    return code, title, cur, max, isDone, extra
+end
+
+function Quest.GetTargetZengSpot()
+    local zone = (Quest.zengState.zoneTarget or ""):lower()
+    local title = (Quest.zengState.currentQuestTitle or ""):lower()
+    if zone:find("bamboo") or zone:find("tre") or title:find("bamboo") then
+        return Quest.zengState.spotBamboo
+    elseif zone:find("frost") or zone:find("băng") or title:find("frost") then
+        return Quest.zengState.spotFrost
+    elseif zone:find("sovereign") or title:find("sovereign") then
+        return Quest.zengState.spotSovereign
+    elseif zone:find("fallout") or title:find("fallout") then
+        return Quest.zengState.spotFallout
+    end
+    if Quest.zengState.objectiveCode == "UseSkillForTimes" or title:find("skill") or title:find("chiêu") then
+        return nil
+    end
+    return Quest.zengState.spotBamboo
+end
+
+function Quest.FindZengNPCModel()
+    local npcFolder = Workspace:FindFirstChild("NPC")
+    if npcFolder then
+        local funcFolder = npcFolder:FindFirstChild("Function")
+        if funcFolder then
+            local found = funcFolder:FindFirstChild("Zeng Tianguo") or funcFolder:FindFirstChild("Tang Thien Quoc")
+            if found and (found:FindFirstChild("HumanoidRootPart") or found:FindFirstChildWhichIsA("BasePart")) then
+                return found
+            end
+        end
+        for _, sub in ipairs(npcFolder:GetChildren()) do
+            local found = sub:FindFirstChild("Zeng Tianguo") or sub:FindFirstChild("Tang Thien Quoc")
+            if found and (found:FindFirstChild("HumanoidRootPart") or found:FindFirstChildWhichIsA("BasePart")) then
+                return found
+            end
+        end
+    end
+    local direct = Workspace:FindFirstChild("Zeng Tianguo", true) or Workspace:FindFirstChild("Tang Thien Quoc", true)
+    if direct then return direct end
+
+    if npcFolder then
+        for _, ch in ipairs(npcFolder:GetDescendants()) do
+            if ch:IsA("Model") then
+                local n = ch.Name:lower()
+                if (n:find("zeng") and n:find("tianguo")) or (n:find("tang") and n:find("thien")) then
+                    return ch
+                end
+            end
+        end
+    end
+    return nil
+end
+
+function Quest.TeleportToZengNPC()
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    if not root then return false end
+
+    local model = Quest.FindZengNPCModel()
+    if model then
+        local npcRoot = model:FindFirstChild("HumanoidRootPart")
+            or model:FindFirstChildWhichIsA("BasePart")
+        if npcRoot then
+            local targetPos = npcRoot.Position + Vector3.new(0, 3, 3)
+            root.CFrame = CFrame.new(targetPos)
+            Quest.zengState.spotNPC = targetPos
+            return true, model, npcRoot
+        end
+    end
+
+    if Quest.zengState.spotNPC then
+        root.CFrame = CFrame.new(Quest.zengState.spotNPC)
+        return true
+    end
+    return false
+end
+
+function Quest.InteractZengNPC(isClaim)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        pcall(function()
+            hum.Sit = false
+            hum:UnequipTools()
+        end)
+    end
+    if Events and Events:FindFirstChild("CancelCast") then
+        pcall(function() Events.CancelCast:FireServer() end)
+    end
+
+    Quest.TeleportToZengNPC()
+    task.wait(0.6)
+
+    local npc = Quest.FindZengNPCModel()
+    if npc then
+        local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
+        if prompt then
+            pcall(function()
+                fireproximityprompt(prompt)
+            end)
+            task.wait(0.6)
+        end
+    end
+
+    local dlg = Quest.GetDialogueGui()
+    if dlg and dlg.Visible then
+        task.wait(0.3)
+        local clicked = false
+        if isClaim then
+            clicked = Quest.ClickLeaveOrClose()
+        else
+            clicked = Quest.ClickQuestButton() or Quest.ClickLeaveOrClose()
+        end
+        task.wait(0.5)
+        Quest.CloseDialogue()
+        return clicked
+    end
+    return false
+end
+
+function Quest.UpdateZengUI(config)
+    if Quest.zengState.uiStatus and Quest.zengState.uiStatus.Set then
+        Quest.zengState.uiStatus.Set(Quest.zengState.statusText)
+    end
+    if Quest.zengState.uiProgress and Quest.zengState.uiProgress.Set then
+        local max = Quest.zengState.targetProgress
+        local cur = Quest.zengState.currentProgress
+        local pct = max > 0 and math.floor((cur / max) * 100) or 0
+        Quest.zengState.uiProgress.Set(string.format("%d / %d (%d%%)", cur, max, pct))
+    end
+    if Quest.zengState.uiParallelBadge and Quest.zengState.uiParallelBadge.Set and config then
+        if config.AutoTicketQuest and config.AutoZengTianguoQuest then
+            Quest.zengState.uiParallelBadge.Set("⚡ SONG SONG (Ưu Tiên Vé)")
+        elseif config.AutoTicketQuest then
+            Quest.zengState.uiParallelBadge.Set("🎫 Chỉ Chạy Vé NV")
+        elseif config.AutoZengTianguoQuest then
+            Quest.zengState.uiParallelBadge.Set("⚡ Chỉ Chạy Zeng Tianguo")
+        else
+            Quest.zengState.uiParallelBadge.Set("Đang Tắt")
+        end
+    end
+end
+
 function Quest.ScanAndUpdateStatus()
     local qType, qTitle, cur, max, done, cdSec = Quest.DetectActiveQuest()
     if qType then
@@ -766,16 +1050,78 @@ function Quest.ScanAndUpdateStatus()
     return qType, qTitle, cur, max, done, cdSec
 end
 
--- 4. Vòng lặp chính Tick của Ticket Quest
+-- 4. Vòng lặp chính Tick của Ticket Quest & Zeng Tianguo
 function Quest.Tick(config)
-    if not config.AutoTicketQuest or Quest.state.isBusyRoutine or Quest.state.isInteracting then return end
+    if not config.AutoTicketQuest and not config.AutoZengTianguoQuest then return end
+    if Quest.state.isBusyRoutine or Quest.state.isInteracting then return end
 
-    if Quest.IsAllQuestsDoneToday() then
-        Quest.state.statusText = "Đã hết nhiệm vụ hôm nay! Hẹn gặp lại ngày mai."
+    local now = tick()
+
+    -- Đồng bộ tiến độ Zeng Tianguo
+    local zCode, zTitle, zCur, zMax, zDone, zZone = Quest.DetectActiveZengQuest()
+    Quest.UpdateZengUI(config)
+
+    -- NẾU CHỈ BẬT ZENG TIANGUO (KHÔNG BẬT VÉ): CHẠY CHẾ ĐỘ SOLO ZENG TIANGUO
+    if not config.AutoTicketQuest and config.AutoZengTianguoQuest then
+        if zDone then
+            if now - (Quest.zengState.lastClaimAttempt or 0) >= 10.0 then
+                Quest.zengState.lastClaimAttempt = now
+                Quest.zengState.statusText = "Đã xong! Đang nộp quest Zeng Tianguo..."
+                Quest.UpdateZengUI(config)
+                Quest.InteractZengNPC(true)
+                task.wait(1.0)
+                Quest.DetectActiveZengQuest()
+                Quest.UpdateZengUI(config)
+            end
+            return
+        end
+
+        local char = LocalPlayer.Character
+        local pg = LocalPlayer:FindFirstChild("PlayerGui")
+        local isFishing = char and char:GetAttribute("Fishing") == true
+        local isMinigame = char and (char:GetAttribute("Minigame") == true or (pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing") and pg.MainGui.Fishing.Visible))
+        if isFishing or isMinigame then return end
+
+        local targetSpot = Quest.GetTargetZengSpot() or Quest.state.spot100Fish
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
+        if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
+            Quest.TeleportTo(targetSpot)
+            Quest.CloseDialogue()
+        end
         return
     end
 
-    local now = tick()
+    -- KIỂM TRA NẾU ĐÃ HẾT VÉ NHIỆM VỤ HÔM NAY
+    if Quest.IsAllQuestsDoneToday() then
+        Quest.state.statusText = "Đã hết nhiệm vụ hôm nay! (Hẹn ngày mai quay lại)"
+        Quest.state.isCooldown = true
+        Quest.state.readyForNewQuest = false
+
+        -- NẾU BẬT ZENG TIANGUO VÀ CHƯA XONG: TẬN DỤNG CÀY NỐT ZENG TIANGUO THAY VÌ ĐỨNG IM!
+        if config.AutoZengTianguoQuest and zCode and not zDone then
+            local subSpot = Quest.GetTargetZengSpot() or Quest.state.spot100Fish
+            local char = LocalPlayer.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart")
+            local spotPos = typeof(subSpot) == "CFrame" and subSpot.Position or subSpot
+            if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
+                Quest.TeleportTo(subSpot)
+            end
+            Quest.state.statusText = string.format("Hết vé: Cày Zeng Tianguo [%s (%d/%d)]", zTitle, zCur, zMax)
+            Quest.UpdateZengUI(config)
+            return
+        end
+
+        -- Tự động đưa về Home Spot để farm câu thường nếu có cài đặt
+        if config.TicketReturnHomeWhenDone and config.HomeFarmSpot and not Quest.state.isAtHomeSpot then
+            Quest.TeleportTo(config.HomeFarmSpot)
+            Quest.state.isAtHomeSpot = true
+            Quest.state.statusText = "Hết quest hôm nay: đã về Home Spot farm!"
+            Utils.ShowNotification("Home Spot", "Đã về vị trí Home Spot farm vì đã hết vé hôm nay!", "SUCCESS", 5)
+        end
+        return
+    end
+
     local qType, qTitle, cur, max, done, detectedCd = Quest.ScanAndUpdateStatus()
     local isDoneNow = Quest.state.isCompleted or done or (Quest.state.targetProgress > 0 and Quest.state.currentProgress >= Quest.state.targetProgress)
 
@@ -792,6 +1138,20 @@ function Quest.Tick(config)
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             Quest.state.statusText = string.format("Đang chờ hồi chiêu vé (còn %02d:%02d)", mins, secs)
+
+            -- Trong thời gian hồi chiêu vé: nếu bật Zeng Tianguo thì tranh thủ làm Zeng Tianguo!
+            if config.AutoZengTianguoQuest and zCode and not zDone then
+                local subSpot = Quest.GetTargetZengSpot() or Quest.state.spot100Fish
+                local char = LocalPlayer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart")
+                local spotPos = typeof(subSpot) == "CFrame" and subSpot.Position or subSpot
+                if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
+                    Quest.TeleportTo(subSpot)
+                end
+                Quest.state.statusText = string.format("Chờ hồi vé (%02d:%02d): Cày Zeng Tianguo [%d/%d]", mins, secs, zCur, zMax)
+                Quest.UpdateZengUI(config)
+                return
+            end
 
             if config.TicketReturnHomeWhenDone and config.HomeFarmSpot and not Quest.state.isAtHomeSpot then
                 local homeTarget = config.HomeFarmSpot
