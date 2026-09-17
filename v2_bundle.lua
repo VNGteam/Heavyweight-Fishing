@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.7"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.8"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -2631,42 +2631,88 @@ function Fishing.HandleMinigame(config, fUI)
                     local bFrame = prog:FindFirstChild("BarFrame")
                     local btn = prog:FindFirstChild("Button")
                     local targetY = (bFrame and bFrame.AbsolutePosition.Y) or (btn and btn.AbsolutePosition.Y) or 0
+                    local targetH = (bFrame and bFrame.AbsoluteSize.Y) or 10
 
+                    local candidateNotes = {}
                     local noteFrame = prog:FindFirstChild("NoteFrame")
-                    local searchContainer = noteFrame or prog
+                    if noteFrame and noteFrame:IsA("GuiObject") then
+                        table.insert(candidateNotes, noteFrame)
+                    end
 
-                    for _, child in ipairs(searchContainer:GetChildren()) do
-                        if child:IsA("GuiObject") and child ~= bFrame and child ~= btn and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" and child.Name ~= "EXP" then
-                            if child.Visible and not Fishing._rhythmSeenNotes[child] then
-                                local childY = child.AbsolutePosition.Y
-                                local childH = child.AbsoluteSize.Y
-                                local dist = targetY > 0 and (childY + childH * 0.5 - targetY) or 0
+                    for _, child in ipairs(prog:GetChildren()) do
+                        if child:IsA("GuiObject") and child ~= bFrame and child ~= btn and child.Name ~= "EXP" and child.Name ~= "UIListLayout" and child.Name ~= "UIPadding" and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" then
+                            if not table.find(candidateNotes, child) then
+                                table.insert(candidateNotes, child)
+                            end
+                        end
+                    end
 
-                                if targetY == 0 or (dist >= -45 and dist <= 35) or (childY >= targetY - 45 and childY <= targetY + 35) then
-                                    Fishing._rhythmSeenNotes[child] = true
+                    if noteFrame then
+                        for _, child in ipairs(noteFrame:GetChildren()) do
+                            if child:IsA("GuiObject") and child.Name ~= "UICorner" and child.Name ~= "UIGradient" and child.Name ~= "UIStroke" then
+                                table.insert(candidateNotes, child)
+                            end
+                        end
+                    end
 
-                                    if vim and laneData.keyCode then
-                                        pcall(function()
-                                            vim:SendKeyEvent(true, laneData.keyCode, false, game)
-                                            task.delay(0.02, function()
-                                                pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
-                                            end)
+                    for _, noteObj in ipairs(candidateNotes) do
+                        if noteObj.Visible then
+                            local noteY = noteObj.AbsolutePosition.Y
+                            local noteH = noteObj.AbsoluteSize.Y
+                            local noteBottom = noteY + noteH
+                            local noteTop = noteY
+
+                            local inHitZone = false
+                            if targetY == 0 then
+                                inHitZone = true
+                            else
+                                inHitZone = (noteBottom >= targetY - 25) and (noteTop <= targetY + targetH + 35)
+                            end
+
+                            local lastHit = (Fishing._rhythmLastHit and Fishing._rhythmLastHit[laneData.key]) or 0
+                            if inHitZone and (now - lastHit >= 0.12) then
+                                if not Fishing._rhythmLastHit then Fishing._rhythmLastHit = {} end
+                                Fishing._rhythmLastHit[laneData.key] = now
+
+                                if vim and laneData.keyCode then
+                                    pcall(function()
+                                        vim:SendKeyEvent(true, laneData.keyCode, false, game)
+                                        task.delay(0.02, function()
+                                            pcall(function() vim:SendKeyEvent(false, laneData.keyCode, false, game) end)
                                         end)
-                                    end
+                                    end)
+                                end
 
-                                    if btn and btn:IsA("GuiButton") then
-                                        pcall(function()
-                                            if firesignal then
-                                                if btn.Activated then firesignal(btn.Activated) end
-                                                if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
-                                            end
+                                if vim and btn and btn:IsA("GuiButton") then
+                                    pcall(function()
+                                        local btnPos = btn.AbsolutePosition
+                                        local btnSize = btn.AbsoluteSize
+                                        local cx = btnPos.X + btnSize.X * 0.5
+                                        local cy = btnPos.Y + btnSize.Y * 0.5
+                                        vim:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+                                        task.delay(0.02, function()
+                                            pcall(function() vim:SendMouseButtonEvent(cx, cy, 0, false, game, 1) end)
                                         end)
-                                    end
+                                    end)
+                                end
 
-                                    if Events and Events:FindFirstChild("RhythmHit") then
-                                        pcall(function() Events.RhythmHit:FireServer(laneData.key) end)
-                                        pcall(function() Events.RhythmHit:FireServer(child.Name) end)
+                                if btn and btn:IsA("GuiButton") then
+                                    pcall(function()
+                                        if firesignal then
+                                            if btn.Activated then firesignal(btn.Activated) end
+                                            if btn.MouseButton1Down then firesignal(btn.MouseButton1Down) end
+                                            if btn.MouseButton1Click then firesignal(btn.MouseButton1Click) end
+                                        end
+                                    end)
+                                end
+
+                                if Events and Events:FindFirstChild("RhythmHit") then
+                                    pcall(function() Events.RhythmHit:FireServer(laneData.key) end)
+                                    pcall(function() Events.RhythmHit:FireServer(laneData.key:lower()) end)
+                                    if noteObj and noteObj.Name then
+                                        pcall(function() Events.RhythmHit:FireServer(noteObj.Name) end)
                                     end
+                                    pcall(function() Events.RhythmHit:FireServer(true, 100) end)
                                 end
                             end
                         end

@@ -2,6 +2,17 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.8.8] - 2026-09-18
+### 🔧 Sửa Triệt Để Lỗi Bot Không Tự Đánh Mini Game Bạch Tuộc (A-S-D Auto Rhythm):
+1. **Khắc Phục Lỗi Nhận Diện NoteFrame**:
+   - Ở bản trước, vòng lặp tìm note bên trong `NoteFrame` thay vì nhận diện chính `NoteFrame` là đối tượng nốt đang rơi (bản chất `NoteFrame` trong game là khối hộp nốt nhạc chuyển động).
+   - Tái thiết kế bộ gom nốt đa tầng: quét trực tiếp `NoteFrame`, các nốt clone trong `ProgressionA/S/D`, và các nốt con nếu có.
+2. **Nâng Cấp Cơ Chế Kích Hoạt Đa Lớp Chống Trượt**:
+   - Thêm bộ click chuột phần cứng `SendMouseButtonEvent` chuẩn xác vào tọa độ tâm nút `Button`.
+   - Kết hợp gõ phím `VirtualInputManager:SendKeyEvent`, kích hoạt sự kiện UI `firesignal` / `getconnections` và bắn trực tiếp RemoteEvent `RhythmHit`.
+   - Cơ chế hồi chiêu theo làn (`lastLaneHit`) ngăn chặn tình trạng bấm trễ hoặc spam đúp.
+3. **Mã Phiên Bản**: Đặt `SCRIPT_BUILD_COMMIT = "v2.8.8"` trên `local.lua`, `v2/core/config.lua`, `loader.lua`, `v2/features/fishing.lua` và `v2_bundle.lua`.
+
 ## [v2.8.7] - 2026-09-18
 ### 🐙 Nâng Cấp Chuyên Sâu Bot Tự Động Gõ Nhịp 3 Làn A - S - D Cho Boss Bạch Tuộc (Nameless Octoparasite):
 1. **Khớp Chuẩn 100% Giao Diện Rhythm Game Thực Tế Theo Ảnh Người Dùng**:
