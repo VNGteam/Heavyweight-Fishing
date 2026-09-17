@@ -2,6 +2,27 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.4] - 2026-09-17
+### 💎 Khắc Phục Triệt Để Lỗi Không Gửi Báo Cáo Ngược Về Điện Thoại Khi Nhận Lệnh:
+1. **Nguyên Nhân Kỹ Thuật (Tại Sao Nhận Được Lệnh Nhưng Không Trả Thông Báo Về Điện Thoại)**:
+   - **Thành công**: Bot đã nhận được lệnh từ nút bấm trên điện thoại 100% (nên mới hiện thông báo `ShowNotification` màu tím trong tab game).
+   - **Điểm lỗi**: Ngay sau đó, hàm tổng hợp báo cáo `SendServerStatusNtfyAlert()` đã gọi đến `GetPlayerGems()` để lấy số Gem nhân vật. Do hàm `GetPlayerGems` chưa được khởi tạo trong mã nguồn, Luau đã báo lỗi ngầm `attempt to call a nil value` bên trong `pcall`, dẫn đến việc hàm bị dừng khẩn cấp trước khi kịp gọi lệnh bắn thông báo `SendNtfyNotification` về ntfy!
+2. **Giải Pháp Đã Xử Lý Toàn Diện (Fix Gì)**:
+   - **Định nghĩa hàm `secretBossState.GetPlayerGems()` chuẩn xác**:
+     - Tự động quét và đọc đúng số lượng Gem từ `PlayerData` (`Gems`, `Gem`, `Diamonds`, `Diamond`, `Ruby`), các thuộc tính Attribute, và cả bảng điểm `leaderstats`.
+     - Đồng bộ chính xác với cả số Gem ảo hoá (nếu người chơi có bật Spoof Gem).
+     - Không dùng biến `local` toàn cục nhằm tuân thủ tuyệt đối quy tắc giới hạn 200 local của Luau.
+   - **Đồng bộ hóa các vị trí gọi hàm**:
+     - Cập nhật `SendServerStatusNtfyAlert()` (báo cáo server).
+     - Cập nhật `SendTicketQuestNtfyAlert()` (báo cáo xong nhiệm vụ vé).
+     - Cập nhật `ticketQuestState.Tick()` (bắt chênh lệch gem trước và sau khi nộp vé).
+   - **Tương thích kép Headers & Body cho Executor**:
+     - Bổ sung cả key chữ hoa lẫn chữ thường (`Url/url`, `Method/method`, `Headers/headers`, `Body/body`) trong payload gửi POST tới ntfy, đảm bảo mọi executor mobile (Delta, Codex, Arceus X, Fluxus...) đều truyền tải trơn tru không bị chặn.
+3. **Đồng Bộ Phiên Bản v2.6.4 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.4` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.3] - 2026-09-17
 ### ⚡ Sửa Lỗi Ấn Nút Trên Thông Báo Không Phản Hồi - Cơ Chế Nhận Lệnh Từ Xa ID-Based Siêu Nhạy:
 1. **Khắc Phục Tận Gốc Lỗi Ấn Nút Action Không Nhận Được Báo Cáo Acc**:

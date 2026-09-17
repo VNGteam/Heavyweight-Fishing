@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.3"
+local SCRIPT_BUILD_COMMIT = "v2.6.4"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4363,9 +4363,13 @@ function SendNtfyNotification(title, message, priorityLevel, tagList, customActi
 
         reqFunc({
             Url = postUrl,
+            url = postUrl,
             Method = "POST",
+            method = "POST",
             Headers = headers,
-            Body = body
+            headers = headers,
+            Body = body,
+            body = body
         })
     end)
 end
@@ -4437,6 +4441,43 @@ function secretBossState.SendWeatherNtfyAlert(weatherName, matchedIsland, isInit
     end)
 end
 
+function secretBossState.GetPlayerGems()
+    local val = 0
+    pcall(function()
+        if visualSpoofState and visualSpoofState.fakeGems and visualSpoofState.fakeGems > 0 then
+            val = visualSpoofState.fakeGems
+            return
+        end
+        local pData = (ticketQuestState and ticketQuestState.GetPlayerDataFolder and ticketQuestState.GetPlayerDataFolder())
+            or (ReplicatedStorage:FindFirstChild("Data") and LocalPlayer and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId))
+        if pData then
+            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond", "Ruby"}) do
+                local gObj = pData:FindFirstChild(gName)
+                if gObj and gObj:IsA("ValueBase") and tonumber(gObj.Value) then
+                    val = tonumber(gObj.Value)
+                    return
+                end
+                local attr = pData:GetAttribute(gName)
+                if attr and tonumber(attr) then
+                    val = tonumber(attr)
+                    return
+                end
+            end
+        end
+        local ls = LocalPlayer and LocalPlayer:FindFirstChild("leaderstats")
+        if ls then
+            for _, gName in ipairs({"Gems", "Gem", "Diamonds", "Diamond"}) do
+                local gObj = ls:FindFirstChild(gName)
+                if gObj and gObj:IsA("ValueBase") and tonumber(gObj.Value) then
+                    val = tonumber(gObj.Value)
+                    return
+                end
+            end
+        end
+    end)
+    return val
+end
+
 function secretBossState.SendTicketQuestNtfyAlert(qCount, ticketCount, gemsGained, totalGems, cooldownMins)
     if not Config.NtfyEnabled or not Config.NtfyNotifyTicketQuest then return end
     pcall(function()
@@ -4472,20 +4513,41 @@ end
 
 function secretBossState.SendServerStatusNtfyAlert()
     if not Config.NtfyEnabled then return end
-    pcall(function()
+    local ok, err = pcall(function()
         local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
         local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
         local jobId = tostring(game.JobId or "N/A")
         local placeId = tostring(game.PlaceId or "18779600655")
 
-        local wIsland, wName = secretBossState.DetectWeather()
-        local curWeather = (wName and wName ~= "" and wName ~= "Clear") and wName or "Clear (Trời Quang)"
-        local islandStr = wIsland and wIsland.islandName or "Không có bão"
+        local curWeather = "Clear (Trời Quang)"
+        local islandStr = "Không có bão"
+        if secretBossState and secretBossState.DetectWeather then
+            pcall(function()
+                local wIsland, wName = secretBossState.DetectWeather()
+                if wName and wName ~= "" and wName ~= "Clear" then
+                    curWeather = wName
+                end
+                if wIsland and wIsland.islandName then
+                    islandStr = wIsland.islandName
+                end
+            end)
+        end
 
-        local pData = ticketQuestState and ticketQuestState.GetPlayerDataFolder and ticketQuestState.GetPlayerDataFolder()
-        local qCount = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
-        local ticketCount = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-        local curGems = GetPlayerGems() or 0
+        local qCount = 0
+        local ticketCount = 0
+        pcall(function()
+            local pData = ticketQuestState and ticketQuestState.GetPlayerDataFolder and ticketQuestState.GetPlayerDataFolder()
+            if pData then
+                if pData:FindFirstChild("TicketQuestDailyCount") then
+                    qCount = tonumber(pData.TicketQuestDailyCount.Value) or 0
+                end
+                if pData:FindFirstChild("Ticket") then
+                    ticketCount = tonumber(pData.Ticket.Value) or 0
+                end
+            end
+        end)
+
+        local curGems = (secretBossState.GetPlayerGems and secretBossState.GetPlayerGems()) or 0
         local questStatus = ticketQuestState and ticketQuestState.statusText or "Đang hoạt động"
 
         local title = "📊 BÁO CÁO TÌNH HÌNH SERVER"
@@ -4503,6 +4565,9 @@ function secretBossState.SendServerStatusNtfyAlert()
         local fullMsg = table.concat(msgParts, "\n")
         SendNtfyNotification(title, fullMsg, 4, {"bar_chart", "clipboard", "partly_sunny"})
     end)
+    if not ok then
+        warn("[ntfy Remote] Lỗi khi tạo báo cáo server:", err)
+    end
 end
 
 secretBossState.remoteCommandStarted = false
@@ -8387,7 +8452,7 @@ function ticketQuestState.Tick()
                 pcall(function() Events.CancelCast:FireServer() end)
             end
 
-            local gemsBefore = GetPlayerGems() or 0
+            local gemsBefore = (secretBossState.GetPlayerGems and secretBossState.GetPlayerGems()) or 0
             local claimSuccess = ticketQuestState.InteractNPC(true)
             ticketQuestState.ClearUINavigation()
             task.delay(0.3, ticketQuestState.ClearUINavigation)
@@ -8416,7 +8481,7 @@ function ticketQuestState.Tick()
 
                 -- Tự động gửi thông báo hoàn thành nhiệm vụ vé về ntfy / điện thoại
                 task.delay(1.2, function()
-                    local gemsAfter = GetPlayerGems() or gemsBefore
+                    local gemsAfter = (secretBossState.GetPlayerGems and secretBossState.GetPlayerGems()) or gemsBefore
                     local gemsGained = math.max(0, gemsAfter - gemsBefore)
                     local curPData = ticketQuestState.GetPlayerDataFolder()
                     local qCount = curPData and curPData:FindFirstChild("TicketQuestDailyCount") and tonumber(curPData.TicketQuestDailyCount.Value) or 0
