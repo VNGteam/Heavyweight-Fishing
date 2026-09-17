@@ -2,6 +2,21 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.8] - 2026-09-17
+### 🛑 Khắc Phục Triệt Để Giới Hạn Tốc Độ (Rate Limit 429) & Khôi Phục Thông Báo:
+1. **Phát Hiện Nguyên Nhân Gốc (Tại Sao Không Nhận Được Tin Nhắn Từ Sau 14h34)**:
+   - **Nguyên nhân**: Vòng lặp lắng nghe lệnh từ xa ở bản trước quét liên tục mỗi 2.5s trên 2 kênh, tạo ra hơn 48 lượt truy vấn/phút tới máy chủ `ntfy.sh`.
+   - **Hậu quả**: Máy chủ `ntfy.sh` có chính sách giới hạn 16 req/phút cho tài khoản miễn phí. Sau khi bị quá tải lúc 14h34, máy chủ ntfy.sh đã kích hoạt chế độ **HTTP 429 (Too Many Requests)**, tạm khóa toàn bộ việc nhận và gửi tin nhắn từ mạng của Executor!
+2. **Các Bước Đã Khắc Phục Toàn Diện (Fix Gì)**:
+   - **Chuyển mặc định `NtfyRemoteCommandEnabled = false`**: Không tự động gửi request nền gây quá tải. Người dùng chỉ cần bật khi có nhu cầu điều khiển từ xa.
+   - **Tối ưu hóa bộ quét (12s / chu kỳ, chỉ quét kênh `_cmd`)**: Giảm hơn 90% tải, tuyệt đối an toàn và không bao giờ bị ntfy.sh khóa nữa.
+   - **Bắt mã lỗi 429 hiển thị lên màn hình**: Nếu IP tạm thời bị giới hạn, bot sẽ hiện thông báo cảnh báo rõ ràng thay vì im lặng.
+   - **Mẹo thoát rate limit tức thì**: Chỉ cần đổi tên Topic mới (ví dụ thêm đuôi `_1`, `_88`) trên script và app điện thoại là nhận thông báo lại ngay tức khắc mà không cần đợi.
+3. **Đồng Bộ Phiên Bản v2.6.8 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.8` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.7] - 2026-09-17
 ### 🛡️ Cơ Chế Gửi ntfy Đa Tầng Tự Động (Dual-Layer Auto Fallback):
 1. **Khắc Phục Tận Gốc Sự Cố Mạng / Executor Không Nhận Thông Báo**:
