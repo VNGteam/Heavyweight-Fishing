@@ -2,131 +2,14 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
-## [v2.8.8] - 2026-09-18
-### 🎯 Sửa Lỗi Tọa Độ Tele Nhiệm Vụ & Bổ Sung 100% Tính Năng Thiếu Cho Bản V2 (Xeno Lite Bundle):
-1. **Sửa Lỗi Tọa Độ Teleport Nhiệm Vụ Vé (Ticket Quest Giver)**:
-   - **Nguyên nhân lỗi cũ**: `Quest.FindTicketNPC` trong `v2/features/quest.lua` chỉ tìm các Model nằm trực tiếp ở Workspace hoặc tìm folder cấp 1 không đệ quy. Trong game, NPC Ticket nằm trong `Workspace.NPC.Function["Ticket Quest Giver"]`. Do không tìm thấy Model thật, script rơi vào fallback teleport đến tọa độ cũ `(-200.7, 11.1, 35.9)` — nơi không có NPC.
-   - **Khắc phục**: 
-     - Quét chính xác cấu trúc game: `Workspace.NPC.Function["Ticket Quest Giver"]`.
-     - Tìm kiếm đệ quy toàn bộ thư mục con trong `Workspace.NPC` và Workspace.
-     - Lấy CFrame chuẩn xác từ `HumanoidRootPart` / `Torso` / `PrimaryPart` và đứng đối diện NPC 2.8 studs.
-2. **Tích Hợp Hệ Thống Nhiệm Vụ Kỹ Năng Zeng Tianguo (Skill Upgrade) & Chế Độ Song Song**:
-   - Thêm đầy đủ `Quest.zengState`, `DetectActiveZengQuest`, `TeleportToZengNPC`, `InteractZengNPC`, `GetTargetZengSpot`.
-   - Hỗ trợ chế độ chạy Solo Zeng Tianguo hoặc chạy Song Song cùng Vé Nhiệm Vụ (`ParallelQuestMode`).
-   - Khi hết vé hôm nay hoặc đang chờ hồi chiêu 20p, bot tự động đi cày tiếp nhiệm vụ Zeng Tianguo thay vì đứng im.
-3. **Phục Hồi Đầy Đủ Chi Tiết Tab Nhiệm Vụ (TabNhiemVu)**:
-   - Thêm đầy đủ 6 danh mục từ `local.lua`: Trạng thái vé, Nhiệm vụ Zeng Tianguo, Cài đặt vị trí 5 điểm câu (100 Cá, 100 Mồi, 100 Skill, 1.5M, NPC), Tùy chỉnh chiêu/mồi, Thao tác nhanh bằng tay (Nhận/Nộp Hard, Quét lại, Đặt lại hết vé), Điểm danh 7 ngày & Nhận thưởng nhiệm vụ ngày.
-4. **Bổ Sung Tab "Quản Lý Cá" (TabQuanLyCa) Hoàn Toàn Mới Vào V2**:
-   - Thêm tab `Quản Lý Cá` (vị trí thứ 3, ngay sau Săn Boss):
-     - Quản lý túi cá & dọn rác an toàn: Khóa toàn bộ cá quý, Mở khóa cá rác, Bán sạch cá rác an toàn.
-     - Bộ theo dõi tiến độ nguyên liệu chế Cần Câu (Sanguine, Dragon).
-     - Bộ theo dõi nguyên liệu chế Mồi Thần Thoại (Verdant Gar, Grouper, Eel...).
-5. **Smart Dual-Source Loader Hoàn Chỉnh**:
-   - Tự động nạp `local.lua` (Full). Nếu executor (như Xeno) bị giới hạn dung lượng tải file lớn thì tự động fallback mượt mà sang `v2_bundle.lua` (Lite Version - 396KB) với đầy đủ 100% tính năng và UI hoàn chỉnh.
-
-## [v2.8.5] - 2026-09-17
-### 🧠 Rhythm Hit Giống Người Thật (Human Emulation cho Octo Minigame):
-**Vấn đề cũ:**
-- `OctoAutoMinigame`: Fire `RhythmHit:FireServer(true, 100)` **mù quáng mỗi tick** — không cần biết note nào, không check UI, cực kỳ bot.
-- `AutoRhythmHit` (v2): Fire ngay tức thì khi `Note.Visible = true` — không có delay, không có vùng hit.
-
-**Đã sửa cả 2 nơi thành hành vi người thật:**
-1. **Vùng Hit (Hit Zone Detection)**:
-   - Tính `relX = (noteX - frameX) / frameWidth` để biết note đang ở đâu trong frame
-   - **Chỉ bấm khi note vào vùng 35%–65%** (gần vạch giữa) — giống mắt người nhìn thấy note tiến đến mới phản xạ
-   - Không bấm note khi mới spawn ở rìa phải (quá sớm)
-2. **Note Tracking (tránh bấm lặp)**:
-   - `seenNotes[noteId]` nhớ các note đã xử lý theo `Name + AbsolutePosition.X`
-   - Reset bảng mỗi 3–3.5 giây theo chu kỳ spawn của game
-3. **Reaction Delay ngẫu nhiên (110ms–260ms)**:
-   - `task.delay(reactionDelay + jitter, ...)` thay vì fire ngay
-   - Jitter ±25ms bổ sung để nhịp bấm không đều hoàn hảo
-4. **Miss Rate tự nhiên (7%)**:
-   - Xác suất nhỏ "chậm tay" — bỏ qua 1 note mỗi ~14 note
-   - Tạo pattern bấm tự nhiên, không perfect tuyệt đối
-
-## [v2.8.4] - 2026-09-17
-### 🎵 Bật Tính Năng Auto Rhythm Hit (Mini Game Octo) + Thêm Toggle UI:
-1. **Phát Hiện & Kích Hoạt `AutoRhythmHit`**:
-   - Tính năng `AutoRhythmHit` đã có trong logic `HandleMinigame` (`v2/features/fishing.lua` dòng 114) nhưng **chưa bao giờ được khai báo** trong `Config` → luôn bị tắt ngầm.
-   - **Fix**: Thêm `AutoRhythmHit = true` vào Config table trong `local.lua` và `v2/core/config.lua`.
-2. **Thêm UI Toggle Trong Menu**:
-   - Thêm nút toggle **"Auto Rhythm Hit (Cá Octo)"** vào tab Câu Cá trong giao diện, với mô tả rõ ràng về chức năng.
-3. **Thêm Vào Config Key Map**:
-   - Đăng ký key `AutoRhythmHit` vào bảng `TOGGLE_KEY_MAP` trong `v2/core/config.lua` để hỗ trợ lưu/tải preset cấu hình.
-- **Kỹ thuật**: Rhythm mini game hoạt động bằng cách scan `RhythmFrame:GetChildren()` tìm các `Note` đang Visible rồi fire `Events.RhythmHit:FireServer(hitNote.Name)` cho từng note.
-
-## [v2.8.3] - 2026-09-17
-### 📚 Ra Mắt Cẩm Nang Wiki 14 Hệ & Bộ Công Cụ Trích Xuất Dữ Liệu Game (Game Data Dumper):
-1. **Giải Mã Khớp 100% 14 Biểu Tượng Hệ Trong Game (14 Elements Database)**:
-   - Khớp toàn bộ 14 biểu tượng trong game thành 14 Hệ Đạo Pháp:
-     - `Ascension` (Thăng Hoa / Tiên Đạo)
-     - `Beiming` (Bắc Minh Thần Công)
-     - `Shu Daoshan` (Thục Đạo Sơn)
-     - `Claw` (Liệp Thú / Trảo Pháp)
-     - `Pain` (Thống Khổ / Thất Thương Cốt)
-     - `Taiji` (Thái Cực Âm Dương)
-     - `Pure Yang` (Thuần Dương Cửu Dương)
-     - `Divine Cloud` (Thần Vân / Cân Đẩu Vân)
-     - `Blood` (Huyết Ma / Huyết Đạo)
-     - `Buddha` (Phật Môn Kim Cang)
-     - `Maoshan` (Mao Sơn Bùa Chú)
-     - `Sanqing` (Tam Thanh Đạo Tổ)
-     - `Cloud` (Vân Đạo Bạch Vân)
-     - `Sovereign Cloud` (Chí Tôn Tinh Vân)
-2. **Hệ Thống Wiki Tương Tác Web ([wiki/index.html](file:///Users/vonguyengiap/Documents/script/wiki/index.html))**:
-   - Giao diện Dark Mode Glassmorphism cao cấp mang phong cách huyền ảo Tu Tiên Võ Hiệp.
-   - Khi bấm vào 1 Hệ: Tự động hiển thị chi tiết tuyệt kỹ (Skills), nhân vật (Characters) sở hữu buff sát thương cho hệ đó, cần câu (Rods) tối ưu nhất và lối chơi meta.
-   - Hỗ trợ thanh tìm kiếm tức thì và 5 tab chuyển đổi: Hệ, Nhân Vật, Tuyệt Kỹ, Cần Câu, Thiên Phú.
-3. **Bộ Công Cụ Trích Xuất Trực Tiếp Trong Game ([wiki_dumper.lua](file:///Users/vonguyengiap/Documents/script/wiki_dumper.lua))**:
-   - Chạy trên mọi Executor (Delta, Codex, Arceus, Synapse...) để require và trích xuất 100% data gốc từ `ReplicatedStorage.Info` ra file JSON trên máy.
-
----
-
-## [v2.8.2] - 2026-09-17
-### 🎮 Ra Mắt Phím Chức Năng Báo Cáo Chuyên Biệt & Nhận Lệnh Điều Khiển Từ Xa (Discord Remote Commands):
-1. **Báo Cáo Tách Rời Từng Danh Mục Riêng Biệt (Modular Webhook Reports)**:
-   - Thay vì luôn gửi bảng tổng kết lớn, người chơi có thể xem riêng từng nhóm dữ liệu với giao diện embed chuyên nghiệp:
-     - 🌦️ **Thời Tiết & Boss**: Báo cáo tình trạng thời tiết hiện tại, đảo bị ảnh hưởng, danh sách Boss mục tiêu có thể xuất hiện và Server Job ID.
-     - 💰 **Tài Sản & Kho Đồ**: Báo cáo riêng Tiền ($), Gems hiện có, Ba lô cá (x/50 con), Tổng cá câu được, Vé nhiệm vụ, Essence Orb, Trait Reroll.
-     - 📜 **Tiến Độ Nhiệm Vụ Vé**: Báo cáo số lượt NV Hard đã làm trong ngày (x/20), Vé đang có, Tổng gems, Trạng thái bot.
-     - ⚡ **Thông Tin Server & Teleport Code**: Trích xuất nhanh Server Job ID và đoạn mã `TeleportToPlaceInstance` một chạm để bạn bè vào cùng server.
-2. **Cụm Nút Chức Năng Trong UI & Phím Tắt Nhanh Bàn Phím (Keybinds)**:
-   - Thêm 4 nút bấm trực tiếp trong Menu UI (Tab Cài Đặt / Webhook).
-   - Thêm tính năng **Phím Tắt Nhanh Bàn Phím** (F4, F6, F7, F8):
-     - `F4`: Bắn nhanh Thời Tiết & Boss về Discord.
-     - `F6`: Bắn nhanh Tài Sản & Ba Lô về Discord.
-     - `F7`: Bắn nhanh Tiến Độ Nhiệm Vụ Vé về Discord.
-     - `F8`: Bắn nhanh Code Teleport Server về Discord.
-     - Có thông báo góc màn hình xác nhận khi kích hoạt bằng phím tắt.
-3. **Cơ Chế Nhận Lệnh Điều Khiển 2 Chiều Từ Xa (Discord Remote Commands)**:
-   - Tích hợp vòng lặp quét an toàn (tần suất ~3.5s, chống rate limit, không lưu đè lệnh cũ).
-   - Tự động nhận diện `Channel ID` từ Webhook URL (hoặc tuỳ biến nhập tay).
-   - Hỗ trợ đầy đủ các lệnh người dùng chat trong kênh Discord từ máy tính hoặc điện thoại:
-     - `!thoitiet` / `!weather`: Phản hồi báo cáo Thời Tiết & Boss.
-     - `!kho` / `!taisan` / `!inv`: Phản hồi báo cáo Tài Sản, Tiền, Gems, Ba lô.
-     - `!ve` / `!quest`: Phản hồi báo cáo Tiến độ vé (x/20).
-     - `!tele` / `!server`: Phản hồi Code Teleport Server.
-     - `!baocao` / `!status`: Phản hồi Báo Cáo Toàn Diện 14 chỉ số.
-     - `!help`: Trả về danh sách hướng dẫn lệnh điều khiển.
-4. **Đồng Bộ Phiên Bản v2.8.2 Toàn Hệ Thống**:
-   - Cập nhật số phiên bản `SCRIPT_BUILD_COMMIT = "v2.8.2"` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua).
-   - Re-bundle thành công [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua) (350 KB) với kiểm tra cú pháp thành công 100%.
-
----
-
-## [v2.8.1] - 2026-09-17
-### 🔗 Cấu Hình Mặc Định Discord Webhook & Xác Thực Kênh Nhận Tin:
-1. **Thiết Lập Mặc Định Discord Webhook URL**:
-   - Cập nhật URL Webhook Discord của người dùng làm mặc định trong hệ thống cấu hình `Config.WebhookUrl`.
-   - Tự động bật `Config.WebhookEnabled = true`, sẵn sàng gửi thông báo ngay khi tải script mà không cần dán thủ công lại mỗi lần chạy.
-   - Kiểm tra và kích hoạt thông báo kiểm thử (Test Embed) thành công tới kênh Discord của người dùng.
-2. **Đồng Bộ Phiên Bản v2.8.1 Toàn Hệ Thống**:
-   - Nâng cấp mã phiên bản `SCRIPT_BUILD_COMMIT = "v2.8.1"` trong [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua).
-   - Tái tạo bundle siêu tốc [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua) (341 KB) với kiểm tra cú pháp thành công 100%.
-   - Cập nhật phiên bản trên [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua) và [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua).
-
----
+## [v2.8.4] - 2026-09-18
+### ⏪ Hoàn Nguyên Về Bản Ổn Định v2.8.4 (Full 100% Tính Năng):
+1. **Phục Hồi Bản Gốc Cố Định Cực Kỳ Ổn Định**:
+   - Khôi phục `local.lua` và `loader.lua` về trạng thái nguyên bản hoạt động mượt mà, đầy đủ 100% tất cả 11 Tabs chức năng (Câu Cá, Săn Boss, Quản Lý Cá, Thần Linh, Nhiệm Vụ, Shop & Chế Mồi, Dịch Chuyển, ESP & Đồ Hoạ, Nhân Vật, Cài Đặt, Thử Nghiệm).
+2. **Loại Bỏ Lỗi Biên Dịch & Kẹt Tọa Độ**:
+   - Khôi phục cơ chế nạp tải mã nguồn trực tiếp qua loader siêu tốc (`OptimizeScript` + đa tầng CDN: GitHub Raw, jsDelivr, Fastly).
+   - Tọa độ nhiệm vụ, tele quest, các vị trí câu và logic săn Boss hoạt động chuẩn xác theo code gốc.
+3. **Mã Phiên Bản**: Đặt `SCRIPT_BUILD_COMMIT = "v2.8.4"`.
 
 ## [v2.8.0] - 2026-09-17
 ### 📢 Nâng Cấp Toàn Diện Discord Webhook & Báo Cáo Server Đa Kênh:

@@ -47,14 +47,7 @@ function TabVisuals.Render(parent)
 
     Components.CreateToggleRow(cardLighting, "Sáng Màn Hình (Fullbright)", "Làm sáng toàn bản đồ, nhìn rõ dưới nước sâu", Config.Fullbright, function(v)
         Config.Fullbright = v
-        Visuals.ApplyFullbright(v, Config)
-    end)
-    Components.CreateSliderRow(cardLighting, "Mức Độ Sáng", "Tùy chỉnh độ sáng theo mắt bạn (1.0 – 3.5)", 1.0, 3.5, Config.FullbrightLevel or 2.0, true, "x", function(v)
-        Config.FullbrightLevel = v
-        if Config.Fullbright then Visuals.ApplyFullbright(true, Config) end
-    end)
-    Components.CreateToggleRow(cardLighting, "Chống Lóa Thời Tiết (Anti-Glare)", "Tự động kìm hãm ánh sáng khi thời tiết đổi sang nắng chói", Config.FullbrightAntiGlare, function(v)
-        Config.FullbrightAntiGlare = v
+        Visuals.ApplyFullbright(v)
     end)
     Components.CreateToggleRow(cardLighting, "Tầm Nhìn Xa (Xóa Mờ Map)", "Tắt hiệu ứng làm mờ xa (DepthOfField) & sương mù, nhìn rõ mọi hòn đảo từ xa", Config.ClearFarVision, function(v)
         Config.ClearFarVision = v

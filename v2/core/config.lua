@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.8"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.4"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -20,7 +20,6 @@ ConfigModule.Config = {
     AnchorBar = true,
     AutoSlam = true,
     AutoCharge = true,
-    AutoRhythmHit = true,
     AntiStuckEnabled = false,
 
     -- Smart Combo V2
@@ -177,11 +176,6 @@ ConfigModule.Config = {
     TicketRemoteClaim = true,
     AutoBuyTickets = false,
 
-    -- Nhiệm Vụ Kỹ Năng Zeng Tianguo & Chế Độ Song Song (Parallel Quest Mode)
-    AutoZengTianguoQuest = false,
-    ParallelQuestMode = true,
-    ZengTianguoAutoClaim = true,
-
     -- Lọc Bán Cá & Kho Báu
     KeepMutations = true,
     KeepHeavyFish = false,
@@ -227,8 +221,6 @@ ConfigModule.Config = {
     ClearFarVision = true,
     NoFog = false,
     Fullbright = false,
-    FullbrightLevel = 2.0,
-    FullbrightAntiGlare = true,
     PerformanceMode = false,
     HideGameUI = false,
     HideOverheadNames = false,
@@ -246,21 +238,12 @@ ConfigModule.Config = {
     AutoRejoin = true,
 
     -- Discord Webhook
-    WebhookUrl = "https://discord.com/api/webhooks/1550111320592875582/avZ-iCes8u9LDAtW7hAwr8or-rVEgHC0WQrid8T1oNJDtwqBajDjpa7RhDZ2EWDdWjW3",
-    WebhookEnabled = true,
+    WebhookUrl = "",
+    WebhookEnabled = false,
     WebhookNotifyBoss = true,
     WebhookNotifyNPC = true,
-    WebhookHourlyStats = true,
-    WebhookNotifyTicketQuest = true,
-    WebhookStatsInterval = 30,
-    ReportKeybindsEnabled = true,
-    KeybindWeatherReport = Enum.KeyCode.F4,
-    KeybindInventoryReport = Enum.KeyCode.F6,
-    KeybindQuestReport = Enum.KeyCode.F7,
-    KeybindTeleportReport = Enum.KeyCode.F8,
-    DiscordRemoteEnabled = false,
-    DiscordBotToken = "",
-    DiscordChannelId = "1396490335269421238",
+    WebhookHourlyStats = false,
+    WebhookStatsInterval = 60,
 
     -- Telegram Bot
     TelegramEnabled = false,
@@ -291,7 +274,6 @@ ConfigModule.ConfigLabelMap = {
     ["Tự Dùng Kỹ Năng Cần"] = "AutoSkills",
     ["Tự Động Đập Cần (Auto Slam)"] = "AutoSlam",
     ["Tự Động Sạc Dây (Auto Charge)"] = "AutoCharge",
-    ["Auto Rhythm Hit (Cá Octo)"] = "AutoRhythmHit",
     ["Tự Động Chống Kẹt Cần (Anti-Stuck)"] = "AntiStuckEnabled",
 
     ["Bật Combo Kỹ Năng Tự Động"] = "SmartComboEnabled",
@@ -356,10 +338,6 @@ ConfigModule.ConfigLabelMap = {
     ["Đổi Server Tìm Taoist"] = "AutoServerHopTaoist",
 
     ["Tự Động Nộp Vé Nhiệm Vụ (Tickets)"] = "AutoTicketQuest",
-    ["Tự Động Làm Vé Nhiệm Vụ"] = "AutoTicketQuest",
-    ["Tự Động Nhiệm Vụ Zeng Tianguo"] = "AutoZengTianguoQuest",
-    ["Ưu Tiên Ghép Bãi Song Song"] = "ParallelQuestMode",
-    ["Tự Động Trả Quest Zeng Tianguo"] = "ZengTianguoAutoClaim",
     ["Chọn Độ Khó Vé Nhiệm Vụ"] = "TicketDifficulty",
     ["Chế Độ Nhiệm Vụ"] = "TicketQuestMode",
     ["Loại Mồi Làm Nhiệm Vụ 100 Mồi"] = "TicketBaitChoice",
@@ -395,8 +373,6 @@ ConfigModule.ConfigLabelMap = {
     ["Tầm Nhìn Xa (Xóa Mờ Map)"] = "ClearFarVision",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
-    ["Mức Độ Sáng"] = "FullbrightLevel",
-    ["Chống Lóa Thời Tiết (Anti-Glare)"] = "FullbrightAntiGlare",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
     ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
     ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",

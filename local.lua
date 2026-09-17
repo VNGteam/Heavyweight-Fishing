@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.8.8"
+local SCRIPT_BUILD_COMMIT = "v2.8.4"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -111,7 +111,6 @@ local Config = {
     AnchorBar = true,
     AutoSlam = true,
     AutoCharge = true,
-    AutoRhythmHit = true,
     AntiStuckEnabled = false,
     SmartComboEnabled = false,
     FishHpThreshold = 500,
@@ -308,21 +307,13 @@ local Config = {
     SelectedExchangeItem = "Trait Reroll",
     ExchangeAmount = 1,
     ShowFishWeightRing = false,
-    WebhookEnabled = true,
-    WebhookUrl = "https://discord.com/api/webhooks/1550111320592875582/avZ-iCes8u9LDAtW7hAwr8or-rVEgHC0WQrid8T1oNJDtwqBajDjpa7RhDZ2EWDdWjW3",
+    WebhookEnabled = false,
+    WebhookUrl = "",
     WebhookNotifyBoss = true,
     WebhookNotifyNPC = true,
     WebhookHourlyStats = true,
     WebhookNotifyTicketQuest = true,
     WebhookStatsInterval = 30,
-    ReportKeybindsEnabled = true,
-    KeybindWeatherReport = Enum.KeyCode.F4,
-    KeybindInventoryReport = Enum.KeyCode.F6,
-    KeybindQuestReport = Enum.KeyCode.F7,
-    KeybindTeleportReport = Enum.KeyCode.F8,
-    DiscordRemoteEnabled = false,
-    DiscordBotToken = "",
-    DiscordChannelId = "1396490335269421238",
     TelegramEnabled = false,
     TelegramBotToken = "",
     TelegramChatId = "",
@@ -1011,7 +1002,6 @@ end
 Config._notificationsFile = "HeavyweightFishing_Notifications.json"
 Config._notificationKeys = {
     "WebhookUrl", "WebhookEnabled", "WebhookNotifyBoss", "WebhookNotifyNPC", "WebhookHourlyStats", "WebhookNotifyTicketQuest", "WebhookStatsInterval",
-    "ReportKeybindsEnabled", "DiscordRemoteEnabled", "DiscordBotToken", "DiscordChannelId",
     "TelegramEnabled", "TelegramBotToken", "TelegramChatId", "TelegramNotifyBoss", "TelegramNotifyNPC",
     "NtfyEnabled", "NtfyTopic", "NtfyAlertWeatherChange", "NtfyAlertWeatherHop", "NtfyNotifyBoss"
 }
@@ -4394,250 +4384,6 @@ local function SendTicketQuestWebhook(qCount, ticketCount, gemsGained, gemsTotal
                 { name = "⏰ Thời gian", value = timeStr, inline = false }
             }
         )
-    end)
-end
-
--- 1. Báo cáo riêng: Thời Tiết & Boss
-local function SendWeatherReportWebhook(label)
-    if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
-    pcall(function()
-        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local jobId = tostring(game.JobId or "N/A")
-        local placeId = tostring(game.PlaceId or "18779600655")
-
-        local curWeather = "Clear (☀️ Trời Quang)"
-        local islandStr = "Không có bão"
-        local bossStr = "Không có boss đặc biệt"
-        if secretBossState and secretBossState.DetectWeather then
-            pcall(function()
-                local wIsland, wName = secretBossState.DetectWeather()
-                if wName and wName ~= "" and wName ~= "Clear" then curWeather = wName end
-                if wIsland then
-                    if wIsland.islandName then islandStr = wIsland.islandName end
-                    if wIsland.bosses and #wIsland.bosses > 0 then
-                        local bNames = {}
-                        for _, b in ipairs(wIsland.bosses) do table.insert(bNames, b.name) end
-                        bossStr = table.concat(bNames, ", ")
-                    end
-                end
-            end)
-        end
-
-        local titleColor = (curWeather ~= "Clear (☀️ Trời Quang)") and 16753920 or 3447003
-
-        SendDiscordWebhook(
-            label or "🌦️ BÁO CÁO THỜI TIẾT & BOSS",
-            string.format("👤 **%s** — Server: `%s`", playerName, jobId),
-            titleColor,
-            {
-                { name = "🌦️ Thời Tiết Hiện Tại", value = curWeather, inline = true },
-                { name = "🏝️ Đảo Bị Ảnh Hưởng", value = islandStr, inline = true },
-                { name = "🌲 Boss Có Thể Xuất Hiện", value = bossStr, inline = false },
-                { name = "⚡ Code Vào Server", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
-                { name = "⏰ Cập nhật lúc", value = timeStr, inline = false }
-            }
-        )
-    end)
-end
-
--- 2. Báo cáo riêng: Tài Sản & Kho Đồ / Ba Lô
-local function SendInventoryReportWebhook(label)
-    if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
-    pcall(function()
-        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local jobId = tostring(game.JobId or "N/A")
-
-        local pData = ReplicatedStorage:FindFirstChild("Data") and LocalPlayer and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-        local fishCount = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
-        local cashVal = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
-        local ticketVal = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-        local essenceVal = pData and pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
-        local rerollVal = pData and pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
-        local gemVal = secretBossState.GetPlayerGems()
-        local invCount, invLimit = GetCurrentBackpackFishCount and GetCurrentBackpackFishCount() or 0, 50
-
-        SendDiscordWebhook(
-            label or "💰 BÁO CÁO TÀI SẢN & KHO ĐỒ",
-            string.format("👤 **%s** — Server: `%s`", playerName, jobId),
-            16766720,
-            {
-                { name = "💰 Tiền Hiện Tại", value = "$" .. FormatWithSpaces(cashVal), inline = true },
-                { name = "💎 Gems Hiện Có", value = FormatWithSpaces(gemVal) .. " Gems", inline = true },
-                { name = "🎒 Ba Lô Cá", value = string.format("%d / %d con", invCount, invLimit), inline = true },
-                { name = "🐟 Tổng Cá Đã Câu", value = FormatWithSpaces(fishCount) .. " con", inline = true },
-                { name = "🎫 Vé Nhiệm Vụ", value = FormatWithSpaces(ticketVal) .. " Vé", inline = true },
-                { name = "🔮 Essence Orb", value = FormatWithSpaces(essenceVal) .. " Viên", inline = true },
-                { name = "🎲 Trait Reroll", value = FormatWithSpaces(rerollVal) .. " Vé", inline = true },
-                { name = "⏰ Cập nhật lúc", value = timeStr, inline = false }
-            }
-        )
-    end)
-end
-
--- 3. Báo cáo riêng: Tiến Độ Nhiệm Vụ Vé
-local function SendQuestReportWebhook(label)
-    if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
-    pcall(function()
-        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local jobId = tostring(game.JobId or "N/A")
-
-        local pData = ReplicatedStorage:FindFirstChild("Data") and LocalPlayer and ReplicatedStorage.Data:FindFirstChild(LocalPlayer.UserId)
-        local ticketVal = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-        local questDone = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
-        local gemVal = secretBossState.GetPlayerGems()
-        local questStatus = (ticketQuestState and ticketQuestState.statusText) or "Đang hoạt động"
-
-        SendDiscordWebhook(
-            label or "📜 BÁO CÁO TIẾN ĐỘ NHIỆM VỤ VÉ",
-            string.format("👤 **%s** — Server: `%s`", playerName, jobId),
-            10181046,
-            {
-                { name = "📜 Lượt NV Hôm Nay", value = string.format("%d / 20 NV", questDone), inline = true },
-                { name = "🎫 Vé Hiện Có", value = FormatWithSpaces(ticketVal) .. " Vé", inline = true },
-                { name = "💎 Tổng Gems", value = FormatWithSpaces(gemVal) .. " Gems", inline = true },
-                { name = "📌 Trạng Thái Bot", value = questStatus, inline = false },
-                { name = "⏰ Cập nhật lúc", value = timeStr, inline = false }
-            }
-        )
-    end)
-end
-
--- 4. Báo cáo riêng: Thông Tin Server & Code Teleport
-local function SendServerTeleportWebhook(label)
-    if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
-    pcall(function()
-        local playerName = (LocalPlayer and LocalPlayer.DisplayName) or (LocalPlayer and LocalPlayer.Name) or "Người Chơi"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local jobId = tostring(game.JobId or "N/A")
-        local placeId = tostring(game.PlaceId or "18779600655")
-
-        local curWeather = "Clear (☀️ Trời Quang)"
-        if secretBossState and secretBossState.DetectWeather then
-            pcall(function()
-                local _, wName = secretBossState.DetectWeather()
-                if wName and wName ~= "" and wName ~= "Clear" then curWeather = wName end
-            end)
-        end
-
-        SendDiscordWebhook(
-            label or "⚡ THÔNG TIN SERVER & CODE TELEPORT",
-            string.format("👤 **%s** — Bạn bè có thể dùng code dưới đây để vào chung server!", playerName),
-            3447003,
-            {
-                { name = "🔑 Server Job ID", value = string.format("`%s`", jobId), inline = true },
-                { name = "🌦️ Thời Tiết", value = curWeather, inline = true },
-                { name = "⚡ Code Teleport", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
-                { name = "⏰ Cập nhật lúc", value = timeStr, inline = false }
-            }
-        )
-    end)
-end
-
--- 5. Báo cáo hướng dẫn lệnh điều khiển từ xa
-local function SendDiscordHelpWebhook()
-    if not Config.WebhookEnabled or not Config.WebhookUrl or #Config.WebhookUrl == 0 then return end
-    pcall(function()
-        SendDiscordWebhook(
-            "📖 DANH SÁCH LỆNH ĐIỀU KHIỂN TỪ XA",
-            "Gõ bất kỳ lệnh nào dưới đây vào kênh Discord để bot lập tức phản hồi thông tin tương ứng:",
-            3447003,
-            {
-                { name = "🌦️ !thoitiet (hoặc !weather)", value = "Gửi báo cáo Thời tiết, Đảo & Boss có thể ra", inline = false },
-                { name = "💰 !kho (hoặc !taisan, !inv)", value = "Gửi báo cáo Tiền, Gems, Ba lô cá, Vé & Linh thạch", inline = false },
-                { name = "📜 !ve (hoặc !quest)", value = "Gửi báo cáo Tiến độ làm nhiệm vụ vé (x/20)", inline = false },
-                { name = "⚡ !tele (hoặc !server)", value = "Lấy ngay Code Teleport một chạm để vào server", inline = false },
-                { name = "📊 !baocao (hoặc !status)", value = "Gửi Báo Cáo Toàn Diện đầy đủ 14 chỉ số", inline = false },
-                { name = "⌨️ Phím Tắt Trong Game", value = "**F4**: Thời Tiết | **F6**: Kho Đồ | **F7**: Vé | **F8**: Teleport", inline = false }
-            }
-        )
-    end)
-end
-
--- 6. Vòng lặp nhận lệnh điều khiển 2 chiều từ xa qua Discord (Discord Remote Commands)
-local discordRemoteRunning = false
-local lastDiscordMessageId = nil
-
-local function StartDiscordRemoteListener()
-    if discordRemoteRunning then return end
-    if not Config.DiscordRemoteEnabled then return end
-    discordRemoteRunning = true
-
-    task.spawn(function()
-        while isRunning and Config.DiscordRemoteEnabled do
-            task.wait(3.5)
-            if not isRunning or not Config.DiscordRemoteEnabled then break end
-
-            local chanId = Config.DiscordChannelId
-            if (not chanId or chanId == "") and Config.WebhookUrl and #Config.WebhookUrl > 0 then
-                pcall(function()
-                    local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
-                    if reqFunc then
-                        local res = reqFunc({ Url = Config.WebhookUrl, Method = "GET" })
-                        if res and res.Body then
-                            local data = HttpService:JSONDecode(res.Body)
-                            if data and data.channel_id then
-                                Config.DiscordChannelId = tostring(data.channel_id)
-                                chanId = Config.DiscordChannelId
-                            end
-                        end
-                    end
-                end)
-            end
-
-            local token = Config.DiscordBotToken
-            if token and token ~= "" and chanId and chanId ~= "" then
-                pcall(function()
-                    local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
-                    if not reqFunc then return end
-
-                    local authHeader = token:find("^Bot ") and token or ("Bot " .. token)
-                    local getUrl = "https://discord.com/api/v10/channels/" .. tostring(chanId) .. "/messages?limit=1"
-
-                    local res = reqFunc({
-                        Url = getUrl,
-                        Method = "GET",
-                        Headers = {
-                            ["Authorization"] = authHeader,
-                            ["User-Agent"] = "DiscordBot (https://github.com/VNGteam/Heavyweight-Fishing, 2.8.2)"
-                        }
-                    })
-
-                    if res and (res.StatusCode == 200 or res.Status == 200) and res.Body then
-                        local msgs = HttpService:JSONDecode(res.Body)
-                        if msgs and #msgs > 0 then
-                            local latestMsg = msgs[1]
-                            local msgId = tostring(latestMsg.id)
-                            local rawContent = tostring(latestMsg.content or "")
-                            local content = string.lower(string.gsub(rawContent, "^%s*(.-)%s*$", "%1"))
-
-                            if lastDiscordMessageId == nil then
-                                lastDiscordMessageId = msgId
-                            elseif msgId ~= lastDiscordMessageId then
-                                lastDiscordMessageId = msgId
-
-                                if content == "!thoitiet" or content == "/thoitiet" or content == "!weather" or content == "/weather" then
-                                    SendWeatherReportWebhook("🌦️ THỜI TIẾT & BOSS (LỆNH DISCORD)")
-                                elseif content == "!kho" or content == "/kho" or content == "!taisan" or content == "/taisan" or content == "!inv" or content == "/inv" then
-                                    SendInventoryReportWebhook("💰 TÀI SẢN & KHO ĐỒ (LỆNH DISCORD)")
-                                elseif content == "!ve" or content == "/ve" or content == "!quest" or content == "/quest" then
-                                    SendQuestReportWebhook("📜 TIẾN ĐỘ NHIỆM VỤ VÉ (LỆNH DISCORD)")
-                                elseif content == "!tele" or content == "/tele" or content == "!server" or content == "/server" then
-                                    SendServerTeleportWebhook("⚡ CODE TELEPORT SERVER (LỆNH DISCORD)")
-                                elseif content == "!baocao" or content == "/baocao" or content == "!status" or content == "/status" then
-                                    SendServerReportWebhook("📊 BÁO CÁO TOÀN DIỆN (LỆNH DISCORD)")
-                                elseif content == "!help" or content == "/help" then
-                                    SendDiscordHelpWebhook()
-                                end
-                            end
-                        end
-                    end
-                end)
-            end
-        end
-        discordRemoteRunning = false
     end)
 end
 
@@ -9199,7 +8945,6 @@ createToggleRow(fishCard, "Giữ Thanh Minigame (Anchor Bar)", "Tự động gi�
 createToggleRow(fishCard, "Tự Dùng Kỹ Năng Cần", "Tự kích hoạt kỹ năng cần câu để kéo cá siêu nhanh", Config.AutoSkills, function(v) Config.AutoSkills = v end)
 createToggleRow(fishCard, "Tự Động Đập Cần (Auto Slam)", "Tự động nhấn Slam mức Perfect khi xuất hiện", Config.AutoSlam, function(v) Config.AutoSlam = v end)
 createToggleRow(fishCard, "Tự Động Sạc Dây (Auto Charge)", "Tự động sạc đầy 100% độ bền dây câu", Config.AutoCharge, function(v) Config.AutoCharge = v end)
-createToggleRow(fishCard, "Auto Rhythm Hit (Cá Octo)", "Tự động ấn nốt nhạc trong mini game nhịp điệu của cá Octo đặc biệt", Config.AutoRhythmHit, function(v) Config.AutoRhythmHit = v end)
 createToggleRow(fishCard, "Tự Động Chống Kẹt Cần (Anti-Stuck)", "Tự động phát hiện và gỡ kẹt khi quăng cần hoặc minigame bị đơ quá 15s", Config.AntiStuckEnabled, function(v) Config.AntiStuckEnabled = v end)
 
 createCategoryHeader(tabFishing, "🏠 Vị Trí Trở Về Nếu Săn Boss (Home Spot)")
@@ -14302,99 +14047,6 @@ createButtonRow(hookCard, "Kiểm Tra Webhook (Test Nhanh)", "Gửi thử 1 tin 
     end)
 end)
 
-createButtonRow(hookCard, "Báo Cáo Thời Tiết & Boss", "Gửi embed riêng về Thời Tiết, Đảo bão và Boss mục tiêu có thể ra", "🌦️ Thời Tiết", function()
-    if not Config.WebhookUrl or Config.WebhookUrl == "" then
-        ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN")
-        return
-    end
-    ShowNotification("Webhook", "Đang gửi báo cáo Thời Tiết & Boss...", "INFO", 2)
-    task.spawn(function()
-        SendWeatherReportWebhook("🌦️ BÁO CÁO THỜI TIẾT & BOSS (THỦ CÔNG)")
-        ShowNotification("Webhook", "Đã gửi thông tin Thời Tiết về Discord!", "SUCCESS", 4)
-    end)
-end)
-
-createButtonRow(hookCard, "Báo Cáo Tài Sản & Ba Lô", "Gửi embed riêng về Tiền, Gems, Ba lô cá, Vé nhiệm vụ, Linh thạch", "💰 Tài Sản", function()
-    if not Config.WebhookUrl or Config.WebhookUrl == "" then
-        ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN")
-        return
-    end
-    ShowNotification("Webhook", "Đang gửi báo cáo Tài Sản & Kho Đồ...", "INFO", 2)
-    task.spawn(function()
-        SendInventoryReportWebhook("💰 BÁO CÁO TÀI SẢN & KHO ĐỒ (THỦ CÔNG)")
-        ShowNotification("Webhook", "Đã gửi thông tin Tài Sản về Discord!", "SUCCESS", 4)
-    end)
-end)
-
-createButtonRow(hookCard, "Báo Cáo Tiến Độ Nhiệm Vụ Vé", "Gửi embed riêng về số lượt NV Hard hôm nay (x/20), Vé và Gems", "📜 Tiến Độ Vé", function()
-    if not Config.WebhookUrl or Config.WebhookUrl == "" then
-        ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN")
-        return
-    end
-    ShowNotification("Webhook", "Đang gửi báo cáo Tiến Độ Vé...", "INFO", 2)
-    task.spawn(function()
-        SendQuestReportWebhook("📜 TIẾN ĐỘ NHIỆM VỤ VÉ (THỦ CÔNG)")
-        ShowNotification("Webhook", "Đã gửi tiến độ Vé về Discord!", "SUCCESS", 4)
-    end)
-end)
-
-createButtonRow(hookCard, "Lấy Code Teleport Server", "Gửi embed chứa Server Job ID và script teleport vào server", "⚡ Teleport", function()
-    if not Config.WebhookUrl or Config.WebhookUrl == "" then
-        ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN")
-        return
-    end
-    ShowNotification("Webhook", "Đang gửi Code Teleport...", "INFO", 2)
-    task.spawn(function()
-        SendServerTeleportWebhook("⚡ CODE TELEPORT SERVER (THỦ CÔNG)")
-        ShowNotification("Webhook", "Đã gửi mã Teleport về Discord!", "SUCCESS", 4)
-    end)
-end)
-
-createToggleRow(hookCard, "Bật Phím Tắt Nhanh (F4, F6, F7, F8)", "F4: Thời Tiết | F6: Kho Đồ/Gems | F7: Nhiệm Vụ | F8: Teleport", Config.ReportKeybindsEnabled, function(v)
-    Config.ReportKeybindsEnabled = v
-    SaveNotificationsConfig()
-    ShowNotification("Phím Tắt", v and "Đã bật phím tắt F4/F6/F7/F8!" or "Đã tắt phím tắt báo cáo.", "INFO", 3)
-end)
-
--- Nhận Lệnh Điều Khiển Từ Xa (Discord Remote Commands)
-createCategoryHeader(tabProfiles, "🤖 Nhận Lệnh Điều Khiển Từ Xa (Discord Remote Commands)")
-local remoteCard = createCardGroup(tabProfiles)
-
-createToggleRow(remoteCard, "Bật Lắng Nghe Lệnh Discord", "Bot tự động nhận lệnh chat (!thoitiet, !kho, !ve, !tele, !baocao, !help) từ kênh Discord", Config.DiscordRemoteEnabled, function(v)
-    Config.DiscordRemoteEnabled = v
-    SaveNotificationsConfig()
-    if v then
-        StartDiscordRemoteListener()
-        ShowNotification("Remote Command", "Đã kích hoạt lắng nghe lệnh Discord!", "SUCCESS", 4)
-    else
-        ShowNotification("Remote Command", "Đã tắt lắng nghe lệnh Discord.", "INFO", 3)
-    end
-end)
-
-createInputRow(remoteCard, "Discord Bot Token", "Token Bot từ Discord Developer Portal (để đọc lệnh người chơi chat)", Config.DiscordBotToken or "", function(txt)
-    Config.DiscordBotToken = txt
-    SaveNotificationsConfig()
-    if Config.DiscordRemoteEnabled and txt ~= "" then
-        StartDiscordRemoteListener()
-    end
-end)
-
-createInputRow(remoteCard, "Channel ID (Kênh Nhận Lệnh)", "Mặc định tự trích xuất từ Webhook URL nếu để trống", Config.DiscordChannelId or "", function(txt)
-    Config.DiscordChannelId = txt
-    SaveNotificationsConfig()
-end)
-
-createButtonRow(remoteCard, "Gửi Danh Sách Lệnh Mẫu Lên Discord", "Gửi bảng hướng dẫn các câu lệnh điều khiển vào kênh Discord ngay", "📖 Xem Lệnh", function()
-    if not Config.WebhookUrl or Config.WebhookUrl == "" then
-        ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN")
-        return
-    end
-    task.spawn(function()
-        SendDiscordHelpWebhook()
-        ShowNotification("Webhook", "Đã gửi danh sách lệnh lên Discord!", "SUCCESS", 4)
-    end)
-end)
-
 
 createCategoryHeader(tabProfiles, "📱 Telegram Bot (Thông Báo Về Điện Thoại)")
 local teleCard = createCardGroup(tabProfiles)
@@ -15187,13 +14839,6 @@ local fishingStartTime = 0
 local wasFishing = false
 local minigameDurationTracker = 0
 local wasMinigame = false
-
--- Trạng thái mô phỏng người thật cho Octo Rhythm Minigame
-local octoRhythm = {
-    seenNotes    = {},   -- Bảng nhớ note đã "thấy" (tránh bấm 2 lần)
-    lastClean    = 0,    -- Thời gian dọn bảng nhớ lần cuối
-    lastHitTime  = 0,    -- Thời gian fire RhythmHit lần cuối
-}
 
 
 
@@ -16289,60 +15934,9 @@ table.insert(activeConnections, RunService.Heartbeat:Connect(function(dt)
             end
         end
 
-        -- Octo Rhythm Minigame: mô phỏng người thật (phản xạ trễ, đúng vùng hit, không lặp)
         if Config.OctoAutoMinigame then
-            local pg = LocalPlayer:FindFirstChildOfClass("PlayerGui")
-            local mainGui = pg and pg:FindFirstChild("MainGui")
-            local fishingUI = mainGui and mainGui:FindFirstChild("Fishing")
-            local rFrame = fishingUI and fishingUI:FindFirstChild("RhythmFrame")
-
-            if rFrame and rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
-                -- Dọn bảng nhớ note mỗi 3.5 giây (chu kỳ reset của game)
-                if (now - octoRhythm.lastClean) > 3.5 then
-                    octoRhythm.seenNotes = {}
-                    octoRhythm.lastClean = now
-                end
-
-                for _, hitNote in ipairs(rFrame:GetChildren()) do
-                    if hitNote.Name:find("Note") and hitNote:IsA("GuiObject") then
-                        -- ID duy nhất cho note theo tên + vị trí X pixel lúc phát hiện
-                        local noteId = hitNote.Name .. "|" .. math.floor(hitNote.AbsolutePosition.X)
-
-                        if not octoRhythm.seenNotes[noteId] then
-                            -- Tính vị trí tương đối của note trong frame (0 = trái, 1 = phải)
-                            local frameW = rFrame.AbsoluteSize.X
-                            local frameX = rFrame.AbsolutePosition.X
-                            local relX = frameW > 0 and ((hitNote.AbsolutePosition.X - frameX) / frameW) or 0.5
-
-                            -- Chỉ xử lý khi note Visible VÀ đang trong vùng hit (35%–65% frame)
-                            -- → Mô phỏng mắt người nhìn thấy note gần vạch giữa mới bấm
-                            if hitNote.Visible and relX >= 0.35 and relX <= 0.65 then
-                                octoRhythm.seenNotes[noteId] = true
-
-                                -- 7% xác suất "chậm tay" nhẹ → bỏ note này (miss tự nhiên)
-                                if math.random(1, 100) > 7 then
-                                    -- Phản xạ người thật: 110ms–260ms delay ngẫu nhiên
-                                    local reactionDelay = 0.11 + math.random() * 0.15
-                                    -- Jitter nhỏ ±25ms để nhịp bấm không đều tuyệt đối
-                                    local jitter = (math.random() - 0.5) * 0.05
-
-                                    local capturedNote = hitNote
-                                    task.delay(reactionDelay + jitter, function()
-                                        -- Kiểm tra lại note còn hiển thị trước khi fire
-                                        if rFrame and rFrame.Visible
-                                            and capturedNote and capturedNote.Visible
-                                            and Events and Events:FindFirstChild("RhythmHit") then
-                                            pcall(function()
-                                                Events.RhythmHit:FireServer(capturedNote.Name)
-                                            end)
-                                            octoRhythm.lastHitTime = tick()
-                                        end
-                                    end)
-                                end
-                            end
-                        end
-                    end
-                end
+            if Events and Events:FindFirstChild("RhythmHit") then
+                Events.RhythmHit:FireServer(true, 100)
             end
         end
     end)
@@ -17428,28 +17022,6 @@ table.insert(activeConnections, UserInputService.InputBegan:Connect(function(inp
         if ToggleUiVisibility then ToggleUiVisibility() end
     elseif input.KeyCode == Enum.KeyCode.End or input.KeyCode == Config.StopKeybind then
         UnloadScript()
-    elseif Config.ReportKeybindsEnabled then
-        if input.KeyCode == (Config.KeybindWeatherReport or Enum.KeyCode.F4) then
-            task.spawn(function()
-                SendWeatherReportWebhook("🌦️ BÁO CÁO THỜI TIẾT & BOSS (PHÍM TẮT F4)")
-                ShowNotification("Phím Tắt F4", "Đã gửi báo cáo Thời Tiết & Boss về Discord!", "INFO", 3)
-            end)
-        elseif input.KeyCode == (Config.KeybindInventoryReport or Enum.KeyCode.F6) then
-            task.spawn(function()
-                SendInventoryReportWebhook("💰 BÁO CÁO TÀI SẢN & KHO ĐỒ (PHÍM TẮT F6)")
-                ShowNotification("Phím Tắt F6", "Đã gửi báo cáo Tài Sản & Ba Lô về Discord!", "INFO", 3)
-            end)
-        elseif input.KeyCode == (Config.KeybindQuestReport or Enum.KeyCode.F7) then
-            task.spawn(function()
-                SendQuestReportWebhook("📜 TIẾN ĐỘ NHIỆM VỤ VÉ (PHÍM TẮT F7)")
-                ShowNotification("Phím Tắt F7", "Đã gửi báo cáo Tiến Độ Vé về Discord!", "INFO", 3)
-            end)
-        elseif input.KeyCode == (Config.KeybindTeleportReport or Enum.KeyCode.F8) then
-            task.spawn(function()
-                SendServerTeleportWebhook("⚡ CODE TELEPORT SERVER (PHÍM TẮT F8)")
-                ShowNotification("Phím Tắt F8", "Đã gửi mã Teleport Server về Discord!", "INFO", 3)
-            end)
-        end
     end
 end))
 

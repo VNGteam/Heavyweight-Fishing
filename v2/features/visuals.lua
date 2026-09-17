@@ -27,62 +27,17 @@ function Visuals.EnsureESPFolder()
 end
 
 -- 2. Lighting Tweaks (Fullbright & Fog)
-function Visuals.ApplyFullbright(enabled, config)
-    config = config or {}
+function Visuals.ApplyFullbright(enabled)
     if enabled then
-        local brightLevel = math.clamp(tonumber(config.FullbrightLevel) or 2.0, 1.0, 3.5)
-        Lighting.Brightness = brightLevel
-        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
-        Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+        Lighting.Brightness = 2
         Lighting.ClockTime = 14
         Lighting.FogEnd = 100000
         Lighting.GlobalShadows = false
-        Lighting.ExposureCompensation = 0
-        -- Giảm Atmosphere glare/haze
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo then
-            atmo.Density = 0.05
-            atmo.Haze = 0
-            atmo.Glare = 0
-        end
-        -- Giảm BloomEffect tránh chói
-        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
-        if bloom then
-            bloom.Intensity = 0.1
-            bloom.Size = 10
-        end
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     else
-        Lighting.Brightness = 2
-        Lighting.Ambient = Color3.fromRGB(70, 70, 70)
-        Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
+        Lighting.Brightness = 1
         Lighting.GlobalShadows = true
-        Lighting.ExposureCompensation = 0
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo then
-            atmo.Density = 0.3
-            atmo.Haze = 0.5
-        end
-        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
-        if bloom then
-            bloom.Intensity = 1
-        end
     end
-end
-
--- Anti-Glare: kìm hãm ánh sáng khi thời tiết đổi (Sunny, Windy, v.v.)
-function Visuals.SetupAntiGlare(config, activeConnections)
-    local conn = Lighting.Changed:Connect(function(prop)
-        if not config.Fullbright or (config.FullbrightAntiGlare == false) then return end
-        if prop == "Brightness" and Lighting.Brightness > 3.0 then
-            Lighting.Brightness = math.clamp(tonumber(config.FullbrightLevel) or 2.0, 1.0, 3.5)
-        elseif prop == "ExposureCompensation" and Lighting.ExposureCompensation > 0.1 then
-            Lighting.ExposureCompensation = 0
-        end
-    end)
-    if activeConnections then
-        table.insert(activeConnections, conn)
-    end
-    return conn
 end
 
 function Visuals.ApplyClearVision(enabled)

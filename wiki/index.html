@@ -1,0 +1,1009 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heavyweight Fishing Wiki - Cẩm Nang 14 Hệ & Nhân Vật</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;900&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-deep: #0b0914;
+            --bg-card: rgba(22, 17, 36, 0.75);
+            --bg-card-hover: rgba(35, 27, 58, 0.85);
+            --border-glass: rgba(168, 85, 247, 0.25);
+            --border-glass-active: rgba(236, 72, 153, 0.6);
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-gold: #f59e0b;
+            --accent-cyan: #06b6d4;
+            --accent-green: #10b981;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --font-title: 'Cinzel', serif;
+            --font-body: 'Outfit', sans-serif;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-deep);
+            background-image: 
+                radial-gradient(circle at 15% 20%, rgba(168, 85, 247, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 85% 80%, rgba(236, 72, 153, 0.12) 0%, transparent 40%),
+                radial-gradient(circle at 50% 50%, rgba(6, 182, 212, 0.08) 0%, transparent 60%);
+            color: var(--text-main);
+            font-family: var(--font-body);
+            min-height: 100vh;
+            padding: 30px 20px;
+            overflow-x: hidden;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1280px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        header {
+            text-align: center;
+            margin-bottom: 35px;
+            position: relative;
+        }
+
+        .badge {
+            display: inline-block;
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(236, 72, 153, 0.2));
+            border: 1px solid rgba(168, 85, 247, 0.5);
+            padding: 6px 16px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #d8b4fe;
+            margin-bottom: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            font-family: var(--font-title);
+            font-size: 2.8rem;
+            font-weight: 900;
+            background: linear-gradient(135deg, #ffffff 20%, #c084fc 60%, #f472b6 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+            text-shadow: 0 0 40px rgba(168, 85, 247, 0.4);
+        }
+
+        .subtitle {
+            color: var(--text-muted);
+            font-size: 1.05rem;
+            max-width: 680px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+
+        /* Nav Tabs */
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+
+        .tab-btn {
+            background: rgba(26, 20, 42, 0.6);
+            border: 1px solid var(--border-glass);
+            color: var(--text-muted);
+            padding: 10px 22px;
+            border-radius: 12px;
+            font-family: var(--font-body);
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .tab-btn:hover {
+            color: #fff;
+            border-color: var(--accent-purple);
+            transform: translateY(-2px);
+            background: rgba(45, 30, 75, 0.7);
+        }
+
+        .tab-btn.active {
+            background: linear-gradient(135deg, rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.3));
+            border-color: var(--accent-purple);
+            color: #ffffff;
+            box-shadow: 0 4px 20px rgba(168, 85, 247, 0.35);
+        }
+
+        /* Search Bar */
+        .search-box {
+            max-width: 540px;
+            margin: 0 auto 30px auto;
+            position: relative;
+        }
+
+        .search-box input {
+            width: 100%;
+            background: rgba(22, 17, 36, 0.8);
+            border: 1px solid var(--border-glass);
+            padding: 14px 20px 14px 45px;
+            border-radius: 16px;
+            color: #fff;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .search-box input:focus {
+            border-color: var(--accent-pink);
+            box-shadow: 0 0 25px rgba(236, 72, 153, 0.3);
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 1.1rem;
+            color: var(--text-muted);
+        }
+
+        /* Elements Grid */
+        .elements-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+            gap: 16px;
+            margin-bottom: 40px;
+        }
+
+        .element-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 16px;
+            padding: 16px 12px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .element-card::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.05), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .element-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--card-color, var(--accent-purple));
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.5), 0 0 20px var(--card-glow, rgba(168, 85, 247, 0.3));
+        }
+
+        .element-card.active {
+            border-color: var(--card-color, #ec4899);
+            background: rgba(35, 25, 60, 0.9);
+            box-shadow: 0 0 30px var(--card-glow, rgba(236, 72, 153, 0.4));
+            transform: scale(1.03);
+        }
+
+        .element-icon {
+            font-size: 2.4rem;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 55px;
+            filter: drop-shadow(0 2px 8px rgba(0,0,0,0.5));
+            transition: transform 0.3s ease;
+        }
+
+        .element-card:hover .element-icon {
+            transform: scale(1.15);
+        }
+
+        .element-name {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 3px;
+        }
+
+        .element-vn {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Detail Panel (When an Element is clicked) */
+        .detail-panel {
+            background: rgba(22, 17, 36, 0.85);
+            border: 1px solid var(--border-glass);
+            border-radius: 20px;
+            padding: 30px;
+            margin-bottom: 40px;
+            backdrop-filter: blur(20px);
+            box-shadow: 0 15px 40px rgba(0,0,0,0.6);
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .detail-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 25px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .detail-title-group {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+        }
+
+        .detail-big-icon {
+            width: 65px;
+            height: 65px;
+            border-radius: 16px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+        }
+
+        .detail-title {
+            font-family: var(--font-title);
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: #fff;
+        }
+
+        .detail-desc {
+            color: #d1d5db;
+            font-size: 0.95rem;
+            margin-top: 4px;
+        }
+
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .detail-section {
+            background: rgba(14, 11, 23, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 16px;
+            padding: 20px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #e9d5ff;
+        }
+
+        /* Items list in details */
+        .item-chip-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .chip-card {
+            background: rgba(30, 23, 48, 0.6);
+            border: 1px solid rgba(168, 85, 247, 0.2);
+            border-radius: 12px;
+            padding: 12px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .chip-card:hover {
+            border-color: var(--accent-pink);
+            background: rgba(45, 33, 73, 0.7);
+            transform: translateX(4px);
+        }
+
+        .chip-name {
+            font-weight: 600;
+            color: #fff;
+            font-size: 0.95rem;
+        }
+
+        .chip-tag {
+            font-size: 0.75rem;
+            padding: 4px 10px;
+            border-radius: 8px;
+            background: rgba(168, 85, 247, 0.2);
+            color: #c084fc;
+            border: 1px solid rgba(168, 85, 247, 0.4);
+        }
+
+        .chip-desc {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+
+        /* Card Views for Characters, Rods, Traits */
+        .cards-list {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-bottom: 40px;
+        }
+
+        .general-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-glass);
+            border-radius: 18px;
+            padding: 22px;
+            backdrop-filter: blur(12px);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .general-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--accent-purple);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5), 0 0 20px rgba(168, 85, 247, 0.2);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 12px;
+        }
+
+        .card-avatar {
+            width: 46px;
+            height: 46px;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid var(--border-glass);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.6rem;
+        }
+
+        .card-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: #fff;
+        }
+
+        .card-role {
+            font-size: 0.8rem;
+            color: var(--accent-cyan);
+            font-weight: 500;
+        }
+
+        .card-body {
+            font-size: 0.9rem;
+            color: #d1d5db;
+            line-height: 1.5;
+            margin-bottom: 15px;
+        }
+
+        .tags-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .tag-pill {
+            font-size: 0.75rem;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 3px 10px;
+            border-radius: 6px;
+            color: #e5e7eb;
+        }
+
+        .tag-pill.highlight {
+            background: rgba(236, 72, 153, 0.15);
+            border-color: rgba(236, 72, 153, 0.4);
+            color: #f472b6;
+        }
+
+        /* Footer */
+        footer {
+            text-align: center;
+            padding: 40px 0 20px 0;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        @media (max-width: 768px) {
+            h1 { font-size: 2rem; }
+            .elements-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); }
+            .detail-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <div class="badge">Heavyweight Fishing Pro Database</div>
+        <h1>CẨM NANG 14 HỆ & NHÂN VẬT</h1>
+        <p class="subtitle">Tra cứu toàn diện các Hệ phái, Nhân vật tăng buff, Kỹ năng tuyệt học và Cần câu thần thoại tương ứng trong game.</p>
+    </header>
+
+    <!-- Nav Tabs -->
+    <div class="nav-tabs">
+        <button class="tab-btn active" onclick="switchTab('elements')">🌀 14 Hệ (Elements)</button>
+        <button class="tab-btn" onclick="switchTab('characters')">👤 Nhân Vật (Characters)</button>
+        <button class="tab-btn" onclick="switchTab('skills')">⚡ Tuyệt Học (Skills)</button>
+        <button class="tab-btn" onclick="switchTab('rods')">🎣 Cần Câu (Rods)</button>
+        <button class="tab-btn" onclick="switchTab('traits')">✨ Thiên Phú (Traits)</button>
+    </div>
+
+    <!-- Search Box -->
+    <div class="search-box">
+        <span class="search-icon">🔍</span>
+        <input type="text" id="searchInput" placeholder="Tìm kiếm hệ, nhân vật, chiêu thức, cần câu..." oninput="handleSearch()">
+    </div>
+
+    <!-- TAB 1: ELEMENTS VIEW -->
+    <div id="tab-elements-content">
+        <!-- 14 Elements Grid (Matching exact 14 icons from image) -->
+        <div class="elements-grid" id="elementsGrid"></div>
+
+        <!-- Detail Box for selected element -->
+        <div class="detail-panel" id="elementDetail">
+            <div class="detail-header">
+                <div class="detail-title-group">
+                    <div class="detail-big-icon" id="detailIcon">☯️</div>
+                    <div>
+                        <div class="detail-title" id="detailTitle">Thái Cực (Taiji)</div>
+                        <div class="detail-desc" id="detailDesc">Trường phái lấy nhu thắng cương, mượn lực đả lực, gây sát thương dồn dập khi cá giãy.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="detail-grid">
+                <!-- Nhân vật Buff -->
+                <div class="detail-section">
+                    <div class="section-title">👤 Nhân Vật Buff Sát Thương Cho Hệ Này</div>
+                    <div class="item-chip-list" id="detailCharacters"></div>
+                </div>
+
+                <!-- Cần Câu Tương Thích -->
+                <div class="detail-section">
+                    <div class="section-title">🎣 Cần Câu & Skin Phù Hợp</div>
+                    <div class="item-chip-list" id="detailRods"></div>
+                </div>
+
+                <!-- Tuyệt Kỹ Thuộc Hệ -->
+                <div class="detail-section" style="grid-column: 1 / -1;">
+                    <div class="section-title">⚡ Các Tuyệt Học / Kỹ Năng Tiêu Biểu Của Hệ</div>
+                    <div class="item-chip-list" id="detailSkills" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TAB 2: CHARACTERS VIEW -->
+    <div id="tab-characters-content" style="display: none;">
+        <div class="cards-list" id="charactersList"></div>
+    </div>
+
+    <!-- TAB 3: SKILLS VIEW -->
+    <div id="tab-skills-content" style="display: none;">
+        <div class="cards-list" id="skillsList"></div>
+    </div>
+
+    <!-- TAB 4: RODS VIEW -->
+    <div id="tab-rods-content" style="display: none;">
+        <div class="cards-list" id="rodsList"></div>
+    </div>
+
+    <!-- TAB 5: TRAITS VIEW -->
+    <div id="tab-traits-content" style="display: none;">
+        <div class="cards-list" id="traitsList"></div>
+    </div>
+
+    <footer>
+        Heavyweight Fishing Wiki Engine • Phiên Bản Dữ Liệu Đồng Bộ v2.8.2
+    </footer>
+</div>
+
+<script>
+// ==========================================
+// 1. DATA DATABASE (EXTRACTED FROM GAME)
+// ==========================================
+const ELEMENTS = [
+    {
+        id: "Ascension",
+        name: "Ascension",
+        vnName: "Thăng Hoa (Tiên Đạo)",
+        icon: "🔺",
+        color: "#c084fc",
+        glow: "rgba(192, 132, 252, 0.4)",
+        desc: "Đạo pháp thăng thiên vô thượng, tối ưu hóa sức mạnh nội lực và kéo cá không giới hạn tốc độ.",
+        characters: ["Enzo", "Ba Chang"],
+        rods: ["Ascendant Bamboo Rod", "Sacred Bamboo Rod", "Lifebloom Rod"],
+        skills: ["Infinite Sky Ascension", "Infinite Sky Ascension V2", "Infinite Sky Ascension V3", "Egoless Technique", "True Path Technique", "Path of Heavenbreak"]
+    },
+    {
+        id: "Beiming",
+        name: "Beiming",
+        vnName: "Bắc Minh (Thần Công)",
+        icon: "🌸",
+        color: "#f472b6",
+        glow: "rgba(244, 114, 182, 0.4)",
+        desc: "Bắc Minh Thần Công, hút nội lực và thể lực của thủy quái, hồi phục sinh lực và giật cá cực mạnh.",
+        characters: ["Beiming"],
+        rods: ["Lifebloom Rod", "Cryo Gravity Rod", "Frostbite Rod", "Kraken Rod"],
+        skills: ["Bac Minh Technique", "Dragonfish Vitality", "River Suppression", "Hellbreaking Hook"]
+    },
+    {
+        id: "Shu Daoshan",
+        name: "Shu Daoshan",
+        vnName: "Thục Đạo Sơn",
+        icon: "⛰️",
+        color: "#f97316",
+        glow: "rgba(249, 115, 22, 0.4)",
+        desc: "Trường phái Thục Đạo Sơn cao ngút trời mây, dời non lấp biển, khống chế độ giãy của các loài cá khổng lồ.",
+        characters: ["Jiang Lao"],
+        rods: ["Anchorbound Rod", "Gravisteel Rod", "Auric Gravity Rod"],
+        skills: ["Mountain Flip", "Demon Mountainbreaker", "Heaven Earth Convergence", "Unshaken Stance"]
+    },
+    {
+        id: "Claw",
+        name: "Claw",
+        vnName: "Liệp Thú (Trảo Pháp)",
+        icon: "🐾",
+        color: "#f3f4f6",
+        glow: "rgba(255, 255, 255, 0.3)",
+        desc: "Kỹ năng xé rách mồi câu mô phỏng dã thú (Hổ, Đại Bàng, Báo), gây sát thương bùng nổ liên hoàn.",
+        characters: ["Yu Jianchou", "Biao Di"],
+        rods: ["Blazeshark Rod", "Kraken Rod", "Demonic Rod"],
+        skills: ["Beastbreaker Cleave", "Beastbreaker Cleave V2", "Beastbreaker Cleave V3", "Apex Eagle Hunt", "Tiger’s Hunt", "Leopard Lock", "Rooster Strike"]
+    },
+    {
+        id: "Pain",
+        name: "Pain",
+        vnName: "Thống Khổ (Thất Thương)",
+        icon: "🦴",
+        color: "#e2e8f0",
+        glow: "rgba(226, 232, 240, 0.3)",
+        desc: "Thất Thương Cốt Pháp: Đổi sinh lực hoặc độ căng dây để gây sát thương đòn chí mạng hủy diệt.",
+        characters: ["Duan Gan", "Nanjiang"],
+        rods: ["Demonic Rod", "Steel Spine Rod", "Diamond Spine Rod"],
+        skills: ["Seven Wounds Fusion", "Beheading Cast", "Head Smash", "Heaven’s Burden"]
+    },
+    {
+        id: "Taiji",
+        name: "Taiji",
+        vnName: "Thái Cực (Âm Dương)",
+        icon: "☯️",
+        color: "#38bdf8",
+        glow: "rgba(56, 189, 248, 0.4)",
+        desc: "Âm Dương tương sinh tương khắc, chuyển hóa lực kéo của cá thành lực giật phản đòn êm ái tuyệt đối.",
+        characters: ["Biao Ge"],
+        rods: ["Taoist Rod", "Taiji Twin Scythe", "AWK Taiji Twin Scythe"],
+        skills: ["Taijiquan Technique", "Taijiquan Technique V2", "Taijiquan Technique V3", "Ascended Taiji Art", "Shadowless Taiji Strike"]
+    },
+    {
+        id: "Pure Yang",
+        name: "Pure Yang",
+        vnName: "Thuần Dương (Cửu Dương)",
+        icon: "🔥",
+        color: "#ef4444",
+        glow: "rgba(239, 68, 68, 0.5)",
+        desc: "Cửu Dương Chân Hỏa thiêu đốt mặt nước, giảm kháng cự của cá và làm kiệt sức boss trong chớp mắt.",
+        characters: ["Xiao Daoshi"],
+        rods: ["Inferno Rod", "Inferno Gravity Rod", "Bloodfire Rod"],
+        skills: ["Pure Yang Wuji", "Nine Suns Ascension", "Blazing Vajra", "Phoenix Strike Art"]
+    },
+    {
+        id: "Divine Cloud",
+        name: "Divine Cloud",
+        vnName: "Thần Vân (Cân Đẩu)",
+        icon: "⚡",
+        color: "#eab308",
+        glow: "rgba(234, 179, 8, 0.4)",
+        desc: "Cân Đẩu Thần Vân ngự lôi phá trận, tốc độ ra chiêu cực hạn, phá tan cửa ải của mọi loài cá.",
+        characters: ["Chu Xin"],
+        rods: ["Thunder Thorn Rod", "Golden Starwing Rod", "Heavenpiercer Rod"],
+        skills: ["One-Strike Heaven Gate", "One-Strike Heaven Gate V2", "One-Strike Heaven Gate V3", "Celestial Gatebreaker", "Celestial Ape's Heavenbreaker"]
+    },
+    {
+        id: "Blood",
+        name: "Blood",
+        vnName: "Huyết Ma (Huyết Đạo)",
+        icon: "🩸",
+        color: "#dc2626",
+        glow: "rgba(220, 38, 38, 0.5)",
+        desc: "Huyết Tế Sát Đạo: Dâng máu để đoạt mạng cá, tăng tỉ lệ chí mạng và tốc độ kéo cá khủng khiếp.",
+        characters: ["Nanjiang", "Enzo"],
+        rods: ["Bloodfire Rod", "Scarlet Corruption Rod", "Demonic Rod"],
+        skills: ["Sever the Gate", "Sever the Gate V2", "Sever the Gate V3", "Ruinous Sacrifice", "Master Slaying Fishing Art", "Friend Slaying Fishing Art", "Lover Slaying Fishing Art", "Kin Slaying Fishing Art"]
+    },
+    {
+        id: "Buddha",
+        name: "Buddha",
+        vnName: "Phật Môn (Kim Cang)",
+        icon: "🪷",
+        color: "#fbbf24",
+        glow: "rgba(251, 191, 36, 0.5)",
+        desc: "Đại Bi Kim Cang Chưởng trấn áp phong ba, khiến thủy quái ngoan ngoãn quy phục vào vợt.",
+        characters: ["Hua Heshang", "Da Shixiong", "Biao Di"],
+        rods: ["Golden Rod", "Grandmaster Golden Rod", "Auric Gravity Rod"],
+        skills: ["Vajra Godcast", "Vajra Fish Subjugation", "Thousandfold Palm", "Spirit Salvation", "Thousand Enemy Sweep"]
+    },
+    {
+        id: "Maoshan",
+        name: "Maoshan",
+        vnName: "Mao Sơn (Bùa Chú)",
+        icon: "📜",
+        color: "#f59e0b",
+        glow: "rgba(245, 158, 11, 0.4)",
+        desc: "Phù chú phong ấn định thân, dán bùa khống chế thanh minigame đứng yên không xê dịch.",
+        characters: ["Da Shixiong"],
+        rods: ["Maoshan Rod", "Taoist Rod"],
+        skills: ["Fivefold Seal Ascension", "Echo Hand Technique", "Six Vein Divine Hook"]
+    },
+    {
+        id: "Sanqing",
+        name: "Sanqing",
+        vnName: "Tam Thanh (Đạo Môn)",
+        icon: "🌀",
+        color: "#10b981",
+        glow: "rgba(16, 185, 129, 0.4)",
+        desc: "Tam Thanh Đạo Tổ (Ngọc Thanh - Thượng Thanh - Thái Thanh), dung hợp tam tài thiên địa nhân.",
+        characters: ["Da Shixiong", "Xiao Daoshi"],
+        rods: ["Taoist Rod", "Heavenpiercer Rod", "Starlight Rod"],
+        skills: ["Sanqing Reversion", "Taiqing Dao Realm", "Shangqing Realm", "Yuqing Flowing Cast"]
+    },
+    {
+        id: "Cloud",
+        name: "Cloud",
+        vnName: "Vân Đạo (Bạch Vân)",
+        icon: "☁️",
+        color: "#94a3b8",
+        glow: "rgba(148, 163, 184, 0.3)",
+        desc: "Hệ mây cơ bản, linh hoạt biến ảo khôn lường, dễ phối hợp với nhiều hệ phái khác nhau.",
+        characters: ["Ba Chang", "Biao Di", "Biao Ge", "Chu Xin", "Sage Yijiu"],
+        rods: ["Bamboo Rod", "Sacred Bamboo Rod", "Alloy Rod"],
+        skills: ["Rolling Chaos", "Rolling Chaos V2", "Rolling Chaos V3", "Pacifies the Clouds", "Skybreaker Technique", "Cyclone Hook"]
+    },
+    {
+        id: "Sovereign Cloud",
+        name: "Sovereign Cloud",
+        vnName: "Chí Tôn Vân (Tinh Vân)",
+        icon: "🌌",
+        color: "#06b6d4",
+        glow: "rgba(6, 182, 212, 0.5)",
+        desc: "Chí Tôn Tinh Vân: Đỉnh cao của mây trời vũ trụ, phá vỡ mọi quy tắc giới hạn lực kéo.",
+        characters: ["Sage Yijiu"],
+        rods: ["Starlight Rod", "Heavenpiercer Rod", "Cryo Gravity Rod"],
+        skills: ["Astral Grand Art", "Astral Grand Art Zenith", "Astral Backstep", "Heavenbound Infinity"]
+    }
+];
+
+const CHARACTERS = [
+    { name: "Ba Chang", role: "Cường Hóa Hệ", icon: "🧔", desc: "Tăng mạnh sát thương cho kỹ năng hệ Cloud (Vân) và Normal (Thường).", buff: ["Cloud", "Normal"] },
+    { name: "Biao Di", role: "Tam Hệ Đa Năng", icon: "👦", desc: "Tăng sát thương đồng thời cho 3 hệ: Cloud (Vân), Buddha (Phật) và Claw (Liệp Thú).", buff: ["Cloud", "Buddha", "Claw"] },
+    { name: "Biao Ge", role: "Thái Cực Phong", icon: "🧑‍🦱", desc: "Tăng sát thương cho kỹ năng hệ Cloud (Vân) và Taiji (Thái Cực).", buff: ["Cloud", "Taiji"] },
+    { name: "Chu Xin", role: "Khởi Đầu Tiên Đạo", icon: "🧑", desc: "Tăng sát thương cho kỹ năng hệ Cloud (Vân) và Divine Cloud (Thần Vân).", buff: ["Cloud", "Divine Cloud"] },
+    { name: "Da Shixiong", role: "Đại Sư Huynh Tam Phái", icon: "👑", desc: "Bá chủ sát thương khi tăng cùng lúc cho Sanqing (Tam Thanh), Buddha (Phật) và Maoshan (Mao Sơn).", buff: ["Sanqing", "Buddha", "Maoshan"] },
+    { name: "Hua Heshang", role: "Đại Sư Phật Môn", icon: "🧘", desc: "Tăng chuyên sâu sát thương cho toàn bộ kỹ năng hệ Buddha (Phật Môn).", buff: ["Buddha"] },
+    { name: "Sage Yijiu", role: "Hiền Nhân Tinh Vân", icon: "🧙‍♂️", desc: "Tăng sát thương cho kỹ năng hệ Cloud (Vân) và Sovereign Cloud (Chí Tôn Vân).", buff: ["Cloud", "Sovereign Cloud"] },
+    { name: "Xiao Daoshi", role: "Tiểu Đạo Sĩ", icon: "🧒", desc: "Tăng sát thương cho kỹ năng hệ Sanqing (Tam Thanh) và Pure Yang (Thuần Dương).", buff: ["Sanqing", "Pure Yang"] },
+    { name: "Yu Jianchou", role: "Kiếm Ma Liệp Thú", icon: "⚔️", desc: "Tăng sát thương chuyên sâu cho toàn bộ kỹ năng hệ Claw (Móng Vuốt / Liệp Thú).", buff: ["Claw"] },
+    { name: "Beiming", role: "Bắc Minh Chân Nhân", icon: "🧝", desc: "Tăng sát thương và khả năng hút lực độc quyền của hệ Beiming (Bắc Minh).", buff: ["Beiming"] },
+    { name: "Jiang Lao", role: "Khương Lão Tiên Sinh", icon: "👴", desc: "Cao thủ trấn áp vùng nước sâu, tăng sức mạnh các chiêu thức hệ Thục Đạo Sơn (Shu Daoshan).", buff: ["Shu Daoshan"] },
+    { name: "Nanjiang", role: "Vu Sư Nam Cương", icon: "🎭", desc: "Chuyên gia độc thuật và huyết sát, cường hóa hệ Blood (Huyết) và Pain (Thống Khổ).", buff: ["Blood", "Pain"] },
+    { name: "Duan Gan", role: "Thiên Tàn Đoạn Cán", icon: "🦯", desc: "Tuyệt đỉnh phản đòn khi dây câu căng cứng, cường hóa hệ Pain (Thống Khổ).", buff: ["Pain"] },
+    { name: "Enzo", role: "Tây Dương Kiếm Sĩ", icon: "🤺", desc: "Phong cách chiến đấu cuồng bạo, tăng cường hệ Ascension (Thăng Hoa) & Blood (Huyết).", buff: ["Ascension", "Blood"] }
+];
+
+const RODS = [
+    { name: "Wooden Rod", power: 8, luck: 1, type: "Khởi Đầu", element: "Normal" },
+    { name: "Bamboo Rod", power: 11, luck: 5, type: "Cơ Bản", element: "Cloud" },
+    { name: "Steel Rod", power: 17, luck: 11, type: "Kim Loại", element: "Normal" },
+    { name: "Enchanted Steel Rod", power: 19, luck: 12, type: "Phép Thuật", element: "Sanqing" },
+    { name: "Bloodfire Rod", power: 27, luck: 10, type: "Huyết Hỏa", element: "Blood, Pure Yang" },
+    { name: "Golden Rod", power: 35, luck: 22, type: "Hoàng Kim", element: "Buddha" },
+    { name: "Taoist Rod", power: 45, luck: 25, type: "Đạo Sĩ", element: "Taiji, Sanqing" },
+    { name: "Maoshan Rod", power: 50, luck: 28, type: "Mao Sơn", element: "Maoshan" },
+    { name: "Anchorbound Rod", power: 50, luck: 25, type: "Thiết Trọng", element: "Shu Daoshan" },
+    { name: "Blazeshark Rod", power: 55, luck: 20, type: "Liệt Sa", element: "Claw, Pure Yang" },
+    { name: "Auric Gravity Rod", power: 60, luck: 10, type: "Hoàng Kim Trọng Lực", element: "Buddha, Shu Daoshan" },
+    { name: "Inferno Gravity Rod", power: 62, luck: 20, type: "Hỏa Diệm Trọng Lực", element: "Pure Yang" },
+    { name: "Cryo Gravity Rod", power: 65, luck: 36, type: "Băng Hàn Trọng Lực", element: "Beiming, Sovereign Cloud" },
+    { name: "Kraken Rod", power: 65, luck: 30, type: "Hải Quái", element: "Beiming, Claw" },
+    { name: "Thunder Thorn Rod", power: 67, luck: 30, type: "Lôi Cực", element: "Divine Cloud" },
+    { name: "Ascendant Bamboo Rod", power: 70, luck: 35, type: "Tiên Trúc", element: "Ascension, Cloud" },
+    { name: "Lifebloom Rod", power: 75, luck: 40, type: "Sinh Mệnh", element: "Buddha, Beiming" },
+    { name: "Starlight Rod", power: 83, luck: 15, type: "Tinh Quang", element: "Sovereign Cloud" },
+    { name: "Demonic Rod", power: 85, luck: 25, type: "Cực Ma", element: "Blood, Pain" },
+    { name: "Heavenpiercer Rod", power: 90, luck: 30, type: "Kình Thiên", element: "Divine Cloud, Sanqing" }
+];
+
+const TRAITS = [
+    { name: "Azure Dragon (Thanh Long)", type: "Tứ Tượng", desc: "Triệu hồi thần long uy trấn, tăng tỉ lệ ra cá quý hiếm và giật cá diện rộng." },
+    { name: "White Tiger (Bạch Hổ)", type: "Tứ Tượng", desc: "Hổ gầm chấn động, tăng mạnh sát thương đòn đánh và lực kéo cá bạo kích." },
+    { name: "Vermilion Bird (Chu Tước)", type: "Tứ Tượng", desc: "Hỏa diệm tái sinh, giảm thời gian hồi chiêu (Cooldown) toàn bộ kỹ năng." },
+    { name: "Black Tortoise (Huyền Vũ)", type: "Tứ Tượng", desc: "Phòng ngự vững chãi như bàn thạch, triệt tiêu lực giật ngược của cá boss." },
+    { name: "Assassin (Thích Khách)", type: "Chiến Đấu", desc: "Tăng mạnh sát thương khi cá ở trạng thái sơ hở." },
+    { name: "Berserk (Cuồng Nộ)", type: "Chiến Đấu", desc: "Mỗi cú giật trúng liên tiếp tăng dần sát thương theo cấp số cộng." },
+    { name: "Chrono (Thời Gian)", type: "Chiến Đấu", desc: "Làm chậm tốc độ chạy của minigame cá, giúp câu dễ dàng 100%." },
+    { name: "Executioner (Đao Phủ)", type: "Chiến Đấu", desc: "Kết liễu ngay lập tức khi HP cá giảm xuống dưới ngưỡng 15%." },
+    { name: "Precision (Chuẩn Xác)", type: "Chiến Đấu", desc: "Khuếch đại vùng căn Perfect trên thanh giật cần." },
+    { name: "Rapid (Thần Tốc)", type: "Chiến Đấu", desc: "Tăng tốc độ thu dây câu (Reel Speed) tối đa." },
+    { name: "Sharp (Sắc Bén)", type: "Chiến Đấu", desc: "Lưỡi câu sắc bén xuyên thủng kháng cự của cá bọc giáp." },
+    { name: "Swift (Mẫn Tiệp)", type: "Chiến Đấu", desc: "Tăng độ linh hoạt khi di chuyển vợt cá theo hướng bơi." },
+    { name: "Powerful (Cường Lực)", type: "Chiến Đấu", desc: "Tăng chỉ số Power gốc của nhân vật lên cần câu." }
+];
+
+// ==========================================
+// 2. RENDER FUNCTIONS
+// ==========================================
+let currentElementId = "Taiji";
+
+function renderElementsGrid() {
+    const grid = document.getElementById("elementsGrid");
+    grid.innerHTML = "";
+    ELEMENTS.forEach(el => {
+        const card = document.createElement("div");
+        card.className = `element-card ${el.id === currentElementId ? "active" : ""}`;
+        card.style.setProperty("--card-color", el.color);
+        card.style.setProperty("--card-glow", el.glow);
+        card.onclick = () => selectElement(el.id);
+        card.innerHTML = `
+            <div class="element-icon">${el.icon}</div>
+            <div class="element-name">${el.name}</div>
+            <div class="element-vn">${el.vnName}</div>
+        `;
+        grid.appendChild(card);
+    });
+}
+
+function selectElement(id) {
+    currentElementId = id;
+    renderElementsGrid();
+    const el = ELEMENTS.find(e => e.id === id);
+    if (!el) return;
+
+    // Title & header
+    document.getElementById("detailIcon").textContent = el.icon;
+    document.getElementById("detailTitle").textContent = `${el.vnName} (${el.name})`;
+    document.getElementById("detailDesc").textContent = el.desc;
+
+    // Characters buffing this element
+    const charBox = document.getElementById("detailCharacters");
+    charBox.innerHTML = "";
+    const matchedChars = CHARACTERS.filter(c => c.buff.includes(el.id));
+    if (matchedChars.length === 0) {
+        charBox.innerHTML = `<div class="chip-desc">Chưa có nhân vật chuyên biệt hoặc dùng buff tự do.</div>`;
+    } else {
+        matchedChars.forEach(c => {
+            const chip = document.createElement("div");
+            chip.className = "chip-card";
+            chip.innerHTML = `
+                <div>
+                    <div class="chip-name">${c.icon} ${c.name}</div>
+                    <div class="chip-desc">${c.desc}</div>
+                </div>
+                <div class="chip-tag">+Buff Dame</div>
+            `;
+            charBox.appendChild(chip);
+        });
+    }
+
+    // Recommended Rods
+    const rodBox = document.getElementById("detailRods");
+    rodBox.innerHTML = "";
+    el.rods.forEach(rName => {
+        const rData = RODS.find(r => r.name === rName) || { name: rName, power: "?", luck: "?" };
+        const chip = document.createElement("div");
+        chip.className = "chip-card";
+        chip.innerHTML = `
+            <div>
+                <div class="chip-name">🎣 ${rData.name}</div>
+                <div class="chip-desc">Sức Mạnh: ${rData.power} • May Mắn: +${rData.luck}%</div>
+            </div>
+            <div class="chip-tag" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border-color: rgba(16, 185, 129, 0.4);">Tương Thích</div>
+        `;
+        rodBox.appendChild(chip);
+    });
+
+    // Skills of this element
+    const skillBox = document.getElementById("detailSkills");
+    skillBox.innerHTML = "";
+    el.skills.forEach(sName => {
+        const chip = document.createElement("div");
+        chip.className = "chip-card";
+        chip.innerHTML = `
+            <div>
+                <div class="chip-name">⚡ ${sName}</div>
+                <div class="chip-desc">Hệ phái: ${el.name} • Sát thương khuếch đại</div>
+            </div>
+            <div class="chip-tag" style="background: rgba(6, 182, 212, 0.2); color: #22d3ee; border-color: rgba(6, 182, 212, 0.4);">Skill</div>
+        `;
+        skillBox.appendChild(chip);
+    });
+}
+
+function renderCharactersTab() {
+    const list = document.getElementById("charactersList");
+    list.innerHTML = "";
+    CHARACTERS.forEach(c => {
+        const card = document.createElement("div");
+        card.className = "general-card";
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="card-avatar">${c.icon}</div>
+                <div>
+                    <div class="card-name">${c.name}</div>
+                    <div class="card-role">${c.role}</div>
+                </div>
+            </div>
+            <div class="card-body">${c.desc}</div>
+            <div class="tags-row">
+                ${c.buff.map(b => `<span class="tag-pill highlight">Buff: ${b}</span>`).join('')}
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function renderSkillsTab() {
+    const list = document.getElementById("skillsList");
+    list.innerHTML = "";
+    ELEMENTS.forEach(el => {
+        el.skills.forEach(s => {
+            const card = document.createElement("div");
+            card.className = "general-card";
+            card.innerHTML = `
+                <div class="card-header">
+                    <div class="card-avatar" style="border-color: ${el.color}">${el.icon}</div>
+                    <div>
+                        <div class="card-name">${s}</div>
+                        <div class="card-role">Hệ ${el.vnName} (${el.name})</div>
+                    </div>
+                </div>
+                <div class="card-body">Kỹ năng đặc trưng của hệ ${el.vnName}. Nhận thêm sát thương trực tiếp từ nhân vật: <b>${el.characters.join(', ')}</b>.</div>
+                <div class="tags-row">
+                    <span class="tag-pill highlight">${el.name}</span>
+                    <span class="tag-pill">Tuyệt Kỹ</span>
+                </div>
+            `;
+            list.appendChild(card);
+        });
+    });
+}
+
+function renderRodsTab() {
+    const list = document.getElementById("rodsList");
+    list.innerHTML = "";
+    RODS.forEach(r => {
+        const card = document.createElement("div");
+        card.className = "general-card";
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="card-avatar">🎣</div>
+                <div>
+                    <div class="card-name">${r.name}</div>
+                    <div class="card-role">${r.type}</div>
+                </div>
+            </div>
+            <div class="card-body">
+                <b>Sức Mạnh (Power):</b> ${r.power}<br>
+                <b>May Mắn (Luck):</b> +${r.luck}%<br>
+                <b>Hệ tương thích tốt nhất:</b> ${r.element}
+            </div>
+            <div class="tags-row">
+                <span class="tag-pill highlight">${r.element}</span>
+                <span class="tag-pill">Cần Câu</span>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function renderTraitsTab() {
+    const list = document.getElementById("traitsList");
+    list.innerHTML = "";
+    TRAITS.forEach(t => {
+        const card = document.createElement("div");
+        card.className = "general-card";
+        card.innerHTML = `
+            <div class="card-header">
+                <div class="card-avatar">✨</div>
+                <div>
+                    <div class="card-name">${t.name}</div>
+                    <div class="card-role">Loại: ${t.type}</div>
+                </div>
+            </div>
+            <div class="card-body">${t.desc}</div>
+            <div class="tags-row">
+                <span class="tag-pill highlight">${t.type}</span>
+                <span class="tag-pill">Nội Tại</span>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+// Tab Switching
+function switchTab(tab) {
+    document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+    event.target.classList.add("active");
+
+    const tabs = ["elements", "characters", "skills", "rods", "traits"];
+    tabs.forEach(t => {
+        const el = document.getElementById(`tab-${t}-content`);
+        if (el) el.style.display = (t === tab) ? "block" : "none";
+    });
+}
+
+// Search Functionality
+function handleSearch() {
+    const q = document.getElementById("searchInput").value.toLowerCase().trim();
+    if (!q) {
+        document.querySelectorAll(".general-card, .element-card").forEach(c => c.style.display = "");
+        return;
+    }
+    document.querySelectorAll(".general-card, .element-card").forEach(c => {
+        const text = c.textContent.toLowerCase();
+        c.style.display = text.includes(q) ? "" : "none";
+    });
+}
+
+// Initial Run
+renderElementsGrid();
+selectElement("Taiji");
+renderCharactersTab();
+renderSkillsTab();
+renderRodsTab();
+renderTraitsTab();
+</script>
+
+</body>
+</html>

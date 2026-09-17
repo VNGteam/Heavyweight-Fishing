@@ -29,7 +29,6 @@ local Character = require(script.features.character)
 -- UI Tabs
 local TabCauCa = require(script.ui.tabs.tab_cau_ca)
 local TabSanBoss = require(script.ui.tabs.tab_san_boss)
-local TabQuanLyCa = require(script.ui.tabs.tab_quan_ly_ca)
 local TabThanLinh = require(script.ui.tabs.tab_than_linh)
 local TabNhiemVu = require(script.ui.tabs.tab_nhiem_vu)
 local TabShop = require(script.ui.tabs.tab_shop)
@@ -55,7 +54,6 @@ BossDps.Init(Window.screenGui)
 -- 3. Tạo các Tab chức năng
 local tabFishing      = Window.CreateTab("Câu Cá")
 local tabBoss         = Window.CreateTab("Săn Boss")
-local tabFishManager  = Window.CreateTab("Quản Lý Cá")
 local tabGod          = Window.CreateTab("Thần Linh")
 local tabQuests       = Window.CreateTab("Nhiệm Vụ")
 local tabShop         = Window.CreateTab("Shop & Chế Mồi")
@@ -68,7 +66,6 @@ local tabExperimental = Window.CreateTab("Thử Nghiệm")
 -- 4. Render nội dung từng Tab
 TabCauCa.Render(tabFishing)
 TabSanBoss.Render(tabBoss)
-TabQuanLyCa.Render(tabFishManager)
 TabThanLinh.Render(tabGod)
 TabNhiemVu.Render(tabQuests)
 TabShop.Render(tabShop)
@@ -89,13 +86,6 @@ ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
 Shop.InitInventoryWatcher(Config)
 Weather.CheckWeatherHopOnJoin(Config)
 Spirits.CheckNPCHopOnJoin(Config)
-
--- Áp dụng Fullbright ngay khi load (nếu bật sẵn)
-if Config.Fullbright then
-    Visuals.ApplyFullbright(true, Config)
-end
--- Khởi động Anti-Glare (giữ sáng ổn định khi thời tiết đổi)
-Visuals.SetupAntiGlare(Config, State.connections)
 
 -- Lắng nghe tin nhắn chat để săn Secret Boss
 pcall(function()

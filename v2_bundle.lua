@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.8"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.4"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -413,7 +413,6 @@ ConfigModule.Config = {
     AnchorBar = true,
     AutoSlam = true,
     AutoCharge = true,
-    AutoRhythmHit = true,
     AntiStuckEnabled = false,
 
     -- Smart Combo V2
@@ -570,11 +569,6 @@ ConfigModule.Config = {
     TicketRemoteClaim = true,
     AutoBuyTickets = false,
 
-    -- Nhiệm Vụ Kỹ Năng Zeng Tianguo & Chế Độ Song Song (Parallel Quest Mode)
-    AutoZengTianguoQuest = false,
-    ParallelQuestMode = true,
-    ZengTianguoAutoClaim = true,
-
     -- Lọc Bán Cá & Kho Báu
     KeepMutations = true,
     KeepHeavyFish = false,
@@ -620,8 +614,6 @@ ConfigModule.Config = {
     ClearFarVision = true,
     NoFog = false,
     Fullbright = false,
-    FullbrightLevel = 2.0,
-    FullbrightAntiGlare = true,
     PerformanceMode = false,
     HideGameUI = false,
     HideOverheadNames = false,
@@ -639,21 +631,12 @@ ConfigModule.Config = {
     AutoRejoin = true,
 
     -- Discord Webhook
-    WebhookUrl = "https://discord.com/api/webhooks/1550111320592875582/avZ-iCes8u9LDAtW7hAwr8or-rVEgHC0WQrid8T1oNJDtwqBajDjpa7RhDZ2EWDdWjW3",
-    WebhookEnabled = true,
+    WebhookUrl = "",
+    WebhookEnabled = false,
     WebhookNotifyBoss = true,
     WebhookNotifyNPC = true,
-    WebhookHourlyStats = true,
-    WebhookNotifyTicketQuest = true,
-    WebhookStatsInterval = 30,
-    ReportKeybindsEnabled = true,
-    KeybindWeatherReport = Enum.KeyCode.F4,
-    KeybindInventoryReport = Enum.KeyCode.F6,
-    KeybindQuestReport = Enum.KeyCode.F7,
-    KeybindTeleportReport = Enum.KeyCode.F8,
-    DiscordRemoteEnabled = false,
-    DiscordBotToken = "",
-    DiscordChannelId = "1396490335269421238",
+    WebhookHourlyStats = false,
+    WebhookStatsInterval = 60,
 
     -- Telegram Bot
     TelegramEnabled = false,
@@ -684,7 +667,6 @@ ConfigModule.ConfigLabelMap = {
     ["Tự Dùng Kỹ Năng Cần"] = "AutoSkills",
     ["Tự Động Đập Cần (Auto Slam)"] = "AutoSlam",
     ["Tự Động Sạc Dây (Auto Charge)"] = "AutoCharge",
-    ["Auto Rhythm Hit (Cá Octo)"] = "AutoRhythmHit",
     ["Tự Động Chống Kẹt Cần (Anti-Stuck)"] = "AntiStuckEnabled",
 
     ["Bật Combo Kỹ Năng Tự Động"] = "SmartComboEnabled",
@@ -749,10 +731,6 @@ ConfigModule.ConfigLabelMap = {
     ["Đổi Server Tìm Taoist"] = "AutoServerHopTaoist",
 
     ["Tự Động Nộp Vé Nhiệm Vụ (Tickets)"] = "AutoTicketQuest",
-    ["Tự Động Làm Vé Nhiệm Vụ"] = "AutoTicketQuest",
-    ["Tự Động Nhiệm Vụ Zeng Tianguo"] = "AutoZengTianguoQuest",
-    ["Ưu Tiên Ghép Bãi Song Song"] = "ParallelQuestMode",
-    ["Tự Động Trả Quest Zeng Tianguo"] = "ZengTianguoAutoClaim",
     ["Chọn Độ Khó Vé Nhiệm Vụ"] = "TicketDifficulty",
     ["Chế Độ Nhiệm Vụ"] = "TicketQuestMode",
     ["Loại Mồi Làm Nhiệm Vụ 100 Mồi"] = "TicketBaitChoice",
@@ -788,8 +766,6 @@ ConfigModule.ConfigLabelMap = {
     ["Tầm Nhìn Xa (Xóa Mờ Map)"] = "ClearFarVision",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
-    ["Mức Độ Sáng"] = "FullbrightLevel",
-    ["Chống Lóa Thời Tiết (Anti-Glare)"] = "FullbrightAntiGlare",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
     ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
     ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",
@@ -2620,62 +2596,13 @@ function Fishing.HandleMinigame(config, fUI)
         Fishing.lastProgressionTime = now
     end
 
-    -- Rhythm Hit (Octo minigame) - Giống người thật: phản xạ có trễ, bấm khi note gần vùng hit
+    -- Rhythm Hit (Octo minigame)
     if config.AutoRhythmHit and fUI:FindFirstChild("RhythmFrame") then
         local rFrame = fUI.RhythmFrame
         if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
-            -- Khởi tạo state nếu chưa có (defensive init)
-            if not Fishing._rhythmSeenNotes then
-                Fishing._rhythmSeenNotes = {}
-            end
-            if not Fishing._rhythmLastClean then
-                Fishing._rhythmLastClean = now
-            end
-
-            -- Dọn bảng nhớ mỗi 3 giây (khi note mới spawn chu kỳ mới)
-            if (now - Fishing._rhythmLastClean) > 3.0 then
-                Fishing._rhythmSeenNotes = {}
-                Fishing._rhythmLastClean = now
-            end
-
             for _, hitNote in ipairs(rFrame:GetChildren()) do
-                if hitNote.Name:find("Note") and hitNote:IsA("GuiObject") then
-                    local noteId = hitNote.Name .. tostring(hitNote.AbsolutePosition.X)
-
-                    -- Chỉ xử lý note chưa từng bấm
-                    if not Fishing._rhythmSeenNotes[noteId] then
-                        -- Kiểm tra note có đang ở gần vùng hit (X ~ 0.40 → 0.60 của frame)
-                        local noteX = hitNote.AbsolutePosition.X
-                        local frameW = rFrame.AbsoluteSize.X
-                        local frameX = rFrame.AbsolutePosition.X
-                        local relativeX = frameW > 0 and ((noteX - frameX) / frameW) or 0.5
-
-                        -- Note chạy từ phải sang trái → chỉ bấm khi note đã vào vùng 35%–65%
-                        if hitNote.Visible and relativeX >= 0.35 and relativeX <= 0.65 then
-                            Fishing._rhythmSeenNotes[noteId] = true
-
-                            -- Xác suất 6% "chậm tay" → bỏ qua note này (giống miss nhỏ của người thật)
-                            local missChance = math.random(1, 100)
-                            if missChance <= 6 then
-                                -- Bỏ qua, để note trôi qua (late miss)
-                            else
-                                -- Reaction time người thật: 120ms–280ms (ngẫu nhiên)
-                                local reactionDelay = 0.12 + math.random() * 0.16
-
-                                -- Jitter nhỏ ±20ms để timing không đều đặn hoàn hảo
-                                local jitter = (math.random() - 0.5) * 0.04
-
-                                task.delay(reactionDelay + jitter, function()
-                                    -- Xác nhận lại note vẫn còn trong frame (người thật cũng hủy nếu note đã qua)
-                                    if rFrame and rFrame.Visible and hitNote and hitNote.Visible then
-                                        pcall(function()
-                                            Events.RhythmHit:FireServer(hitNote.Name)
-                                        end)
-                                    end
-                                end)
-                            end
-                        end
-                    end
+                if hitNote.Name:find("Note") and hitNote.Visible then
+                    Events.RhythmHit:FireServer(hitNote.Name)
                 end
             end
         end
@@ -2939,53 +2866,14 @@ function Quest.FindTicketNPC()
         return Quest.state.cachedNPCModel, Quest.state.cachedNPCPos, Quest.state.cachedNPCPrompt, Quest.state.cachedNPCCFrame
     end
 
-    local function extractModelData(model)
-        if not model then return nil, nil, nil end
-        local p = model:FindFirstChildWhichIsA("ProximityPrompt", true)
-        local hrp = (p and p.Parent:IsA("BasePart") and p.Parent)
-            or model:FindFirstChild("HumanoidRootPart")
-            or model:FindFirstChild("Torso")
-            or model:FindFirstChild("UpperTorso")
-            or model.PrimaryPart
-            or model:FindFirstChildWhichIsA("BasePart")
-        local cf = (hrp and hrp.CFrame) or (model:IsA("Model") and model:GetPivot()) or model.CFrame
-        return cf, p, hrp
+    local function extractModelData(inst)
+        if not inst then return nil end
+        local cf = inst:IsA("Model") and inst:GetPivot() or (inst:IsA("BasePart") and inst.CFrame)
+        local prompt = inst:FindFirstChildWhichIsA("ProximityPrompt", true)
+        return cf, prompt
     end
 
-    -- 1. Ưu tiên tìm đúng cấu trúc: Workspace.NPC.Function["Ticket Quest Giver"]
-    local directModel = nil
-    local npcFolder = Workspace:FindFirstChild("NPC")
-    if npcFolder then
-        local funcFolder = npcFolder:FindFirstChild("Function")
-        if funcFolder then
-            directModel = funcFolder:FindFirstChild("Ticket Quest Giver")
-        end
-        if not directModel then
-            for _, ch in ipairs(npcFolder:GetChildren()) do
-                local n = ch.Name:lower()
-                if ch:IsA("Model") and (n:find("ticket") or n:find("giver")) then
-                    directModel = ch
-                    break
-                elseif ch:IsA("Folder") then
-                    for _, sub in ipairs(ch:GetChildren()) do
-                        local sn = sub.Name:lower()
-                        if sub:IsA("Model") and (sn:find("ticket") or sn:find("giver")) then
-                            directModel = sub
-                            break
-                        end
-                    end
-                end
-                if directModel then break end
-            end
-        end
-    end
-
-    if not directModel then
-        directModel = Workspace:FindFirstChild("Ticket Quest Giver", true)
-            or Workspace:FindFirstChild("Ticket Quest", true)
-            or Workspace:FindFirstChild("TicketNPC", true)
-    end
-
+    local directModel = Workspace:FindFirstChild("Ticket Quest") or Workspace:FindFirstChild("TicketNPC")
     if directModel then
         local cf, p = extractModelData(directModel)
         if cf then
@@ -3001,20 +2889,35 @@ function Quest.FindTicketNPC()
     for _, fName in ipairs({"NPC", "NPCs", "Entities", "Characters", "Spawns"}) do
         local folder = Workspace:FindFirstChild(fName)
         if folder then
-            for _, inst in ipairs(folder:GetDescendants()) do
-                if inst:IsA("Model") then
-                    local n = inst.Name:lower()
-                    if n:find("ticket") or n:find("giver") then
-                        local cf, p = extractModelData(inst)
-                        if cf then
-                            Quest.state.cachedNPCModel = inst
-                            Quest.state.cachedNPCPos = cf.Position
-                            Quest.state.cachedNPCCFrame = cf
-                            Quest.state.cachedNPCPrompt = p
-                            Quest.state.spotNPC = cf.Position
-                            return inst, cf.Position, p, cf
-                        end
+            for _, inst in ipairs(folder:GetChildren()) do
+                local n = inst.Name:lower()
+                if n:find("ticket") or n:find("giver") then
+                    local cf, p = extractModelData(inst)
+                    if cf then
+                        Quest.state.cachedNPCModel = inst
+                        Quest.state.cachedNPCPos = cf.Position
+                        Quest.state.cachedNPCCFrame = cf
+                        Quest.state.cachedNPCPrompt = p
+                        Quest.state.spotNPC = cf.Position
+                        return inst, cf.Position, p, cf
                     end
+                end
+            end
+        end
+    end
+
+    for _, inst in ipairs(Workspace:GetChildren()) do
+        if inst:IsA("Model") then
+            local n = inst.Name:lower()
+            if n:find("ticket") and (n:find("quest") or n:find("giver") or n:find("npc")) then
+                local cf, p = extractModelData(inst)
+                if cf then
+                    Quest.state.cachedNPCModel = inst
+                    Quest.state.cachedNPCPos = cf.Position
+                    Quest.state.cachedNPCCFrame = cf
+                    Quest.state.cachedNPCPrompt = p
+                    Quest.state.spotNPC = cf.Position
+                    return inst, cf.Position, p, cf
                 end
             end
         end
@@ -3230,26 +3133,6 @@ function Quest.CloseDialogue()
         if dlg then dlg.Visible = false end
     end)
     Quest.ClearUINavigation()
-end
-
-function Quest.ClickQuestButton()
-    local buttons = Quest.GetDialogueButtons()
-    for _, b in ipairs(buttons) do
-        if b.clean == "quest" or (b.clean:find("quest") and not b.clean:find("accept") and not b.clean:find("nevermind")) then
-            return Quest.ClickButtonEntry(b, "Quest")
-        end
-    end
-    return false
-end
-
-function Quest.ClickLeaveOrClose()
-    local buttons = Quest.GetDialogueButtons()
-    for _, b in ipairs(buttons) do
-        if b.clean:find("leave") or b.clean:find("close") or b.clean:find("xong") then
-            return Quest.ClickButtonEntry(b, "Close")
-        end
-    end
-    return false
 end
 
 function Quest.CheckAllQuestsDoneToday()
@@ -3545,246 +3428,6 @@ function Quest.DetectActiveQuest()
     return nil, nil, 0, 0, false, nil
 end
 
---// HỆ THỐNG NHIỆM VỤ ZENG TIANGUO (SKILL UPGRADE) & SONG SONG //--
-Quest.zengState = {
-    active = false,
-    currentQuestTitle = "Chưa nhận nhiệm vụ",
-    currentProgress = 0,
-    targetProgress = 0,
-    isCompleted = false,
-    objectiveCode = "none",
-    zoneTarget = "",
-    statusText = "Đang quét nhiệm vụ Zeng Tianguo...",
-    lastSyncTime = 0,
-    lastNpcInteract = 0,
-    lastClaimAttempt = 0,
-
-    spotBamboo = Vector3.new(-1223.0, 9.0, -24.1),
-    spotFrost = Vector3.new(-1366.0, 14.0, -1495.4),
-    spotSovereign = Vector3.new(-1276.4, 12.0, 1239.7),
-    spotFallout = Vector3.new(65.5, 12.0, 1181.3),
-    spotNPC = Vector3.new(65.5, 12.0, 1181.3),
-
-    uiStatus = nil,
-    uiProgress = nil,
-    uiParallelBadge = nil,
-}
-
-function Quest.DetectActiveZengQuest()
-    local pData = Quest.GetPlayerDataFolder()
-    if not pData then return nil, "Chưa nhận nhiệm vụ", 0, 0, false, nil end
-    local questFolder = pData:FindFirstChild("Quest")
-    if not questFolder then return nil, "Chưa nhận nhiệm vụ", 0, 0, false, nil end
-
-    local zq = questFolder:FindFirstChild("Zeng Tianguo Quest", true)
-        or questFolder:FindFirstChild("Tang Thien Quoc Quest", true)
-        or questFolder:FindFirstChild("Tang Thien Quoc", true)
-        or questFolder:FindFirstChild("Zeng Tianguo", true)
-
-    if not zq then
-        for _, ch in ipairs(questFolder:GetDescendants()) do
-            if ch:IsA("Folder") or ch:IsA("Configuration") then
-                local cn = ch.Name:lower()
-                if (cn:find("zeng") and cn:find("tianguo")) or (cn:find("tang") and cn:find("thien")) then
-                    zq = ch
-                    break
-                end
-            end
-        end
-    end
-
-    if not zq then
-        Quest.zengState.active = false
-        Quest.zengState.currentQuestTitle = "Chưa nhận nhiệm vụ"
-        Quest.zengState.currentProgress = 0
-        Quest.zengState.targetProgress = 0
-        Quest.zengState.isCompleted = false
-        Quest.zengState.objectiveCode = "none"
-        Quest.zengState.zoneTarget = ""
-        Quest.zengState.statusText = "Chưa nhận nhiệm vụ từ Zeng Tianguo"
-        return nil, "Chưa nhận nhiệm vụ", 0, 0, false, nil
-    end
-
-    local cur = 0
-    local curVal = zq:FindFirstChild("1")
-    if curVal and tonumber(curVal.Value) ~= nil then
-        cur = tonumber(curVal.Value)
-    end
-
-    local objFolder = zq:FindFirstChild("Objective")
-    local objVal = objFolder and objFolder:FindFirstChild("1")
-    local objStr = objVal and tostring(objVal.Value or "") or ""
-
-    local rawTitle, rawMax, rawCode, rawExtra = objStr:match("^([^,]+),([^,]+),([^,]+),?(.*)$")
-    if not rawTitle then
-        rawTitle, rawMax = objStr:match("^([^,]+),([^,]+)")
-    end
-
-    local max = tonumber(rawMax) or 100
-    local title = (rawTitle and #rawTitle > 0) and rawTitle or zq.Name
-    local code = rawCode or "none"
-    local extra = rawExtra or ""
-
-    local isDone = (max > 0 and cur >= max)
-
-    Quest.zengState.active = true
-    Quest.zengState.currentQuestTitle = title
-    Quest.zengState.currentProgress = cur
-    Quest.zengState.targetProgress = max
-    Quest.zengState.isCompleted = isDone
-    Quest.zengState.objectiveCode = code
-    Quest.zengState.zoneTarget = extra
-
-    if isDone then
-        Quest.zengState.statusText = string.format("Đã xong: %s (%d/%d) - Sẵn sàng nộp quest!", title, cur, max)
-    else
-        Quest.zengState.statusText = string.format("Đang làm: %s (%d/%d)", title, cur, max)
-    end
-
-    return code, title, cur, max, isDone, extra
-end
-
-function Quest.GetTargetZengSpot()
-    local zone = (Quest.zengState.zoneTarget or ""):lower()
-    local title = (Quest.zengState.currentQuestTitle or ""):lower()
-    if zone:find("bamboo") or zone:find("tre") or title:find("bamboo") then
-        return Quest.zengState.spotBamboo
-    elseif zone:find("frost") or zone:find("băng") or title:find("frost") then
-        return Quest.zengState.spotFrost
-    elseif zone:find("sovereign") or title:find("sovereign") then
-        return Quest.zengState.spotSovereign
-    elseif zone:find("fallout") or title:find("fallout") then
-        return Quest.zengState.spotFallout
-    end
-    if Quest.zengState.objectiveCode == "UseSkillForTimes" or title:find("skill") or title:find("chiêu") then
-        return nil
-    end
-    return Quest.zengState.spotBamboo
-end
-
-function Quest.FindZengNPCModel()
-    local npcFolder = Workspace:FindFirstChild("NPC")
-    if npcFolder then
-        local funcFolder = npcFolder:FindFirstChild("Function")
-        if funcFolder then
-            local found = funcFolder:FindFirstChild("Zeng Tianguo") or funcFolder:FindFirstChild("Tang Thien Quoc")
-            if found and (found:FindFirstChild("HumanoidRootPart") or found:FindFirstChildWhichIsA("BasePart")) then
-                return found
-            end
-        end
-        for _, sub in ipairs(npcFolder:GetChildren()) do
-            local found = sub:FindFirstChild("Zeng Tianguo") or sub:FindFirstChild("Tang Thien Quoc")
-            if found and (found:FindFirstChild("HumanoidRootPart") or found:FindFirstChildWhichIsA("BasePart")) then
-                return found
-            end
-        end
-    end
-    local direct = Workspace:FindFirstChild("Zeng Tianguo", true) or Workspace:FindFirstChild("Tang Thien Quoc", true)
-    if direct then return direct end
-
-    if npcFolder then
-        for _, ch in ipairs(npcFolder:GetDescendants()) do
-            if ch:IsA("Model") then
-                local n = ch.Name:lower()
-                if (n:find("zeng") and n:find("tianguo")) or (n:find("tang") and n:find("thien")) then
-                    return ch
-                end
-            end
-        end
-    end
-    return nil
-end
-
-function Quest.TeleportToZengNPC()
-    local char = LocalPlayer.Character
-    local root = char and char:FindFirstChild("HumanoidRootPart")
-    if not root then return false end
-
-    local model = Quest.FindZengNPCModel()
-    if model then
-        local npcRoot = model:FindFirstChild("HumanoidRootPart")
-            or model:FindFirstChildWhichIsA("BasePart")
-        if npcRoot then
-            local targetPos = npcRoot.Position + Vector3.new(0, 3, 3)
-            root.CFrame = CFrame.new(targetPos)
-            Quest.zengState.spotNPC = targetPos
-            return true, model, npcRoot
-        end
-    end
-
-    if Quest.zengState.spotNPC then
-        root.CFrame = CFrame.new(Quest.zengState.spotNPC)
-        return true
-    end
-    return false
-end
-
-function Quest.InteractZengNPC(isClaim)
-    local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum then
-        pcall(function()
-            hum.Sit = false
-            hum:UnequipTools()
-        end)
-    end
-    if Events and Events:FindFirstChild("CancelCast") then
-        pcall(function() Events.CancelCast:FireServer() end)
-    end
-
-    Quest.TeleportToZengNPC()
-    task.wait(0.6)
-
-    local npc = Quest.FindZengNPCModel()
-    if npc then
-        local prompt = npc:FindFirstChildWhichIsA("ProximityPrompt", true)
-        if prompt then
-            pcall(function()
-                fireproximityprompt(prompt)
-            end)
-            task.wait(0.6)
-        end
-    end
-
-    local dlg = Quest.GetDialogueGui()
-    if dlg and dlg.Visible then
-        task.wait(0.3)
-        local clicked = false
-        if isClaim then
-            clicked = Quest.ClickLeaveOrClose()
-        else
-            clicked = Quest.ClickQuestButton() or Quest.ClickLeaveOrClose()
-        end
-        task.wait(0.5)
-        Quest.CloseDialogue()
-        return clicked
-    end
-    return false
-end
-
-function Quest.UpdateZengUI(config)
-    if Quest.zengState.uiStatus and Quest.zengState.uiStatus.Set then
-        Quest.zengState.uiStatus.Set(Quest.zengState.statusText)
-    end
-    if Quest.zengState.uiProgress and Quest.zengState.uiProgress.Set then
-        local max = Quest.zengState.targetProgress
-        local cur = Quest.zengState.currentProgress
-        local pct = max > 0 and math.floor((cur / max) * 100) or 0
-        Quest.zengState.uiProgress.Set(string.format("%d / %d (%d%%)", cur, max, pct))
-    end
-    if Quest.zengState.uiParallelBadge and Quest.zengState.uiParallelBadge.Set and config then
-        if config.AutoTicketQuest and config.AutoZengTianguoQuest then
-            Quest.zengState.uiParallelBadge.Set("⚡ SONG SONG (Ưu Tiên Vé)")
-        elseif config.AutoTicketQuest then
-            Quest.zengState.uiParallelBadge.Set("🎫 Chỉ Chạy Vé NV")
-        elseif config.AutoZengTianguoQuest then
-            Quest.zengState.uiParallelBadge.Set("⚡ Chỉ Chạy Zeng Tianguo")
-        else
-            Quest.zengState.uiParallelBadge.Set("Đang Tắt")
-        end
-    end
-end
-
 function Quest.ScanAndUpdateStatus()
     local qType, qTitle, cur, max, done, cdSec = Quest.DetectActiveQuest()
     if qType then
@@ -3818,78 +3461,16 @@ function Quest.ScanAndUpdateStatus()
     return qType, qTitle, cur, max, done, cdSec
 end
 
--- 4. Vòng lặp chính Tick của Ticket Quest & Zeng Tianguo
+-- 4. Vòng lặp chính Tick của Ticket Quest
 function Quest.Tick(config)
-    if not config.AutoTicketQuest and not config.AutoZengTianguoQuest then return end
-    if Quest.state.isBusyRoutine or Quest.state.isInteracting then return end
+    if not config.AutoTicketQuest or Quest.state.isBusyRoutine or Quest.state.isInteracting then return end
+
+    if Quest.IsAllQuestsDoneToday() then
+        Quest.state.statusText = "Đã hết nhiệm vụ hôm nay! Hẹn gặp lại ngày mai."
+        return
+    end
 
     local now = tick()
-
-    -- Đồng bộ tiến độ Zeng Tianguo
-    local zCode, zTitle, zCur, zMax, zDone, zZone = Quest.DetectActiveZengQuest()
-    Quest.UpdateZengUI(config)
-
-    -- NẾU CHỈ BẬT ZENG TIANGUO (KHÔNG BẬT VÉ): CHẠY CHẾ ĐỘ SOLO ZENG TIANGUO
-    if not config.AutoTicketQuest and config.AutoZengTianguoQuest then
-        if zDone then
-            if now - (Quest.zengState.lastClaimAttempt or 0) >= 10.0 then
-                Quest.zengState.lastClaimAttempt = now
-                Quest.zengState.statusText = "Đã xong! Đang nộp quest Zeng Tianguo..."
-                Quest.UpdateZengUI(config)
-                Quest.InteractZengNPC(true)
-                task.wait(1.0)
-                Quest.DetectActiveZengQuest()
-                Quest.UpdateZengUI(config)
-            end
-            return
-        end
-
-        local char = LocalPlayer.Character
-        local pg = LocalPlayer:FindFirstChild("PlayerGui")
-        local isFishing = char and char:GetAttribute("Fishing") == true
-        local isMinigame = char and (char:GetAttribute("Minigame") == true or (pg and pg:FindFirstChild("MainGui") and pg.MainGui:FindFirstChild("Fishing") and pg.MainGui.Fishing.Visible))
-        if isFishing or isMinigame then return end
-
-        local targetSpot = Quest.GetTargetZengSpot() or Quest.state.spot100Fish
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        local spotPos = typeof(targetSpot) == "CFrame" and targetSpot.Position or targetSpot
-        if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
-            Quest.TeleportTo(targetSpot)
-            Quest.CloseDialogue()
-        end
-        return
-    end
-
-    -- KIỂM TRA NẾU ĐÃ HẾT VÉ NHIỆM VỤ HÔM NAY
-    if Quest.IsAllQuestsDoneToday() then
-        Quest.state.statusText = "Đã hết nhiệm vụ hôm nay! (Hẹn ngày mai quay lại)"
-        Quest.state.isCooldown = true
-        Quest.state.readyForNewQuest = false
-
-        -- NẾU BẬT ZENG TIANGUO VÀ CHƯA XONG: TẬN DỤNG CÀY NỐT ZENG TIANGUO THAY VÌ ĐỨNG IM!
-        if config.AutoZengTianguoQuest and zCode and not zDone then
-            local subSpot = Quest.GetTargetZengSpot() or Quest.state.spot100Fish
-            local char = LocalPlayer.Character
-            local root = char and char:FindFirstChild("HumanoidRootPart")
-            local spotPos = typeof(subSpot) == "CFrame" and subSpot.Position or subSpot
-            if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
-                Quest.TeleportTo(subSpot)
-            end
-            Quest.state.statusText = string.format("Hết vé: Cày Zeng Tianguo [%s (%d/%d)]", zTitle, zCur, zMax)
-            Quest.UpdateZengUI(config)
-            return
-        end
-
-        -- Tự động đưa về Home Spot để farm câu thường nếu có cài đặt
-        if config.TicketReturnHomeWhenDone and config.HomeFarmSpot and not Quest.state.isAtHomeSpot then
-            Quest.TeleportTo(config.HomeFarmSpot)
-            Quest.state.isAtHomeSpot = true
-            Quest.state.statusText = "Hết quest hôm nay: đã về Home Spot farm!"
-            Utils.ShowNotification("Home Spot", "Đã về vị trí Home Spot farm vì đã hết vé hôm nay!", "SUCCESS", 5)
-        end
-        return
-    end
-
     local qType, qTitle, cur, max, done, detectedCd = Quest.ScanAndUpdateStatus()
     local isDoneNow = Quest.state.isCompleted or done or (Quest.state.targetProgress > 0 and Quest.state.currentProgress >= Quest.state.targetProgress)
 
@@ -3906,20 +3487,6 @@ function Quest.Tick(config)
             local mins = math.floor(remain / 60)
             local secs = remain % 60
             Quest.state.statusText = string.format("Đang chờ hồi chiêu vé (còn %02d:%02d)", mins, secs)
-
-            -- Trong thời gian hồi chiêu vé: nếu bật Zeng Tianguo thì tranh thủ làm Zeng Tianguo!
-            if config.AutoZengTianguoQuest and zCode and not zDone then
-                local subSpot = Quest.GetTargetZengSpot() or Quest.state.spot100Fish
-                local char = LocalPlayer.Character
-                local root = char and char:FindFirstChild("HumanoidRootPart")
-                local spotPos = typeof(subSpot) == "CFrame" and subSpot.Position or subSpot
-                if root and spotPos and (root.Position - spotPos).Magnitude > 25 then
-                    Quest.TeleportTo(subSpot)
-                end
-                Quest.state.statusText = string.format("Chờ hồi vé (%02d:%02d): Cày Zeng Tianguo [%d/%d]", mins, secs, zCur, zMax)
-                Quest.UpdateZengUI(config)
-                return
-            end
 
             if config.TicketReturnHomeWhenDone and config.HomeFarmSpot and not Quest.state.isAtHomeSpot then
                 local homeTarget = config.HomeFarmSpot
@@ -5074,62 +4641,17 @@ function Visuals.EnsureESPFolder()
 end
 
 -- 2. Lighting Tweaks (Fullbright & Fog)
-function Visuals.ApplyFullbright(enabled, config)
-    config = config or {}
+function Visuals.ApplyFullbright(enabled)
     if enabled then
-        local brightLevel = math.clamp(tonumber(config.FullbrightLevel) or 2.0, 1.0, 3.5)
-        Lighting.Brightness = brightLevel
-        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
-        Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+        Lighting.Brightness = 2
         Lighting.ClockTime = 14
         Lighting.FogEnd = 100000
         Lighting.GlobalShadows = false
-        Lighting.ExposureCompensation = 0
-        -- Giảm Atmosphere glare/haze
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo then
-            atmo.Density = 0.05
-            atmo.Haze = 0
-            atmo.Glare = 0
-        end
-        -- Giảm BloomEffect tránh chói
-        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
-        if bloom then
-            bloom.Intensity = 0.1
-            bloom.Size = 10
-        end
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
     else
-        Lighting.Brightness = 2
-        Lighting.Ambient = Color3.fromRGB(70, 70, 70)
-        Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
+        Lighting.Brightness = 1
         Lighting.GlobalShadows = true
-        Lighting.ExposureCompensation = 0
-        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
-        if atmo then
-            atmo.Density = 0.3
-            atmo.Haze = 0.5
-        end
-        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
-        if bloom then
-            bloom.Intensity = 1
-        end
     end
-end
-
--- Anti-Glare: kìm hãm ánh sáng khi thời tiết đổi (Sunny, Windy, v.v.)
-function Visuals.SetupAntiGlare(config, activeConnections)
-    local conn = Lighting.Changed:Connect(function(prop)
-        if not config.Fullbright or (config.FullbrightAntiGlare == false) then return end
-        if prop == "Brightness" and Lighting.Brightness > 3.0 then
-            Lighting.Brightness = math.clamp(tonumber(config.FullbrightLevel) or 2.0, 1.0, 3.5)
-        elseif prop == "ExposureCompensation" and Lighting.ExposureCompensation > 0.1 then
-            Lighting.ExposureCompensation = 0
-        end
-    end)
-    if activeConnections then
-        table.insert(activeConnections, conn)
-    end
-    return conn
 end
 
 function Visuals.ApplyClearVision(enabled)
@@ -6209,132 +5731,6 @@ function TabCaiDat.Render(parent)
         Utils.ShowNotification("Webhook", "Đã gửi tin nhắn test đến Discord!", "SUCCESS", 4)
     end)
 
-    Components.CreateButtonRow(cardWebhook, "Báo Cáo Toàn Diện Ngay", "Gửi bảng tổng kết 14 chỉ số đầy đủ về Discord ngay", "📊 Báo Cáo Ngay", function()
-        if not Config.WebhookUrl or Config.WebhookUrl == "" then
-            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
-            return
-        end
-        Utils.ShowNotification("Webhook", "Đang tổng hợp báo cáo toàn diện...", "INFO", 2)
-        local pData = game:GetService("ReplicatedStorage"):FindFirstChild("Data") and LocalPlayer and game:GetService("ReplicatedStorage").Data:FindFirstChild(LocalPlayer.UserId)
-        local fishCount = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
-        local cashVal = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
-        local ticketVal = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-        local questDone = pData and pData:FindFirstChild("TicketQuestDailyCount") and tonumber(pData.TicketQuestDailyCount.Value) or 0
-        local essenceVal = pData and pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
-        local rerollVal = pData and pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
-        local curWeather = (State and State.CurrentWeather) or "Clear (Trời Quang)"
-        local timeStr = os.date("%H:%M:%S - %d/%m/%Y")
-        local jobId = tostring(game.JobId or "N/A")
-        local placeId = tostring(game.PlaceId or "18779600655")
-
-        Utils.SendDiscordWebhook(
-            "📊 BÁO CÁO TOÀN DIỆN (YÊU CẦU THỦ CÔNG)",
-            string.format("👤 **%s** — Server: `%s`", LocalPlayer and LocalPlayer.DisplayName or "User", jobId),
-            3447003,
-            {
-                { name = "🌦️ Thời Tiết", value = curWeather, inline = true },
-                { name = "🐟 Tổng Cá", value = tostring(fishCount) .. " con", inline = true },
-                { name = "💰 Tiền", value = "$" .. tostring(cashVal), inline = true },
-                { name = "🎫 Vé Nhiệm Vụ", value = tostring(ticketVal) .. " Vé", inline = true },
-                { name = "📜 NV Xong Hôm Nay", value = tostring(questDone) .. "/20 NV", inline = true },
-                { name = "🔮 Essence Orb", value = tostring(essenceVal) .. " Viên", inline = true },
-                { name = "🎲 Trait Reroll", value = tostring(rerollVal) .. " Vé", inline = true },
-                { name = "⚡ Code Vào Server", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
-                { name = "⏰ Cập nhật lúc", value = timeStr, inline = false }
-            },
-            Config.WebhookUrl
-        )
-        Utils.ShowNotification("Webhook", "Đã gửi báo cáo toàn diện!", "SUCCESS", 4)
-    end)
-
-    Components.CreateButtonRow(cardWebhook, "Báo Cáo Thời Tiết & Boss", "Gửi embed thời tiết và boss mục tiêu có thể ra", "🌦️ Thời Tiết", function()
-        if not Config.WebhookUrl or Config.WebhookUrl == "" then
-            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
-            return
-        end
-        local curWeather = (State and State.CurrentWeather) or "Clear (Trời Quang)"
-        local jobId = tostring(game.JobId or "N/A")
-        local placeId = tostring(game.PlaceId or "18779600655")
-        Utils.SendDiscordWebhook(
-            "🌦️ BÁO CÁO THỜI TIẾT & BOSS",
-            string.format("👤 **%s** — Server: `%s`", LocalPlayer and LocalPlayer.DisplayName or "User", jobId),
-            3447003,
-            {
-                { name = "🌦️ Thời Tiết", value = curWeather, inline = true },
-                { name = "⚡ Code Vào Server", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
-                { name = "⏰ Cập nhật lúc", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = false }
-            },
-            Config.WebhookUrl
-        )
-        Utils.ShowNotification("Webhook", "Đã gửi báo cáo Thời Tiết!", "SUCCESS", 4)
-    end)
-
-    Components.CreateButtonRow(cardWebhook, "Báo Cáo Tài Sản & Ba Lô", "Gửi embed tiền, gems, vé, essence, trait", "💰 Tài Sản", function()
-        if not Config.WebhookUrl or Config.WebhookUrl == "" then
-            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
-            return
-        end
-        local pData = game:GetService("ReplicatedStorage"):FindFirstChild("Data") and LocalPlayer and game:GetService("ReplicatedStorage").Data:FindFirstChild(LocalPlayer.UserId)
-        local fishCount = pData and pData:FindFirstChild("FishCaught") and tonumber(pData.FishCaught.Value) or 0
-        local cashVal = pData and pData:FindFirstChild("Cash") and tonumber(pData.Cash.Value) or 0
-        local ticketVal = pData and pData:FindFirstChild("Ticket") and tonumber(pData.Ticket.Value) or 0
-        local essenceVal = pData and pData:FindFirstChild("EssenceOrb") and tonumber(pData.EssenceOrb.Value) or 0
-        local rerollVal = pData and pData:FindFirstChild("Trait Reroll") and tonumber(pData["Trait Reroll"].Value) or 0
-        Utils.SendDiscordWebhook(
-            "💰 BÁO CÁO TÀI SẢN & KHO ĐỒ",
-            string.format("👤 **%s** — Server: `%s`", LocalPlayer and LocalPlayer.DisplayName or "User", tostring(game.JobId or "N/A")),
-            16766720,
-            {
-                { name = "💰 Tiền", value = "$" .. tostring(cashVal), inline = true },
-                { name = "🐟 Tổng Cá", value = tostring(fishCount) .. " con", inline = true },
-                { name = "🎫 Vé", value = tostring(ticketVal) .. " Vé", inline = true },
-                { name = "🔮 Essence", value = tostring(essenceVal) .. " Viên", inline = true },
-                { name = "🎲 Trait", value = tostring(rerollVal) .. " Vé", inline = true },
-                { name = "⏰ Cập nhật lúc", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = false }
-            },
-            Config.WebhookUrl
-        )
-        Utils.ShowNotification("Webhook", "Đã gửi thông tin Tài Sản!", "SUCCESS", 4)
-    end)
-
-    Components.CreateButtonRow(cardWebhook, "Lấy Code Teleport Server", "Gửi embed chứa Server Job ID và script teleport", "⚡ Teleport", function()
-        if not Config.WebhookUrl or Config.WebhookUrl == "" then
-            Utils.ShowNotification("Webhook", "Vui lòng nhập Webhook URL trước!", "WARN", 3)
-            return
-        end
-        local jobId = tostring(game.JobId or "N/A")
-        local placeId = tostring(game.PlaceId or "18779600655")
-        Utils.SendDiscordWebhook(
-            "⚡ THÔNG TIN SERVER & CODE TELEPORT",
-            string.format("👤 **%s** — Dùng code dưới đây để vào server:", LocalPlayer and LocalPlayer.DisplayName or "User"),
-            3447003,
-            {
-                { name = "🔑 Job ID", value = string.format("`%s`", jobId), inline = true },
-                { name = "⚡ Code Teleport", value = string.format("```lua\ngame:GetService(\"TeleportService\"):TeleportToPlaceInstance(%s, \"%s\", game.Players.LocalPlayer)\n```", placeId, jobId), inline = false },
-                { name = "⏰ Cập nhật lúc", value = os.date("%H:%M:%S - %d/%m/%Y"), inline = false }
-            },
-            Config.WebhookUrl
-        )
-        Utils.ShowNotification("Webhook", "Đã gửi mã Teleport!", "SUCCESS", 4)
-    end)
-
-    Components.CreateToggleRow(cardWebhook, "Bật Phím Tắt Báo Cáo (F4, F6, F7, F8)", "F4: Thời Tiết | F6: Tài Sản | F7: Nhiệm Vụ | F8: Teleport", Config.ReportKeybindsEnabled, function(v)
-        Config.ReportKeybindsEnabled = v
-    end)
-
-    -- Discord Remote Controls
-    Components.CreateCategoryHeader(parent, "🤖 Nhận Lệnh Điều Khiển Từ Xa (Discord Remote Commands)")
-    local cardRemote = Components.CreateCardGroup(parent)
-    Components.CreateToggleRow(cardRemote, "Bật Lắng Nghe Lệnh Discord", "Tự động nhận lệnh chat (!thoitiet, !kho, !ve, !tele, !baocao, !help)", Config.DiscordRemoteEnabled, function(v)
-        Config.DiscordRemoteEnabled = v
-    end)
-    Components.CreateInputRow(cardRemote, "Discord Bot Token", "Token Bot từ Discord Developer Portal", Config.DiscordBotToken or "", function(v)
-        Config.DiscordBotToken = v
-    end, nil, "MTIzNDU2Nzg5...")
-    Components.CreateInputRow(cardRemote, "Channel ID", "ID kênh Discord (tự phát hiện từ webhook nếu trống)", Config.DiscordChannelId or "", function(v)
-        Config.DiscordChannelId = v
-    end, nil, "1396490335269421238")
-
     -- Telegram Bot
     Components.CreateCategoryHeader(parent, "✈️ Thông Báo Telegram Bot")
     local cardTele = Components.CreateCardGroup(parent)
@@ -7272,7 +6668,7 @@ end
 __modules["ui.tabs.tab_nhiem_vu"] = function()
 --[[
     v2/ui/tabs/tab_nhiem_vu.lua
-    Daily Tickets Engine, Zeng Tianguo Quest, Spots Management & Remote Actions
+    Daily Tickets Engine, Settings, Spots Management & Remote Actions
 --]]
 
 local Components = __require("ui.components")
@@ -7281,649 +6677,96 @@ local Config = ConfigModule.Config
 local Quest = __require("features.quest")
 local Services = __require("core.services")
 local LocalPlayer = Services.LocalPlayer
-local Events = Services.Events
 local Utils = __require("core.utils")
 
 local TabNhiemVu = {}
 
 function TabNhiemVu.Render(parent)
-    -- ============================================================
-    -- 1. TRẠNG THÁI & BẬT/TẮT NHIỆM VỤ VÉ (TICKET QUESTS)
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "Trạng Thái & Bật/Tắt Nhiệm Vụ Vé (Ticket Quests)")
-    local questCard = Components.CreateCardGroup(parent)
+    Components.CreateCategoryHeader(parent, "📊 Trạng Thái Vé Nhiệm Vụ")
+    local cardStatus = Components.CreateCardGroup(parent)
 
-    Components.CreateToggleRow(questCard, "Tự Động Làm Vé Nhiệm Vụ", "Tự động nhận, thực hiện và trả vé nhiệm vụ theo chu kỳ 20p", Config.AutoTicketQuest, function(v)
-        Config.AutoTicketQuest = v
-        if v then
-            Quest.state.active = true
-            Utils.ShowNotification("Nhiệm Vụ Vé", "Đã bật tự động làm vé nhiệm vụ! Script sẽ quét và thực hiện quest.", "SUCCESS", 5)
-        else
-            Quest.state.active = false
-            Quest.state.isBusyRoutine = false
-            Quest.state.currentQuestType = "none"
-            Quest.state.isCooldown = false
-            Quest.state.isAtHomeSpot = false
-            Utils.ShowNotification("Nhiệm Vụ Vé", "Đã tắt tự động làm vé nhiệm vụ.", "INFO", 4)
-        end
-        Quest.ScanAndUpdateStatus()
-    end)
-
-    Components.CreateDropdownRow(questCard, "Độ Khó Nhiệm Vụ", "Chọn độ khó vé nhiệm vụ nhận từ NPC (Mặc định: Hard)", {"Hard", "Easy"}, Config.TicketDifficulty, function(v)
-        Config.TicketDifficulty = v
-    end)
-
-    local questModes = {
-        "Tự Động (Auto Detect)",
-        "Câu 10 Con Cá 1.5M+ (Map 9)",
-        "Tiêu Thụ 100 Mồi (Map 1)",
-        "Dùng Kỹ Năng 100 Lần",
-        "Câu Nhanh 100 Con Cá (Map 1)"
-    }
-    Components.CreateDropdownRow(questCard, "Chế Độ Nhiệm Vụ", "Tự động nhận diện từ game hoặc ép kiểu nhiệm vụ bạn muốn bot làm", questModes, Config.TicketQuestMode, function(v)
-        Config.TicketQuestMode = v
-        Quest.state.currentQuestType = "none"
-        Quest.state.currentProgress = 0
-        Quest.ScanAndUpdateStatus()
-    end)
-
-    local uiStatus = Components.CreateInfoRow(questCard, "Nhiệm Vụ Hiện Tại", Quest.state.statusText)
-    local uiProgress = Components.CreateInfoRow(questCard, "Tiến Độ Nhiệm Vụ", "0 / 100 (0%)")
-    local uiCooldown = Components.CreateInfoRow(questCard, "Hồi Chiêu 20 Phút", "Sẵn sàng nhận vé!")
-
+    local statusRow = Components.CreateInfoRow(cardStatus, "Tiến Độ Nhiệm Vụ", Quest.state.statusText)
     task.spawn(function()
         while true do
-            task.wait(1.2)
-            pcall(function()
-                if uiStatus and uiStatus.Set then
-                    uiStatus.Set(Quest.state.statusText)
-                end
-                if uiProgress and uiProgress.Set then
-                    local cur = Quest.state.currentProgress or 0
-                    local max = Quest.state.targetProgress or 100
-                    local pct = max > 0 and math.floor((cur / max) * 100) or 0
-                    uiProgress.Set(string.format("%d / %d (%d%%)", cur, max, pct))
-                end
-                if uiCooldown and uiCooldown.Set then
-                    if Quest.state.isCooldown and (Quest.state.cooldownEnd or 0) > tick() then
-                        local remain = math.max(0, math.floor(Quest.state.cooldownEnd - tick()))
-                        local mins = math.floor(remain / 60)
-                        local secs = remain % 60
-                        uiCooldown.Set(string.format("Còn %02d:%02d", mins, secs))
-                    elseif Quest.IsAllQuestsDoneToday and Quest.IsAllQuestsDoneToday() then
-                        uiCooldown.Set("Đã hết nhiệm vụ hôm nay!")
-                    else
-                        uiCooldown.Set("Sẵn sàng nhận vé!")
-                    end
-                end
-            end)
+            task.wait(1.5)
+            if statusRow and statusRow.Set then
+                statusRow.Set(Quest.state.statusText)
+            end
         end
     end)
 
-    -- ============================================================
-    -- 2. NHIỆM VỤ KỸ NĂNG ZENG TIANGUO & CHẾ ĐỘ SONG SONG
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "⚡ Nhiệm Vụ Kỹ Năng Zeng Tianguo & Chế Độ Song Song")
-    local zengCard = Components.CreateCardGroup(parent)
+    Components.CreateCategoryHeader(parent, "🎟️ Tự Động Nộp & Làm Vé Nhiệm Vụ (Tickets)")
+    local cardTicket = Components.CreateCardGroup(parent)
 
-    local uiParallelBadge = Components.CreateInfoRow(zengCard, "Chế Độ Vận Hành", "Đang Tắt")
-    Quest.zengState.uiParallelBadge = uiParallelBadge
+    Components.CreateToggleRow(cardTicket, "Tự Động Nộp Vé Nhiệm Vụ (Tickets)", "Tự động nhận, thực hiện và trả nhiệm vụ vé hàng ngày", Config.AutoTicketQuest, function(v) Config.AutoTicketQuest = v end)
+    Components.CreateDropdownRow(cardTicket, "Chọn Độ Khó Vé Nhiệm Vụ", "Độ khó nhiệm vụ muốn ưu tiên nhận", {"Hard", "Easy"}, Config.TicketDifficulty, function(v) Config.TicketDifficulty = v end)
+    Components.CreateDropdownRow(cardTicket, "Chế Độ Nhiệm Vụ", "Chế độ lọc loại nhiệm vụ ưu tiên", {"Tự Động (Auto Detect)", "100 Cá (Fish 100)", "100 Chiêu (Skill 100)", "15m Cá (Size 15m)", "100 Mồi (Bait 100)"}, Config.TicketQuestMode, function(v) Config.TicketQuestMode = v end)
+    Components.CreateDropdownRow(cardTicket, "Mồi Cho Nhiệm Vụ 100 Mồi", "Loại mồi dùng khi làm quest 100 mồi", {"Basic Bait", "Ancestral Bait", "Secret Bait"}, Config.TicketBaitChoice, function(v) Config.TicketBaitChoice = v end)
+    Components.CreateDropdownRow(cardTicket, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Chiêu spam cho nhiệm vụ 100 skill", {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}, Config.TicketSkillKey, function(v) Config.TicketSkillKey = v end)
+    Components.CreateDropdownRow(cardTicket, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu kết liễu nhanh cho nhiệm vụ 100 cá", {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}, Config.TicketQuickSkill, function(v) Config.TicketQuickSkill = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự bán cá giải phóng chỗ trống khi đang làm vé", Config.TicketAutoSellFull, function(v) Config.TicketAutoSellFull = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Về Home Spot Khi Xong Nhiệm Vụ", "Tự bay về điểm farm chính khi hết vé", Config.TicketReturnHomeWhenDone, function(v) Config.TicketReturnHomeWhenDone = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Động Quăng Cần Tại Home Spot", "Tiếp tục farm cá tại Home Spot khi hoàn thành vé", Config.TicketAutoCastAtHome, function(v) Config.TicketAutoCastAtHome = v end)
+    Components.CreateToggleRow(cardTicket, "Nhận & Nộp Vé Từ Xa (Remote)", "Thực hiện nhận và trả nhiệm vụ từ xa", Config.TicketRemoteClaim, function(v) Config.TicketRemoteClaim = v end)
+    Components.CreateToggleRow(cardTicket, "Tự Động Nhận Thưởng Hàng Ngày (Daily)", "Tự động nhận quà đăng nhập mỗi ngày", Config.AutoClaimDaily, function(v) Config.AutoClaimDaily = v end)
 
-    Components.CreateToggleRow(zengCard, "Tự Động Nhiệm Vụ Zeng Tianguo", "Tự động nhận, thực hiện và trả nhiệm vụ nâng cấp kỹ năng của Zeng Tianguo", Config.AutoZengTianguoQuest, function(v)
-        Config.AutoZengTianguoQuest = v
-        if v then
-            Quest.zengState.active = true
-            Utils.ShowNotification("Zeng Tianguo", "Đã bật tự động làm nhiệm vụ Zeng Tianguo (Skill Upgrade)!", "SUCCESS", 5)
-        else
-            Quest.zengState.active = false
-            Utils.ShowNotification("Zeng Tianguo", "Đã tắt tự động làm nhiệm vụ Zeng Tianguo.", "INFO", 4)
-        end
-        Quest.DetectActiveZengQuest()
-        Quest.UpdateZengUI(Config)
-    end)
+    Components.CreateCategoryHeader(parent, "⚡ Thao Tác Nhanh")
+    local cardActions = Components.CreateCardGroup(parent)
 
-    Components.CreateToggleRow(zengCard, "Ưu Tiên Ghép Bãi Song Song", "Khi bật cả 2, tự động câu ở đảo của Zeng Tianguo để hoàn thành cả 2 cùng lúc (Ưu tiên vé)", Config.ParallelQuestMode, function(v)
-        Config.ParallelQuestMode = v
-        Quest.UpdateZengUI(Config)
-    end)
-
-    Components.CreateToggleRow(zengCard, "Tự Động Trả Quest Zeng Tianguo", "Tự động bay về NPC trả quest khi hoàn thành chuỗi mục tiêu", Config.ZengTianguoAutoClaim, function(v)
-        Config.ZengTianguoAutoClaim = v
-    end)
-
-    local uiZengStatus = Components.CreateInfoRow(zengCard, "Nhiệm Vụ Kỹ Năng", Quest.zengState.statusText)
-    local uiZengProgress = Components.CreateInfoRow(zengCard, "Tiến Độ Kỹ Năng", "0 / 100 (0%)")
-    Quest.zengState.uiStatus = uiZengStatus
-    Quest.zengState.uiProgress = uiZengProgress
-
-    Components.CreateButtonRow(zengCard, "Tìm & Bay Đến NPC Zeng Tianguo", "Tự động tìm kiếm vị trí NPC Zeng Tianguo (Skill Upgrade) và bay tới đối diện", "Bay Đến NPC", function()
-        local ok = Quest.TeleportToZengNPC()
-        if ok then
-            Utils.ShowNotification("Dịch Chuyển", "Đã bay đến NPC Zeng Tianguo (Skill Upgrade)!", "SUCCESS", 4)
-        else
-            Utils.ShowNotification("Dịch Chuyển", "Không tìm thấy model NPC Zeng Tianguo trong game!", "WARN", 4)
-        end
-    end)
-
-    Components.CreateButtonRow(zengCard, "Nhận / Nộp Quest Zeng Tianguo", "Tương tác nhanh với NPC Zeng Tianguo để nhận hoặc nộp nhiệm vụ hoàn thành", "Tương Tác", function()
+    Components.CreateButtonRow(cardActions, "Nộp Vé Ngay Lập Tức", "Dịch chuyển tức thì đến NPC và nộp vé hoàn thành", "Nộp Vé", function()
+        Utils.ShowNotification("Nhiệm Vụ Vé", "Đang tiến hành nộp vé...", "INFO", 3)
         task.spawn(function()
-            Utils.ShowNotification("Zeng Tianguo", "Đang tương tác với NPC Zeng Tianguo...", "INFO", 3)
-            local isDone = Quest.zengState.isCompleted
-            Quest.InteractZengNPC(isDone)
-            task.wait(1.0)
-            Quest.DetectActiveZengQuest()
-            Quest.UpdateZengUI(Config)
-        end)
-    end)
-
-    -- ============================================================
-    -- 3. CÀI ĐẶT VỊ TRÍ CÂU & NPC TICKET QUEST
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "📍 Cài Đặt Vị Trí Câu & NPC Ticket Quest")
-    local spotCard = Components.CreateCardGroup(parent)
-
-    local function getSpotPos(spot)
-        if not spot then return Vector3.zero end
-        if typeof(spot) == "CFrame" then return spot.Position end
-        if typeof(spot) == "Vector3" then return spot end
-        if type(spot) == "table" and spot.x then return Vector3.new(spot.x, spot.y, spot.z) end
-        return Vector3.zero
-    end
-
-    local p100 = getSpotPos(Quest.state.spot100Fish)
-    local ui100Spot = Components.CreateInfoRow(spotCard, "Điểm Câu 100 Con (Map 1)", string.format("(%.0f, %.0f, %.0f)", p100.X, p100.Y, p100.Z))
-    Components.CreateButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Con", "Gán vị trí bạn đang đứng làm nơi câu 100 con cá nhẹ", "Lấy Vị Trí", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            Quest.state.spot100Fish = root.CFrame
-            Quest.SaveSpots()
-            if ui100Spot and ui100Spot.Set then
-                ui100Spot.Set(string.format("(%.0f, %.0f, %.0f)", root.Position.X, root.Position.Y, root.Position.Z))
-            end
-            Utils.ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí câu 100 con: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS", 4)
-        end
-    end)
-    Components.CreateButtonRow(spotCard, "Bay Đến Điểm Câu 100 Con", "Dịch chuyển tức thì đến điểm câu 100 con đã cài", "Bay Đến", function()
-        Quest.TeleportTo(Quest.state.spot100Fish)
-        Utils.ShowNotification("Dịch Chuyển", "Đã bay đến điểm câu 100 con!", "SUCCESS", 3)
-    end)
-
-    local p100B = getSpotPos(Quest.state.spot100Bait)
-    local ui100BaitSpot = Components.CreateInfoRow(spotCard, "Điểm Tiêu Thụ 100 Mồi (Map 1)", string.format("(%.0f, %.0f, %.0f)", p100B.X, p100B.Y, p100B.Z))
-    Components.CreateButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Mồi", "Gán vị trí bạn đang đứng làm nơi câu tiêu thụ 100 mồi", "Lấy Vị Trí", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            Quest.state.spot100Bait = root.CFrame
-            Quest.SaveSpots()
-            if ui100BaitSpot and ui100BaitSpot.Set then
-                ui100BaitSpot.Set(string.format("(%.0f, %.0f, %.0f)", root.Position.X, root.Position.Y, root.Position.Z))
-            end
-            Utils.ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí 100 mồi: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS", 4)
-        end
-    end)
-    Components.CreateButtonRow(spotCard, "Bay Đến Điểm 100 Mồi", "Dịch chuyển tức thì đến điểm câu 100 mồi đã cài", "Bay Đến", function()
-        Quest.TeleportTo(Quest.state.spot100Bait)
-        Utils.ShowNotification("Dịch Chuyển", "Đã bay đến điểm 100 mồi!", "SUCCESS", 3)
-    end)
-
-    local p100S = getSpotPos(Quest.state.spot100Skill)
-    local ui100SkillSpot = Components.CreateInfoRow(spotCard, "Điểm Câu 100 Skill (Map 1)", string.format("(%.0f, %.0f, %.0f)", p100S.X, p100S.Y, p100S.Z))
-    Components.CreateButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 100 Skill", "Gán vị trí bạn đang đứng làm nơi spam 100 skill", "Lấy Vị Trí", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            Quest.state.spot100Skill = root.CFrame
-            Quest.SaveSpots()
-            if ui100SkillSpot and ui100SkillSpot.Set then
-                ui100SkillSpot.Set(string.format("(%.0f, %.0f, %.0f)", root.Position.X, root.Position.Y, root.Position.Z))
-            end
-            Utils.ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí 100 skill: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS", 4)
-        end
-    end)
-    Components.CreateButtonRow(spotCard, "Bay Đến Điểm 100 Skill", "Dịch chuyển tức thì đến điểm spam 100 skill đã cài", "Bay Đến", function()
-        Quest.TeleportTo(Quest.state.spot100Skill)
-        Utils.ShowNotification("Dịch Chuyển", "Đã bay đến điểm 100 skill!", "SUCCESS", 3)
-    end)
-
-    local p15M = getSpotPos(Quest.state.spot15MFish)
-    local ui15MSpot = Components.CreateInfoRow(spotCard, "Điểm Câu 1.5M (Map 9)", string.format("(%.0f, %.0f, %.0f)", p15M.X, p15M.Y, p15M.Z))
-    Components.CreateButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Điểm 1.5M", "Gán vị trí bạn đang đứng làm nơi câu cá 1.5M+", "Lấy Vị Trí", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            Quest.state.spot15MFish = root.CFrame
-            Quest.SaveSpots()
-            if ui15MSpot and ui15MSpot.Set then
-                ui15MSpot.Set(string.format("(%.0f, %.0f, %.0f)", root.Position.X, root.Position.Y, root.Position.Z))
-            end
-            Utils.ShowNotification("Vị Trí Nhiệm Vụ", string.format("Đã lưu vị trí câu 1.5M: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS", 4)
-        end
-    end)
-    Components.CreateButtonRow(spotCard, "Bay Đến Điểm Câu 1.5M", "Dịch chuyển tức thì đến điểm câu cá 1.5M+ đã cài", "Bay Đến", function()
-        Quest.TeleportTo(Quest.state.spot15MFish)
-        Utils.ShowNotification("Dịch Chuyển", "Đã bay đến điểm câu 1.5M!", "SUCCESS", 3)
-    end)
-
-    local pNPC = getSpotPos(Quest.state.spotNPC)
-    local uiNPCSpot = Components.CreateInfoRow(spotCard, "Vị Trí NPC Ticket Quest (Map 1)", string.format("(%.0f, %.0f, %.0f)", pNPC.X, pNPC.Y, pNPC.Z))
-    Components.CreateButtonRow(spotCard, "Lấy Tọa Độ Hiện Tại Làm Vị Trí NPC", "Gán vị trí bạn đang đứng cạnh NPC Ticket Quest", "Lấy Vị Trí", function()
-        local char = LocalPlayer.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart")
-        if root then
-            Quest.state.spotNPC = root.CFrame
-            Quest.SaveSpots()
-            if uiNPCSpot and uiNPCSpot.Set then
-                uiNPCSpot.Set(string.format("(%.0f, %.0f, %.0f)", root.Position.X, root.Position.Y, root.Position.Z))
-            end
-            Utils.ShowNotification("Vị Trí NPC", string.format("Đã lưu vị trí NPC Ticket Quest: (%.0f, %.0f, %.0f)!", root.Position.X, root.Position.Y, root.Position.Z), "SUCCESS", 4)
-        end
-    end)
-    Components.CreateButtonRow(spotCard, "Tìm & Bay Đến NPC Ticket Quest", "Tự động quét, xoay góc nhìn và bay thẳng đến NPC Ticket Quest", "Bay Đến NPC", function()
-        local npcModel, focusPos, prompt = Quest.TeleportToNPC()
-        if focusPos then
-            Quest.state.spotNPC = focusPos
-            Quest.SaveSpots()
-            if uiNPCSpot and uiNPCSpot.Set then
-                uiNPCSpot.Set(string.format("(%.0f, %.0f, %.0f)", focusPos.X, focusPos.Y, focusPos.Z))
-            end
-            Utils.ShowNotification("Dịch Chuyển", "Đã tìm thấy, căn góc nhìn chuẩn và bay đến NPC Ticket Quest!", "SUCCESS", 4)
-        else
-            Quest.TeleportTo(Quest.state.spotNPC)
-            Utils.ShowNotification("Dịch Chuyển", "Đã bay đến tọa độ lưu của NPC Ticket Quest!", "SUCCESS", 4)
-        end
-    end)
-
-    -- ============================================================
-    -- 4. TÙY CHỈNH MỒI & KỸ NĂNG CHO NHIỆM VỤ
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "⚙️ Tùy Chỉnh Mồi & Kỹ Năng Cho Nhiệm Vụ")
-    local optionCard = Components.CreateCardGroup(parent)
-
-    local ticketBaits = {"Basic Bait", "Crude Mash Bait", "Corrupted Essence Bait", "Elite Bait", "Ancestral Bait"}
-    Components.CreateDropdownRow(optionCard, "Mồi Cho Nhiệm Vụ 100 Mồi", "Loại mồi bot sẽ mua và dùng khi nhận nv 100 mồi", ticketBaits, Config.TicketBaitChoice, function(v)
-        Config.TicketBaitChoice = v
-    end)
-
-    local skillList = {"Chiêu Z", "Chiêu X", "Chiêu C", "Chiêu V"}
-    Components.CreateDropdownRow(optionCard, "Chiêu Dùng Cho Nhiệm Vụ 100 Skill", "Kỹ năng bot dùng sau 3s khóa chiêu rồi cất cần lặp lại", skillList, Config.TicketSkillKey, function(v)
-        Config.TicketSkillKey = v
-    end)
-
-    Components.CreateDropdownRow(optionCard, "Chiêu Giật Nhanh Cho 100 Con Cá", "Chiêu mạnh nhất dùng để kết liễu cá Map 1 trong 1 hit", skillList, Config.TicketQuickSkill, function(v)
-        Config.TicketQuickSkill = v
-    end)
-
-    Components.CreateToggleRow(optionCard, "Tự Bán Cá Khi Đầy Balo (Vé NV)", "Tự động bán sạch cá khi balo đạt giới hạn để câu tiếp", Config.TicketAutoSellFull, function(v)
-        Config.TicketAutoSellFull = v
-    end)
-
-    Components.CreateToggleRow(optionCard, "Tự Về Home Spot Câu Farm (Chờ 20p)", "Khi trả xong vé và chờ hồi 20p, tự bay về Home Spot và tự động câu cá/combo", Config.TicketReturnHomeWhenDone, function(v)
-        Config.TicketReturnHomeWhenDone = v
-        Config.TicketAutoCastAtHome = v
-    end)
-
-    Components.CreateToggleRow(optionCard, "Nhận & Nộp Vé Từ Xa (Remote)", "Đứng yên tại chỗ câu để nhận và nộp vé Hard từ xa (không cần bay về NPC)", Config.TicketRemoteClaim, function(v)
-        Config.TicketRemoteClaim = v
-    end)
-
-    -- ============================================================
-    -- 5. THAO TÁC NHANH BẰNG TAY
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "⚡ Thao Tác Nhanh Bằng Tay")
-    local manualCard = Components.CreateCardGroup(parent)
-
-    Components.CreateButtonRow(manualCard, "Nhận Vé Hard Ngay", "Tương tác NPC, mở hội thoại và bấm nút Quest để nhận vé mới", "Nhận Hard", function()
-        task.spawn(function()
-            Utils.ShowNotification("Nhiệm Vụ Vé", "Đang tương tác NPC nhận vé Hard...", "INFO", 3)
-            Quest.InteractNPC(false, Config)
-        end)
-    end)
-
-    Components.CreateButtonRow(manualCard, "Nộp / Trả Vé Hard Ngay", "Tương tác NPC, mở hội thoại và trả vé nhận quà", "Nộp Hard", function()
-        task.spawn(function()
-            Utils.ShowNotification("Nhiệm Vụ Vé", "Đang tương tác NPC nộp vé Hard...", "INFO", 3)
             Quest.InteractNPC(true, Config)
         end)
     end)
 
-    Components.CreateButtonRow(manualCard, "Quét Lại Tiến Độ Nhiệm Vụ", "Quét ngay lập tức PlayerGui để kiểm tra nhiệm vụ và tiến độ hiện tại", "Quét Ngay", function()
-        Quest.ScanAndUpdateStatus()
-        Utils.ShowNotification("Nhiệm Vụ Vé", tostring(Quest.state.statusText), "INFO", 5)
+    Components.CreateButtonRow(cardActions, "Nhận Vé Mới Ngay", "Dịch chuyển đến NPC và nhận vé nhiệm vụ mới", "Nhận Vé", function()
+        Utils.ShowNotification("Nhiệm Vụ Vé", "Đang tiến hành nhận vé mới...", "INFO", 3)
+        task.spawn(function()
+            Quest.InteractNPC(false, Config)
+        end)
     end)
 
-    Components.CreateButtonRow(manualCard, "Đặt Lại / Bỏ Chặn Hết Vé Hôm Nay", "Xóa cờ đánh dấu hết vé hôm nay để bot thử tương tác nhận vé lại", "🔄 Đặt Lại", function()
-        Quest.state.allQuestsDoneForToday = false
-        Quest.state.allQuestsDoneDate = nil
-        Quest.state.allQuestsDoneUtcDate = nil
-        Quest.state.savedDailyCount = nil
-        Quest.state.readyForNewQuest = true
-        Quest.state.isCooldown = false
-        Quest.state.isAtHomeSpot = false
-        Quest.state.cooldownEnd = 0
-        Quest.state.statusText = "Đã đặt lại! Sẵn sàng thử nhận vé mới."
-        Utils.ShowNotification("Nhiệm Vụ Vé", "Đã xóa cờ hết vé hôm nay! Bot sẽ thử nhận vé lại.", "SUCCESS", 5)
+    Components.CreateButtonRow(cardActions, "Bay Đến NPC Vé", "Dịch chuyển tức thì đến vị trí của NPC trao vé", "Bay Đến", function()
+        Quest.TeleportToNPC()
+        Utils.ShowNotification("Nhiệm Vụ Vé", "Đã bay đến vị trí NPC nhận vé!", "SUCCESS", 4)
     end)
 
-    -- ============================================================
-    -- 6. ĐIỂM DANH & NHIỆM VỤ HÀNG NGÀY
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "Điểm Danh & Nhiệm Vụ Hàng Ngày")
-    local dailyCard = Components.CreateCardGroup(parent)
+    Components.CreateCategoryHeader(parent, "📍 Cài Đặt Điểm Câu Cho Từng Loại Vé")
+    local cardSpots = Components.CreateCardGroup(parent)
 
-    Components.CreateButtonRow(dailyCard, "Nhận Thưởng Nhiệm Vụ Ngày", "Tự kiểm tra và nhận thưởng các quest đã xong", "Nhận Thưởng", function()
-        if Events and Events:FindFirstChild("ClaimQuest") then
-            for i = 1, 4 do
-                Events.ClaimQuest:FireServer("Daily", i)
-            end
-            Utils.ShowNotification("Nhiệm Vụ Ngày", "Đã nhận thưởng tất cả nhiệm vụ ngày hoàn thành!", "SUCCESS", 4)
-        else
-            Utils.ShowNotification("Lỗi", "Không tìm thấy Remote ClaimQuest!", "ERROR", 3)
+    Components.CreateButtonRow(cardSpots, "Lưu Vị Trí Hiện Tại Làm Điểm 100 Cá", "Đặt tọa độ đứng hiện tại làm điểm farm 100 con cá", "Lưu 100 Cá", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Quest.state.spot100Fish = root.Position
+            Quest.SaveSpots()
+            Utils.ShowNotification("Điểm Câu", "Đã lưu điểm làm nhiệm vụ 100 con cá!", "SUCCESS", 4)
         end
     end)
 
-    Components.CreateToggleRow(dailyCard, "Tự Điểm Danh 7 Ngày", "Tự động nhận quà điểm danh hàng ngày từ ngày 1 - 7", Config.AutoClaimDaily, function(v)
-        Config.AutoClaimDaily = v
+    Components.CreateButtonRow(cardSpots, "Lưu Vị Trí Hiện Tại Làm Điểm 1.5M Cá", "Đặt tọa độ đứng hiện tại làm điểm farm cá 1.5M (Map 9)", "Lưu 1.5M Cá", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Quest.state.spot15MFish = root.Position
+            Quest.SaveSpots()
+            Utils.ShowNotification("Điểm Câu", "Đã lưu điểm làm nhiệm vụ cá 1.5M!", "SUCCESS", 4)
+        end
     end)
 
-    Components.CreateSliderRow(dailyCard, "Độ Trễ Nhận Quà", "Thời gian giãn cách giữa các ngày", 0.2, 2.0, Config.DailyClaimDelay or 0.5, true, "s", function(v)
-        Config.DailyClaimDelay = v
+    Components.CreateButtonRow(cardSpots, "Lưu Vị Trí Hiện Tại Làm Điểm 100 Mồi", "Đặt tọa độ đứng hiện tại làm điểm farm tiêu thụ 100 mồi", "Lưu 100 Mồi", function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            Quest.state.spot100Bait = root.Position
+            Quest.SaveSpots()
+            Utils.ShowNotification("Điểm Câu", "Đã lưu điểm làm nhiệm vụ 100 mồi!", "SUCCESS", 4)
+        end
     end)
 end
 
 return TabNhiemVu
-
-end
-
-__modules["ui.tabs.tab_quan_ly_ca"] = function()
---[[
-    v2/ui/tabs/tab_quan_ly_ca.lua
-    Fish Manager: Safe Junk Cleaning, Search & Batch Lock/Unlock, Rod & Bait Crafting Trackers
---]]
-
-local Components = __require("ui.components")
-local ConfigModule = __require("core.config")
-local Config = ConfigModule.Config
-local Services = __require("core.services")
-local ReplicatedStorage = Services.ReplicatedStorage
-local Events = Services.Events
-local LocalPlayer = Services.LocalPlayer
-local Utils = __require("core.utils")
-local Shop = __require("features.shop")
-
-local TabQuanLyCa = {}
-
--- Danh sách các loài cá nguyên liệu quý chế Cần & Mồi
-local protectedFishNames = {
-    ["Verdant Alligator Gar"] = "Mồi Thần Thoại",
-    ["Verdant Grouper"] = "Mồi Thần Thoại",
-    ["Verdant Bonefang"] = "Mồi Thần Thoại",
-    ["Crimson Bonefang"] = "Cần / Mồi Quý",
-    ["Scarlet Fish"] = "Cần Sanguine",
-    ["Elder Scarlet Fish"] = "Cần Sanguine",
-    ["Crimson Electric Eel"] = "Cần Sanguine",
-    ["Golden Dragonfish"] = "Cần Dragon",
-    ["Rainbow Dragonfish"] = "Cần Thần Thoại",
-    ["Draconic Koi"] = "Cần Dragon",
-    ["Sanguine Fish"] = "Cần Sanguine",
-    ["Crimson Bream"] = "Cần / Mồi Quý",
-}
-
-function TabQuanLyCa.ScanAndClassify()
-    local pData = ReplicatedStorage:FindFirstChild("Data") and ReplicatedStorage.Data:FindFirstChild(tostring(LocalPlayer.UserId))
-    local inv = pData and pData:FindFirstChild("Inventory")
-
-    local protList = {}
-    local junkList = {}
-    local countsByName = {}
-
-    if not inv then
-        return protList, junkList, countsByName
-    end
-
-    for _, item in ipairs(inv:GetChildren()) do
-        local rawName = tostring(item.Name or "")
-        local cleanName = rawName:gsub("^%[.-%]%s*", ""):gsub("%s*%b()", ""):gsub("%s*x%d+$", ""):match("^%s*(.-)%s*$") or rawName
-        local weight = Shop.GetItemWeight(item)
-        local isFav = Shop.IsItemFavorited(item)
-        local isMut = Shop.IsMutatedFish(item)
-        local isSpecial = protectedFishNames[cleanName] ~= nil
-
-        local entry = {
-            item = item,
-            name = cleanName,
-            weight = weight,
-            isLocked = isFav,
-            isMut = isMut,
-            isSpecial = isSpecial,
-            specialReason = protectedFishNames[cleanName]
-        }
-
-        if not countsByName[cleanName] then
-            countsByName[cleanName] = {
-                name = cleanName,
-                total = 0,
-                locked = 0,
-                unlocked = 0,
-                items = {}
-            }
-        end
-        countsByName[cleanName].total = countsByName[cleanName].total + 1
-        if isFav then
-            countsByName[cleanName].locked = countsByName[cleanName].locked + 1
-        else
-            countsByName[cleanName].unlocked = countsByName[cleanName].unlocked + 1
-        end
-        table.insert(countsByName[cleanName].items, entry)
-
-        local shouldProtect = isFav or isMut or isSpecial or (Config.KeepHeavyFish and weight >= (Config.HeavyFishThreshold or 1000))
-        if shouldProtect then
-            table.insert(protList, entry)
-        else
-            table.insert(junkList, entry)
-        end
-    end
-
-    return protList, junkList, countsByName
-end
-
-function TabQuanLyCa.Render(parent)
-    local isBusy = false
-
-    -- ============================================================
-    -- 1. QUẢN LÝ TÚI CÁ & DỌN RÁC AN TOÀN
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "🛡️ Quản Lý Túi Cá & Dọn Rác An Toàn")
-    local bagCard = Components.CreateCardGroup(parent)
-
-    local rowTotal = Components.CreateInfoRow(bagCard, "Tổng cá trong Balo", "Đang quét...")
-    local rowProtected = Components.CreateInfoRow(bagCard, "Cá quý đang bảo vệ", "...")
-    local rowJunk = Components.CreateInfoRow(bagCard, "Cá rác có thể bán an toàn", "...")
-
-    local function refreshOverview()
-        local protList, junkList, _ = TabQuanLyCa.ScanAndClassify()
-        local total = #protList + #junkList
-        if rowTotal and rowTotal.Set then rowTotal.Set(string.format("%d con", total)) end
-        if rowProtected and rowProtected.Set then rowProtected.Set(string.format("%d con (Đột biến / Cần / Mồi / Khóa)", #protList)) end
-        if rowJunk and rowJunk.Set then rowJunk.Set(string.format("%d con (Có thể bán ngay)", #junkList)) end
-    end
-
-    task.spawn(function()
-        while true do
-            task.wait(2.5)
-            pcall(refreshOverview)
-        end
-    end)
-
-    Components.CreateButtonRow(bagCard, "Khóa Toàn Bộ Cá Quý", "Bảo vệ cá Đột Biến, Nguyên Liệu Chế Cần & Mồi", "🔒 Khóa Cá Quý", function()
-        if isBusy then return end
-        isBusy = true
-        task.spawn(function()
-            local protList, _, _ = TabQuanLyCa.ScanAndClassify()
-            local favEvent = Events and Events:FindFirstChild("FavoriteItem")
-            if not favEvent then
-                Utils.ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 3)
-                isBusy = false
-                return
-            end
-            local count = 0
-            for _, p in ipairs(protList) do
-                if not p.isLocked and p.item and p.item.Parent then
-                    pcall(function() favEvent:FireServer(p.item) end)
-                    count = count + 1
-                    task.wait(0.04)
-                end
-            end
-            Utils.ShowNotification("Bảo Vệ Cá Quý", string.format("Đã khóa an toàn %d con cá quý!", count), "SUCCESS", 4)
-            refreshOverview()
-            isBusy = false
-        end)
-    end)
-
-    Components.CreateButtonRow(bagCard, "Mở Khóa Riêng Cá Rác", "Mở khóa toàn bộ cá thường để chuẩn bị bán", "🔓 Mở Khóa Rác", function()
-        if isBusy then return end
-        isBusy = true
-        task.spawn(function()
-            local _, junkList, _ = TabQuanLyCa.ScanAndClassify()
-            local favEvent = Events and Events:FindFirstChild("FavoriteItem")
-            if not favEvent then
-                Utils.ShowNotification("Lỗi", "Không tìm thấy Remote FavoriteItem!", "ERROR", 3)
-                isBusy = false
-                return
-            end
-            local count = 0
-            for _, j in ipairs(junkList) do
-                if j.isLocked and j.item and j.item.Parent then
-                    pcall(function() favEvent:FireServer(j.item) end)
-                    count = count + 1
-                    task.wait(0.04)
-                end
-            end
-            Utils.ShowNotification("Mở Khóa Rác", string.format("Đã mở khóa %d con cá rác!", count), "SUCCESS", 4)
-            refreshOverview()
-            isBusy = false
-        end)
-    end)
-
-    Components.CreateButtonRow(bagCard, "Bán Sạch Cá Rác An Toàn", "Tự động khóa cá quý, mở khóa rác và bán sạch", "💰 Bán Sạch Rác", function()
-        if isBusy then
-            Utils.ShowNotification("Dọn Rác", "Đang bận xử lý, vui lòng chờ...", "WARN", 2)
-            return
-        end
-        isBusy = true
-        task.spawn(function()
-            local protList, junkList, _ = TabQuanLyCa.ScanAndClassify()
-            if #junkList == 0 then
-                Utils.ShowNotification("Dọn Rác", "Không có cá rác nào cần bán!", "INFO", 3)
-                isBusy = false
-                return
-            end
-
-            local favEvent = Events and Events:FindFirstChild("FavoriteItem")
-            local sellEvent = Events and Events:FindFirstChild("SellFish")
-            if not sellEvent then
-                Utils.ShowNotification("Lỗi", "Không tìm thấy Remote SellFish!", "ERROR", 3)
-                isBusy = false
-                return
-            end
-
-            Utils.ShowNotification("Dọn Rác", string.format("Đang dọn dẹp %d con cá rác an toàn...", #junkList), "INFO", 3)
-
-            -- 1. Khóa cá quý chưa khóa
-            if favEvent then
-                for _, p in ipairs(protList) do
-                    if not p.isLocked and p.item and p.item.Parent then
-                        pcall(function() favEvent:FireServer(p.item) end)
-                        task.wait(0.04)
-                    end
-                end
-                task.wait(0.2)
-
-                -- 2. Mở khóa cá rác nếu đang khóa
-                for _, j in ipairs(junkList) do
-                    if j.isLocked and j.item and j.item.Parent then
-                        pcall(function() favEvent:FireServer(j.item) end)
-                        task.wait(0.04)
-                    end
-                end
-                task.wait(0.3)
-            end
-
-            -- 3. Bán sạch cá
-            sellEvent:FireServer("All")
-            Utils.ShowNotification("Bán Cá", string.format("Đã bán sạch %d con cá rác! Cá quý được bảo vệ 100%%.", #junkList), "SUCCESS", 5)
-            task.wait(1.0)
-            refreshOverview()
-            isBusy = false
-        end)
-    end)
-
-    -- ============================================================
-    -- 2. TIẾN ĐỘ NGUYÊN LIỆU CHẾ CẦN CÂU (ROD CRAFTING TRACKER)
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "🎣 Tiến Độ Chế Cần Câu (Rod Crafting Tracker)")
-    local rodCard = Components.CreateCardGroup(parent)
-
-    local rowCrimson = Components.CreateInfoRow(rodCard, "Crimson Bonefang (Cần Sanguine)", "...")
-    local rowScarlet = Components.CreateInfoRow(rodCard, "Scarlet Fish (Cần Sanguine)", "...")
-    local rowDragon = Components.CreateInfoRow(rodCard, "Golden Dragonfish (Cần Dragon)", "...")
-
-    local function refreshRodProgress()
-        local _, _, counts = TabQuanLyCa.ScanAndClassify()
-        local cBone = counts["Crimson Bonefang"] and counts["Crimson Bonefang"].total or 0
-        local sFish = counts["Scarlet Fish"] and counts["Scarlet Fish"].total or 0
-        local gDragon = counts["Golden Dragonfish"] and counts["Golden Dragonfish"].total or 0
-
-        if rowCrimson and rowCrimson.Set then rowCrimson.Set(string.format("Đang có: %d con", cBone)) end
-        if rowScarlet and rowScarlet.Set then rowScarlet.Set(string.format("Đang có: %d con", sFish)) end
-        if rowDragon and rowDragon.Set then rowDragon.Set(string.format("Đang có: %d con", gDragon)) end
-    end
-
-    task.spawn(function()
-        while true do
-            task.wait(3.0)
-            pcall(refreshRodProgress)
-        end
-    end)
-
-    -- ============================================================
-    -- 3. TIẾN ĐỘ NGUYÊN LIỆU CHẾ MỒI (BAIT CRAFTING TRACKER)
-    -- ============================================================
-    Components.CreateCategoryHeader(parent, "🍖 Nguyên Liệu Chế Mồi Thần Thoại")
-    local baitCard = Components.CreateCardGroup(parent)
-
-    local rowAlligator = Components.CreateInfoRow(baitCard, "Verdant Alligator Gar", "...")
-    local rowGrouper = Components.CreateInfoRow(baitCard, "Verdant Grouper", "...")
-    local rowEel = Components.CreateInfoRow(baitCard, "Crimson Electric Eel", "...")
-
-    local function refreshBaitProgress()
-        local _, _, counts = TabQuanLyCa.ScanAndClassify()
-        local vGar = counts["Verdant Alligator Gar"] and counts["Verdant Alligator Gar"].total or 0
-        local vGroup = counts["Verdant Grouper"] and counts["Verdant Grouper"].total or 0
-        local cEel = counts["Crimson Electric Eel"] and counts["Crimson Electric Eel"].total or 0
-
-        if rowAlligator and rowAlligator.Set then rowAlligator.Set(string.format("Đang có: %d con", vGar)) end
-        if rowGrouper and rowGrouper.Set then rowGrouper.Set(string.format("Đang có: %d con", vGroup)) end
-        if rowEel and rowEel.Set then rowEel.Set(string.format("Đang có: %d con", cEel)) end
-    end
-
-    task.spawn(function()
-        while true do
-            task.wait(3.0)
-            pcall(refreshBaitProgress)
-        end
-    end)
-
-    -- Initial load
-    task.delay(0.5, function()
-        refreshOverview()
-        refreshRodProgress()
-        refreshBaitProgress()
-    end)
-end
-
-return TabQuanLyCa
 
 end
 
@@ -8742,14 +7585,7 @@ function TabVisuals.Render(parent)
 
     Components.CreateToggleRow(cardLighting, "Sáng Màn Hình (Fullbright)", "Làm sáng toàn bản đồ, nhìn rõ dưới nước sâu", Config.Fullbright, function(v)
         Config.Fullbright = v
-        Visuals.ApplyFullbright(v, Config)
-    end)
-    Components.CreateSliderRow(cardLighting, "Mức Độ Sáng", "Tùy chỉnh độ sáng theo mắt bạn (1.0 – 3.5)", 1.0, 3.5, Config.FullbrightLevel or 2.0, true, "x", function(v)
-        Config.FullbrightLevel = v
-        if Config.Fullbright then Visuals.ApplyFullbright(true, Config) end
-    end)
-    Components.CreateToggleRow(cardLighting, "Chống Lóa Thời Tiết (Anti-Glare)", "Tự động kìm hãm ánh sáng khi thời tiết đổi sang nắng chói", Config.FullbrightAntiGlare, function(v)
-        Config.FullbrightAntiGlare = v
+        Visuals.ApplyFullbright(v)
     end)
     Components.CreateToggleRow(cardLighting, "Tầm Nhìn Xa (Xóa Mờ Map)", "Tắt hiệu ứng làm mờ xa (DepthOfField) & sương mù, nhìn rõ mọi hòn đảo từ xa", Config.ClearFarVision, function(v)
         Config.ClearFarVision = v
@@ -9162,7 +7998,6 @@ local Character = __require("features.character")
 -- UI Tabs
 local TabCauCa = __require("ui.tabs.tab_cau_ca")
 local TabSanBoss = __require("ui.tabs.tab_san_boss")
-local TabQuanLyCa = __require("ui.tabs.tab_quan_ly_ca")
 local TabThanLinh = __require("ui.tabs.tab_than_linh")
 local TabNhiemVu = __require("ui.tabs.tab_nhiem_vu")
 local TabShop = __require("ui.tabs.tab_shop")
@@ -9188,7 +8023,6 @@ BossDps.Init(Window.screenGui)
 -- 3. Tạo các Tab chức năng
 local tabFishing      = Window.CreateTab("Câu Cá")
 local tabBoss         = Window.CreateTab("Săn Boss")
-local tabFishManager  = Window.CreateTab("Quản Lý Cá")
 local tabGod          = Window.CreateTab("Thần Linh")
 local tabQuests       = Window.CreateTab("Nhiệm Vụ")
 local tabShop         = Window.CreateTab("Shop & Chế Mồi")
@@ -9201,7 +8035,6 @@ local tabExperimental = Window.CreateTab("Thử Nghiệm")
 -- 4. Render nội dung từng Tab
 TabCauCa.Render(tabFishing)
 TabSanBoss.Render(tabBoss)
-TabQuanLyCa.Render(tabFishManager)
 TabThanLinh.Render(tabGod)
 TabNhiemVu.Render(tabQuests)
 TabShop.Render(tabShop)
@@ -9222,13 +8055,6 @@ ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
 Shop.InitInventoryWatcher(Config)
 Weather.CheckWeatherHopOnJoin(Config)
 Spirits.CheckNPCHopOnJoin(Config)
-
--- Áp dụng Fullbright ngay khi load (nếu bật sẵn)
-if Config.Fullbright then
-    Visuals.ApplyFullbright(true, Config)
-end
--- Khởi động Anti-Glare (giữ sáng ổn định khi thời tiết đổi)
-Visuals.SetupAntiGlare(Config, State.connections)
 
 -- Lắng nghe tin nhắn chat để săn Secret Boss
 pcall(function()
