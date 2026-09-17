@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.5"
+local SCRIPT_BUILD_COMMIT = "v2.6.6"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4332,9 +4332,7 @@ function SendNtfyNotification(title, message, priorityLevel, tagList, customActi
                     action = "http",
                     label = "📊 Lấy Báo Cáo Server",
                     url = targetHost .. "/" .. cleanTopic .. "_cmd",
-                    method = "POST",
-                    body = "status",
-                    clear = false
+                    body = "status"
                 }
             }
         end
@@ -4344,43 +4342,29 @@ function SendNtfyNotification(title, message, priorityLevel, tagList, customActi
             title = tostring(title or "Heavyweight Fishing"),
             message = tostring(message or ""),
             priority = priorityLevel or 3,
-            tags = tagList or {"fishing_pole_and_fish"}
+            tags = tagList or {"fishing_pole_and_fish"},
+            actions = actionList
         }
-
-        if actionList and #actionList > 0 then
-            payload.actions = actionList
-        end
 
         local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
         if not reqFunc then return end
 
         local body = HttpService:JSONEncode(payload)
         local headers = {
-            ["Content-Type"] = "application/json"
+            ["Content-Type"] = "application/json",
+            ["content-type"] = "application/json"
         }
 
         -- ntfy JSON publishing BẮT BUỘC gửi tới root URL (https://ntfy.sh).
+        -- Tuyệt đối không nối thêm /cleanTopic vào URL kẻo ntfy hiểu nhầm toàn bộ JSON là văn bản thô!
         local postUrl = targetHost
 
-        local okSend = pcall(function()
-            reqFunc({
-                Url = postUrl,
-                Method = "POST",
-                Headers = headers,
-                Body = body
-            })
-        end)
-
-        if not okSend then
-            pcall(function()
-                reqFunc({
-                    url = postUrl,
-                    method = "POST",
-                    headers = headers,
-                    body = body
-                })
-            end)
-        end
+        reqFunc({
+            Url = postUrl,
+            Method = "POST",
+            Headers = headers,
+            Body = body
+        })
     end)
 end
 

@@ -2,6 +2,18 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.6] - 2026-09-17
+### ⚡ Khôi Phục Hoàn Toàn Hàm Gửi ntfy Chuẩn Mực & Sửa Triệt Để Báo Cáo Server:
+1. **Khôi Phục Cấu Trúc Request ntfy Ổn Định (Như Bản Hoạt Động Tốt Lúc 14h34)**:
+   - Đưa cấu trúc hàm `SendNtfyNotification` về chính xác phiên bản gốc đã gửi thành công lúc 14h34 (bỏ toàn bộ các tầng fallback thử nghiệm gây xung đột trên Executor di động).
+   - Sử dụng đúng cấu trúc headers kép `Content-Type / content-type: application/json` và gửi trực tiếp qua `reqFunc`.
+2. **Kích Hoạt Hoàn Hảo Chiều Phản Hồi Báo Cáo Server**:
+   - Duy trì hàm `secretBossState.GetPlayerGems()` để khi nhận lệnh từ nút **`📊 Lấy Báo Cáo Server`**, bot không còn bị crash ngầm ở dòng lấy gem nữa mà lập tức gửi ngược báo cáo server về điện thoại.
+3. **Đồng Bộ Phiên Bản v2.6.6 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.6` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.5] - 2026-09-17
 ### 🛠️ Sửa Lỗi Gửi Test ntfy & Khắc Phục Xung Đột Tham Số Request Trên Executor:
 1. **Khắc Phục Tận Gốc Lỗi Bấm Nút "Gửi Test" Không Nhận Được Thông Báo**:
