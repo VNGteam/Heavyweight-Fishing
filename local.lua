@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.0"
+local SCRIPT_BUILD_COMMIT = "v2.6.1"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4313,14 +4313,15 @@ function SendNtfyNotification(title, message, priorityLevel, tagList)
             end
         end
 
+        cleanTopic = cleanTopic:gsub("^/+", ""):gsub("/+$", "")
         if #cleanTopic == 0 and not rawTopic:find("^https?://") then
             cleanTopic = rawTopic
         end
 
         local payload = {
-            topic = cleanTopic ~= "" and cleanTopic or nil,
-            title = title or "Heavyweight Fishing Alert",
-            message = message or "",
+            topic = cleanTopic,
+            title = tostring(title or "Heavyweight Fishing"),
+            message = tostring(message or ""),
             priority = priorityLevel or 3,
             tags = tagList or {"fishing_pole_and_fish"}
         }
@@ -4330,13 +4331,13 @@ function SendNtfyNotification(title, message, priorityLevel, tagList)
 
         local body = HttpService:JSONEncode(payload)
         local headers = {
-            ["Content-Type"] = "application/json; charset=utf-8"
+            ["Content-Type"] = "application/json",
+            ["content-type"] = "application/json"
         }
 
+        -- ntfy JSON publishing BẮT BUỘC gửi tới root URL (https://ntfy.sh).
+        -- Tuyệt đối không nối thêm /cleanTopic vào URL kẻo ntfy hiểu nhầm toàn bộ JSON là văn bản thô!
         local postUrl = targetHost
-        if cleanTopic ~= "" and not postUrl:find("/" .. cleanTopic .. "$") then
-            postUrl = targetHost .. "/" .. cleanTopic
-        end
 
         reqFunc({
             Url = postUrl,
@@ -13885,7 +13886,7 @@ createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo �
     task.spawn(function()
         local _, curWeather = secretBossState.DetectWeather()
         local testWeather = (curWeather and curWeather ~= "" and curWeather ~= "Clear") and curWeather or "Clear (Trời Quang)"
-        local testMsg = string.format("Kết nối ntfy thành công từ tài khoản: %s\nThời tiết server hiện tại: %s\nJobId: %s\nThời gian: %s",
+        local testMsg = string.format("✅ Kết nối thành công!\n👤 Tài khoản: %s\n🌦️ Thời tiết server: %s\n🔑 JobId: %s\n⏰ %s",
             (LocalPlayer and (LocalPlayer.DisplayName or LocalPlayer.Name)) or "Unknown",
             testWeather,
             tostring(game.JobId or "N/A"),

@@ -1,6 +1,6 @@
 --[[
     ==================================================================
-    🚀 IDENTICAL LOADER V2.6.0 - SIÊU TỐC & CHỐNG CACHE 100% (ULTRA-FAST)
+    🚀 IDENTICAL LOADER V2.6.1 - SIÊU TỐC & CHỐNG CACHE 100% (ULTRA-FAST)
     ==================================================================
     - Tự động bỏ qua Cache của Executor và GitHub CDN (Anti-Cache Query + Headers).
     - Biên dịch trực tiếp 0ms (Zero latency compile), không delay xử lý chuỗi.

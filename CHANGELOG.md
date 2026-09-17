@@ -2,6 +2,19 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.1] - 2026-09-17
+### 🎨 Sửa Lỗi ntfy Hiển Thị Mã JSON Thô Rối Mắt - Tối Ưu Thông Báo Đẩy Đẹp, Chuẩn Mobile:
+1. **Khắc Phục Tận Gốc Lỗi Hiển Thị Chuỗi JSON `{...}` Trên Ứng Dụng ntfy**:
+   - **Nguyên nhân kỹ thuật**: Trong bản v2.5.9 / v2.6.0, hàm gửi thông báo đã nối thêm tên Topic vào đường dẫn URL (`https://ntfy.sh/ThongBaoThoiTiet`). Máy chủ ntfy quy định nếu một yêu cầu POST được gửi trực tiếp tới đường dẫn `/<topic>`, nó sẽ xem toàn bộ nội dung gửi lên là **văn bản thô (raw text)**, khiến toàn bộ chuỗi JSON `{"title":..., "message":..., "tags":...}` bị in thẳng ra màn hình điện thoại thành một đoạn mã lộn xộn, rối mắt.
+   - **Cách khắc phục chuẩn 100%**: Sửa lại điểm gửi POST trực tiếp về Root URL `https://ntfy.sh` với payload JSON chứa trường `"topic"`. Máy chủ ntfy sẽ tự động bóc tách:
+     - **Tiêu đề (Title)**: In đậm to rõ ràng trên thanh thông báo.
+     - **Nội dung (Message)**: Trình bày từng dòng gọn gàng, có icon minh họa, không còn bất kỳ dấu ngoặc `{}` hay nháy kép `""` nào của JSON.
+     - **Biểu tượng (Tags)**: Tự động đổi thành icon biểu tượng thời tiết (⛅, ⛈️, ❄️, 🌫️, ☀️, 🎐...).
+2. **Đồng Bộ Phiên Bản v2.6.1 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.1` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.0] - 2026-09-17
 ### 💾 Cơ Chế Tự Động Lưu Trữ & Chống Mất Link Thông Báo (ntfy, Webhook, Telegram) Khi Kill / Mở Lại Script:
 1. **Lưu Trữ Tức Thì Vào File Cấu Hình Riêng (`HeavyweightFishing_Notifications.json`)**:
