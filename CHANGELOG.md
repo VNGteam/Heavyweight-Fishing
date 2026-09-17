@@ -2,6 +2,26 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.8.0] - 2026-09-17
+### 📢 Nâng Cấp Toàn Diện Discord Webhook & Báo Cáo Server Đa Kênh:
+1. **Nút "Gửi Báo Cáo Toàn Diện Ngay" (📊 Gửi Ngay)**:
+   - Gửi ngay lập tức 1 Discord Embed sang trọng với đầy đủ 14 chỉ số quan trọng: Uptime, Thời Tiết hiện tại, Đảo đang đứng, Boss mục tiêu có thể ra, Tổng cá, Ba lô cá hiện tại, Tiền, Gems, Vé nhiệm vụ, Vé đã xong hôm nay (x/20), Essence Orb, Trait Reroll, Trạng thái bot, Code Teleport vào server (Job ID) và Thời gian cập nhật.
+   - Màu sắc embed tự động đổi sang màu cam cảnh báo nếu phát hiện thời tiết nguy hiểm / bão.
+2. **Thông Báo Khi Hoàn Thành Nhiệm Vụ Vé (Ticket Quest Hard)**:
+   - Tự động kích hoạt khi nộp vé Hard thành công.
+   - Gửi embed chi tiết: Số lượt NV hôm nay (x/20), Vé hiện có, Gems nhận được, Tổng gems, Thời gian chờ hồi chiêu, Server Job ID và Code Teleport.
+   - Có toggle bật/tắt riêng trong UI (`WebhookNotifyTicketQuest`), lưu bền vững chống mất cấu hình.
+3. **Nâng Cấp Báo Cáo Định Kỳ & Thêm Slider Chỉnh Tần Suất**:
+   - Thêm trường Thời Tiết, Boss, Ba lô vào báo cáo định kỳ.
+   - Bổ sung slider điều chỉnh "Tần Suất Báo Cáo Định Kỳ" (từ 5 đến 120 phút, mặc định 30 phút).
+   - Khắc phục triệt để nguy cơ bị Discord giới hạn tần suất (429 Rate Limit) do tính sai phút thành giây.
+4. **Nâng Cấp Hàm Gửi Discord Webhook Đa Hình & Tương Thích Tuyệt Đối**:
+   - Hỗ trợ cả 2 định dạng gọi (chuỗi tham số title/desc/color/fields và table payload trực tiếp).
+   - Tự động lấy avatar Roblox của người chơi làm thumbnail và icon footer.
+   - Footer hiển thị phiên bản động theo `SCRIPT_BUILD_COMMIT`.
+
+---
+
 ## [v2.7.1] - 2026-09-17
 ### ⏪ Hoàn Nguyên Về Cấu Trúc v2.6.1 (Bản Gửi Thông Báo Đẹp Gốc) + Các Bổ Sung Quan Trọng:
 1. **Khôi phục 100% cấu trúc bản v2.6.1** – Đây là bản user xác nhận gửi và nhận thông báo ntfy đẹp nhất, ổn định nhất. Toàn bộ hàm `SendNtfyNotification` và luồng xử lý được giữ nguyên vẹn.
