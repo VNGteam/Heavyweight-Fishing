@@ -114,9 +114,11 @@ function Fishing.HandleMinigame(config, fUI)
     if config.AutoRhythmHit and fUI:FindFirstChild("RhythmFrame") then
         local rFrame = fUI.RhythmFrame
         if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
-            -- Bảng nhớ các note đã "nhìn thấy" (để không bấm lại 2 lần cùng 1 note)
+            -- Khởi tạo state nếu chưa có (defensive init)
             if not Fishing._rhythmSeenNotes then
                 Fishing._rhythmSeenNotes = {}
+            end
+            if not Fishing._rhythmLastClean then
                 Fishing._rhythmLastClean = now
             end
 
