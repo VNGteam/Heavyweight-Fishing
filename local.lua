@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.4"
+local SCRIPT_BUILD_COMMIT = "v2.6.5"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4303,8 +4303,8 @@ local function SendTelegramMessage(text)
     end)
 end
 
-function SendNtfyNotification(title, message, priorityLevel, tagList, customActions)
-    if not Config.NtfyEnabled or not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
+function SendNtfyNotification(title, message, priorityLevel, tagList, customActions, isTest)
+    if (not Config.NtfyEnabled and not isTest) or not Config.NtfyTopic or #tostring(Config.NtfyTopic):gsub("%s+", "") == 0 then return end
     pcall(function()
         local rawTopic = tostring(Config.NtfyTopic):gsub("%s+", "")
         if #rawTopic == 0 then return end
@@ -4344,33 +4344,43 @@ function SendNtfyNotification(title, message, priorityLevel, tagList, customActi
             title = tostring(title or "Heavyweight Fishing"),
             message = tostring(message or ""),
             priority = priorityLevel or 3,
-            tags = tagList or {"fishing_pole_and_fish"},
-            actions = actionList
+            tags = tagList or {"fishing_pole_and_fish"}
         }
+
+        if actionList and #actionList > 0 then
+            payload.actions = actionList
+        end
 
         local reqFunc = (syn and syn.request) or (http and http.request) or http_request or request
         if not reqFunc then return end
 
         local body = HttpService:JSONEncode(payload)
         local headers = {
-            ["Content-Type"] = "application/json",
-            ["content-type"] = "application/json"
+            ["Content-Type"] = "application/json"
         }
 
         -- ntfy JSON publishing BẮT BUỘC gửi tới root URL (https://ntfy.sh).
-        -- Tuyệt đối không nối thêm /cleanTopic vào URL kẻo ntfy hiểu nhầm toàn bộ JSON là văn bản thô!
         local postUrl = targetHost
 
-        reqFunc({
-            Url = postUrl,
-            url = postUrl,
-            Method = "POST",
-            method = "POST",
-            Headers = headers,
-            headers = headers,
-            Body = body,
-            body = body
-        })
+        local okSend = pcall(function()
+            reqFunc({
+                Url = postUrl,
+                Method = "POST",
+                Headers = headers,
+                Body = body
+            })
+        end)
+
+        if not okSend then
+            pcall(function()
+                reqFunc({
+                    url = postUrl,
+                    method = "POST",
+                    headers = headers,
+                    body = body
+                })
+            end)
+        end
     end)
 end
 
@@ -14190,6 +14200,13 @@ createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo �
         ShowNotification("ntfy", "Vui lòng nhập ntfy Topic trước!", "WARN")
         return
     end
+    if not Config.NtfyEnabled then
+        Config.NtfyEnabled = true
+        if UIControllers.NtfyEnabled and UIControllers.NtfyEnabled.Set then
+            pcall(function() UIControllers.NtfyEnabled.Set(true, true) end)
+        end
+        SaveNotificationsConfig()
+    end
     ShowNotification("ntfy", "Đang gửi thông báo test đến điện thoại...", "INFO")
     task.spawn(function()
         local _, curWeather = secretBossState.DetectWeather()
@@ -14200,7 +14217,7 @@ createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo �
             tostring(game.JobId or "N/A"),
             os.date("%H:%M:%S - %d/%m/%Y")
         )
-        SendNtfyNotification("🔔 TEST NTFY - THỜI TIẾT SERVER", testMsg, 4, {"bell", "partly_sunny", "white_check_mark"})
+        SendNtfyNotification("🔔 TEST NTFY - THỜI TIẾT SERVER", testMsg, 4, {"bell", "partly_sunny", "white_check_mark"}, nil, true)
         ShowNotification("ntfy", "Đã gửi thông báo test! Hãy kiểm tra điện thoại của bạn.", "SUCCESS", 5)
     end)
 end)

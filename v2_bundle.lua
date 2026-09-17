@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.6.4"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.6.5"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {

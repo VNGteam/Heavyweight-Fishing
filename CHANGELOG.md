@@ -2,6 +2,17 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.5] - 2026-09-17
+### 🛠️ Sửa Lỗi Gửi Test ntfy & Khắc Phục Xung Đột Tham Số Request Trên Executor:
+1. **Khắc Phục Tận Gốc Lỗi Bấm Nút "Gửi Test" Không Nhận Được Thông Báo**:
+   - **Xóa bỏ xung đột key kép**: Trong bản v2.6.4, việc truyền đồng thời cả `Url` lẫn `url`, `Headers` lẫn `headers` trong cùng một bảng (table) đã khiến trình biên dịch C++ của một số executor mobile (Delta, Codex, Arceus X) báo lỗi cú pháp hoặc từ chối gửi gói tin HTTP.
+   - **Cơ chế dự phòng 2 tầng độc lập**: Tách thành 2 tầng gửi riêng biệt hoàn toàn. Bot thử bảng chuẩn `{ Url, Method, Headers, Body }` trước; nếu executor không hỗ trợ thì mới gọi tầng chữ thường `{ url, method, headers, body }`.
+   - **Tự động kích hoạt khi Test (`isTest = true`)**: Nút "Gửi Test" giờ đây tự động bật công tắc `NtfyEnabled = true` và đồng bộ UI, cho phép người dùng kiểm tra đường truyền thành công 100% ngay cả khi chưa kịp gạt công tắc bật ntfy.
+2. **Đồng Bộ Phiên Bản v2.6.5 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.5` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.4] - 2026-09-17
 ### 💎 Khắc Phục Triệt Để Lỗi Không Gửi Báo Cáo Ngược Về Điện Thoại Khi Nhận Lệnh:
 1. **Nguyên Nhân Kỹ Thuật (Tại Sao Nhận Được Lệnh Nhưng Không Trả Thông Báo Về Điện Thoại)**:
