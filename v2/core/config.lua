@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.0"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.5"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -20,6 +20,7 @@ ConfigModule.Config = {
     AnchorBar = true,
     AutoSlam = true,
     AutoCharge = true,
+    AutoRhythmHit = true,
     AntiStuckEnabled = false,
 
     -- Smart Combo V2
@@ -238,12 +239,21 @@ ConfigModule.Config = {
     AutoRejoin = true,
 
     -- Discord Webhook
-    WebhookUrl = "",
-    WebhookEnabled = false,
+    WebhookUrl = "https://discord.com/api/webhooks/1550111320592875582/avZ-iCes8u9LDAtW7hAwr8or-rVEgHC0WQrid8T1oNJDtwqBajDjpa7RhDZ2EWDdWjW3",
+    WebhookEnabled = true,
     WebhookNotifyBoss = true,
     WebhookNotifyNPC = true,
-    WebhookHourlyStats = false,
-    WebhookStatsInterval = 60,
+    WebhookHourlyStats = true,
+    WebhookNotifyTicketQuest = true,
+    WebhookStatsInterval = 30,
+    ReportKeybindsEnabled = true,
+    KeybindWeatherReport = Enum.KeyCode.F4,
+    KeybindInventoryReport = Enum.KeyCode.F6,
+    KeybindQuestReport = Enum.KeyCode.F7,
+    KeybindTeleportReport = Enum.KeyCode.F8,
+    DiscordRemoteEnabled = false,
+    DiscordBotToken = "",
+    DiscordChannelId = "1396490335269421238",
 
     -- Telegram Bot
     TelegramEnabled = false,
@@ -274,6 +284,7 @@ ConfigModule.ConfigLabelMap = {
     ["Tự Dùng Kỹ Năng Cần"] = "AutoSkills",
     ["Tự Động Đập Cần (Auto Slam)"] = "AutoSlam",
     ["Tự Động Sạc Dây (Auto Charge)"] = "AutoCharge",
+    ["Auto Rhythm Hit (Cá Octo)"] = "AutoRhythmHit",
     ["Tự Động Chống Kẹt Cần (Anti-Stuck)"] = "AntiStuckEnabled",
 
     ["Bật Combo Kỹ Năng Tự Động"] = "SmartComboEnabled",

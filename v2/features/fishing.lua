@@ -110,13 +110,60 @@ function Fishing.HandleMinigame(config, fUI)
         Fishing.lastProgressionTime = now
     end
 
-    -- Rhythm Hit (Octo minigame)
+    -- Rhythm Hit (Octo minigame) - Giống người thật: phản xạ có trễ, bấm khi note gần vùng hit
     if config.AutoRhythmHit and fUI:FindFirstChild("RhythmFrame") then
         local rFrame = fUI.RhythmFrame
         if rFrame.Visible and Events and Events:FindFirstChild("RhythmHit") then
+            -- Bảng nhớ các note đã "nhìn thấy" (để không bấm lại 2 lần cùng 1 note)
+            if not Fishing._rhythmSeenNotes then
+                Fishing._rhythmSeenNotes = {}
+                Fishing._rhythmLastClean = now
+            end
+
+            -- Dọn bảng nhớ mỗi 3 giây (khi note mới spawn chu kỳ mới)
+            if (now - Fishing._rhythmLastClean) > 3.0 then
+                Fishing._rhythmSeenNotes = {}
+                Fishing._rhythmLastClean = now
+            end
+
             for _, hitNote in ipairs(rFrame:GetChildren()) do
-                if hitNote.Name:find("Note") and hitNote.Visible then
-                    Events.RhythmHit:FireServer(hitNote.Name)
+                if hitNote.Name:find("Note") and hitNote:IsA("GuiObject") then
+                    local noteId = hitNote.Name .. tostring(hitNote.AbsolutePosition.X)
+
+                    -- Chỉ xử lý note chưa từng bấm
+                    if not Fishing._rhythmSeenNotes[noteId] then
+                        -- Kiểm tra note có đang ở gần vùng hit (X ~ 0.40 → 0.60 của frame)
+                        local noteX = hitNote.AbsolutePosition.X
+                        local frameW = rFrame.AbsoluteSize.X
+                        local frameX = rFrame.AbsolutePosition.X
+                        local relativeX = frameW > 0 and ((noteX - frameX) / frameW) or 0.5
+
+                        -- Note chạy từ phải sang trái → chỉ bấm khi note đã vào vùng 35%–65%
+                        if hitNote.Visible and relativeX >= 0.35 and relativeX <= 0.65 then
+                            Fishing._rhythmSeenNotes[noteId] = true
+
+                            -- Xác suất 6% "chậm tay" → bỏ qua note này (giống miss nhỏ của người thật)
+                            local missChance = math.random(1, 100)
+                            if missChance <= 6 then
+                                -- Bỏ qua, để note trôi qua (late miss)
+                            else
+                                -- Reaction time người thật: 120ms–280ms (ngẫu nhiên)
+                                local reactionDelay = 0.12 + math.random() * 0.16
+
+                                -- Jitter nhỏ ±20ms để timing không đều đặn hoàn hảo
+                                local jitter = (math.random() - 0.5) * 0.04
+
+                                task.delay(reactionDelay + jitter, function()
+                                    -- Xác nhận lại note vẫn còn trong frame (người thật cũng hủy nếu note đã qua)
+                                    if rFrame and rFrame.Visible and hitNote and hitNote.Visible then
+                                        pcall(function()
+                                            Events.RhythmHit:FireServer(hitNote.Name)
+                                        end)
+                                    end
+                                end)
+                            end
+                        end
+                    end
                 end
             end
         end
