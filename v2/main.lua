@@ -87,6 +87,13 @@ Shop.InitInventoryWatcher(Config)
 Weather.CheckWeatherHopOnJoin(Config)
 Spirits.CheckNPCHopOnJoin(Config)
 
+-- Áp dụng Fullbright ngay khi load (nếu bật sẵn)
+if Config.Fullbright then
+    Visuals.ApplyFullbright(true, Config)
+end
+-- Khởi động Anti-Glare (giữ sáng ổn định khi thời tiết đổi)
+Visuals.SetupAntiGlare(Config, State.connections)
+
 -- Lắng nghe tin nhắn chat để săn Secret Boss
 pcall(function()
     local TextChatService = game:GetService("TextChatService")

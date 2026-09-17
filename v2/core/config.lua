@@ -9,7 +9,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.6"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.7"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -222,6 +222,8 @@ ConfigModule.Config = {
     ClearFarVision = true,
     NoFog = false,
     Fullbright = false,
+    FullbrightLevel = 2.0,
+    FullbrightAntiGlare = true,
     PerformanceMode = false,
     HideGameUI = false,
     HideOverheadNames = false,
@@ -384,6 +386,8 @@ ConfigModule.ConfigLabelMap = {
     ["Tầm Nhìn Xa (Xóa Mờ Map)"] = "ClearFarVision",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
+    ["Mức Độ Sáng"] = "FullbrightLevel",
+    ["Chống Lóa Thời Tiết (Anti-Glare)"] = "FullbrightAntiGlare",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
     ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
     ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",

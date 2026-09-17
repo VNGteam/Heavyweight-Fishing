@@ -402,7 +402,7 @@ local LocalPlayer = Services.LocalPlayer
 
 local ConfigModule = {}
 
-ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.6"
+ConfigModule.SCRIPT_BUILD_COMMIT = "v2.8.7"
 
 -- 1. Full Config Table from backup.lua
 ConfigModule.Config = {
@@ -615,6 +615,8 @@ ConfigModule.Config = {
     ClearFarVision = true,
     NoFog = false,
     Fullbright = false,
+    FullbrightLevel = 2.0,
+    FullbrightAntiGlare = true,
     PerformanceMode = false,
     HideGameUI = false,
     HideOverheadNames = false,
@@ -777,6 +779,8 @@ ConfigModule.ConfigLabelMap = {
     ["Tầm Nhìn Xa (Xóa Mờ Map)"] = "ClearFarVision",
     ["Xóa Sương Mù & Mưa Bão"] = "NoFog",
     ["Sáng Màn Hình (Fullbright)"] = "Fullbright",
+    ["Mức Độ Sáng"] = "FullbrightLevel",
+    ["Chống Lóa Thời Tiết (Anti-Glare)"] = "FullbrightAntiGlare",
     ["Chế Độ Giảm Lag (Low GFX)"] = "PerformanceMode",
     ["Ẩn Giao Diện Gốc Của Game"] = "HideGameUI",
     ["Ẩn Tên Mặc Định Người Chơi"] = "HideOverheadNames",
@@ -4701,17 +4705,62 @@ function Visuals.EnsureESPFolder()
 end
 
 -- 2. Lighting Tweaks (Fullbright & Fog)
-function Visuals.ApplyFullbright(enabled)
+function Visuals.ApplyFullbright(enabled, config)
+    config = config or {}
     if enabled then
-        Lighting.Brightness = 2
+        local brightLevel = math.clamp(tonumber(config.FullbrightLevel) or 2.0, 1.0, 3.5)
+        Lighting.Brightness = brightLevel
+        Lighting.Ambient = Color3.fromRGB(140, 140, 140)
+        Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
         Lighting.ClockTime = 14
         Lighting.FogEnd = 100000
         Lighting.GlobalShadows = false
-        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.ExposureCompensation = 0
+        -- Giảm Atmosphere glare/haze
+        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
+        if atmo then
+            atmo.Density = 0.05
+            atmo.Haze = 0
+            atmo.Glare = 0
+        end
+        -- Giảm BloomEffect tránh chói
+        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
+        if bloom then
+            bloom.Intensity = 0.1
+            bloom.Size = 10
+        end
     else
-        Lighting.Brightness = 1
+        Lighting.Brightness = 2
+        Lighting.Ambient = Color3.fromRGB(70, 70, 70)
+        Lighting.OutdoorAmbient = Color3.fromRGB(70, 70, 70)
         Lighting.GlobalShadows = true
+        Lighting.ExposureCompensation = 0
+        local atmo = Lighting:FindFirstChildWhichIsA("Atmosphere")
+        if atmo then
+            atmo.Density = 0.3
+            atmo.Haze = 0.5
+        end
+        local bloom = Lighting:FindFirstChildWhichIsA("BloomEffect")
+        if bloom then
+            bloom.Intensity = 1
+        end
     end
+end
+
+-- Anti-Glare: kìm hãm ánh sáng khi thời tiết đổi (Sunny, Windy, v.v.)
+function Visuals.SetupAntiGlare(config, activeConnections)
+    local conn = Lighting.Changed:Connect(function(prop)
+        if not config.Fullbright or (config.FullbrightAntiGlare == false) then return end
+        if prop == "Brightness" and Lighting.Brightness > 3.0 then
+            Lighting.Brightness = math.clamp(tonumber(config.FullbrightLevel) or 2.0, 1.0, 3.5)
+        elseif prop == "ExposureCompensation" and Lighting.ExposureCompensation > 0.1 then
+            Lighting.ExposureCompensation = 0
+        end
+    end)
+    if activeConnections then
+        table.insert(activeConnections, conn)
+    end
+    return conn
 end
 
 function Visuals.ApplyClearVision(enabled)
@@ -7771,7 +7820,14 @@ function TabVisuals.Render(parent)
 
     Components.CreateToggleRow(cardLighting, "Sáng Màn Hình (Fullbright)", "Làm sáng toàn bản đồ, nhìn rõ dưới nước sâu", Config.Fullbright, function(v)
         Config.Fullbright = v
-        Visuals.ApplyFullbright(v)
+        Visuals.ApplyFullbright(v, Config)
+    end)
+    Components.CreateSliderRow(cardLighting, "Mức Độ Sáng", "Tùy chỉnh độ sáng theo mắt bạn (1.0 – 3.5)", 1.0, 3.5, Config.FullbrightLevel or 2.0, true, "x", function(v)
+        Config.FullbrightLevel = v
+        if Config.Fullbright then Visuals.ApplyFullbright(true, Config) end
+    end)
+    Components.CreateToggleRow(cardLighting, "Chống Lóa Thời Tiết (Anti-Glare)", "Tự động kìm hãm ánh sáng khi thời tiết đổi sang nắng chói", Config.FullbrightAntiGlare, function(v)
+        Config.FullbrightAntiGlare = v
     end)
     Components.CreateToggleRow(cardLighting, "Tầm Nhìn Xa (Xóa Mờ Map)", "Tắt hiệu ứng làm mờ xa (DepthOfField) & sương mù, nhìn rõ mọi hòn đảo từ xa", Config.ClearFarVision, function(v)
         Config.ClearFarVision = v
@@ -8241,6 +8297,13 @@ ConfigModule.LoadBossTargetsAndSyncUI(State.bossTogglesMap)
 Shop.InitInventoryWatcher(Config)
 Weather.CheckWeatherHopOnJoin(Config)
 Spirits.CheckNPCHopOnJoin(Config)
+
+-- Áp dụng Fullbright ngay khi load (nếu bật sẵn)
+if Config.Fullbright then
+    Visuals.ApplyFullbright(true, Config)
+end
+-- Khởi động Anti-Glare (giữ sáng ổn định khi thời tiết đổi)
+Visuals.SetupAntiGlare(Config, State.connections)
 
 -- Lắng nghe tin nhắn chat để săn Secret Boss
 pcall(function()
