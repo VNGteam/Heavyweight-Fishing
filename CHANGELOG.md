@@ -2,44 +2,20 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
-## [v2.6.1] - 2026-09-17
-### ⚡ Tái Cấu Trúc Toàn Diện Hệ Thống Xả Skill Minigame & Khắc Phục Triệt Để Lỗi Không Ra Chiêu:
-1. **Loại Bỏ Khóa Chặn Kỹ Năng Trong `comboState.CastSkill`**:
-   - Gỡ bỏ hoàn toàn logic chặn phím cũ trong `CastSkill` (`if curQ == "fish_100" and cleanKey ~= allowedQuick then return false`).
-   - Đảm bảo bất cứ khi nào hệ thống hoặc người chơi yêu cầu xuất chiêu (Z, X, C, V hay chiêu Hồi Máu Cứu Nguy), skill sẽ được bắn đi ngay lập tức mà không bao giờ bị trả về `false`.
-2. **Hợp Nhất Cơ Chế Minigame Vào Bộ Máy Cốt Lõi (Zero Latency Execution)**:
-   - Thay vì chạy một luồng bất đồng bộ riêng biệt (`isBusyRoutine`) chứa độ trễ 3 giây chờ thụ động khiến cá thường kết thúc minigame trước khi kịp xả chiêu, nhiệm vụ `fish_100` và `skill_100` nay được kết nối trực tiếp vào bộ máy minigame chính.
-   - Kỹ năng được kích hoạt ngay tức khắc từ 0.12s đầu tiên khi cá cắn câu.
-3. **Cơ Chế Tự Động Thích Ứng Cho Mọi Loại Cần Câu (Smart Skill Fallback)**:
-   - Nếu cần câu của người chơi không sở hữu phím chiêu được chỉ định (ví dụ: cần tân thủ chỉ có chiêu Z/X mà không có chiêu V), script tự động phát hiện nút không tồn tại và chuyển ngay sang chiêu khác có sẵn trên cần để xuất chiêu, tuyệt đối không bị đơ/ngưng trệ.
-4. **Nhận Diện Boss Siêu Cấp & Kích Hoạt Full Combo Tức Thì**:
-   - Khi phát hiện Boss (theo tên bí mật, thanh máu Boss hoặc máu >= 1500 HP), lập tức chuyển từ chế độ 1 chiêu sang **Full Combo Z, X, C, V** và duy trì xả chiêu liên tục theo nhịp hồi phục cho đến khi Boss gục ngã.
-5. **Cập Nhật Tiến Độ Nhiệm Vụ 100 Cá Thời Gian Thực**:
-   - Tự động ghi nhận và tăng tiến độ `fish_100` ngay khoảnh khắc minigame hoàn tất và cá được kéo lên balo.
-6. **Đồng Bộ Phiên Bản v2.6.1 Toàn Hệ Thống**:
-   - Cập nhật số phiên bản `v2.6.1` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), và [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua).
-
----
-
-## [v2.6.0] - 2026-09-17
-### ⚔️ Khắc Phục Lỗi Không Xài Skill Khi Gặp Boss Trong Nhiệm Vụ Vé (Ticket Quest Boss Skill Fix):
-1. **Phát Hiện Nguyên Nhân Gốc Rễ (Root Cause Analysis)**:
-   - Trong chu trình nhiệm vụ `fish_100` ("Câu 100 lần"), trước đây code chỉ cài đặt duy nhất 1 phím skill phụ (mặc định là `V`) vào danh sách combo và chỉ kích hoạt 1 lần duy nhất ở Bước 3.
-   - Đối với cá con/cá thường: Máu ít (vài chục đến vài trăm HP) nên chỉ cần 1 phát skill `V` là cá chết ngay lập tức, khiến người dùng thấy script vẫn xài skill bình thường.
-   - Đối với Boss: Máu Boss lên đến hàng chục nghìn / hàng triệu HP. Phát skill `V` duy nhất chỉ gãi ngứa. Sau đó bước vào Bước 4 (vòng lặp kéo cá kéo dài tối đa 25s), code cũ chỉ spam `Slam`, `Charge` và `UpdateFishProgression` mà **hoàn toàn KHÔNG xài thêm bất kỳ chiêu skill nào**, khiến Boss không chết và người chơi thấy như script không chịu xài skill.
-2. **Cơ Chế Nhận Diện Boss Thông Minh Tự Động (Smart Boss Detection)**:
-   - Tích hợp kiểm tra Boss toàn diện: `GetCurrentHookedFishName()`, tra cứu `Wiki.IsSecretBossFish`, `secretBossLookup`, `Config.SecretBossTargets`, nhận diện thanh máu `BossFightBar`, `BossBar`, `BossUI`, `BossHealth`, và ngưỡng máu `curHp >= 1500`.
-   - Ngay khi nhận diện là Boss: Tự động chuyển đổi danh sách chiêu thức từ 1 phím nhanh sang **Toàn Bộ Bộ Kỹ Năng Combo (Z, X, C, V)** từ `LoopSkills`.
-3. **Bổ Sung Vòng Lặp Xả Chiêu Liên Tục Trong Khi Kéo Cá (Continuous Pulling Skill Loop)**:
-   - Trong suốt thời gian kéo cá (Bước 4), hệ thống tự động kiểm tra cooldown và xả skill liên tục mỗi 0.15s.
-   - Tích hợp kỹ năng tự hồi máu khẩn cấp (`EmergencyHealSkill`) khi máu người chơi giảm thấp trong lúc giao tranh với Boss.
-   - Áp dụng đồng bộ cho cả 2 loại nhiệm vụ: `fish_100` (Câu 100 lần) và `skill_100` (Xài 100 lần skill).
-4. **Đồng Bộ Phiên Bản v2.6.0**:
-   - Cập nhật phiên bản lên `v2.6.0` trong [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua) và [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua).
-
----
-
 ## [v2.5.9] - 2026-09-17
+### 🔄 Rollback Về Bản Ổn Định v2.5.9 (Theo Yêu Cầu Người Dùng):
+1. **Khôi Phục Bản Build Ổn Định v2.5.9**:
+   - Hoàn tác toàn bộ các thay đổi minigame thử nghiệm của v2.6.0/v2.6.1.
+   - Giữ nguyên vẹn tính năng siêu cấp **Bảng Điều Khiển & Tra Cứu Toàn Bộ Cá Game (All Fish Master Controller & Encyclopedia)** của v2.5.9: danh mục 48+ loài cá, nút toggle autoCatch/autoSell cho từng loài cá, tự lưu vào file json `HeavyweightFishing_FishSettings.json`.
+2. **Khắc Phục Hoàn Toàn Vấn Đề Khóa Phím Chức Năng (Hotbar 1, 2, 3)**:
+   - Reset ngay lập tức `gs.SelectedObject = nil` sau khi tương tác thoại, ngăn chặn việc Roblox rơi vào chế độ UI focus chiếm quyền bàn phím.
+   - Không can thiệp tắt `GuiNavigationEnabled` toàn cục để đảm bảo các phím mở túi đồ, chọn cần (1, 2, 3) và menu game luôn hoạt động bình thường.
+3. **Đồng Bộ Số Hiệu Phiên Bản Toàn Diện (Build v2.5.9)**:
+   - Đồng bộ `v2.5.9` trên [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), và [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua).
+
+---
+
+## [v2.5.9-alpha] - 2026-09-17
 ### 📋 Ra Mắt Bảng Điều Khiển & Tra Cứu Toàn Bộ Cá Game (All Fish Master Controller & Encyclopedia):
 1. **Bảng Danh Mục Đầy Đủ 100% Các Loài Cá Trong Game (Toàn bộ 48+ Loài Từ Album/Index & Boss Realm)**:
    - Tích hợp ngay đầu Tab **Quản Lý Cá** (`tabFishManager`) với giao diện cuộn hiện đại, sang trọng và mượt mà.
