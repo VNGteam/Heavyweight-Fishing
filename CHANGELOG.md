@@ -2,6 +2,15 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.7.1] - 2026-09-17
+### ⏪ Hoàn Nguyên Về Cấu Trúc v2.6.1 (Bản Gửi Thông Báo Đẹp Gốc) + Các Bổ Sung Quan Trọng:
+1. **Khôi phục 100% cấu trúc bản v2.6.1** – Đây là bản user xác nhận gửi và nhận thông báo ntfy đẹp nhất, ổn định nhất. Toàn bộ hàm `SendNtfyNotification` và luồng xử lý được giữ nguyên vẹn.
+2. **Thêm `secretBossState.GetPlayerGems()`** – Hàm lấy số Gems an toàn, không làm crash script khi bấm nút Báo Cáo Server.
+3. **Thêm `secretBossState.SendServerStatusNtfyAlert()`** – Gửi báo cáo tình hình server về điện thoại đầy đủ (thời tiết, gems, job ID, teleport code).
+4. **Nút "Gửi Test" thông minh hơn** – Tự động bật NtfyEnabled nếu user chưa bật, hiển thị tên kênh đang gửi.
+
+---
+
 ## [v2.7.0] - 2026-09-17
 ### 💎 Khôi Phục Toàn Diện Cấu Trúc Gốc v2.6.3 & Khắc Phục Lỗi Lấy Gems:
 1. **Khôi Phục Toàn Bộ Hệ Thống ntfy Về Chuẩn Gốc v2.6.3 (Hoạt Động Ổn Định 100%)**:
