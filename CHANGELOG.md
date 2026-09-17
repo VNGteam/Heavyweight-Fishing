@@ -2,6 +2,17 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.7] - 2026-09-17
+### 🛡️ Cơ Chế Gửi ntfy Đa Tầng Tự Động (Dual-Layer Auto Fallback):
+1. **Khắc Phục Tận Gốc Sự Cố Mạng / Executor Không Nhận Thông Báo**:
+   - **Tầng 1 (Root JSON API)**: Gửi qua endpoint gốc `https://ntfy.sh` với cấu trúc JSON đầy đủ (tiêu đề tiếng Việt, biểu tượng cảm xúc, nút bấm hành động).
+   - **Tầng 2 (Topic URL Fallback)**: Nếu Tầng 1 trả về mã lỗi (>= 400) hoặc executor bị nghẽn mạng, bot sẽ **tự động chuyển hướng ngay lập tức** sang gửi trực tiếp qua URL Topic `https://ntfy.sh/<Topic>` bằng headers tiêu chuẩn. Đảm bảo thông báo không bao giờ bị rơi rụng.
+   - **Hiển thị kênh gửi trực quan**: Nút "Gửi Test" hiển thị rõ tên Topic đang gửi đến trên màn hình game để người dùng đối chiếu chính xác với app ntfy trên điện thoại.
+2. **Đồng Bộ Phiên Bản v2.6.7 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.7` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.6.6] - 2026-09-17
 ### ⚡ Khôi Phục Hoàn Toàn Hàm Gửi ntfy Chuẩn Mực & Sửa Triệt Để Báo Cáo Server:
 1. **Khôi Phục Cấu Trúc Request ntfy Ổn Định (Như Bản Hoạt Động Tốt Lúc 14h34)**:

@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.6.6"
+local SCRIPT_BUILD_COMMIT = "v2.6.7"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -4355,16 +4355,37 @@ function SendNtfyNotification(title, message, priorityLevel, tagList, customActi
             ["content-type"] = "application/json"
         }
 
-        -- ntfy JSON publishing BẮT BUỘC gửi tới root URL (https://ntfy.sh).
-        -- Tuyệt đối không nối thêm /cleanTopic vào URL kẻo ntfy hiểu nhầm toàn bộ JSON là văn bản thô!
+        -- 1. Gửi qua Root API URL (chuẩn ntfy hiển thị đẹp, có tiêu đề & icon)
         local postUrl = targetHost
+        local okSend, res = pcall(function()
+            return reqFunc({
+                Url = postUrl,
+                Method = "POST",
+                Headers = headers,
+                Body = body
+            })
+        end)
 
-        reqFunc({
-            Url = postUrl,
-            Method = "POST",
-            Headers = headers,
-            Body = body
-        })
+        local code = 200
+        if okSend and res and type(res) == "table" then
+            code = tonumber(res.StatusCode) or tonumber(res.status_code) or tonumber(res.Status) or 200
+        end
+
+        -- 2. Nếu gửi Root API gặp sự cố (mã lỗi >= 400 hoặc executor kẹt), tự động Fallback gửi trực tiếp tới URL Topic
+        if not okSend or code >= 400 then
+            pcall(function()
+                reqFunc({
+                    Url = targetHost .. "/" .. cleanTopic,
+                    Method = "POST",
+                    Headers = {
+                        ["Title"] = tostring(title or "Heavyweight Fishing"),
+                        ["Priority"] = tostring(priorityLevel or 3),
+                        ["Tags"] = table.concat(tagList or {"fishing_pole_and_fish"}, ",")
+                    },
+                    Body = tostring(message or "")
+                })
+            end)
+        end
     end)
 end
 
@@ -14191,7 +14212,7 @@ createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo �
         end
         SaveNotificationsConfig()
     end
-    ShowNotification("ntfy", "Đang gửi thông báo test đến điện thoại...", "INFO")
+    ShowNotification("ntfy", "Đang gửi thông báo test đến kênh: " .. tostring(clean) .. "...", "INFO", 4)
     task.spawn(function()
         local _, curWeather = secretBossState.DetectWeather()
         local testWeather = (curWeather and curWeather ~= "" and curWeather ~= "Clear") and curWeather or "Clear (Trời Quang)"
