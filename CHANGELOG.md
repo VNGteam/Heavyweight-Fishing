@@ -2,6 +2,20 @@
 
 Tất cả các bản cập nhật, sửa lỗi và nâng cấp tính năng đều được ghi nhận chi tiết tại đây theo đúng quy tắc dự án.
 
+## [v2.6.0] - 2026-09-17
+### 💾 Cơ Chế Tự Động Lưu Trữ & Chống Mất Link Thông Báo (ntfy, Webhook, Telegram) Khi Kill / Mở Lại Script:
+1. **Lưu Trữ Tức Thì Vào File Cấu Hình Riêng (`HeavyweightFishing_Notifications.json`)**:
+   - Mỗi khi người dùng nhập hoặc thay đổi bất kỳ ô thông tin nào (`ntfy Topic`, `Webhook URL`, `Telegram Bot Token`, `Telegram Chat ID`) hay gạt các công tắc thông báo, hệ thống sẽ tự động ghi đè an toàn vào file `HeavyweightFishing_Notifications.json`.
+   - Cơ chế ghi file có tích hợp bộ đệm (Debounce 0.3s) chống nghẽn I/O khi người dùng đang gõ phím liên tục.
+2. **Tự Động Nạp & Đồng Bộ Giao Diện 100% Khi Kill Mở Lại Script Hoặc Nhảy Server**:
+   - Khi script vừa khởi động (load), bot đọc ngay dữ liệu từ file local để nạp vào `Config` trước khi vẽ giao diện.
+   - Ngay sau khi giao diện khởi tạo xong, hệ thống tự động điền lại toàn bộ đường dẫn link / Topic vào ô TextBox và bật/tắt đúng trạng thái các nút gạt.
+   - **Cam kết**: Người chơi **KHÔNG BAO GIỜ BỊ MẤT** link Webhook, Token Telegram hay ntfy Topic dù kill script bao nhiêu lần hoặc chuyển server liên tục.
+3. **Đồng Bộ Phiên Bản v2.6.0 Toàn Hệ Thống**:
+   - Cập nhật số phiên bản `v2.6.0` trên toàn bộ file: [local.lua](file:///Users/vonguyengiap/Documents/script/local.lua), [v2/core/config.lua](file:///Users/vonguyengiap/Documents/script/v2/core/config.lua), [loader.lua](file:///Users/vonguyengiap/Documents/script/loader.lua), [loader_v2.lua](file:///Users/vonguyengiap/Documents/script/loader_v2.lua), [v2_bundle.lua](file:///Users/vonguyengiap/Documents/script/v2_bundle.lua).
+
+---
+
 ## [v2.5.9] - 2026-09-17
 ### 📱 Tích Hợp ntfy Push Notifications - Báo Cáo Thời Tiết & Server Trực Tiếp Về Điện Thoại:
 1. **Thông Báo Đẩy Thời Gian Thực Về Điện Thoại Qua App ntfy (iOS / Android)**:

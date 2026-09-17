@@ -95,7 +95,7 @@ local activeConnections = {}
 local cleanUpInstances = {}
 
 --// MÃ COMMIT BẢN BUILD HIỆN TẠI (NHÚNG TĨNH TRONG CODE, KHÔNG DÙNG MẠNG) //--
-local SCRIPT_BUILD_COMMIT = "v2.5.9"
+local SCRIPT_BUILD_COMMIT = "v2.6.0"
 
 local Events = ReplicatedStorage:FindFirstChild("Events")
 if not Events then
@@ -989,6 +989,76 @@ local function LoadBossTargetsAndSyncUI()
         end
     end)
 end
+
+-- ============================================================
+-- NOTIFICATIONS PERSISTENCE (HeavyweightFishing_Notifications.json)
+-- Tự động lưu/nạp Webhook, Telegram, ntfy Topic chống mất khi kill script
+-- ============================================================
+Config._notificationsFile = "HeavyweightFishing_Notifications.json"
+Config._notificationKeys = {
+    "WebhookUrl", "WebhookEnabled", "WebhookNotifyBoss", "WebhookNotifyNPC", "WebhookHourlyStats", "WebhookStatsInterval",
+    "TelegramEnabled", "TelegramBotToken", "TelegramChatId", "TelegramNotifyBoss", "TelegramNotifyNPC",
+    "NtfyEnabled", "NtfyTopic", "NtfyAlertWeatherChange", "NtfyAlertWeatherHop", "NtfyNotifyBoss"
+}
+
+Config._notifSavePending = false
+function SaveNotificationsConfig()
+    if not writefile then return end
+    if Config._notifSavePending then return end
+    Config._notifSavePending = true
+    task.delay(0.3, function()
+        Config._notifSavePending = false
+        local data = {}
+        for _, k in ipairs(Config._notificationKeys) do
+            data[k] = Config[k]
+        end
+        local ok, encoded = pcall(function() return HttpService:JSONEncode(data) end)
+        if ok and encoded then
+            pcall(function() writefile(Config._notificationsFile, encoded) end)
+        end
+    end)
+end
+
+function LoadNotificationsConfigAndSyncUI()
+    if not isfile or not isfile(Config._notificationsFile) or not readfile then return end
+    local ok, content = pcall(function() return readfile(Config._notificationsFile) end)
+    if not ok or not content or #content == 0 then return end
+    local decOk, data = pcall(function() return HttpService:JSONDecode(content) end)
+    if not decOk or type(data) ~= "table" then return end
+
+    -- Bước 1: Nạp trực tiếp vào Config
+    for _, k in ipairs(Config._notificationKeys) do
+        if data[k] ~= nil then
+            Config[k] = data[k]
+        end
+    end
+
+    -- Bước 2: Đồng bộ giao diện UIControllers
+    task.spawn(function()
+        task.wait(0.2)
+        for _, k in ipairs(Config._notificationKeys) do
+            local ctrl = UIControllers[k]
+            if ctrl and ctrl.Set and Config[k] ~= nil then
+                pcall(function() ctrl.Set(Config[k], true) end)
+            end
+        end
+    end)
+end
+
+-- Nạp ngay lúc khởi động để Config có sẵn dữ liệu trước khi vẽ UI
+pcall(function()
+    if isfile and isfile("HeavyweightFishing_Notifications.json") and readfile then
+        local ok, c = pcall(function() return readfile("HeavyweightFishing_Notifications.json") end)
+        if ok and c and #c > 0 then
+            local decOk, d = pcall(function() return HttpService:JSONDecode(c) end)
+            if decOk and type(d) == "table" then
+                for _, k in ipairs(Config._notificationKeys) do
+                    if d[k] ~= nil then Config[k] = d[k] end
+                end
+            end
+        end
+    end
+end)
 
 local Colors = {
     Background       = Color3.fromRGB(15, 12, 22),
@@ -13679,22 +13749,27 @@ local hookCard = createCardGroup(tabProfiles)
 
 createInputRow(hookCard, "Webhook URL", "Dán URL Webhook từ máy chủ Discord của bạn vào đây", Config.WebhookUrl or "", function(txt)
     Config.WebhookUrl = txt
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(hookCard, "Bật Webhook", "Kích hoạt gửi thông báo về Discord", Config.WebhookEnabled, function(v)
     Config.WebhookEnabled = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(hookCard, "Thông Báo Bắt Được Boss", "Gửi tin nhắn khi câu trúng hoặc bắt thành công Boss / Cá Thần Thoại", Config.WebhookNotifyBoss, function(v)
     Config.WebhookNotifyBoss = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(hookCard, "Thông Báo Đạo Sĩ (Taoist & Maoshan)", "Gửi tin nhắn JobId server khi phát hiện Đạo Sĩ (Taoist) hoặc Mao Sơn (Maoshan)", Config.WebhookNotifyNPC, function(v)
     Config.WebhookNotifyNPC = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(hookCard, "Báo Cáo Định Kỳ (Mỗi 30 Phút)", "Gửi bảng tổng kết thời gian treo máy, số cá và tiền kiếm được", Config.WebhookHourlyStats, function(v)
     Config.WebhookHourlyStats = v
+    SaveNotificationsConfig()
 end)
 
 createButtonRow(hookCard, "Kiểm Tra Webhook (Test)", "Gửi thử 1 thông báo mẫu về Discord ngay lập tức", "Gửi Test", function()
@@ -13728,22 +13803,27 @@ local teleCard = createCardGroup(tabProfiles)
 
 createInputRow(teleCard, "Telegram Bot Token", "Nhập mã Token bot tạo từ @BotFather trên Telegram", Config.TelegramBotToken or "", function(txt)
     Config.TelegramBotToken = txt
+    SaveNotificationsConfig()
 end)
 
 createInputRow(teleCard, "Telegram Chat ID", "Nhập mã Chat ID cuộc trò chuyện (lấy từ bot @userinfobot)", Config.TelegramChatId or "", function(txt)
     Config.TelegramChatId = txt
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(teleCard, "Bật Telegram Bot", "Kích hoạt gửi tin nhắn thông báo về ứng dụng Telegram trên điện thoại", Config.TelegramEnabled, function(v)
     Config.TelegramEnabled = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(teleCard, "Thông Báo Bắt Được Boss", "Gửi tin nhắn Telegram khi câu trúng hoặc bắt thành công Boss", Config.TelegramNotifyBoss, function(v)
     Config.TelegramNotifyBoss = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(teleCard, "Thông Báo Đạo Sĩ (Taoist & Maoshan)", "Gửi tin nhắn Telegram kèm JobId khi phát hiện Đạo Sĩ", Config.TelegramNotifyNPC, function(v)
     Config.TelegramNotifyNPC = v
+    SaveNotificationsConfig()
 end)
 
 createButtonRow(teleCard, "Kiểm Tra Telegram (Test)", "Gửi thử 1 tin nhắn test đến Telegram của bạn ngay lập tức", "Gửi Test", function()
@@ -13772,22 +13852,27 @@ local ntfyCard = createCardGroup(tabProfiles)
 
 createInputRow(ntfyCard, "ntfy Topic", "Nhập tên Topic đã đăng ký trên app ntfy (Ví dụ: my_weather_alert_88)", Config.NtfyTopic or "", function(txt)
     Config.NtfyTopic = txt
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(ntfyCard, "Bật ntfy Push", "Kích hoạt gửi thông báo đẩy đến điện thoại qua ntfy", Config.NtfyEnabled, function(v)
     Config.NtfyEnabled = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(ntfyCard, "Thông Báo Đổi Thời Tiết (ntfy)", "Gửi thông báo ngay khi thời tiết server đổi (Mưa, Bão, Sương Mù, Tuyết...)", Config.NtfyAlertWeatherChange, function(v)
     Config.NtfyAlertWeatherChange = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(ntfyCard, "Thông Báo Tìm Server Thời Tiết (ntfy)", "Gửi thông báo khi Weather Hop tìm được server có thời tiết mục tiêu", Config.NtfyAlertWeatherHop, function(v)
     Config.NtfyAlertWeatherHop = v
+    SaveNotificationsConfig()
 end)
 
 createToggleRow(ntfyCard, "Thông Báo Boss & NPC (ntfy)", "Gửi thông báo khi phát hiện Secret Boss hoặc Đạo Sĩ (Taoist & Maoshan)", Config.NtfyNotifyBoss, function(v)
     Config.NtfyNotifyBoss = v
+    SaveNotificationsConfig()
 end)
 
 createButtonRow(ntfyCard, "Kiểm Tra ntfy (Test)", "Gửi thử 1 thông báo đẩy mẫu về app ntfy trên điện thoại ngay lập tức", "Gửi Test", function()
@@ -16759,5 +16844,8 @@ pcall(LoadSmartComboAndSyncUI)
 
 -- Nạp trạng thái bật/tắt từng Secret Boss từ file local và đồng bộ UI toggle
 pcall(LoadBossTargetsAndSyncUI)
+
+-- Nạp cấu hình thông báo (ntfy, Webhook, Telegram) từ file local và đồng bộ UI
+pcall(LoadNotificationsConfigAndSyncUI)
 
 ShowNotification("VIỆT HOÁ V1.4", "Heavyweight Fishing đã cập nhật: Tự Động Tìm Server Thời Tiết, Totem Thời Tiết & Webhook!", "SUCCESS", 6)
