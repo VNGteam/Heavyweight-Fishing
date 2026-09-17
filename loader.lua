@@ -25,25 +25,25 @@ local SCRIPT_SOURCES = {
     -- Nguồn 1: GitHub Raw kèm anti-cache query
     {
         name = "GitHub Raw",
-        url = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/v2_bundle.lua?t=" .. tostring(tick())
+        url = "https://raw.githubusercontent.com/VNGteam/Heavyweight-Fishing/main/local.lua?t=" .. tostring(tick())
     },
-    -- Nguồn 2: jsDelivr CDN
+    -- Nguồn 2: jsDelivr CDN (Server CDN quốc tế, độ trễ cực thấp, không bị chặn bởi nhà mạng)
     {
         name = "jsDelivr Edge CDN",
-        url = "https://cdn.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/v2_bundle.lua"
+        url = "https://cdn.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/local.lua"
     },
     -- Nguồn 3: Fastly jsDelivr Fallback
     {
         name = "Fastly CDN",
-        url = "https://fastly.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/v2_bundle.lua"
+        url = "https://fastly.jsdelivr.net/gh/VNGteam/Heavyweight-Fishing@main/local.lua"
     }
 }
 
 -- Xác thực script hợp lệ (loại bỏ chuỗi lỗi "Timeout", HTML 403 hoặc rate limit)
 local function IsValidLuaScript(content)
     if not content or type(content) ~= "string" then return false end
-    -- v2_bundle.lua nặng > 300KB
-    if #content < 20000 then return false end
+    -- File local.lua thực tế nặng > 600KB
+    if #content < 30000 then return false end
     if not content:find("pcall") or not content:find("game") then return false end
     if content:sub(1, 10) == "{\"message\"" or content:find("API rate limit") then return false end
     return true
@@ -75,7 +75,7 @@ local function FetchScript()
 
     -- Dự phòng cuối cùng: GitHub REST API
     local apiOk, apiResult = pcall(function()
-        return game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/v2_bundle.lua?t=" .. tostring(tick()), true)
+        return game:HttpGet("https://api.github.com/repos/VNGteam/Heavyweight-Fishing/contents/local.lua?t=" .. tostring(tick()), true)
     end)
     if apiOk and apiResult and #apiResult > 1000 then
         local decOk, decoded = pcall(function()
